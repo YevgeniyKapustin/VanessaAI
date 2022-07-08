@@ -101,5 +101,6 @@ class Launcher(Conversation, Private):
         return msg
 
 
-Vanessa = Launcher()
-Vanessa.run()
+if __name__ == '__main__':
+    Vanessa = Launcher()
+    Vanessa.run()

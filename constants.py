@@ -17,7 +17,7 @@ zmiysphrases = [
     'не ну такое',
 ]
 
-heroscities = [
+herofractions = [
     'орден порядка',
     'инферно',
     'лесной союз',
@@ -58,5 +58,5 @@ img_carnage = 'photo-212138773_457239022'
 img_kringe = 'photo-212138773_457239023'
 img_zombi = 'photo-212138773_457239032'
 
-# sticker id
+# stickers id
 stick_clown = 60804

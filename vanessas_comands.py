@@ -1,7 +1,6 @@
 from constants import *
 
-# 'команда, которую понимает ванесса': 'её ответ'
-# то, что не сокрыто в скобочки находится в constants
+# 'command': 'response'
 text_commands = {
     'капуста': 'эхб',
     'тулик': anec,
@@ -48,10 +47,10 @@ stick_commands = {
     'лич': stick_clown,
 }
 
-# эти команды имеют сложный ответ, который вызывается в main
+# these are complex commands that are called in main
 helpful_commands = [
-    'фракция',       # 0
-    'д',             # 1
-    'навык',         # 2
-    'абоба',         # 3
+    'фракция',
+    'д',
+    'навык',
+    'абоба',
 ]

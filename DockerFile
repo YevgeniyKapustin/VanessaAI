@@ -1,9 +1,0 @@
-from python:3.8
-
-workdir /vanessa
-
-copy . /vanessa
-
-run pip install --no-cache-dir -r requirements.txt
-
-cmd ["python", "main.py"]

@@ -24,7 +24,7 @@ class Conversation(VanessasCore):
         self.api_session.messages.send(chat_id=chat_id, attachment=url, random_id=0)
 
     def __send_random_fraction(self, chat_id):
-        text = '🎲 ' + heroscities[randint(0, 7)]
+        text = '🎲 ' + herofractions[randint(0, 7)]
         self.api_session.messages.send(chat_id=chat_id, message=text, random_id=0)
 
     def __send_roll_dice(self, chat_id, msg):
@@ -71,11 +71,7 @@ class Conversation(VanessasCore):
             self.__send_text(chat_id, zmiysphrases[randint(0, 14)])
 
 
-class Private(VanessasCore):
-    pass
-
-
-class Launcher(Conversation, Private):
+class Launcher(Conversation):
 
     def run(self):
         print("Server started")

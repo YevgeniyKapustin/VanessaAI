@@ -1,9 +1,13 @@
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api import VkApi
 from random import randint
+import wikipedia
+from wikipedia import DisambiguationError
 
 from confidential_info import *
 from vanessas_comands import *
+
+wikipedia.set_lang("ru")
 
 
 class VanessasCore:
@@ -12,7 +16,7 @@ class VanessasCore:
     api_session = vk_session.get_api()
 
 
-class Conversation(VanessasCore):
+class Conference(VanessasCore):
 
     def __send_text(self, chat_id, text):
         self.api_session.messages.send(chat_id=chat_id, message=text, random_id=0)
@@ -34,6 +38,16 @@ class Conversation(VanessasCore):
         if msg.isdigit():
             msg = '🎲 {}'.format(randint(1, int(msg)))
             self.api_session.messages.send(chat_id=chat_id, message=msg, random_id=0)
+
+    def __send_wiki_article(self, chat_id, msg):
+        msg = msg.replace('что', '')
+        msg = msg.replace('такое', '')
+        if '?' in msg:
+            msg = msg.replace('?', '')
+        try:
+            self.api_session.messages.send(chat_id=chat_id, message=wikipedia.summary(msg, sentences=3), random_id=0)
+        except DisambiguationError:
+            self.api_session.messages.send(chat_id=chat_id, message='чота нету ничего', random_id=0)
 
     def message_definition(self, chat_id, msg):
         for i in indirect_gifs_command:
@@ -70,17 +84,31 @@ class Conversation(VanessasCore):
         elif msg == helpful_commands[3]:
             self.__send_text(chat_id, zmiysphrases[randint(0, 14)])
 
+        elif helpful_commands[4] in msg:
+            self.__send_wiki_article(chat_id, msg)
 
-class Launcher(Conversation):
+
+class Private(VanessasCore):
+    pass
+
+
+class Launcher(Conference, Private):
 
     def run(self):
         print("Server started")
         for event in self.longpoll.listen():
-            if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
-                chat_id = event.chat_id
-                msg = event.object.message['text'].lower()
-                msg = self.__message_filtering(msg)
-                self.message_definition(chat_id, msg)
+            if event.type == VkBotEventType.MESSAGE_NEW:
+                if event.from_chat:
+                    chat_id = event.chat_id
+                    msg = event.object.message['text'].lower()
+                    msg = self.__message_filtering(msg)
+                    self.message_definition(chat_id, msg)
+
+                # elif event.from_user:
+                #     user_id = event.user_id
+                #     msg = event.object.message['text'].lower()
+                #     msg = self.__message_filtering(msg)
+                #     self.message_definition(user_id, msg)
 
     @staticmethod
     def __message_filtering(msg):

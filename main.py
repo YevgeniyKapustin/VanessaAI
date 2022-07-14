@@ -2,7 +2,6 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api import VkApi
 from random import randint
 from wikipedia import summary, set_lang, PageError, DisambiguationError
-
 from confidential_info import *
 from vanessas_comands import *
 
@@ -44,7 +43,7 @@ class Conference(VanessasCore):
         if '?' in msg:
             msg = msg.replace('?', '')
         try:
-            self.api_session.messages.send(chat_id=chat_id, message=summary(msg, sentences=3), random_id=0)
+            self.api_session.messages.send(chat_id=chat_id, message=summary(msg, sentences=2), random_id=0)
         except PageError:
             self.api_session.messages.send(chat_id=chat_id, message='чота нету ничего', random_id=0)
         except DisambiguationError:
@@ -87,7 +86,8 @@ class Conference(VanessasCore):
         elif msg == helpful_commands[3]:
             self.__send_text(chat_id, zmiysphrases[randint(0, 14)])
 
-        elif helpful_commands[4] in msg:
+        elif helpful_commands[4] in msg[:9] or helpful_commands[5] in msg[:9] or helpful_commands[6] in msg[:9] or \
+                helpful_commands[7] in msg[:9]:
             self.__send_wiki_article(chat_id, msg)
 
 

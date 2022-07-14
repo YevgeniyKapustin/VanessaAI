@@ -92,11 +92,7 @@ class Conference(VanessasCore):
             self.__send_wiki_article(chat_id, msg)
 
 
-class Private(VanessasCore):
-    pass
-
-
-class Launcher(Conference, Private):
+class Launcher(Conference):
 
     def run(self):
         print("Server started")
@@ -107,13 +103,6 @@ class Launcher(Conference, Private):
                     msg = event.object.message['text'].lower()
                     msg = self.__message_filtering(msg)
                     self.message_definition(chat_id, msg)
-
-                elif event.to_me:
-                    user_id = event.user_id
-                    msg = event.object.message['text'].lower()
-                    print(user_id, msg)
-                    # msg = self.__message_filtering(msg)
-                    # self.message_definition(user_id, msg)
 
     @staticmethod
     def __message_filtering(msg):

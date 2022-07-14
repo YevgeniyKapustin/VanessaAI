@@ -2,7 +2,7 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api import VkApi
 from random import randint
 import wikipedia
-from wikipedia import DisambiguationError
+from wikipedia import PageError, DisambiguationError
 
 from confidential_info import *
 from vanessas_comands import *
@@ -46,8 +46,12 @@ class Conference(VanessasCore):
             msg = msg.replace('?', '')
         try:
             self.api_session.messages.send(chat_id=chat_id, message=wikipedia.summary(msg, sentences=3), random_id=0)
-        except DisambiguationError:
+        except PageError:
             self.api_session.messages.send(chat_id=chat_id, message='чота нету ничего', random_id=0)
+        except DisambiguationError:
+            self.api_session.messages.send(chat_id=chat_id,
+                                           message='ну, было много вариантов конечно, но я решила, что ничего не скажу',
+                                           random_id=0)
 
     def message_definition(self, chat_id, msg):
         for i in indirect_gifs_command:
@@ -104,11 +108,12 @@ class Launcher(Conference, Private):
                     msg = self.__message_filtering(msg)
                     self.message_definition(chat_id, msg)
 
-                # elif event.from_user:
-                #     user_id = event.user_id
-                #     msg = event.object.message['text'].lower()
-                #     msg = self.__message_filtering(msg)
-                #     self.message_definition(user_id, msg)
+                elif event.to_me:
+                    user_id = event.user_id
+                    msg = event.object.message['text'].lower()
+                    print(user_id, msg)
+                    # msg = self.__message_filtering(msg)
+                    # self.message_definition(user_id, msg)
 
     @staticmethod
     def __message_filtering(msg):

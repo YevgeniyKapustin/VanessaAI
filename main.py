@@ -1,13 +1,12 @@
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api import VkApi
 from random import randint
-import wikipedia
-from wikipedia import PageError, DisambiguationError
+from wikipedia import summary, set_lang, PageError, DisambiguationError
 
 from confidential_info import *
 from vanessas_comands import *
 
-wikipedia.set_lang("ru")
+set_lang("ru")
 
 
 class VanessasCore:
@@ -45,7 +44,7 @@ class Conference(VanessasCore):
         if '?' in msg:
             msg = msg.replace('?', '')
         try:
-            self.api_session.messages.send(chat_id=chat_id, message=wikipedia.summary(msg, sentences=3), random_id=0)
+            self.api_session.messages.send(chat_id=chat_id, message=summary(msg, sentences=3), random_id=0)
         except PageError:
             self.api_session.messages.send(chat_id=chat_id, message='чота нету ничего', random_id=0)
         except DisambiguationError:

@@ -43,15 +43,18 @@ class Conference(VanessasCore):
         if '?' in msg:
             msg = msg.replace('?', '')
         try:
+            print('начало')
             self.api_session.messages.send(chat_id=chat_id, message=summary(msg, sentences=2), random_id=0)
+            print('конец')
         except PageError:
             self.api_session.messages.send(chat_id=chat_id, message='чота нету ничего', random_id=0)
-        except DisambiguationError:
-            self.api_session.messages.send(chat_id=chat_id,
-                                           message='ну, было много вариантов конечно, но я решила, что ничего не скажу',
-                                           random_id=0)
+        # except DisambiguationError:
+        #     self.api_session.messages.send(chat_id=chat_id,
+        #                                    message='ну, было много вариантов конечно, но я решила, что ничего не скажу',
+        #                                    random_id=0)
 
     def message_definition(self, chat_id, msg):
+        print(msg)
         for i in indirect_gifs_command:
             if i in msg:
                 self.__send_file(chat_id, indirect_gifs_command[i])
@@ -77,9 +80,6 @@ class Conference(VanessasCore):
         elif msg == helpful_commands[0]:
             self.__send_random_fraction(chat_id)
 
-        elif helpful_commands[1] in msg:
-            self.__send_roll_dice(chat_id, msg)
-
         elif msg == helpful_commands[2]:
             self.__send_text(chat_id, position[randint(0, 3)])
 
@@ -88,7 +88,11 @@ class Conference(VanessasCore):
 
         elif helpful_commands[4] in msg[:9] or helpful_commands[5] in msg[:9] or helpful_commands[6] in msg[:9] or \
                 helpful_commands[7] in msg[:9]:
+            print('вики')
             self.__send_wiki_article(chat_id, msg)
+
+        elif helpful_commands[1] in msg:
+            self.__send_roll_dice(chat_id, msg)
 
 
 class Launcher(Conference):

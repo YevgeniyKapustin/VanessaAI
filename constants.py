@@ -38,6 +38,10 @@ position = [
     'низ право',
 ]
 
+# error response
+DisambiguationError_response = 'ну, было много вариантов конечно, но я решила, что ничего не скажу'
+PageError_response = 'чота нету ничего'
+
 # links to gifs
 gif_sus = 'doc465630601_633778583'
 gif_recruit_sus = 'doc465630601_638241402'
@@ -56,7 +60,16 @@ gif_bad = 'doc465630601_642603896'
 # links to img
 img_carnage = 'photo-212138773_457239022'
 img_kringe = 'photo-212138773_457239023'
-img_zombi = 'photo-212138773_457239032'
+img_zombie = 'photo-212138773_457239032'
+img_no_power = 'photo-212138773_457239033'
 
 # stickers id
 stick_clown = 60804
+
+# filter
+filterable_text = {
+    'ванесса'
+    'ванесса,'
+    '[club212138773|@vanessakapustovna]'
+    '[club212138773|@vanessakapustovna],'
+}

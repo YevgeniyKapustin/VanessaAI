@@ -40,7 +40,7 @@ img_commands = {
 }
 
 indirect_img_commands = {
-    'зомби в топе': img_zombi,
+    'зомби в топе': img_zombie,
 }
 
 stick_commands = {
@@ -54,7 +54,6 @@ helpful_commands = [
     'навык',
     'абоба',
     'что такое',
-    'кто такой',
-    'кто такая',
-    'кто такие',
+    'мут',
+    'размут',
 ]

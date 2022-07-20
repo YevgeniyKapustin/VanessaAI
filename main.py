@@ -36,7 +36,7 @@ class Conversation(VanessasCore):
 
     def __send_roll_dice(self, chat_id, msg):
         if msg.replace(dice, '').isdigit():
-            self.__send_text(chat_id, f'🎲 {randint(1, int(msg))}')
+            self.__send_text(chat_id, f'🎲 {randint(1, int(msg.replace(dice, "")))}')
 
     def __send_wiki_article(self, chat_id, msg):
         try:

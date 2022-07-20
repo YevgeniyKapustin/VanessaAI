@@ -44,16 +44,12 @@ indirect_img_commands = {
 }
 
 stick_commands = {
-    'лич': stick_clown,
+
 }
 
 # these are complex commands that are called in main
-helpful_commands = [
-    'фракция',
-    'д',
-    'навык',
-    'абоба',
-    'что такое',
-    'мут',
-    'размут',
-]
+aboba = 'абоба'
+dice = 'д'
+heroes_helper = ['фракция',  'навык']
+wiki = ['что такое', 'кто такая', 'кто такой']
+mute = ['мут', 'размут']

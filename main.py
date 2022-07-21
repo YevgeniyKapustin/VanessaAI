@@ -35,7 +35,7 @@ class Conversation(VanessasCore):
         self.__send_text(chat_id, f'🎲 {herofractions[randint(0, 7)]}')
 
     def __send_roll_dice(self, chat_id, msg):
-        if msg.replace(dice, '').isdigit():
+        if msg.replace(dice, '').isdigit() and msg.replace(dice, '') != '0':
             self.__send_text(chat_id, f'🎲 {randint(1, int(msg.replace(dice, "")))}')
 
     def __send_wiki_article(self, chat_id, msg):
@@ -47,44 +47,72 @@ class Conversation(VanessasCore):
             self.__send_text(chat_id, DisambiguationError_response)
 
     def __shut_up(self, chat_id, msg, peer_id, event):
+        members = self.__members_search(peer_id, chat_id)
+        if self.__from_check(event, members):
+            if not members:
+                return
+            victim_id = self.__victim_id_search(msg, event)
+            if victim_id == 'ub2121387' or victim_id == '-212138773':
+                self.__send_text(chat_id, 'я бы сказала, что это несколько возмутительно')
+                return
+            found = False
+            for member in members['items']:
+                try:
+                    if str(member['member_id']) == victim_id:
+                        found = True
+                        if member['is_admin']:
+                            self.__send_file(chat_id, img_no_power)
+                        return
+                except KeyError:
+                    pass
+                if not found:
+                    self.__send_text(chat_id, 'жертвы нету в этой беседе')
+                elif victim_id in self._shut_up_people:
+                    self.__send_text(chat_id, f'наш [id{victim_id}|друг] уже отдыхает')
+                    return
+                else:
+                    self._shut_up_people.append(victim_id)
+                    self.__send_text(chat_id, f'наш [id{victim_id}|друг] пока что отдохнет')
+                    return
+        else:
+            self.__send_file(chat_id, img_no_power)
+
+    def __redemption(self, chat_id, msg, event, peer_id):
+        members = self.__members_search(peer_id, chat_id)
+        if self.__from_check(event, members):
+            victim_id = self.__victim_id_search(msg, event)
+            if victim_id in self._shut_up_people:
+                self._shut_up_people.remove(victim_id)
+                self.__send_text(chat_id, f'[id{victim_id}|друг], ты свободен, наслаждайся жизнью и хорошего тебе дня')
+            else:
+                self.__send_text(chat_id, f'да не то чтобы он сильно замучен')
+        else:
+            self.__send_file(chat_id, img_no_power)
+
+    @staticmethod
+    def __from_check(event, members):
+        from_admin = False
+        member_id = event.object.message['from_id']
+        for member in members['items']:
+            try:
+                if member['member_id'] == member_id and member['is_admin']:
+                    from_admin = True
+                    return from_admin
+            except KeyError:
+                pass
+        return from_admin
+
+    def __members_search(self, peer_id, chat_id):
         try:
             members = self.api_session.messages.getConversationMembers(peer_id=peer_id)
         except ApiError:
             self.__send_text(chat_id, 'ну знаете, могли бы админку чтоле дать для начала')
             return
-        victim_id = self.__victim_id_search(msg, event)
-        if victim_id == 'ub2121387' or victim_id == '-212138773':
-            self.__send_text(chat_id, 'я бы сказала, что это несколько возмутительно')
-            return
-        found = False
-        for member in members['items']:
-            try:
-                if str(member['member_id']) == victim_id:
-                    found = True
-                    if member['is_admin']:
-                        self.__send_file(chat_id, img_no_power)
-                    return
-            except KeyError:
-                pass
-        if not found:
-            self.__send_text(chat_id, 'жертвы нету в этой беседе')
-        elif victim_id in self._shut_up_people:
-            self.__send_text(chat_id, f'наш [id{victim_id}|друг] уже отдыхает')
-            return
-        else:
-            self._shut_up_people.append(victim_id)
-            self.__send_text(chat_id, f'[id{victim_id}|друг] пока что отдохнет')
-            return
-
-    def __redemption(self, chat_id, msg):
-        victim_id = self.__id_definition_by_reference(msg.replace('размут', ''))
-        if victim_id in self._shut_up_people:
-            self._shut_up_people.remove(victim_id)
-            self.__send_text(chat_id, f'наш [id{victim_id}|друг], ты свободен, наслаждайся жизнью и хорошего тебе дня')
-        else:
-            self.__send_text(chat_id, f'да не то чтобы он сильно замучен')
+        return members
 
     def __victim_id_search(self, msg, event):
+        if 'раз' in msg:
+            msg = msg.replace('раз', '')
         msg = msg.replace('мут', '')
         if msg == '' and 'reply_message' in event.object.message:
             victim_id = str(event.object.message['reply_message']['from_id'])
@@ -128,7 +156,7 @@ class Conversation(VanessasCore):
             self.__shut_up(chat_id, msg, peer_id, event)
 
         elif msg[:6] == mute[1]:
-            self.__redemption(chat_id, msg)
+            self.__redemption(chat_id, msg, event, peer_id)
 
         for i in indirect_gifs_command:
             if i in msg:

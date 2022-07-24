@@ -65,15 +65,15 @@ class Conversation(VanessasCore):
                         return
                 except KeyError:
                     pass
-                if not found:
-                    self.__send_text(chat_id, 'жертвы нету в этой беседе')
-                elif victim_id in self._shut_up_people:
-                    self.__send_text(chat_id, f'наш [id{victim_id}|друг] уже отдыхает')
-                    return
-                else:
-                    self._shut_up_people.append(victim_id)
-                    self.__send_text(chat_id, f'наш [id{victim_id}|друг] пока что отдохнет')
-                    return
+            if not found:
+                self.__send_text(chat_id, 'жертвы нету в этой беседе')
+            elif victim_id in self._shut_up_people:
+                self.__send_text(chat_id, f'наш [id{victim_id}|друг] уже отдыхает')
+                return
+            else:
+                self._shut_up_people.append(victim_id)
+                self.__send_text(chat_id, f'наш [id{victim_id}|друг] пока что отдохнет')
+                return
         else:
             self.__send_file(chat_id, img_no_power)
 
@@ -161,10 +161,12 @@ class Conversation(VanessasCore):
         for i in indirect_gifs_command:
             if i in msg:
                 self.__send_file(chat_id, indirect_gifs_command[i])
+                return
 
         for i in indirect_img_commands:
             if i in msg:
                 self.__send_file(chat_id, indirect_img_commands[i])
+                return
 
 
 class Launcher(Conversation):

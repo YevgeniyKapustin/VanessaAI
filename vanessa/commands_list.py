@@ -1,9 +1,8 @@
-from constants import *
+from vanessa.links import *
 
 # 'command': 'response'
 text_commands = {
     'капуста': 'эхб',
-    'тулик': anec,
     'змий': 'гений',
     'матвей': 'мегахарош',
     'картошка': 'хороший чел, качественный',
@@ -48,8 +47,8 @@ stick_commands = {
 }
 
 # these are complex commands that are called in main
-aboba = 'абоба'
-dice = 'д'
+aboba_command = 'абоба'
+dice_command = 'д'
 heroes_helper = ['фракция',  'навык']
-wiki = ['что такое', 'кто такая', 'кто такой']
-mute = ['мут', 'размут']
+wiki_command = ['что такое', 'кто такая', 'кто такой']
+mute_command = ['мут', 'размут']

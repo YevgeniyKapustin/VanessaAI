@@ -19,11 +19,11 @@ class Vanessa(Mute):
         with open('serial_number.data', 'wb') as f:
             self.serial_number += 1
             dump(self.serial_number, f)
-        self.version = 'VanessaV2R'
+        self.version = 'V2R'
 
     def run(self):
-        print("Server started")
-        send_text(4, f'Здравствуйте, меня зовут Ванесса. А если быть точной {self.version}экземпляр{self.serial_number}')
+        print('Server started')
+        send_text(4, f'Здравствуйте, меня зовут {self.version}№{self.serial_number}. Но вы можете звать просто Ванесса.')
         for event in longpoll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 peer_id = event.object.message['peer_id']

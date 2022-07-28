@@ -1,6 +1,6 @@
 from vk_api import ApiError
 from vanessa.actions import send_text, send_file
-from vanessa.connection import api_session
+from vanessa.connection_to_vk.connection import vk
 from vanessa.links import img_no_power
 
 
@@ -77,7 +77,7 @@ class Mute:
     @staticmethod
     def __members_search(peer_id, chat_id):
         try:
-            members = api_session.messages.getConversationMembers(peer_id=peer_id)
+            members = vk.messages.getConversationMembers(peer_id=peer_id)
             return members
         except ApiError:
             send_text(chat_id, 'ну знаете, могли бы админку чтоле дать для начала')

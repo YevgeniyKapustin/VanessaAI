@@ -1,29 +1,22 @@
+import sys
+sys.path.append("..")
 from vk_api.bot_longpoll import VkBotEventType
-from vanessa.actions import send_text, remove_msg
-from vanessa.commands_logic.mute import Mute
-from vanessa.filtring import message_filtering
-from vanessa.navigation import response_definition
-from vanessa.connection import longpoll
-from pickle import dump, load
+from actions import remove_msg
+from commands_logic.mute import Mute
+from filtring import message_filtering
+from navigation import response_definition
+from vanessa.connection_to_vk.connection import longpoll
+from vanessa.vanessas_avatar.vanessa_look import VanessaAvatar
+from vanessa.settings import debug
 
 
 class Vanessa(Mute):
 
     def __init__(self):
         super().__init__()
-        try:
-            with open('serial_number.data', 'rb') as f:
-                self.serial_number = load(f)
-        except FileNotFoundError:
-            self.serial_number = 0
-        with open('serial_number.data', 'wb') as f:
-            self.serial_number += 1
-            dump(self.serial_number, f)
-        self.version = 'V2R'
 
     def run(self):
         print('Server started')
-        send_text(4, f'Здравствуйте, меня зовут {self.version}№{self.serial_number}. Но вы можете звать просто Ванесса.')
         for event in longpoll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 peer_id = event.object.message['peer_id']
@@ -36,4 +29,6 @@ class Vanessa(Mute):
 
 
 if __name__ == '__main__':
+    if not debug:
+        VanessaAvatar().refresh_avatar()
     Vanessa().run()

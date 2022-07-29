@@ -6,15 +6,16 @@ from vanessa.settings import debug
 
 
 class VanessaAvatar:
-
+    """a class for changing the avatar in the community of vanessa every time a new instance of vanessa is created"""
     def __init__(self):
-        self.version, self.serial_number = self.init_version_and_sn()
+        self.version, self.serial_number = self.__init_sn_and_version()
         if not debug:
             self.font = ImageFont.truetype("arial.ttf", 25)
             self.line_height = sum(self.font.getmetrics())
             self.upload = upload
 
     def refresh_avatar(self):
+        """replaces the old avatar with a new one and cleaning up all traces"""
         if not debug:
             self.__delete_avatar()
             self.__post_avatar()
@@ -22,7 +23,7 @@ class VanessaAvatar:
             raise Exception('Debug mode is true')
 
     @staticmethod
-    def init_version_and_sn():
+    def __init_sn_and_version() -> tuple:
         try:
             with open('serial_number.data', 'rb') as f:
                 serial_number = load(f)

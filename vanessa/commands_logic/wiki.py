@@ -4,6 +4,7 @@ set_lang('ru')
 
 
 def send_wiki_article(chat_id, msg):
+    """sends the article requested from wikipedia"""
     try:
         return send_text(chat_id, summary(msg.replace('что такое', ''), sentences=3))
     except PageError:

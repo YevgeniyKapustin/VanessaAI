@@ -46,7 +46,7 @@ stick_commands = {
 
 }
 
-# these are complex commands that are called in main
+# these are complex commands
 aboba_command = 'абоба'
 dice_command = 'д'
 heroes_helper = ['фракция',  'навык']

@@ -6,8 +6,8 @@ from commands_logic.mute import Mute
 from filtring import message_filtering
 from navigation import response_definition
 from vanessa.connection_to_vk.connection import longpoll
-from vanessa.vanessas_avatar.vanessa_look import VanessaAvatar
-from vanessa.settings import debug
+# from vanessa.vanessas_avatar.vanessa_look import VanessaAvatar
+# from vanessa.settings import debug  # not needed on the server
 
 
 class Vanessa(Mute):
@@ -29,6 +29,6 @@ class Vanessa(Mute):
 
 
 if __name__ == '__main__':
-    if not debug:
-        VanessaAvatar().refresh_avatar()
+    # if not debug:  # does not work on the server, my ip is needed
+    #     VanessaAvatar().refresh_avatar()
     Vanessa().run()

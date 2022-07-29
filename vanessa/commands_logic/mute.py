@@ -5,15 +5,16 @@ from vanessa.links import img_no_power
 
 
 class Mute:
-
+    """class for working with mutes and unmutes"""
     def __init__(self):
         self.shut_up_people = []
 
-    def shut_up(self, chat_id, msg, peer_id, event):
+    def shut_up(self, chat_id: int, msg: str, peer_id: int, event):
+        """allows conversation admins to mute a non-admin conversation participant"""
         members = self.__members_search(peer_id, chat_id)
-        if self.__from_check(event, members):
+        if self.__member_status_check(event, members):
             victim_id = self.__victim_id_search(msg, event)
-            if victim_id == 'ub2121387' or victim_id == '-212138773':
+            if victim_id == 'ub2121387' or victim_id == '-212138773':  # vanessa can't shut up
                 return send_text(chat_id, 'я бы сказала, что это несколько возмутительно')
             found = False
             for member in members['items']:
@@ -38,8 +39,9 @@ class Mute:
             return send_file(chat_id, img_no_power)
 
     def redemption(self, chat_id, msg, event, peer_id):
+        """allows an admin to remove a member's mute"""
         members = self.__members_search(peer_id, chat_id)
-        if self.__from_check(event, members):
+        if self.__member_status_check(event, members):
             victim_id = self.__victim_id_search(msg, event)
             if victim_id in self.shut_up_people:
                 self.shut_up_people.remove(victim_id)
@@ -58,11 +60,12 @@ class Mute:
         if msg == '' and 'reply_message' in event.object.message:
             victim_id = str(event.object.message['reply_message']['from_id'])
         else:
-            victim_id = self.__id_definition_by_reference(msg)
+            victim_id = self.__id_definition_by_mention(msg)
         return victim_id
 
     @staticmethod
-    def __from_check(event, members):
+    def __member_status_check(event, members) -> bool:
+        """returns true if the requester is an administrator"""
         from_admin = False
         member_id = event.object.message['from_id']
         for member in members['items']:
@@ -84,5 +87,5 @@ class Mute:
             return
 
     @staticmethod
-    def __id_definition_by_reference(reference):
-        return reference.strip()[3:12]
+    def __id_definition_by_mention(mention):
+        return mention.strip()[3:12]  # cut id from mention

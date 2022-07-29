@@ -4,7 +4,8 @@ from vanessa.commands_logic import randomize as rnd, mute
 from vanessa.commands_logic.wiki import send_wiki_article
 
 
-def response_definition(chat_id, msg, peer_id, event):
+def response_definition(chat_id: int, msg: str, peer_id: int, event):
+    """check for command detection"""
     if msg in text_commands:
         return send_text(chat_id, text_commands[msg])
 
@@ -21,7 +22,7 @@ def response_definition(chat_id, msg, peer_id, event):
         return rnd.send_random_fraction(chat_id)
 
     elif msg == heroes_helper[1]:
-        return send_text(chat_id, rnd.send_random_position(chat_id))
+        return send_text(chat_id, rnd.send_random_skill_position(chat_id))
 
     elif msg[:1] == dice_command:
         return rnd.send_roll_dice(chat_id, msg)

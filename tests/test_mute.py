@@ -19,7 +19,7 @@ def test_mute(chat_id, command, expect_response):
         members_mock.return_value = members
         with patch('vanessa.commands_logic.mute.Mute._Mute__victim_id_search') as victim_id_mock:
             victim_id_mock.return_value = '560930170'
-            with patch('vanessa.commands_logic.mute.Mute._Mute__from_check') as from_check_mock:
+            with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = True
                 assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
 
@@ -30,7 +30,7 @@ def test_mute_vanessa(chat_id, command, expect_response):
         members_mock.return_value = members
         with patch('vanessa.commands_logic.mute.Mute._Mute__victim_id_search') as victim_id_mock:
             victim_id_mock.return_value = '-212138773'
-            with patch('vanessa.commands_logic.mute.Mute._Mute__from_check') as from_check_mock:
+            with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = True
                 assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
 
@@ -41,7 +41,7 @@ def test_mute_admin(chat_id, command, expect_response):
         members_mock.return_value = members
         with patch('vanessa.commands_logic.mute.Mute._Mute__victim_id_search') as victim_id_mock:
             victim_id_mock.return_value = '465630601'
-            with patch('vanessa.commands_logic.mute.Mute._Mute__from_check') as from_check_mock:
+            with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = True
                 assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
 
@@ -52,6 +52,6 @@ def test_mute_from_not_admin(chat_id, command, expect_response):
         members_mock.return_value = members
         with patch('vanessa.commands_logic.mute.Mute._Mute__victim_id_search') as victim_id_mock:
             victim_id_mock.return_value = '560930170'
-            with patch('vanessa.commands_logic.mute.Mute._Mute__from_check') as from_check_mock:
+            with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = False
                 assert navigation.response_definition(chat_id, command, 0, 0) == expect_response

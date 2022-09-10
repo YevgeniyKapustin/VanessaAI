@@ -2,21 +2,22 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 from vanessa.connection_to_vk.connection import upload, vk_admin
 from pickle import dump, load
-from vanessa.settings import debug
+from vanessas_config import get_vanessas_config
+config = get_vanessas_config()
 
 
 class VanessaAvatar:
     """a class for changing the avatar in the community of vanessa every time a new instance of vanessa is created"""
     def __init__(self):
         self.version, self.serial_number = self.__init_sn_and_version()
-        if not debug:
+        if not config.get("settings", "debug"):
             self.font = ImageFont.truetype("arial.ttf", 25)
             self.line_height = sum(self.font.getmetrics())
             self.upload = upload
 
     def refresh_avatar(self):
         """replaces the old avatar with a new one and cleaning up all traces"""
-        if not debug:
+        if not config.get("settings", "debug"):
             self.__delete_avatar()
             self.__post_avatar()
         else:

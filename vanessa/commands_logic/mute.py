@@ -1,7 +1,7 @@
 from vk_api import ApiError
 from vanessa.actions import send_text, send_file
 from vanessa.connection_to_vk.connection import vk
-from vanessa.links import img_no_power
+from vanessa.default_commands.links import img_no_power
 
 
 class Mute:

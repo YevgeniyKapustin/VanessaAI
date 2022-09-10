@@ -1,4 +1,4 @@
-from vanessa import navigation
+from vanessa.navigation import Response
 from pytest import mark
 from mock import patch
 
@@ -21,7 +21,7 @@ def test_mute(chat_id, command, expect_response):
             victim_id_mock.return_value = '560930170'
             with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = True
-                assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
+                assert Response().response_definition(chat_id, command, 0, 0) == expect_response
 
 
 @mark.parametrize('chat_id, command, expect_response', test_cases[1])
@@ -32,7 +32,7 @@ def test_mute_vanessa(chat_id, command, expect_response):
             victim_id_mock.return_value = '-212138773'
             with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = True
-                assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
+                assert Response().response_definition(chat_id, command, 0, 0) == expect_response
 
 
 @mark.parametrize('chat_id, command, expect_response', test_cases[2])
@@ -43,7 +43,7 @@ def test_mute_admin(chat_id, command, expect_response):
             victim_id_mock.return_value = '465630601'
             with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = True
-                assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
+                assert Response().response_definition(chat_id, command, 0, 0) == expect_response
 
 
 @mark.parametrize('chat_id, command, expect_response', test_cases[2])
@@ -54,4 +54,4 @@ def test_mute_from_not_admin(chat_id, command, expect_response):
             victim_id_mock.return_value = '560930170'
             with patch('vanessa.commands_logic.mute.Mute._Mute__member_status_check') as from_check_mock:
                 from_check_mock.return_value = False
-                assert navigation.response_definition(chat_id, command, 0, 0) == expect_response
+                assert Response().response_definition(chat_id, command, 0, 0) == expect_response

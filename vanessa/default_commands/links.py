@@ -16,3 +16,5 @@ img_carnage = 'photo-212138773_457239022'
 img_kringe = 'photo-212138773_457239023'
 img_zombie = 'photo-212138773_457239032'
 img_no_power = 'photo-212138773_457239033'
+
+github = 'https://github.com/Kapusta-fairy/VKBot-Vanessa'

@@ -1,6 +1,5 @@
 from vanessa.actions import send_text
 from random import randint
-from vanessa.commands_list import dice_command
 
 zmiysphrases = [
     'эно как',
@@ -38,7 +37,8 @@ herofractions = [
 
 
 def send_roll_dice(chat_id: int, msg: str) -> str:
-    """sends the result from 1 to the number after 'd'"""
+    """sends the result from 1 to the number after 'Д'"""
+    dice_command = 'д'
     if msg.replace(dice_command, '').isdigit() and msg.replace(dice_command, '') != '0':
         return send_text(chat_id, f'🎲 {randint(1, int(msg.replace(dice_command, "")))}')
 

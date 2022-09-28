@@ -5,8 +5,14 @@ set_lang('ru')
 
 def send_wiki_article(chat_id, msg):
     """sends the article requested from wikipedia"""
+    if 'что такое' in msg:
+        msg.replace('что такое', '')
+    elif 'кто такой' in msg:
+        msg.replace('кто такой', '')
+    elif 'кто такая' in msg:
+        msg.replace('кто такая', '')
     try:
-        return send_text(chat_id, summary(msg.replace('что такое', ''), sentences=3))
+        return send_text(chat_id, summary(msg, sentences=3))
     except PageError:
         return send_text(chat_id, 'чота нету ничего')
     except DisambiguationError:

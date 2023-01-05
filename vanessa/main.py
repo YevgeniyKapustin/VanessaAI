@@ -8,16 +8,18 @@ from navigation import Response
 from vanessa.connection_to_vk.connection import longpoll
 
 
-class Vanessa(Mute):
+class Vanessa:
 
-    def run(self):
+    @staticmethod
+    def run():
         print('Server started')
         for event in longpoll.listen():
             response = Response()
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg = event.object.message
                 peer_id = msg['peer_id']
-                if str(msg['from_id']) in self.shut_up_people:
+                a = Mute.get_shut_up_people_list()
+                if str(msg['from_id']) in a:
                     remove_msg(peer_id, msg['conversation_message_id'])
                 else:
                     chat_id = event.chat_id

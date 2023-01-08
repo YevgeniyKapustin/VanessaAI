@@ -1,5 +1,4 @@
 import json
-
 from vk_api import ApiError
 from vanessa.actions import send_text, send_file
 from vanessa.connection_to_vk.connection import vk
@@ -45,8 +44,7 @@ class Mute:
         if self.__member_status_check(event, members):
             victim_id = self.__victim_id_search(msg, event)
             if victim_id in shut_up_people:
-                shut_up_people.remove(victim_id)
-                self.__supplement_shut_up_people_list(shut_up_people)
+                self.__remove_from_shut_up_people_list(victim_id)
                 send_text(chat_id, f'[id{victim_id}|друг], ты свободен, наслаждайся жизнью и хорошего тебе дня')
                 return f'[id{victim_id}|друг], ты свободен, наслаждайся жизнью и хорошего тебе дня'
             else:

@@ -64,6 +64,9 @@ class Response:
         elif msg == 'абоба':
             return rnd.send_random_zmiysphrases(chat_id)
 
+        elif msg == 'рарити':
+            return rnd.send_random_rarity(chat_id)
+
         elif msg == 'статистика игроков':
             return send_text(chat_id, Cabbagesite.get_players_winrate())
 

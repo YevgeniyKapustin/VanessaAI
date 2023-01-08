@@ -1,5 +1,6 @@
-from vanessa.actions import send_text
+from vanessa.actions import send_text, send_file
 from random import randint
+from vanessa.connection_to_vk.connection import vk, vk_admin
 
 zmiysphrases = [
     'эно как',
@@ -53,3 +54,9 @@ def send_random_skill_position(chat_id: int):
 
 def send_random_fraction(chat_id: int):
     return send_text(chat_id, f'🎲 {herofractions[randint(0, 7)]}')
+
+
+def send_random_rarity(chat_id: int):
+    photos = vk_admin.photos.get(owner_id='-41670861', album_id='269289093', count=1000)
+    random_choice = str(photos['items'][randint(0, 999)]['id'])
+    return send_file(chat_id, f'photo-41670861_{random_choice}')

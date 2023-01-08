@@ -1,5 +1,4 @@
 from vk_api import ApiError
-
 from vanessa.connection_to_vk.connection import vk
 
 

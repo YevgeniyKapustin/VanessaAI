@@ -1,5 +1,7 @@
 from sys import path
 path.append("..")
+from requests import ReadTimeout
+from requests.exceptions import ProxyError
 from vk_api.bot_longpoll import VkBotEventType
 from actions import remove_msg
 from commands_logic.mute import Mute
@@ -9,6 +11,14 @@ from vanessa.connection_to_vk.connection import longpoll
 
 
 class Vanessa:
+
+    def launch(self):
+        try:
+            self.run()
+        except ReadTimeout:
+            self.launch()
+        except ProxyError:
+            self.launch()
 
     @staticmethod
     def run():
@@ -28,4 +38,4 @@ class Vanessa:
 
 
 if __name__ == '__main__':
-    Vanessa().run()
+    Vanessa().launch()

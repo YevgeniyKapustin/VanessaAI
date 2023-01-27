@@ -1,6 +1,5 @@
 from sys import path
 path.append("..")
-path.append("...")
 from requests import ReadTimeout
 from requests.exceptions import ProxyError
 from vk_api.bot_longpoll import VkBotEventType

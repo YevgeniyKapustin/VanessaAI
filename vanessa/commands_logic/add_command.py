@@ -123,16 +123,18 @@ class Commands:
 
         if command_type == 'текст':
             index = 0
-        elif command_type == 'гиф':
+        elif command_type == 'текст_внутри':
             index = 1
-        elif command_type == 'гиф_внутри':
+        elif command_type == 'гиф':
             index = 2
-        elif command_type == 'изображение':
+        elif command_type == 'гиф_внутри':
             index = 3
-        elif command_type == 'изображение_внутри':
+        elif command_type == 'изображение':
             index = 4
-        elif command_type == 'стикер':
+        elif command_type == 'изображение_внутри':
             index = 5
+        elif command_type == 'стикер':
+            index = 6
         else:
             return ''
 

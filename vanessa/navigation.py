@@ -12,9 +12,9 @@ class Response:
         with open('commands.json', 'r') as f:
             self.commands = json.load(f)
         self.text_commands = self.commands[0]['text_commands']
-        self.text_commands = self.commands[1]['indirect_text_commands']
-        self.gifs_commands = self.commands[2]['gif_commands']
-        self.indirect_gifs_command = self.commands[3]['indirect_gif_commands']
+        self.indirect_text_commands = self.commands[1]['indirect_text_commands']
+        self.gif_commands = self.commands[2]['gif_commands']
+        self.indirect_gif_commands = self.commands[3]['indirect_gif_commands']
         self.img_commands = self.commands[4]['img_commands']
         self.indirect_img_commands = self.commands[5]['indirect_img_commands']
         self.stick_commands = self.commands[6]['stick_commands']
@@ -22,9 +22,9 @@ class Response:
     def response_definition(self, chat_id: int, msg: str, peer_id: int, event):
         """check for command detection"""
 
-        for i in self.indirect_gifs_command:
+        for i in self.indirect_gif_commands:
             if i in msg:
-                return send_file(chat_id, self.indirect_gifs_command[i])
+                return send_file(chat_id, self.indirect_gif_commands[i])
 
         for i in self.indirect_img_commands:
             if i in msg:
@@ -33,15 +33,15 @@ class Response:
         if msg in self.text_commands:
             return send_text(chat_id, self.text_commands[msg])
 
-        elif msg in self.gifs_commands:
-            return send_file(chat_id, self.gifs_commands[msg])
+        elif msg in self.gif_commands:
+            return send_file(chat_id, self.gif_commands[msg])
 
         elif msg in self.img_commands:
             return send_file(chat_id, self.img_commands[msg])
 
         elif msg in self.stick_commands:
             return send_stick(chat_id, self.stick_commands[msg])
-        # helpfull_commands
+        # helpful_commands
 
         elif msg == 'команды':
             return send_text(chat_id, Commands().get_commands())
@@ -82,12 +82,16 @@ class Response:
         elif msg[:1] == 'д':
             return rnd.send_roll_dice(chat_id, msg)
 
-        # end helpfull_commands
+        # end helpful_commands
         else:
-            for i in self.indirect_gifs_command:
+            for i in self.indirect_gif_commands:
                 if i in msg:
-                    return send_file(chat_id, self.indirect_gifs_command[i])
+                    return send_file(chat_id, self.indirect_gif_commands[i])
 
             for i in self.indirect_img_commands:
                 if i in msg:
                     return send_file(chat_id, self.indirect_img_commands[i])
+
+            for i in self.indirect_text_commands:
+                if i in msg:
+                    return send_text(chat_id, self.indirect_text_commands[i])

@@ -1,5 +1,6 @@
 import json
 from commands_logic.cabbagesite import Cabbagesite
+from commands_logic.add_command import Commands
 from vanessa.actions import *
 from vanessa.commands_logic import randomize as rnd, mute, add_command
 from vanessa.commands_logic.wiki import send_wiki_article
@@ -11,11 +12,12 @@ class Response:
         with open('commands.json', 'r') as f:
             self.commands = json.load(f)
         self.text_commands = self.commands[0]['text_commands']
-        self.gifs_commands = self.commands[1]['gifs_commands']
-        self.indirect_gifs_command = self.commands[2]['indirect_gifs_command']
-        self.img_commands = self.commands[3]['img_commands']
-        self.indirect_img_commands = self.commands[4]['indirect_img_commands']
-        self.stick_commands = self.commands[5]['stick_commands']
+        self.text_commands = self.commands[1]['indirect_text_commands']
+        self.gifs_commands = self.commands[2]['gif_commands']
+        self.indirect_gifs_command = self.commands[3]['indirect_gif_commands']
+        self.img_commands = self.commands[4]['img_commands']
+        self.indirect_img_commands = self.commands[5]['indirect_img_commands']
+        self.stick_commands = self.commands[6]['stick_commands']
 
     def response_definition(self, chat_id: int, msg: str, peer_id: int, event):
         """check for command detection"""
@@ -40,6 +42,10 @@ class Response:
         elif msg in self.stick_commands:
             return send_stick(chat_id, self.stick_commands[msg])
         # helpfull_commands
+
+        elif msg == 'команды':
+            return send_text(chat_id, Commands().get_commands())
+
         elif msg == 'фракция':
             return rnd.send_random_fraction(chat_id)
 

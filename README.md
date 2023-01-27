@@ -13,4 +13,4 @@
 - добавить команду помощь - показывает информацию о добавлении команд
 - команды - показывает полный список команд 
 ---
-![708e1eef4cc5eb972dcc40705dd7201b](https://user-images.githubusercontent.com/106178214/215072489-a71c1ae7-6388-4f2c-b266-90bb090c9c10.jpg)
+![изображение_2023-01-27_141308807_waifu2x_art_noise1 (1)_20230127112230_Cartoon_x4](https://user-images.githubusercontent.com/106178214/215074764-2a59dbf8-ea81-4ad9-b58b-52ed37507764.png)

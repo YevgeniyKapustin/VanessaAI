@@ -1,11 +1,13 @@
+import pytest
+
 from vanessa.response import Response
 from vanessa.commands_logic.randomize import *
 from vanessa.default_commands.links import *
-import pytest
+
 test_chat_id = 4
 banan = 'Бана́н — название съедобных плодов культивируемых растений рода Банан (Musa); обычно под таковыми понимают Musa acuminata и Musa × paradisiaca, а также Musa balbisiana, Musa fehi, Musa troglodytarum и ряд других. Также бананами могут называть плоды Ensete ventricosum (строго говоря, являющегося представителем другого рода семейства Банановые). С ботанической точки зрения банан является ягодой, многосеменной и толстокожей.'
 simple_commands = [
-    (test_chat_id, 'капуста', 'эхб'),
+    (test_chat_id, 'гитхаб', 'https://github.com/Kapusta-fairy/VKBot-Vanessa'),
     (test_chat_id, 'сус', gif_sus),
     (test_chat_id, 'бесплатно', gif_free),
     (test_chat_id, 'резня', img_carnage),
@@ -15,7 +17,8 @@ simple_commands = [
 
 @pytest.mark.parametrize('chat_id, command, expect_response', simple_commands)
 def test_simple_commands(chat_id, command, expect_response):
-    assert Response().response_definition(chat_id, command, 0, 0) == expect_response
+    assert Response().response_definition(chat_id, command, 0, 0)\
+           == expect_response
 
 
 @pytest.mark.parametrize('chat_id, command', [(test_chat_id, 'абоба')])

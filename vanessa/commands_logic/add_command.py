@@ -1,4 +1,4 @@
-from actions import send_text
+from vanessa.actions import send_text
 import json
 
 

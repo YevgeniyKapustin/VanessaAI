@@ -1,5 +1,7 @@
 from wikipedia import summary, PageError, DisambiguationError, WikipediaException, set_lang
+
 from vanessa.actions import send_text
+
 set_lang('ru')
 
 

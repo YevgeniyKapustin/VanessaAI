@@ -14,6 +14,7 @@ class Commands:
     ]
 
     def get_commands(self):
+        """Returns all commands written in commands.json"""
         with open('commands.json', 'r') as f:
             commands = json.load(f)
 

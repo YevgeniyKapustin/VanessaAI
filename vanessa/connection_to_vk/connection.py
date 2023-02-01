@@ -1,8 +1,10 @@
 from vk_api.bot_longpoll import VkBotLongPoll
-from vk_api import VkApi, VkUpload
 from vk_api.vk_api import VkApiGroup
-from vanessas_config import get_vanessas_config
-config = get_vanessas_config()
+from vk_api import VkApi, VkUpload
+
+from vanessa.vanessas_config import get_vanessa_config
+
+config = get_vanessa_config()
 
 vk_session = VkApiGroup(token=config.get("connection", "community_token"))
 vk = vk_session.get_api()

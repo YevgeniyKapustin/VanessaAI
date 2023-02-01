@@ -1,4 +1,4 @@
-from vanessa.navigation import Response
+from vanessa.response import Response
 from vanessa.commands_logic.randomize import *
 from vanessa.default_commands.links import *
 import pytest

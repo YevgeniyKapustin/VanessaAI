@@ -1,6 +1,7 @@
-from vanessa.actions import send_text, send_file
 from random import randint
-from vanessa.connection_to_vk.connection import vk, vk_admin
+
+from vanessa.actions import send_text, send_file
+from vanessa.connection_to_vk.connection import vk_admin
 
 zmiysphrases = [
     'эно как',
@@ -40,8 +41,10 @@ herofractions = [
 def send_roll_dice(chat_id: int, msg: str) -> str:
     """sends the result from 1 to the number after 'Д'"""
     dice_command = 'д'
-    if msg.replace(dice_command, '').isdigit() and msg.replace(dice_command, '') != '0':
-        return send_text(chat_id, f'🎲 {randint(1, int(msg.replace(dice_command, "")))}')
+    if msg.replace(dice_command, '').isdigit() and \
+            msg.replace(dice_command, '') != '0':
+        return send_text(chat_id,
+                         f'🎲 {randint(1, int(msg.replace(dice_command, "")))}')
 
 
 def send_random_zmiysphrases(chat_id: int):
@@ -57,6 +60,7 @@ def send_random_fraction(chat_id: int):
 
 
 def send_random_rarity(chat_id: int):
-    photos = vk_admin.photos.get(owner_id='-41670861', album_id='269289093', count=1000)
+    photos = vk_admin.photos.get(owner_id='-41670861', album_id='269289093',
+                                 count=1000)
     random_choice = str(photos['items'][randint(0, 999)]['id'])
     return send_file(chat_id, f'photo-41670861_{random_choice}')

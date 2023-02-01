@@ -1,5 +1,6 @@
 def message_filtering(msg: str):
-    """filters the message from the values specified in filterable_text and converts the message to lowercase"""
+    """Filters the message from the values specified in filterable_text
+     and converts the message to lowercase"""
     filterable_text = {
         'ванесса'
         'ванесса,'

@@ -1,13 +1,17 @@
 import os
+
 from PIL import Image, ImageDraw, ImageFont
-from vanessa.connection_to_vk.connection import upload, vk_admin
 from pickle import dump, load
+
 from vanessas_config import get_vanessas_config
+from vanessa.connection_to_vk.connection import upload, vk_admin
+
 config = get_vanessas_config()
 
 
 class VanessaAvatar:
-    """a class for changing the avatar in the community of vanessa every time a new instance of vanessa is created"""
+    """a class for changing the avatar in the community of vanessa every time
+    a new instance of vanessa is created"""
     def __init__(self):
         self.version, self.serial_number = self.__init_sn_and_version()
         if not config.get("settings", "debug"):
@@ -42,22 +46,30 @@ class VanessaAvatar:
         image.save(f'vanessas_avatar/vanessa_avatar{self.serial_number}.jpg')
 
     def __drawing_fontimage(self):
-        fontimage = Image.new('L', (self.font.getsize(self.version)[0], self.line_height))
-        ImageDraw.Draw(fontimage).text((0, 0), self.version, fill=255, font=self.font)
+        fontimage = Image.new('L', (self.font.getsize(self.version)[0],
+                                    self.line_height))
+        ImageDraw.Draw(fontimage).text((0, 0), self.version, fill=255,
+                                       font=self.font)
         return fontimage.rotate(25, resample=Image.BICUBIC, expand=True)
 
     def __post_avatar(self):
         self.__create_avatar()
-        upload.photo_profile(f'vanessas_avatar/vanessa_avatar{self.serial_number}.jpg', owner_id=-212138773)
+        upload.photo_profile(f'vanessas_avatar/vanessa_avatar'
+                             f'{self.serial_number}.jpg', owner_id=-212138773)
         last_post = vk_admin.wall.get(owner_id=-212138773, count=1)
         if last_post['items']:
-            vk_admin.wall.delete(owner_id=-212138773, post_id=last_post['items'][0]['id'])
+            vk_admin.wall.delete(owner_id=-212138773,
+                                 post_id=last_post['items'][0]['id'])
 
     def __delete_avatar(self):
         try:
-            os.remove(f'vanessas_avatar/vanessa_avatar{self.serial_number - 1}.jpg')
-            last_avatar = vk_admin.photos.get(owner_id=-212138773, album_id='profile', rev=1, count=1)
+            os.remove(f'vanessas_avatar/vanessa_avatar'
+                      f'{self.serial_number - 1}.jpg')
+            last_avatar = vk_admin.photos.get(owner_id=-212138773,
+                                              album_id='profile',
+                                              rev=1, count=1)
             if last_avatar['items']:
-                vk_admin.photos.delete(owner_id=-212138773, photo_id=last_avatar['items'][0]['id'])
+                vk_admin.photos.delete(owner_id=-212138773,
+                                       photo_id=last_avatar['items'][0]['id'])
         except FileNotFoundError:
             return

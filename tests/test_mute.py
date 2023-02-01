@@ -1,4 +1,4 @@
-from vanessa.navigation import Response
+from vanessa.response import Response
 from pytest import mark
 from mock import patch
 

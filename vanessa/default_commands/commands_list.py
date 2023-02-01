@@ -1,4 +1,5 @@
 import json
+
 from links import *
 # actually, the data is taken from json,
 # this file is only needed to store commands in case of a reset

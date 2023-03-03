@@ -18,11 +18,7 @@ from connection import Connection
 
 
 class Vanessa:
-    """The main class for the bot that implements its main work cycle.
-
-    methods:
-        launch: starts the bot run loop
-    """
+    """The main class for the bot that implements its main work cycle."""
 
     def __init__(self):
         self.__starting_counter = 0
@@ -76,6 +72,9 @@ class Vanessa:
                 peer_id = msg['peer_id']
 
                 if str(msg['from_id']) in Mute.get_shut_up_people_list():
+                    self.remove_msg(peer_id, msg['conversation_message_id'])
+                if str(msg['from_id']) == '86664766' and \
+                        msg['attachments']['type'] == 'video':
                     self.remove_msg(peer_id, msg['conversation_message_id'])
                 else:
                     chat_id = event.chat_id

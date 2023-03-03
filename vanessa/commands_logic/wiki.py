@@ -9,7 +9,7 @@ class Wikipedia:
     """Class for working with wikipedia articles"""
     def __init__(self):
         set_lang('ru')
-        self.send_text = Actions.send_text
+        self.send_text = Actions().send_text
 
     def send_wiki_article(self, chat_id, msg):
         """Sends the article requested from wikipedia"""

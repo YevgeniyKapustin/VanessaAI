@@ -49,9 +49,7 @@ class Response:
         self.stick_commands = self.commands[6]['stick_commands']
 
     def response_definition(self, chat_id: int, msg: str, peer_id: int, event):
-        """Checks whether the message matches the command and,
-        if it matches, calls the required method
-        """
+        """Causes questions to be checked for an answer"""
         self.chat_id = chat_id
         self.msg = msg
         self.peer_id = peer_id

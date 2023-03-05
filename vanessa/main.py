@@ -11,10 +11,10 @@ from requests.exceptions import ProxyError
 
 from vk_api.bot_longpoll import VkBotEventType
 
-from actions import Actions
+from basic_actions.actions import remove_msg
 from commands_logic.mute import Mute
-from response import Response
-from connection import Connection
+from basic_actions.response import Response
+from prepare.connection import Connection
 
 
 class Vanessa:
@@ -23,7 +23,6 @@ class Vanessa:
     def __init__(self):
         self.__starting_counter = 0
         self.__issue_that_occurred = 'No issue occurred'
-        self.remove_msg = Actions().remove_msg
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
@@ -51,11 +50,11 @@ class Vanessa:
 
         print(log)
 
-        if path.isfile('log.txt'):
-            with open('log.txt', 'r') as read_f:
+        if path.isfile('service_files/log.txt'):
+            with open('service_files/log.txt', 'r') as read_f:
                 previous_logs = read_f.read()
 
-        with open('log.txt', 'w') as write_f:
+        with open('service_files/log.txt', 'w') as write_f:
             write_f.write(f'{previous_logs}{log}\n')
 
     def __run(self):
@@ -72,10 +71,7 @@ class Vanessa:
                 peer_id = msg['peer_id']
 
                 if str(msg['from_id']) in Mute.get_shut_up_people_list():
-                    self.remove_msg(peer_id, msg['conversation_message_id'])
-                if str(msg['from_id']) == '86664766' and \
-                        msg['attachments']['type'] == 'video':
-                    self.remove_msg(peer_id, msg['conversation_message_id'])
+                    remove_msg(peer_id, msg['conversation_message_id'])
                 else:
                     chat_id = event.chat_id
                     msg = self.__message_filtering(msg['text'])

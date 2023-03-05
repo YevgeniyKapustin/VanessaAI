@@ -1,7 +1,7 @@
 from pytest import mark
 from mock import patch
 
-from vanessa.response import Response
+from vanessa.basic_actions.response import Response
 
 test_chat_id = 4
 test_cases = [

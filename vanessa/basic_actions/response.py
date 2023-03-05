@@ -2,12 +2,14 @@
 import json
 from os import path
 
-from commands_logic.cabbagesite import Cabbagesite
+from commands_logic.cabbagesite import get_players_winrate, \
+    get_fractions_winrate
 from commands_logic.add_command import Commands
 from commands_logic.mute import Mute
-from commands_logic.randomize import RandomCommands
-from commands_logic.wiki import Wikipedia
-from actions import Actions
+from commands_logic.randomize import send_random_fraction, \
+    send_random_zmiysphrases, send_random_rarity, send_roll_dice
+from commands_logic.wiki import send_wiki_article
+from basic_actions.actions import send_text, send_stick, send_file
 
 
 class Response:
@@ -18,12 +20,7 @@ class Response:
         self.peer_id = None
         self.event = None
 
-        self.send_text = Actions().send_text
-        self.send_file = Actions().send_file
-        self.send_stick = Actions().send_stick
-        self.rnd = RandomCommands()
-
-        if not path.isfile('commands.json'):
+        if not path.isfile('../service_files/commands.json'):
             default_json = [
                 {"text_commands": {}},
                 {"indirect_text_commands": {}},
@@ -33,10 +30,10 @@ class Response:
                 {"indirect_img_commands": {}},
                 {"stick_commands": {}}
             ]
-            with open('commands.json', 'w') as f:
+            with open('../service_files/commands.json', 'w') as f:
                 json.dump(default_json, f, indent=4)
 
-        with open('commands.json', 'r') as f:
+        with open('../service_files/commands.json', 'r') as f:
             self.commands = json.load(f)
 
         self.text_commands = self.commands[0]['text_commands']
@@ -61,46 +58,43 @@ class Response:
     def __check_json_commands(self):
         """Checking commands written in commands.json"""
         if self.msg in self.text_commands:
-            return self.send_text(self.chat_id, self.text_commands[self.msg])
+            return send_text(self.chat_id, self.text_commands[self.msg])
 
         elif self.msg in self.gif_commands:
-            return self.send_file(self.chat_id, self.gif_commands[self.msg])
+            return send_file(self.chat_id, self.gif_commands[self.msg])
 
         elif self.msg in self.img_commands:
-            return self.send_file(self.chat_id, self.img_commands[self.msg])
+            return send_file(self.chat_id, self.img_commands[self.msg])
 
         elif self.msg in self.stick_commands:
-            return self.send_stick(self.chat_id, self.stick_commands[self.msg])
+            return send_stick(self.chat_id, self.stick_commands[self.msg])
 
         for i in self.indirect_text_commands:
             if i in self.msg:
-                return self.send_text(self.chat_id,
-                                      self.indirect_text_commands[i])
+                return send_text(self.chat_id, self.indirect_text_commands[i])
 
         for i in self.indirect_gif_commands:
             if i in self.msg:
-                return self.send_file(self.chat_id,
-                                      self.indirect_gif_commands[i])
+                return send_file(self.chat_id, self.indirect_gif_commands[i])
 
         for i in self.indirect_img_commands:
             if i in self.msg:
-                return self.send_file(self.chat_id,
-                                      self.indirect_img_commands[i])
+                return send_file(self.chat_id, self.indirect_img_commands[i])
 
     def __check_special_commands(self):
         """Checking hard code commands"""
         if self.msg == 'команды':
-            return self.send_text(self.chat_id, Commands().get_commands())
+            return send_text(self.chat_id, Commands().get_commands())
 
         elif self.msg == 'фракция':
-            return self.rnd.send_random_fraction(self.chat_id)
+            return send_random_fraction(self.chat_id)
 
         elif self.msg[:9] in ['что такое', 'кто такая', 'кто такой']:
-            return Wikipedia().send_wiki_article(self.chat_id, self.msg)
+            return send_wiki_article(self.chat_id, self.msg)
 
         elif self.msg[:3] == 'мут':
-            return Mute.shut_up(Mute(), self.chat_id, self.msg,
-                                     self.peer_id, self.event)
+            return Mute().shut_up(self.chat_id, self.msg, self.peer_id,
+                                  self.event)
 
         elif self.msg[:6] == 'размут':
             return Mute.redemption(
@@ -123,20 +117,16 @@ class Response:
             )
 
         elif self.msg == 'абоба':
-            return self.rnd.send_random_zmiysphrases(self.chat_id)
+            return send_random_zmiysphrases(self.chat_id)
 
         elif self.msg == 'рарити':
-            return self.rnd.send_random_rarity(self.chat_id)
+            return send_random_rarity(self.chat_id)
 
         elif self.msg == 'статистика игроков':
-            return self.send_text(self.chat_id,
-                                  Cabbagesite.get_players_winrate())
+            return send_text(self.chat_id, get_players_winrate())
 
         elif self.msg == 'статистика фракций':
-            return self.send_text(
-                self.chat_id,
-                Cabbagesite.get_fractions_winrate()
-            )
+            return send_text(self.chat_id, get_fractions_winrate())
 
         elif self.msg[:1] == 'д':
-            return self.rnd.send_roll_dice(self.chat_id, self.msg)
+            return send_roll_dice(self.chat_id, self.msg)

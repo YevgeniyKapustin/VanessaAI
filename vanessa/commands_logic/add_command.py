@@ -1,12 +1,12 @@
 """Module for custom commands"""
-from vanessa.actions import Actions
+
 import json
+
+from basic_actions.actions import send_text
 
 
 class Commands:
     """Class for working with custom commands"""
-    def __init__(self):
-        self.send_text = Actions().send_text
 
     command_types = [
         'text_commands',
@@ -20,7 +20,7 @@ class Commands:
 
     def get_commands(self):
         """Returns all commands written in commands.json"""
-        with open('../commands.json', 'r') as f:
+        with open('../service_files/commands.json', 'r') as f:
             commands = json.load(f)
 
         response = ''
@@ -41,6 +41,8 @@ class Commands:
         размут* - выключает мут для этого пользователя(только для админов)
         гитхаб/github - ссылка на этот репозиторий
         добавить команду помощь - показывает информацию о добавлении команд
+        рарити - отправляет случайную рарити
+        абоба - абоба
         команды - показывает полный список команд'''
 
         return response
@@ -51,18 +53,18 @@ class Commands:
             index, command_type, msg = self._command_type_definition(msg,
                                                                      chat_id)
         except ValueError:
-            return self.send_text(chat_id, 'чета ты насусил братик')
+            return send_text(chat_id, 'чета ты насусил братик')
         if index == 'help':
             return ''
         msg = msg.split(':')
         try:
             request = msg[0].strip()
             if request == 'сус':
-                return self.send_text(chat_id, 'сус священен')
+                return send_text(chat_id, 'сус священен')
             elif 'добавить команду' in request:
-                return self.send_text(chat_id, 'неа')
+                return send_text(chat_id, 'неа')
             elif 'удалить команду' in request:
-                return self.send_text(chat_id, 'неа')
+                return send_text(chat_id, 'неа')
             response = msg[1].strip()
 
             if command_type == 'gifs_commands' or command_type == \
@@ -76,18 +78,17 @@ class Commands:
                 response = f'photo{attachment["owner_id"]}_{attachment["id"]}'
 
             if request and response and command_type:
-                with open('../commands.json', 'r') as f:
+                with open('../service_files/commands.json', 'r') as f:
                     commands = json.load(f)
                 commands[index][command_type][request] = response
 
-                with open('../commands.json', 'w') as f:
+                with open('../service_files/commands.json', 'w') as f:
                     json.dump(commands, f, indent=4)
-                return self.send_text(chat_id, f'команда {request} была '
-                                               f'добавлена')
+                return send_text(chat_id, f'команда {request} была добавлена')
             else:
-                return self.send_text(chat_id, 'чета ты насусил братик')
+                return send_text(chat_id, 'чета ты насусил братик')
         except IndexError:
-            return self.send_text(chat_id, 'чета ты насусил братик')
+            return send_text(chat_id, 'чета ты насусил братик')
 
     def remove_command(self, msg, chat_id):
         """Example: удалить команду текст_внутри вопрос"""
@@ -95,7 +96,7 @@ class Commands:
             index, command_type, msg = self._command_type_definition(msg,
                                                                      chat_id)
         except ValueError:
-            return self.send_text(chat_id, 'чета ты насусил братик')
+            return send_text(chat_id, 'чета ты насусил братик')
 
         if index == 'help':
             return ''
@@ -104,21 +105,21 @@ class Commands:
         request = msg[0].strip()
 
         if request == 'сус':
-            return self.send_text(chat_id, 'сус священен')
+            return send_text(chat_id, 'сус священен')
 
         if request and command_type:
-            with open('../commands.json', 'r') as f:
+            with open('../service_files/commands.json', 'r') as f:
                 commands = json.load(f)
             try:
                 commands[index][command_type].pop(request)
             except KeyError:
-                return self.send_text(chat_id, 'чета ты насусил братик')
-            with open('../commands.json', 'w') as f:
+                return send_text(chat_id, 'чета ты насусил братик')
+            with open('../service_files/commands.json', 'w') as f:
                 json.dump(commands, f, indent=4)
-            return self.send_text(chat_id, f'команда {request} была удалена')
+            return send_text(chat_id, f'команда {request} была удалена')
 
         else:
-            return self.send_text(chat_id, 'чета ты насусил братик')
+            return send_text(chat_id, 'чета ты насусил братик')
 
     def _command_type_definition(self, msg, chat_id):
         if msg == 'добавить команду помощь':
@@ -127,12 +128,12 @@ class Commands:
                        в случае ответа для гиф нужен его url, для стикера id \
                        типы команд: текст, гиф, изображение, стикер, ' \
                        'гиф_внутри, изображение_внутри'
-            self.send_text(chat_id, add_help)
+            send_text(chat_id, add_help)
 
             return 'help', 'help', 'help'
 
         msg = msg.lower().split(' ')
-        msg = self._filtring(msg)
+        msg = self._filtering(msg)
 
         try:
             command_type = msg[0]
@@ -199,7 +200,7 @@ class Commands:
             return f'"{command_type}" is not a command type'
 
     @staticmethod
-    def _filtring(msg):
+    def _filtering(msg):
         msg.remove('команду')
         if 'добавить' in msg:
             msg.remove('добавить')

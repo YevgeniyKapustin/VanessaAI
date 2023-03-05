@@ -4,8 +4,8 @@ from os import path
 
 from vk_api import ApiError
 
-from vanessa.actions import Actions
-from vanessa.connection import Connection
+from vanessa.basic_actions.actions import send_text, send_file
+from vanessa.prepare.connection import Connection
 
 
 class Mute:
@@ -14,9 +14,6 @@ class Mute:
     def __init__(self):
         self.img_no_power = ''
         self.vk = Connection().vk
-        self.actions = Actions()
-        self.send_text = self.actions.send_text
-        self.send_file = self.actions.send_file
 
     def shut_up(self, chat_id: int, msg: str, peer_id: int, event):
         """Allows conversation admins to mute a non-admin conversation
@@ -28,39 +25,37 @@ class Mute:
             victim_id = self.__victim_id_search(msg, event)
             # vanessa can't shut up
             if victim_id == 'ub2121387' or victim_id == '-212138773':
-                return self.send_text(chat_id, 'я бы сказала, что это '
-                                               'несколько возмутительно')
+                return send_text(chat_id, 'я бы сказала, что это '
+                                          'несколько возмутительно')
 
             found = False
 
             for member in members['items']:
-                # тут бы сделать что-то вроде бинарного поиска, элементов
-                # довольно много
                 try:
                     if str(member['member_id']) == victim_id:
                         found = True
                         if member['is_admin']:
-                            return self.send_file(chat_id, self.img_no_power)
+                            return send_file(chat_id, self.img_no_power)
                         break
                 except KeyError:
                     pass
 
             if not found:
-                return self.send_text(chat_id, 'жертвы нету в этой беседе')
+                return send_text(chat_id, 'жертвы нету в этой беседе')
 
             elif victim_id in self.get_shut_up_people_list():
-                self.send_text(chat_id,
-                               f'наш [id{victim_id}|друг] уже отдыхает')
+                send_text(chat_id,
+                          f'наш [id{victim_id}|друг] уже отдыхает')
                 return f'наш [id{victim_id}|друг] уже отдыхает'
 
             else:
                 self.__supplement_shut_up_people_list(victim_id)
-                self.send_text(chat_id,
-                               f'наш [id{victim_id}|друг] пока что отдохнет')
+                send_text(chat_id,
+                          f'наш [id{victim_id}|друг] пока что отдохнет')
                 return f'наш [id{victim_id}|друг] пока что отдохнет'
 
         else:
-            return self.send_file(chat_id, self.img_no_power)
+            return send_file(chat_id, self.img_no_power)
 
     def redemption(self, chat_id, msg, event, peer_id):
         """Allows an admin to remove a member's mute"""
@@ -71,7 +66,7 @@ class Mute:
             victim_id = self.__victim_id_search(msg, event)
             if victim_id in shut_up_people:
                 self.__remove_from_shut_up_people_list(victim_id)
-                self.send_text(
+                send_text(
                     chat_id,
                     f'[id{victim_id}|друг], ты свободен, наслаждайся жизнью и '
                     'хорошего тебе дня'
@@ -79,10 +74,10 @@ class Mute:
                 return f'[id{victim_id}|друг], ты свободен, наслаждайся ' \
                        f'жизнью и хорошего тебе дня'
             else:
-                self.send_text(chat_id, 'да не то чтобы он сильно замучен')
+                send_text(chat_id, 'да не то чтобы он сильно замучен')
                 return 'да не то чтобы он сильно замучен'
         else:
-            self.send_file(chat_id, self.img_no_power)
+            send_file(chat_id, self.img_no_power)
 
     @staticmethod
     def get_shut_up_people_list():
@@ -147,8 +142,8 @@ class Mute:
             return self.vk.messages.getConversationMembers(peer_id=peer_id)
 
         except ApiError:
-            return self.send_text(chat_id, 'ну знаете, могли бы админку чтоле '
-                                           'дать для начала')
+            return send_text(chat_id, 'ну знаете, могли бы админку чтоле '
+                                      'дать для начала')
 
     @staticmethod
     def __id_definition_by_mention(mention):

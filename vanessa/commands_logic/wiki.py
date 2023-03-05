@@ -1,30 +1,26 @@
 """Module for working with wikipedia"""
-from wikipedia import summary, PageError, DisambiguationError, \
-    WikipediaException, set_lang
+from wikipedia import summary, set_lang, PageError, DisambiguationError, \
+    WikipediaException
 
-from vanessa.actions import Actions
+from vanessa.basic_actions.actions import send_text
+
+set_lang('ru')
 
 
-class Wikipedia:
-    """Class for working with wikipedia articles"""
-    def __init__(self):
-        set_lang('ru')
-        self.send_text = Actions().send_text
-
-    def send_wiki_article(self, chat_id, msg):
-        """Sends the article requested from wikipedia"""
-        if 'что такое' in msg:
-            msg = msg.replace('что такое', '')
-        elif 'кто такой' in msg:
-            msg = msg.replace('кто такой', '')
-        elif 'кто такая' in msg:
-            msg = msg.replace('кто такая', '')
-        try:
-            return self.send_text(chat_id, summary(msg, sentences=3))
-        except PageError:
-            return self.send_text(chat_id, 'чота нету ничего')
-        except DisambiguationError:
-            return self.send_text(chat_id, 'ну, было много вариантов конечно, '
-                                           'но я решила, что ничего не скажу')
-        except WikipediaException:
-            return self.send_text(chat_id, 'сусня какая-то')
+def send_wiki_article(chat_id, msg):
+    """Sends the article requested from wikipedia"""
+    if 'что такое' in msg:
+        msg = msg.replace('что такое', '')
+    elif 'кто такой' in msg:
+        msg = msg.replace('кто такой', '')
+    elif 'кто такая' in msg:
+        msg = msg.replace('кто такая', '')
+    try:
+        return send_text(chat_id, summary(msg, sentences=3))
+    except PageError:
+        return send_text(chat_id, 'чота нету ничего')
+    except DisambiguationError:
+        return send_text(chat_id, 'ну, было много вариантов конечно, но я '
+                                  'решила, что ничего не скажу')
+    except WikipediaException:
+        return send_text(chat_id, 'сусня какая-то')

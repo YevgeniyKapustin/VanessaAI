@@ -22,7 +22,7 @@ class Vanessa:
 
     def __init__(self):
         self.__starting_counter = 0
-        self.__issue_that_occurred = 'No issue occurred'
+        self.__issue = 'No issue occurred'
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
@@ -33,19 +33,17 @@ class Vanessa:
             self.__starting_counter += 1
 
             self.__log_about_launch()
-            self.__issue_that_occurred = 'No issue occurred'
+            self.__issue = 'No issue occurred'
 
             try:
                 self.__run()
-            except ReadTimeout:
-                self.__issue_that_occurred = 'ReadTimeout'
-            except ProxyError:
-                self.__issue_that_occurred = 'ProxyError'
+            except ReadTimeout or ProxyError as issue:
+                self.__issue = issue
 
     def __log_about_launch(self):
         """Print launch information and writes to log.txt."""
         log = f'Server started # {self.__starting_counter} {datetime.now()} ' \
-              f'issue: {self.__issue_that_occurred}'
+              f'issue: {self.__issue}'
         previous_logs = ''
 
         print(log)

@@ -20,7 +20,7 @@ class Response:
         self.peer_id = None
         self.event = None
 
-        if not path.isfile('../service_files/commands.json'):
+        if not path.isfile('./service_files/commands.json'):
             default_json = [
                 {"text_commands": {}},
                 {"indirect_text_commands": {}},
@@ -30,10 +30,10 @@ class Response:
                 {"indirect_img_commands": {}},
                 {"stick_commands": {}}
             ]
-            with open('../service_files/commands.json', 'w') as f:
+            with open('./service_files/commands.json', 'w') as f:
                 json.dump(default_json, f, indent=4)
 
-        with open('../service_files/commands.json', 'r') as f:
+        with open('./service_files/commands.json', 'r') as f:
             self.commands = json.load(f)
 
         self.text_commands = self.commands[0]['text_commands']

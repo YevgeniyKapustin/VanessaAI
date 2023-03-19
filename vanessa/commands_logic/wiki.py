@@ -2,7 +2,7 @@
 from wikipedia import summary, set_lang, PageError, DisambiguationError, \
     WikipediaException
 
-from vanessa.basic_actions.actions import send_text
+from basic_actions.actions import send_text
 
 set_lang('ru')
 

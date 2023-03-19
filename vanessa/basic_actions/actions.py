@@ -1,7 +1,7 @@
 """Contains the basic actions for VK api."""
 from vk_api import ApiError
 
-from vanessa.prepare.connection import Connection
+from prepare.connection import Connection
 
 _vk = Connection().vk
 

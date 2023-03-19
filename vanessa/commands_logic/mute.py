@@ -4,8 +4,8 @@ from os import path
 
 from vk_api import ApiError
 
-from vanessa.basic_actions.actions import send_text, send_file
-from vanessa.prepare.connection import Connection
+from basic_actions.actions import send_text, send_file
+from prepare.connection import Connection
 
 
 class Mute:

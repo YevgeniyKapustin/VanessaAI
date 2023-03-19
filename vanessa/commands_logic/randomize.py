@@ -1,8 +1,8 @@
 """Contains various functions that somehow use random"""
 from random import randint
 
-from vanessa.basic_actions.actions import send_text, send_file
-from vanessa.prepare.connection import Connection
+from basic_actions.actions import send_text, send_file
+from prepare.connection import Connection
 
 _vk_admin = Connection().vk_admin
 

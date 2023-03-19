@@ -16,7 +16,8 @@ def send_wiki_article(chat_id, msg):
     elif 'кто такая' in msg:
         msg = msg.replace('кто такая', '')
     try:
-        return send_text(chat_id, summary(msg, sentences=3))
+        response = summary(msg, chars=400)
+        return send_text(chat_id, response[:response.rfind('.')-1])
     except PageError:
         return send_text(chat_id, 'чота нету ничего')
     except DisambiguationError:

@@ -16,12 +16,11 @@ def send_wiki_article(chat_id, msg):
     elif 'кто такая' in msg:
         msg = msg.replace('кто такая', '')
     try:
-        response = summary(msg, chars=400)
-        return send_text(chat_id, response[:response.rfind('.')-1])
+        response = summary(msg, chars=400)[::-1][3:][::-1]
+        return send_text(chat_id, f'{response[:response.rfind(".")]}.')
     except PageError:
         return send_text(chat_id, 'чота нету ничего')
-    except DisambiguationError:
-        return send_text(chat_id, 'ну, было много вариантов конечно, но я '
-                                  'решила, что ничего не скажу')
+    except DisambiguationError as error:
+        send_wiki_article(chat_id, error.options[0])
     except WikipediaException:
         return send_text(chat_id, 'сусня какая-то')

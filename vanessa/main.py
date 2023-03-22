@@ -1,8 +1,8 @@
 """The main module of the bot, containing the methods for launching it.
 
 For questions, you can contact me at:
-VK - https://vk.com/kapystageniy
-TG - @kapustaevg
+VK - https://vk.com/kapystaevg
+TG - @kapustaevg03
 """
 from datetime import datetime
 from os import path
@@ -22,7 +22,7 @@ class Vanessa:
 
     def __init__(self):
         self.__starting_counter = 0
-        self.__issue = 'No issue occurred'
+        self.__exception = 'No issue occurred'
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
@@ -33,17 +33,17 @@ class Vanessa:
             self.__starting_counter += 1
 
             self.__log_about_launch()
-            self.__issue = 'No issue occurred'
+            self.__exception = 'No exception occurred'
 
             try:
                 self.__run()
-            except ReadTimeout or ProxyError as issue:
-                self.__issue = issue
+            except ReadTimeout or ProxyError as exception:
+                self.__exception = exception
 
     def __log_about_launch(self):
         """Print launch information and writes to log.txt."""
         log = f'Server started # {self.__starting_counter} {datetime.now()} ' \
-              f'issue: {self.__issue}'
+              f'issue: {self.__exception}'
         previous_logs = ''
 
         print(log)
@@ -62,7 +62,6 @@ class Vanessa:
         Else it sends msg to the response definition for response_definition.
         """
         for event in Connection().longpoll.listen():
-            response = Response()
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg = event.object.message
@@ -73,7 +72,7 @@ class Vanessa:
                 else:
                     chat_id = event.chat_id
                     msg = self.__message_filtering(msg['text'])
-                    response.response_definition(chat_id, msg, peer_id, event)
+                    Response(chat_id, msg, peer_id, event).definition()
 
     @staticmethod
     def __message_filtering(msg: str):

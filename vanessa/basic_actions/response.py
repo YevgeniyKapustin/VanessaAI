@@ -1,3 +1,4 @@
+from basic_actions.database import DataBase
 from commands_logic.cabbagesite import get_players_winrate, \
     get_fractions_winrate
 from commands_logic.add_command import Commands
@@ -6,12 +7,12 @@ from commands_logic.randomize import send_random_fraction, \
     send_random_zmiysphrases, send_random_rarity, send_roll_dice
 from commands_logic.wiki import send_wiki_article
 from basic_actions.actions import send_text, send_stick, send_file
-from basic_actions.database import DataBase
 
 
-class Response:
+class Response(object):
     """The intermediary class between commands and responses."""
-    def __init__(self, chat_id: int, msg: str, peer_id: int, event: object):
+    def __init__(self, chat_id: int, msg: str, peer_id: int, event):
+        super().__init__()
         self.chat_id = chat_id
         self.msg = msg
         self.peer_id = peer_id
@@ -24,13 +25,10 @@ class Response:
             self.__check_db_commands()
 
     def __check_db_commands(self):
-
-        data = self.db.get_response(self.msg)
-
-        if data:
+        if self.db.get_response(self.msg):
             return self.__send_choice()
 
-        for i in self.db.get_all_contextual():
+        for i in self.db.get_all_commands():
             if i in self.msg:
                 return self.__send_choice()
 

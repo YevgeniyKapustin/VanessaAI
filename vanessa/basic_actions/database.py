@@ -7,7 +7,6 @@ class DataBase(object):
     def __init__(self):
         with sql.connect('vanessa.db') as connect:
             self.cursor = connect.cursor()
-
             self.__tables_validation()
 
     def set_command(self, _type, strategy, request, response):
@@ -19,14 +18,14 @@ class DataBase(object):
     def get_response(self, request):
         try:
             self.cursor.execute(f'''SELECT response, type FROM commands 
-            WHERE request == "{request}"''')
+            WHERE request == "{request}" ''')
             return self.cursor.fetchone()
         except OperationalError:
             return None
 
-    def get_all_contextual(self):
-        self.cursor.execute('''SELECT response, type FROM commands 
-        WHERE strategy == "контекстный"''')
+    def get_all_commands(self, strategy='контекстный'):
+        self.cursor.execute(f'''SELECT response, type FROM commands 
+        WHERE strategy == "{strategy}" ''')
         return self.cursor.fetchall()
 
     def __tables_validation(self):

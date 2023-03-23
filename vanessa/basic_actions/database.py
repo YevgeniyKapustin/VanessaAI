@@ -10,9 +10,14 @@ class DataBase(object):
             self.__tables_validation()
 
     def set_command(self, _type, strategy, request, response):
-        a = self.cursor.execute(f'''INSERT INTO commands
+        self.cursor.execute(f'''INSERT INTO commands
         (type, strategy, request, response)
         VALUES ("{_type}", "{strategy}", "{request}", "{response}")''')
+        return self.cursor.fetchone()
+
+    def set_shut_up_person(self, user_id):
+        self.cursor.execute(f'''INSERT INTO commands(user_id) 
+        VALUES ("{user_id}")''')
         return self.cursor.fetchone()
 
     def update_command(self, _type, strategy, request, response):
@@ -25,6 +30,12 @@ class DataBase(object):
     def remove_command(self, request):
         self.cursor.execute(f'''DELETE FROM commands
         WHERE request = "{request}"
+        ''')
+        return self.cursor.fetchone()
+
+    def remove_from_shut_up_people(self, user_id):
+        self.cursor.execute(f'''DELETE FROM shut_up_people
+        WHERE user_id = "{user_id}"
         ''')
         return self.cursor.fetchone()
 
@@ -45,6 +56,14 @@ class DataBase(object):
         self.cursor.execute(f'''SELECT * FROM commands''')
         return self.cursor.fetchall()
 
+    def get_shut_up_person(self, user_id):
+        try:
+            self.cursor.execute(f'''SELECT user_id FROM shut_up_people 
+            WHERE user_id == "{user_id}"''')
+            return self.cursor.fetchall()
+        except OperationalError:
+            return None
+
     def __tables_validation(self):
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS commands (
@@ -52,3 +71,6 @@ class DataBase(object):
         strategy TEXT NOT NULL,
         request TEXT NOT NULL UNIQUE,
         response TEXT NOT NULL)''')
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS shut_up_people (
+        user_id INT NOT NULL UNIQUE)''')

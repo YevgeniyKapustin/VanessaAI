@@ -12,7 +12,7 @@ from requests.exceptions import ProxyError
 from vk_api.bot_longpoll import VkBotEventType
 
 from basic_actions.actions import remove_msg
-from commands_logic.mute import Mute
+from basic_actions.database import DataBase
 from basic_actions.response import Response
 from prepare.connection import Connection
 
@@ -23,6 +23,7 @@ class Vanessa:
     def __init__(self):
         self.__starting_counter = 0
         self.__exception = 'No issue occurred'
+        self.db = DataBase()
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
@@ -67,7 +68,7 @@ class Vanessa:
                 msg = event.object.message
                 peer_id = msg['peer_id']
 
-                if str(msg['from_id']) in Mute.get_shut_up_people_list():
+                if self.db.get_shut_up_person(msg['from_id']):
                     remove_msg(peer_id, msg['conversation_message_id'])
                 else:
                     chat_id = event.chat_id

@@ -61,18 +61,15 @@ class Mute(object):
 
         if self.__member_status_check(event, members):
             victim_id = self.__victim_id_search(msg, event)
-            if victim_id == self.db.get_shut_up_person(victim_id):
+            if int(victim_id) == self.db.get_shut_up_person(victim_id)[0]:
                 self.db.remove_from_shut_up_people(victim_id)
-                send_text(
+                return send_text(
                     chat_id,
                     f'[id{victim_id}|друг], ты свободен, наслаждайся жизнью и '
                     'хорошего тебе дня'
                 )
-                return f'[id{victim_id}|друг], ты свободен, наслаждайся ' \
-                       f'жизнью и хорошего тебе дня'
             else:
-                send_text(chat_id, 'да не то чтобы он сильно замучен')
-                return 'да не то чтобы он сильно замучен'
+                return send_text(chat_id, 'да не то чтобы он сильно замучен')
         else:
             send_file(chat_id, self.img_no_power)
 

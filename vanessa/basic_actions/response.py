@@ -79,6 +79,9 @@ class Response(object):
         elif self.msg == 'абоба':
             return send_random_zmiysphrases(self.chat_id)
 
+        elif self.db.get_all_shut_up_person() and self.msg == 'зверинец':
+            return send_text(self.chat_id, self.db.get_all_shut_up_person())
+
         elif self.msg == 'рарити':
             return send_random_rarity(self.chat_id)
 

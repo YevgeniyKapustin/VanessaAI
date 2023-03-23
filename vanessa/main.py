@@ -6,15 +6,24 @@ TG - @kapustaevg03
 """
 from datetime import datetime
 from os import path
+
+from pydantic import BaseModel
 from requests import ReadTimeout
 from requests.exceptions import ProxyError
-
 from vk_api.bot_longpoll import VkBotEventType
 
 from basic_actions.actions import remove_msg
 from basic_actions.database import DataBase
 from basic_actions.response import Response
 from prepare.connection import Connection
+
+
+class Msg(BaseModel):
+    peer_id: int
+    from_id: int
+    conversation_message_id: int
+    text: str
+    reply_message: dict = None
 
 
 class Vanessa:
@@ -65,30 +74,13 @@ class Vanessa:
         for event in Connection().longpoll.listen():
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
-                msg = event.object.message
-                peer_id = msg['peer_id']
+                msg = Msg.parse_obj(event.object.message)
+                peer_id = msg.peer_id
 
-                if self.db.get_shut_up_person(msg['from_id']):
-                    remove_msg(peer_id, msg['conversation_message_id'])
+                if self.db.get_shut_up_person(msg.from_id):
+                    remove_msg(peer_id, msg.conversation_message_id)
                 else:
-                    chat_id = event.chat_id
-                    msg = self.__message_filtering(msg['text'])
-                    Response(chat_id, msg, peer_id, event).definition()
-
-    @staticmethod
-    def __message_filtering(msg: str):
-        """Filter the message and converts the message to lowercase."""
-        filterable_text = {
-            'ванесса'
-            'ванесса,'
-            '[club212138773|@vanessakapustovna]'
-            '[club212138773|@vanessakapustovna],'
-        }
-        msg = msg.lower().split(' ')
-        for word in msg:
-            if word in filterable_text:
-                msg.remove(word)
-        return ' '.join(msg)
+                    Response(msg, event).definition()
 
 
 if __name__ == '__main__':

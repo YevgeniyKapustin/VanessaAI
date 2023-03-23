@@ -26,7 +26,7 @@ class Commands(object):
         commands = ''
 
         for index, i in enumerate(self.db.get_all_commands_data()):
-            commands += f'{index + 1}. {i[3]}, {i[2]}, {i[0]}, {i[1]}<br>'
+            commands += f'{index + 1}. {i[3]}: {i[2]}, {i[0]}, {i[1]}<br>'
 
         return f'{prefix}<br><br>{commands}<br><br>{postfix}'
 
@@ -76,7 +76,7 @@ class Commands(object):
         _type = self._get_command_type(msg)
         msg.remove(msg[0])
 
-        msg: list = ''.join(msg).split(':')
+        msg: list = ' '.join(msg).split(':')
 
         request = msg[0]
         response = msg[1]

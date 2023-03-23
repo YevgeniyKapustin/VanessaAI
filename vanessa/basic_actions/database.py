@@ -10,9 +10,22 @@ class DataBase(object):
             self.__tables_validation()
 
     def set_command(self, _type, strategy, request, response):
-        self.cursor.execute(f'''INSERT INTO commands (
-        type, strategy, request, response
-        VALUES {_type}, {strategy}, {request}, {response})''')
+        a = self.cursor.execute(f'''INSERT INTO commands
+        (type, strategy, request, response)
+        VALUES ("{_type}", "{strategy}", "{request}", "{response}")''')
+        return self.cursor.fetchone()
+
+    def update_command(self, _type, strategy, request, response):
+        self.cursor.execute(f'''UPDATE commands SET 
+        type = "{_type}", strategy = "{strategy}", response = "{response}"
+        WHERE request = "{request}"
+        ''')
+        return self.cursor.fetchone()
+
+    def remove_command(self, request):
+        self.cursor.execute(f'''DELETE FROM commands
+        WHERE request = "{request}"
+        ''')
         return self.cursor.fetchone()
 
     def get_response(self, request):
@@ -23,9 +36,13 @@ class DataBase(object):
         except OperationalError:
             return None
 
-    def get_all_commands(self, strategy='контекстный'):
+    def get_all_commands(self, strategy='contextual'):
         self.cursor.execute(f'''SELECT response, type FROM commands 
         WHERE strategy == "{strategy}" ''')
+        return self.cursor.fetchall()
+
+    def get_all_commands_data(self):
+        self.cursor.execute(f'''SELECT * FROM commands''')
         return self.cursor.fetchall()
 
     def __tables_validation(self):

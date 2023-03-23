@@ -1,105 +1,97 @@
-"""Module for custom commands"""
-
-import json
+from sqlite3 import IntegrityError
 
 from basic_actions.actions import send_text
+from basic_actions.database import DataBase
 
 
-class Commands:
+class Commands(object):
     """Class for working with custom commands"""
 
-    command_types = [
-        'text_commands',
-        'indirect_text_commands',
-        'gif_commands',
-        'indirect_gif_commands',
-        'img_commands',
-        'indirect_img_commands',
-        'stick_commands'
-    ]
+    def __init__(self):
+        self.db = DataBase()
 
     def get_commands(self):
-        """Returns all commands written in commands.json"""
-        with open('../service_files/commands.json', 'r') as f:
-            commands = json.load(f)
-
-        response = ''
-
-        for i, command_type in enumerate(self.command_types):
-            iterated_commands = commands[i][command_type]
-            command = self._swap_command_type_en_to_ru(command_type)
-            response += f'<br><br>{command}:<br><br>'
-
-            for msg in iterated_commands:
-                response += f'{msg}: {iterated_commands[msg]}<br>'
-
-        response += '''<br><br>полезные команды:<br>
+        """Returns all commands from db"""
+        prefix = 'Команды на текущий момент:<br>Запрос, Ответ, Тип, Контекст'
+        postfix = f'''Прочие команды:<br>
         фракция - генерирует случайную фракцию из героев 5
         д* - генерирует случайное число в диапазоне от 1 до указанного числа
         что такое* - отвечает первыми тремя предложениями из википедии
         мут* - удаляет все новые сообщения этого пользователя(только для админов)
         размут* - выключает мут для этого пользователя(только для админов)
-        гитхаб/github - ссылка на этот репозиторий
         добавить команду помощь - показывает информацию о добавлении команд
         рарити - отправляет случайную рарити
         абоба - абоба
         команды - показывает полный список команд'''
+        commands = ''
 
-        return response
+        for index, i in enumerate(self.db.get_all_commands_data()):
+            commands += f'{index + 1}. {i[3]}, {i[2]}, {i[0]}, {i[1]}<br>'
 
-    def add_command(self, msg, chat_id, event):
+        return f'{prefix}<br><br>{commands}<br><br>{postfix}'
+
+    def add_command(self, msg: str, chat_id, event):
         """Example: добавить команду текст_внутри вопрос: ответ"""
         try:
-            index, command_type, msg = self._command_type_definition(msg,
-                                                                     chat_id)
-        except ValueError:
-            return send_text(chat_id, 'чета ты насусил братик')
-        if index == 'help':
-            return ''
-        msg = msg.split(':')
-        try:
-            request = msg[0].strip()
+            request, response, _type = self.define_command(msg)
+            strategy = 'contextual'
+
             if request == 'сус':
                 return send_text(chat_id, 'сус священен')
             elif 'добавить команду' in request:
                 return send_text(chat_id, 'неа')
             elif 'удалить команду' in request:
                 return send_text(chat_id, 'неа')
-            response = msg[1].strip()
 
-            if command_type == 'gifs_commands' or command_type == \
-                    'indirect_gifs_commands':
+            if _type[-1] == '_':
+                _type = _type[:-1]
+            else:
+                strategy = 'normal'
+
+            if _type == 'гиф':
                 attachment = event.message.attachments[0]['doc']
                 response = f'doc{attachment["owner_id"]}_{attachment["id"]}'
-
-            elif command_type == 'img_commands' or command_type == \
-                    'indirect_img_commands':
+            elif _type == 'изображение':
                 attachment = event.message.attachments[0]['photo']
                 response = f'photo{attachment["owner_id"]}_{attachment["id"]}'
 
-            if request and response and command_type:
-                with open('../service_files/commands.json', 'r') as f:
-                    commands = json.load(f)
-                commands[index][command_type][request] = response
-
-                with open('../service_files/commands.json', 'w') as f:
-                    json.dump(commands, f, indent=4)
+            if request and response and _type:
+                try:
+                    self.db.set_command(_type, strategy, request, response)
+                except IntegrityError:
+                    self.db.update_command(_type, strategy, request, response)
                 return send_text(chat_id, f'команда {request} была добавлена')
             else:
-                return send_text(chat_id, 'чета ты насусил братик')
-        except IndexError:
-            return send_text(chat_id, 'чета ты насусил братик')
+                return self.__some_wrong(chat_id)
+        except IndexError or ValueError:
+            return self.__some_wrong(chat_id)
+
+    @staticmethod
+    def __some_wrong(chat_id):
+        return send_text(chat_id, 'чета ты насусил братик')
+
+    def define_command(self, msg):
+        msg: list = self._filtering(msg.lower().split(' '))
+
+        _type = self._get_command_type(msg)
+        msg.remove(msg[0])
+
+        msg: list = ''.join(msg).split(':')
+
+        request = msg[0]
+        response = msg[1]
+
+        return request, response, _type
+
+    @staticmethod
+    def _get_command_type(msg):
+        try:
+            return msg[0]
+        except IndexError as error:
+            return error
 
     def remove_command(self, msg, chat_id):
-        """Example: удалить команду текст_внутри вопрос"""
-        try:
-            index, command_type, msg = self._command_type_definition(msg,
-                                                                     chat_id)
-        except ValueError:
-            return send_text(chat_id, 'чета ты насусил братик')
-
-        if index == 'help':
-            return ''
+        """Example: удалить команду текст запрос"""
 
         msg = msg.split(':')
         request = msg[0].strip()
@@ -107,100 +99,35 @@ class Commands:
         if request == 'сус':
             return send_text(chat_id, 'сус священен')
 
-        if request and command_type:
-            with open('../service_files/commands.json', 'r') as f:
-                commands = json.load(f)
-            try:
-                commands[index][command_type].pop(request)
-            except KeyError:
-                return send_text(chat_id, 'чета ты насусил братик')
-            with open('../service_files/commands.json', 'w') as f:
-                json.dump(commands, f, indent=4)
+        if request:
+            self.db.remove_command(request)
             return send_text(chat_id, f'команда {request} была удалена')
-
         else:
             return send_text(chat_id, 'чета ты насусил братик')
 
-    def _command_type_definition(self, msg, chat_id):
+    @staticmethod
+    def _command_type_definition(msg, chat_id):
         if msg == 'добавить команду помощь':
-            add_help = 'добавить команду (тип команды) (запрос): (ответ) \
-                       например: добавить команду текст амогус: тутуту \
-                       в случае ответа для гиф нужен его url, для стикера id \
-                       типы команд: текст, гиф, изображение, стикер, ' \
-                       'гиф_внутри, изображение_внутри'
+            add_help = '''добавить команду (тип ответа)(_) (запрос): (ответ)
+                       например: добавить команду текст_ амогус: тутуту
+                       нижнее подчеркивание нужно добавить если вы хотите, 
+                       чтобы команда писалась в случае если запрос содержится 
+                       в сообщении, а не целиком его составляла в случае ответа
+                       для гиф или изображения нужен его url, для стикера id 
+                       типы команд: текст, гиф, изображение, стикер'''
             send_text(chat_id, add_help)
-
-            return 'help', 'help', 'help'
-
-        msg = msg.lower().split(' ')
-        msg = self._filtering(msg)
-
+            return None
         try:
-            command_type = msg[0]
-            msg.remove(msg[0])
-        except IndexError:
-            return ''
+            _type = msg[0]
+        except IndexError as error:
+            return error
 
-        if command_type == 'текст':
-            index = 0
-        elif command_type == 'текст_внутри':
-            index = 1
-        elif command_type == 'гиф':
-            index = 2
-        elif command_type == 'гиф_внутри':
-            index = 3
-        elif command_type == 'изображение':
-            index = 4
-        elif command_type == 'изображение_внутри':
-            index = 5
-        elif command_type == 'стикер':
-            index = 6
-        else:
-            return ''
-
-        return index, \
-            self._swap_command_type_ru_to_en(command_type), ' '.join(msg)
+        return _type
 
     @staticmethod
-    def _swap_command_type_en_to_ru(command_type):
-        if command_type == 'text_commands':
-            return 'текст'
-        elif command_type == 'indirect_text_commands':
-            return 'текст_внутри'
-        elif command_type == 'gif_commands':
-            return 'гиф'
-        elif command_type == 'indirect_gif_commands':
-            return 'гиф_внутри'
-        elif command_type == 'img_commands':
-            return 'изображение'
-        elif command_type == 'indirect_img_commands':
-            return 'изображение_внутри'
-        elif command_type == 'stick_commands':
-            return 'стикер'
-        else:
-            return f'"{command_type}" is not a command type'
-
-    @staticmethod
-    def _swap_command_type_ru_to_en(command_type):
-        if command_type == 'текст':
-            return 'text_commands'
-        elif command_type == 'текст_внутри':
-            return 'indirect_text_commands'
-        elif command_type == 'гиф':
-            return 'gif_commands'
-        elif command_type == 'гиф_внутри':
-            return 'indirect_gif_commands'
-        elif command_type == 'изображение':
-            return 'img_commands'
-        elif command_type == 'изображение_внутри':
-            return 'indirect_img_commands'
-        elif command_type == 'стикер':
-            return 'stick_commands'
-        else:
-            return f'"{command_type}" is not a command type'
-
-    @staticmethod
-    def _filtering(msg):
+    def _filtering(msg) -> list:
+        if not isinstance(msg, list):
+            msg = msg.lower().split(' ')
         msg.remove('команду')
         if 'добавить' in msg:
             msg.remove('добавить')

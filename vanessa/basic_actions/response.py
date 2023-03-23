@@ -12,7 +12,6 @@ from basic_actions.actions import send_text, send_stick, send_file
 class Response(object):
     """The intermediary class between commands and responses."""
     def __init__(self, chat_id: int, msg: str, peer_id: int, event):
-        super().__init__()
         self.chat_id = chat_id
         self.msg = msg
         self.peer_id = peer_id

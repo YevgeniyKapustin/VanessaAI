@@ -10,7 +10,7 @@ set_lang('ru')
 
 
 def send_wiki_article(chat_id, msg):
-    """Sends the article requested from wikipedia"""
+    """Sends the article requested from wikipedia."""
     if 'что такое' in msg:
         msg = msg.replace('что такое', '')
     elif 'кто такой' in msg:

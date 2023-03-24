@@ -4,7 +4,7 @@ from commands_logic.cabbagesite import get_players_winrate, \
 from commands_logic.add_command import Commands
 from commands_logic.mute import Mute
 from commands_logic.randomize import send_random_fraction, \
-    send_random_zmiysphrases, send_random_rarity, send_roll_dice
+    send_random_zmiys_phrases, send_random_rarity, send_roll_dice
 from commands_logic.wiki import send_wiki_article
 from basic_actions.actions import send_text, send_stick, send_file
 
@@ -75,7 +75,7 @@ class Response(object):
             )
 
         elif self.text == 'абоба':
-            return send_random_zmiysphrases(self.chat_id)
+            return send_random_zmiys_phrases(self.chat_id)
 
         elif self.db.get_all_shut_up_person() and self.text == 'зверинец':
             return send_text(self.chat_id, self.db.get_all_shut_up_person())

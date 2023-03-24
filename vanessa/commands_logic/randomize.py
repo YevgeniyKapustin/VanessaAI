@@ -43,15 +43,12 @@ herofractions = [
 
 def send_roll_dice(chat_id: int, msg: str) -> str:
     """Sends the result from 1 to the number after 'Д'"""
-    dice_command = 'д'
-
-    if msg.replace(dice_command, '').isdigit() and \
-            msg.replace(dice_command, '') != '0':
-        return send_text(chat_id,
-                         f'🎲 {randint(1, int(msg.replace(dice_command, "")))}')
+    digital = msg.replace('д', '')
+    if digital.isdigit() and digital != '0':
+        return send_text(chat_id, f'🎲 {randint(1, int(digital))}')
 
 
-def send_random_zmiysphrases(chat_id: int):
+def send_random_zmiys_phrases(chat_id: int):
     """Selects and sends a random phrase of the good person to the chat"""
     return send_text(chat_id, f'{zmiysphrases[randint(0, 14)]}')
 
@@ -68,7 +65,5 @@ def send_random_rarity(chat_id: int):
         album_id='269289093',
         count=1000
     )
-
     random_choice = str(photos['items'][randint(0, 999)]['id'])
-
     return send_file(chat_id, f'photo-41670861_{random_choice}')

@@ -33,6 +33,7 @@ class Vanessa:
         self.__starting_counter = 0
         self.__exception = 'No issue occurred'
         self.db = DataBase()
+        self.longpoll = Connection().longpoll
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
@@ -47,7 +48,9 @@ class Vanessa:
 
             try:
                 self.__run()
-            except ReadTimeout or ProxyError as exception:
+            except ReadTimeout as exception:
+                self.__exception = exception
+            except ProxyError as exception:
                 self.__exception = exception
 
     def __log_about_launch(self):
@@ -71,7 +74,7 @@ class Vanessa:
         If the sender of the msg is muted, deletes his msg.
         Else it sends msg to the response definition for response_definition.
         """
-        for event in Connection().longpoll.listen():
+        for event in self.longpoll.listen():
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg = Msg.parse_obj(event.object.message)

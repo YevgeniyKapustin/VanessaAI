@@ -1,6 +1,5 @@
 from basic_actions.database import DataBase
-from commands_logic.cabbagesite import get_players_winrate, \
-    get_fractions_winrate
+from commands_logic.cabbagesite import get_winrate
 from commands_logic.add_command import Commands
 from commands_logic.mute import Mute
 from commands_logic.randomize import send_random_fraction, \
@@ -84,10 +83,10 @@ class Response(object):
             return send_random_rarity(self.chat_id)
 
         elif self.text == 'статистика игроков':
-            return send_text(self.chat_id, get_players_winrate())
+            return send_text(self.chat_id, get_winrate('players'))
 
         elif self.text == 'статистика фракций':
-            return send_text(self.chat_id, get_fractions_winrate())
+            return send_text(self.chat_id, get_winrate('fractions'))
 
         elif self.text[:1] == 'д':
             return send_roll_dice(self.chat_id, self.text)

@@ -4,19 +4,12 @@ https://kapusta.eu.pythonanywhere.com
 import requests
 
 
-def get_players_winrate():
-    """Returns html string with winrate of players"""
-    players_data = requests.get(
-        'https://kapusta.eu.pythonanywhere.com/api/players_stats'
-    ).json()
-    return '<br>'.join([f"{player['name']}: {player['winrate']}%"
-                        for player in players_data])
-
-
-def get_fractions_winrate():
-    """Returns html string with winrate of fractions"""
-    fractions_data = requests.get(
-        'https://kapusta.eu.pythonanywhere.com/api/fractions_stats'
-    ).json()
-    return '<br>'.join([f"{fraction['name']}: {fraction['winrate']}%"
-                        for fraction in fractions_data])
+def get_winrate(request: str = 'players') -> str:
+    """Makes a request to the site api and returns html for vk.
+    :param str request: 'players' or 'fractions'
+    :returns: html string, by default returns players
+    """
+    request = f'https://kapusta.eu.pythonanywhere.com/api/{request}_stats'
+    data = requests.get(request).json()
+    lst = [f"{item['name']}: {item['winrate']}%" for item in data]
+    return '<br>'.join(lst)

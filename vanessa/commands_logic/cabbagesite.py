@@ -1,11 +1,13 @@
-"""Module to represent the class "Cabbagesite" for working with the site
+"""Module to represent the class "Cabbagesite" for working with the site.
+
 https://kapusta.eu.pythonanywhere.com
 """
 import requests
 
 
 def get_winrate(request: str = 'players') -> str:
-    """Makes a request to the site api and returns html for vk.
+    """Make a request to the site api and returns html for vk.
+
     :param str request: 'players' or 'fractions'
     :returns: html string, by default returns players
     """

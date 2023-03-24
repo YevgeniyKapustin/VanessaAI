@@ -1,4 +1,4 @@
-"""Module for working with wikipedia"""
+"""Module for working with wikipedia."""
 from random import choice
 
 from wikipedia import summary, set_lang, PageError, DisambiguationError, \
@@ -10,7 +10,7 @@ set_lang('ru')
 
 
 def send_wiki_article(chat_id: int, msg: str) -> str:
-    """Sends the article requested from wikipedia."""
+    """Send the article requested from wikipedia."""
     if 'что такое' in msg:
         msg = msg.replace('что такое', '')
     elif 'кто такой' in msg:

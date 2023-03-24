@@ -1,4 +1,4 @@
-"""Contains various functions that somehow use random"""
+"""Contains various functions that somehow use random."""
 from random import randint
 
 from basic_actions.actions import send_text, send_file
@@ -42,24 +42,24 @@ herofractions = [
 
 
 def send_roll_dice(chat_id: int, msg: str) -> str:
-    """Sends the result from 1 to the number after 'Д'"""
+    """Send the result from 1 to the number after 'Д'."""
     digital = msg.replace('д', '')
     if digital.isdigit() and digital != '0':
         return send_text(chat_id, f'🎲 {randint(1, int(digital))}')
 
 
 def send_random_zmiys_phrases(chat_id: int) -> str:
-    """Selects and sends a random phrase of the good person to the chat"""
+    """Select and sends a random phrase of the good person to the chat."""
     return send_text(chat_id, f'{zmiysphrases[randint(0, 14)]}')
 
 
 def send_random_fraction(chat_id: int) -> str:
-    """Sends a random faction from the herofractions"""
+    """Send a random faction from the herofractions."""
     return send_text(chat_id, f'🎲 {herofractions[randint(0, 7)]}')
 
 
 def send_random_rarity(chat_id: int) -> str:
-    """Sends random art with rarity"""
+    """Send random art with rarity."""
     photos = _vk_admin.photos.get(
         owner_id='-41670861',
         album_id='269289093',

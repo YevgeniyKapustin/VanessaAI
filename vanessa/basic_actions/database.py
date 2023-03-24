@@ -48,11 +48,10 @@ class DataBase(object):
             ''')
         return self.cursor.fetchone()
 
-    def get_response(self, request):
+    def get_response_and_type(self, request):
         try:
             with sql.connect('vanessa.db') as connect:
                 self.cursor = connect.cursor()
-                self.__tables_validation()
                 self.cursor.execute(f'''SELECT response, type FROM commands 
                 WHERE request == "{request}" ''')
             return self.cursor.fetchone()
@@ -62,15 +61,13 @@ class DataBase(object):
     def get_all_commands(self, strategy='contextual'):
         with sql.connect('vanessa.db') as connect:
             self.cursor = connect.cursor()
-            self.__tables_validation()
-            self.cursor.execute(f'''SELECT response, type FROM commands 
-            WHERE strategy == "{strategy}" ''')
+            self.cursor.execute(f'''SELECT request, type, response
+            FROM commands WHERE strategy == "{strategy}" ''')
         return self.cursor.fetchall()
 
     def get_all_commands_data(self):
         with sql.connect('vanessa.db') as connect:
             self.cursor = connect.cursor()
-            self.__tables_validation()
             self.cursor.execute(f'''SELECT * FROM commands''')
         return self.cursor.fetchall()
 

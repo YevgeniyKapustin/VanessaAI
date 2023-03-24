@@ -6,6 +6,7 @@ from commands_logic.randomize import send_random_fraction, \
     send_random_zmiys_phrases, send_random_rarity, send_roll_dice
 from commands_logic.wiki import send_wiki_article
 from basic_actions.actions import send_text, send_stick, send_file
+from service_files.big_strings import commands_add_help
 
 
 class Response(object):
@@ -17,6 +18,7 @@ class Response(object):
         self.event = event
         self.msg = msg
         self.db = DataBase()
+        self.add_help = commands_add_help
 
     def definition(self):
         """Causes questions to be checked for an answer."""
@@ -24,16 +26,15 @@ class Response(object):
             self.__check_db_commands()
 
     def __check_db_commands(self):
-        if self.db.get_response(self.text):
-            return self.__send_choice()
+        data = self.db.get_response_and_type(self.text)
+        if data:
+            return self.__send_choice(data[0], data[1])
 
-        for i in self.db.get_all_commands():
-            if i in self.text:
-                return self.__send_choice()
+        for data in self.db.get_all_commands():
+            if data[0] in self.text:
+                return self.__send_choice(data[2], data[1])
 
-    def __send_choice(self):
-        response, _type = self.db.get_response(self.text)
-
+    def __send_choice(self, response, _type):
         if _type == 'текст':
             return send_text(self.chat_id, response)
         elif _type == 'гиф' or _type == 'изображение':
@@ -59,19 +60,14 @@ class Response(object):
             return Mute.redemption(
                 Mute(self.msg, self.event))
 
+        elif self.text == 'добавить команду помощь':
+            return send_text(self.chat_id, self.add_help)
+
         elif self.text[:16] == 'добавить команду':
-            return Commands.add_command(
-                Commands(),
-                self.text, self.chat_id,
-                self.event
-            )
+            return Commands.add_command(Commands(), self.text, self.event)
 
         elif self.text[:15] == 'удалить команду':
-            return Commands.remove_command(
-                Commands(),
-                self.text,
-                self.chat_id
-            )
+            return Commands.remove_command(Commands(), self.text, self.chat_id)
 
         elif self.text == 'абоба':
             return send_random_zmiys_phrases(self.chat_id)

@@ -42,24 +42,37 @@ herofractions = [
 
 
 def send_roll_dice(chat_id: int, msg: str) -> str:
-    """Send the result from 1 to the number after 'Д'."""
+    """Send the result from 1 to the number after 'Д'.
+
+    :param chat_id: id of the chat to which the message will be sent
+    :param msg: message sent by user
+    """
     digital = msg.replace('д', '')
     if digital.isdigit() and digital != '0':
         return send_text(chat_id, f'🎲 {randint(1, int(digital))}')
 
 
 def send_random_zmiys_phrases(chat_id: int) -> str:
-    """Select and sends a random phrase of the good person to the chat."""
+    """Select and sends a random phrase of the good person to the chat.
+
+    :param chat_id: id of the chat to which the message will be sent
+    """
     return send_text(chat_id, f'{zmiysphrases[randint(0, 14)]}')
 
 
 def send_random_fraction(chat_id: int) -> str:
-    """Send a random faction from the herofractions."""
+    """Send a random faction from the herofractions.
+
+    :param chat_id: id of the chat to which the message will be sent
+    """
     return send_text(chat_id, f'🎲 {herofractions[randint(0, 7)]}')
 
 
 def send_random_rarity(chat_id: int) -> str:
-    """Send random art with rarity."""
+    """Send random art with rarity.
+
+    :param chat_id: id of the chat to which the message will be sent
+    """
     photos = _vk_admin.photos.get(
         owner_id='-41670861',
         album_id='269289093',

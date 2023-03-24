@@ -9,7 +9,7 @@ from basic_actions.actions import send_text
 set_lang('ru')
 
 
-def send_wiki_article(chat_id, msg):
+def send_wiki_article(chat_id: int, msg: str) -> str:
     """Sends the article requested from wikipedia."""
     if 'что такое' in msg:
         msg = msg.replace('что такое', '')

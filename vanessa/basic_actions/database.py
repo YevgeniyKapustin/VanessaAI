@@ -8,12 +8,12 @@ class DataBase(object):
         self.__tables_validation()
         self.cursor = None
 
-    def set_command(self, _type, strategy, request, response):
+    def set_command(self, cmd):
         with sql.connect('vanessa.db') as connect:
             self.cursor = connect.cursor()
-            self.cursor.execute(f'''INSERT INTO commands
-            (type, strategy, request, response)
-            VALUES ("{_type}", "{strategy}", "{request}", "{response}")''')
+            self.cursor.execute(f'''INSERT INTO commands(type, strategy, 
+            request, response) VALUES ("{cmd.type}", "{cmd.strategy}", 
+            "{cmd.request}", "{cmd.response}")''')
         return self.cursor.fetchone()
 
     def set_shut_up_person(self, user_id):
@@ -23,12 +23,12 @@ class DataBase(object):
             VALUES ("{user_id}")''')
         return self.cursor.fetchone()
 
-    def update_command(self, _type, strategy, request, response):
+    def update_command(self, cmd):
         with sql.connect('vanessa.db') as connect:
             self.cursor = connect.cursor()
-            self.cursor.execute(f'''UPDATE commands SET 
-            type = "{_type}", strategy = "{strategy}", response = "{response}"
-            WHERE request = "{request}"
+            self.cursor.execute(f'''UPDATE commands SET type = "{cmd.type}", 
+            strategy = "{cmd.strategy}", response = "{cmd.response}"
+            WHERE request = "{cmd.request}"
             ''')
         return self.cursor.fetchone()
 

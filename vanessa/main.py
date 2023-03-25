@@ -29,6 +29,7 @@ class Msg(BaseModel):
 class Event(object):
     msg: Msg
     chat_id: int
+    attachments: dict = None
 
 
 class EventBuilder(object):
@@ -39,12 +40,16 @@ class EventBuilder(object):
     def get_event(self):
         return self.__event
 
-    def append_msg(self, msg: object):
+    def set_msg(self, msg: object):
         self.__event.msg = msg
         return self
 
-    def append_chat_id(self, chat_id: int):
+    def set_chat_id(self, chat_id: int):
         self.__event.chat_id = chat_id
+        return self
+
+    def set_attachment(self, event):
+        self.__event.attachments = event.message.attachments
         return self
 
 
@@ -100,8 +105,10 @@ class Vanessa:
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg = Msg.parse_obj(event.object.message)
-                event = EventBuilder().append_msg(msg).\
-                    append_chat_id(event.chat_id).get_event()
+                event = (
+                    EventBuilder().set_msg(msg).set_chat_id(event.chat_id).
+                    set_attachment(event).get_event()
+                )
 
                 if self.db.get_shut_up_person(event.msg.from_id):
                     remove_msg(event)

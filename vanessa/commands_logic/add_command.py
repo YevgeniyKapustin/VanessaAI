@@ -6,13 +6,20 @@ from basic_actions.database import DataBase
 from service_files.big_strings import commands_list_postfix
 
 
+class Command(object):
+    type = None
+    strategy = None
+    request = None
+    response = None
+
+
 class Commands(object):
     """Class for working with custom commands.
 
     :Methods:
     - get_commands()
-    - add_command(msg, event)
-    - remove_command(msg, chat_id)
+    - add_command(event)
+    - remove_command(event)
     """
 
     def __init__(self):
@@ -29,46 +36,45 @@ class Commands(object):
 
         return f'{prefix}<br><br>{commands}<br><br>{postfix}'
 
-    def add_command(self, msg: str, event) -> str or None:
-        """Add command to db.
-
-        :param msg: example: "добавить команду текст_ запрос: ответ"
-        :param event: object with information about the event
-        """
+    def add_command(self, event) -> str or None:
+        """Add command to db."""
+        text = event.msg.text
         chat_id = event.chat_id
         try:
-            request, response, _type = self._define_command(msg)
+            cmd = Command()
+            command_data = self._define_command(text)
+            cmd.request, cmd.response, cmd._type = command_data
 
-            if self._define_prohibitions(request, chat_id):
+            if self._define_prohibitions(cmd.request, chat_id):
                 return None
 
-            strategy = self._define_strategy(_type)
+            strategy = self._define_strategy(cmd.type)
             if strategy == 'contextual':
-                _type = _type[:-1]
+                cmd.type = cmd.type[:-1]
 
-            attch = self._define_attachment(_type, event)
+            attch = self._define_attachment(cmd.type, event)
             if attch:
-                response = f'{_type}{attch["owner_id"]}_{attch["id"]}'
+                cmd.response = f'{cmd.type}{attch["owner_id"]}_{attch["id"]}'
 
-            if request and response and _type and strategy:
+            if cmd.request and cmd.response and cmd.type and strategy:
                 try:
-                    self.db.set_command(_type, strategy, request, response)
+                    self.db.set_command(cmd)
                 except IntegrityError:
-                    self.db.update_command(_type, strategy, request, response)
-                return send_text(chat_id, f'команда {request} была добавлена')
+                    self.db.update_command(cmd)
+                self._success_add(chat_id, cmd)
             else:
                 return self._something_wrong(chat_id)
         except (IndexError, ValueError):
             return self._something_wrong(chat_id)
 
-    def remove_command(self, msg: str, chat_id: id) -> str:
+    def remove_command(self, event) -> str:
         """Remove command from db.
 
-        :param msg: example: удалить команду текст запрос
-        :param chat_id: id of the chat to which the message will be sent
+        :param event: example: удалить команду текст запрос
         """
-        msg = msg.split(':')
+        msg = event.msg.text.split(':')
         request = msg[0].strip()
+        chat_id = event.chat_id
 
         if request == 'сус':
             return send_text(chat_id, 'сус священен')
@@ -78,17 +84,17 @@ class Commands(object):
         else:
             return send_text(chat_id, 'чета ты насусил братик')
 
-    def _define_command(self, msg: str) -> tuple:
+    def _define_command(self, text: str) -> tuple:
         """Extract data from a message.
 
-        :param msg: message sent by user
+        :param text: message sent by user
         """
-        data: list = self._filtering(msg)
+        data: list = self._filtering(text)
 
         _type: str = self._get_command_type(data)
-        data.remove(msg[0])
+        data.remove(text[0])
 
-        msg: list = ' '.join(msg).split(':')
+        msg: list = ' '.join(text).split(':')
 
         request = msg[0]
         response = msg[1]
@@ -115,19 +121,19 @@ class Commands(object):
             return str(error)
 
     @staticmethod
-    def _filtering(msg: str) -> list:
+    def _filtering(text: str) -> list:
         """Remove redundant information from the message.
 
-        :param msg: message sent by user
+        :param text: message sent by user
         """
-        if not isinstance(msg, list):
-            msg = msg.lower().split(' ')
-        msg.remove('команду')
-        if 'добавить' in msg:
-            msg.remove('добавить')
+        if not isinstance(text, list):
+            text = text.lower().split(' ')
+        text.remove('команду')
+        if 'добавить' in text:
+            text.remove('добавить')
         else:
-            msg.remove('удалить')
-        return msg
+            text.remove('удалить')
+        return text
 
     @staticmethod
     def _define_strategy(_type: str) -> str:
@@ -170,6 +176,10 @@ class Commands(object):
         else:
             return None
 
-        attachment = event.message.attachments[0][f'{attch_type}']
+        attachment = event.attachments[0][f'{attch_type}']
 
         return attachment
+
+    @staticmethod
+    def _success_add(chat_id, cmd):
+        return send_text(chat_id, f'команда {cmd.request} была добавлена')

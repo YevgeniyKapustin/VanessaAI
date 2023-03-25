@@ -26,6 +26,28 @@ class Msg(BaseModel):
     reply_message: dict = None
 
 
+class Event(object):
+    msg: Msg
+    chat_id: int
+
+
+class EventBuilder(object):
+
+    def __init__(self):
+        self.__event = Event
+
+    def get_event(self):
+        return self.__event
+
+    def append_msg(self, msg: object):
+        self.__event.msg = msg
+        return self
+
+    def append_chat_id(self, chat_id: int):
+        self.__event.chat_id = chat_id
+        return self
+
+
 class Vanessa:
     """The main class for the bot that implements its main work cycle."""
 
@@ -37,8 +59,10 @@ class Vanessa:
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
-
+        
         Also monitors data updates for logs and triggers logging.
+
+
         """
         while True:
             self.__starting_counter += 1
@@ -48,9 +72,7 @@ class Vanessa:
 
             try:
                 self.__run()
-            except ReadTimeout as exception:
-                self.__exception = exception
-            except ProxyError as exception:
+            except (ReadTimeout, ProxyError) as exception:
                 self.__exception = exception
 
     def __log_about_launch(self):
@@ -78,12 +100,13 @@ class Vanessa:
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg = Msg.parse_obj(event.object.message)
-                peer_id = msg.peer_id
+                event = EventBuilder().append_msg(msg).\
+                    append_chat_id(event.chat_id).get_event()
 
-                if self.db.get_shut_up_person(msg.from_id):
-                    remove_msg(peer_id, msg.conversation_message_id)
+                if self.db.get_shut_up_person(event.msg.from_id):
+                    remove_msg(event)
                 else:
-                    Response(msg, event).definition()
+                    Response(event).definition()
 
 
 if __name__ == '__main__':

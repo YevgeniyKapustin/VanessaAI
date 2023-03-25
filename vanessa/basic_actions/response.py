@@ -11,12 +11,12 @@ from service_files.big_strings import commands_add_help
 
 class Response(object):
     """The intermediary class between commands and responses."""
-    def __init__(self, msg, event):
+    def __init__(self, event):
         self.chat_id = event.chat_id
-        self.text = msg.text
-        self.peer_id = msg.peer_id
+        self.text = event.msg.text
+        self.peer_id = event.msg.peer_id
         self.event = event
-        self.msg = msg
+        self.msg = event.msg
         self.db = DataBase()
         self.add_help = commands_add_help
 
@@ -24,6 +24,14 @@ class Response(object):
         """Causes questions to be checked for an answer."""
         if not self.__check_special_commands():
             self.__check_db_commands()
+
+    def __send_choice(self, response, _type):
+        if _type == 'текст':
+            return send_text(self.chat_id, response)
+        elif _type == 'гиф' or _type == 'изображение':
+            return send_file(self.chat_id, response)
+        elif _type == 'стикер':
+            return send_stick(self.chat_id, response)
 
     def __check_db_commands(self):
         data = self.db.get_response_and_type(self.text)
@@ -33,14 +41,6 @@ class Response(object):
         for data in self.db.get_all_commands():
             if data[0] in self.text:
                 return self.__send_choice(data[2], data[1])
-
-    def __send_choice(self, response, _type):
-        if _type == 'текст':
-            return send_text(self.chat_id, response)
-        elif _type == 'гиф' or _type == 'изображение':
-            return send_file(self.chat_id, response)
-        elif _type == 'стикер':
-            return send_stick(self.chat_id, response)
 
     def __check_special_commands(self):
         """Checking hard code commands."""

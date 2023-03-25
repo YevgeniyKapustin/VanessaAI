@@ -1,4 +1,5 @@
 """Module for interactive addition of commands by users."""
+from dataclasses import dataclass
 from sqlite3 import IntegrityError
 
 from basic_actions.actions import send_text
@@ -6,11 +7,19 @@ from basic_actions.database import DataBase
 from service_files.big_strings import commands_list_postfix
 
 
+@dataclass
 class Command(object):
-    type = None
-    strategy = None
-    request = None
-    response = None
+    """Class for creating a command object and containing information about it.
+
+    :param type: response content type
+    :param strategy: conditions under which the request will be received
+    :param request: the text contained in the user's message
+    :param response: reply to a request
+    """
+    type: str = None
+    strategy: str = None
+    request: str = None
+    response: str = None
 
 
 class Commands(object):
@@ -37,13 +46,15 @@ class Commands(object):
         return f'{prefix}<br><br>{commands}<br><br>{postfix}'
 
     def add_command(self, event) -> str or None:
-        """Add command to db."""
-        text = event.msg.text
+        """Add command to db.
+
+        :param event: object with information about the event
+        """
         chat_id = event.chat_id
         try:
             cmd = Command()
-            command_data = self._define_command(text)
-            cmd.request, cmd.response, cmd._type = command_data
+            text = event.msg.text
+            cmd.request, cmd.response, cmd.type = self._define_command(text)
 
             if self._define_prohibitions(cmd.request, chat_id):
                 return None
@@ -70,7 +81,7 @@ class Commands(object):
     def remove_command(self, event) -> str:
         """Remove command from db.
 
-        :param event: example: удалить команду текст запрос
+        :param event: object with information about the event
         """
         msg = event.msg.text.split(':')
         request = msg[0].strip()
@@ -92,9 +103,9 @@ class Commands(object):
         data: list = self._filtering(text)
 
         _type: str = self._get_command_type(data)
-        data.remove(text[0])
+        data.remove(data[0])
 
-        msg: list = ' '.join(text).split(':')
+        msg: list = ''.join(data).split(':')
 
         request = msg[0]
         response = msg[1]

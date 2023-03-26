@@ -3,6 +3,7 @@ from sqlite3 import OperationalError
 
 
 class DataBase(object):
+    """ORM for Vanessa"""
     __instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -15,6 +16,10 @@ class DataBase(object):
 
     @staticmethod
     def set_command(cmd):
+        """Adds command to database.
+
+        :param cmd: command object
+        """
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''INSERT INTO commands(type, strategy, 
@@ -24,6 +29,10 @@ class DataBase(object):
 
     @staticmethod
     def set_shut_up_person(user_id):
+        """Adds person to database of muted.
+
+        :param user_id: user ID
+        """
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''INSERT INTO shut_up_people(user_id) 
@@ -32,6 +41,10 @@ class DataBase(object):
 
     @staticmethod
     def update_command(cmd):
+        """Update command to database.
+
+        :param cmd: command object
+        """
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''UPDATE commands SET type = "{cmd.type}", 
@@ -42,6 +55,10 @@ class DataBase(object):
 
     @staticmethod
     def remove_command(request):
+        """Remove command from database.
+
+        :param request: a request made to invoke a command
+        """
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''DELETE FROM commands
@@ -51,6 +68,10 @@ class DataBase(object):
 
     @staticmethod
     def remove_from_shut_up_people(user_id):
+        """Remove person from database of muted.
+
+        :param user_id: user ID
+        """
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''DELETE FROM shut_up_people
@@ -60,6 +81,10 @@ class DataBase(object):
 
     @staticmethod
     def get_response_and_type(request):
+        """Return command from database or None.
+
+        :param request: a request made to invoke a command
+        """
         try:
             with sql.connect('vanessa.db') as connect:
                 cursor = connect.cursor()
@@ -71,6 +96,10 @@ class DataBase(object):
 
     @staticmethod
     def get_all_commands(strategy='contextual'):
+        """Return all commands from database.
+
+        :param strategy: 'contextual' or 'normal', by default 'contextual'
+        """
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''SELECT request, type, response
@@ -79,6 +108,7 @@ class DataBase(object):
 
     @staticmethod
     def get_all_commands_data():
+        """Return all commands with full data about them."""
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''SELECT * FROM commands''')
@@ -86,10 +116,14 @@ class DataBase(object):
 
     @staticmethod
     def get_shut_up_person(user_id):
+        """Return person data.
+
+        :param user_id: user ID
+        """
         try:
             with sql.connect('vanessa.db') as connect:
                 cursor = connect.cursor()
-                cursor.execute(f'''SELECT user_id FROM shut_up_people 
+                cursor.execute(f'''SELECT * FROM shut_up_people 
                 WHERE user_id == "{user_id}"''')
             return cursor.fetchone()
         except OperationalError:
@@ -97,9 +131,10 @@ class DataBase(object):
 
     @staticmethod
     def get_all_shut_up_person():
+        """Return all shut_up_person with full data about them."""
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
-            cursor.execute(f'''SELECT user_id FROM shut_up_people''')
+            cursor.execute(f'''SELECT * FROM shut_up_people''')
         return cursor.fetchall()
 
     @staticmethod

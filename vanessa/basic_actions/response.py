@@ -10,7 +10,10 @@ from service_files.big_strings import commands_add_help
 
 
 class Response(object):
-    """The intermediary class between commands and responses."""
+    """The intermediary class between commands and responses.
+
+    :param event: object with information about the request
+    """
     def __init__(self, event):
         self.chat_id = event.chat_id
         self.text = event.msg.text
@@ -22,10 +25,10 @@ class Response(object):
 
     def definition(self):
         """Causes questions to be checked for an answer."""
-        if not self.__check_special_commands():
-            self.__check_db_commands()
+        if not self._check_special_commands():
+            self._check_db_commands()
 
-    def __send_choice(self, response, _type):
+    def _send_choice(self, response, _type):
         if _type == 'текст':
             return send_text(self.chat_id, response)
         elif _type == 'гиф' or _type == 'изображение':
@@ -33,17 +36,17 @@ class Response(object):
         elif _type == 'стикер':
             return send_stick(self.chat_id, response)
 
-    def __check_db_commands(self):
+    def _check_db_commands(self):
         data = self.db.get_response_and_type(self.text)
         if data:
-            return self.__send_choice(data[0], data[1])
+            return self._send_choice(data[0], data[1])
 
         for data in self.db.get_all_commands():
             if data[0] in self.text:
-                return self.__send_choice(data[2], data[1])
+                return self._send_choice(data[2], data[1])
 
-    def __check_special_commands(self):
-        """Checking hard code commands."""
+    def _check_special_commands(self):
+        """Check hard code commands."""
         if self.text == 'команды':
             return send_text(self.chat_id, Commands().get_commands())
 

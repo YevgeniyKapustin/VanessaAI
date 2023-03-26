@@ -5,17 +5,22 @@ from vk_api import VkApi, VkUpload
 from prepare.config import Config
 
 
-class Connection:
-    """Establishes a connection with VK and serves to store variables for
-    storing connection data
-    variables:
+class Connection(object):
+    """Establishes a connection with VK and serves to store variables.
+
+    :Variables:
         vk: vk api object using a community token
         vk_admin: vk api object using an admin token
         longpoll: object for working with community events
         upload: file upload object
-
-
     """
+    __instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = super(Connection, cls).__new__(cls)
+        return cls.__instance
+
     def __init__(self):
         self.__config = Config().get_config()
 

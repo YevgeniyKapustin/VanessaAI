@@ -3,7 +3,20 @@ from sqlite3 import OperationalError
 
 
 class DataBase(object):
-    """ORM for Vanessa"""
+    """ORM for Vanessa.
+
+    :Methods:
+    set_command(cmd)
+    update_command(cmd)
+    remove_command(request)
+    get_response_and_type(request)
+    get_all_commands_for_strategy(strategy)
+    get_all_commands_data()
+
+    get_all_shut_up_person()
+    get_shut_up_person(user_id)
+    remove_from_shut_up_people(user_id)
+    """
     __instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -16,7 +29,7 @@ class DataBase(object):
 
     @staticmethod
     def set_command(cmd):
-        """Adds command to database.
+        """Add command to database.
 
         :param cmd: command object
         """
@@ -29,7 +42,7 @@ class DataBase(object):
 
     @staticmethod
     def set_shut_up_person(user_id):
-        """Adds person to database of muted.
+        """Add person to database of muted.
 
         :param user_id: user ID
         """
@@ -95,7 +108,7 @@ class DataBase(object):
             return None
 
     @staticmethod
-    def get_all_commands(strategy='contextual'):
+    def get_all_commands_for_strategy(strategy='contextual'):
         """Return all commands from database.
 
         :param strategy: 'contextual' or 'normal', by default 'contextual'

@@ -41,7 +41,7 @@ class Mute(object):
 
             for member in members['items']:
                 try:
-                    if member['member_id'] == int(victim_id):
+                    if str(member['member_id']) == victim_id:
                         found = True
                         if member['is_admin']:
                             return self._send_response('no_power')
@@ -50,7 +50,7 @@ class Mute(object):
                     pass
 
             if not found:
-                return self._send_response('no_found_victim', victim_id)
+                return self._send_response('no_found_victim')
 
             elif victim_id == self.db.get_shut_up_person(victim_id):
                 return self._send_response('already_muted', victim_id)
@@ -84,7 +84,7 @@ class Mute(object):
         if 'раз' in text:
             text = text.replace('раз', '')
         text = text.replace('мут', '')
-        if text == '' and 'reply_message' in self.event.object.message:
+        if text == '' and self.msg.reply_message:
             victim_id = self.msg.reply_message['from_id']
         else:
             victim_id = self._id_definition_by_mention(text)

@@ -41,7 +41,7 @@ class Response(object):
         if data:
             return self._send_choice(data[0], data[1])
 
-        for data in self.db.get_all_commands():
+        for data in self.db.get_all_commands_for_strategy('contextual'):
             if data[0] in self.text:
                 return self._send_choice(data[2], data[1])
 

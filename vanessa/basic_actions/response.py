@@ -4,7 +4,7 @@ from commands_logic.add_command import Commands
 from commands_logic.mute import Mute
 from commands_logic.randomize import send_random_fraction, \
     send_random_zmiys_phrases, send_random_rarity, send_roll_dice
-from commands_logic.wiki import send_wiki_article
+from commands_logic.wiki import Wikipedia
 from basic_actions.actions import send_text, send_stick, send_file
 from service_files.big_strings import commands_add_help
 
@@ -51,23 +51,23 @@ class Response(object):
             return send_random_fraction(self.chat_id)
 
         elif self.text[:9] in ['что такое', 'кто такая', 'кто такой']:
-            return send_wiki_article(self.chat_id, self.text)
+            return Wikipedia(self.event).send_wiki_article()
 
         elif self.text[:3] == 'мут':
-            return Mute(self.msg, self.event).shut_up()
+            return Mute(self.event).shut_up()
 
         elif self.text[:6] == 'размут':
             return Mute.redemption(
-                Mute(self.msg, self.event))
+                Mute(self.event))
 
         elif self.text == 'добавить команду помощь':
             return send_text(self.chat_id, self.add_help)
 
         elif self.text[:16] == 'добавить команду':
-            return Commands.add_command(Commands(), self.text, self.event)
+            return Commands.add_command(Commands(), self.event)
 
         elif self.text[:15] == 'удалить команду':
-            return Commands.remove_command(Commands(), self.text, self.chat_id)
+            return Commands.remove_command(Commands(), self.event)
 
         elif self.text == 'абоба':
             return send_random_zmiys_phrases(self.chat_id)

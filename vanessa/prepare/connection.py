@@ -13,6 +13,8 @@ class Connection:
         vk_admin: vk api object using an admin token
         longpoll: object for working with community events
         upload: file upload object
+
+
     """
     def __init__(self):
         self.__config = Config().get_config()

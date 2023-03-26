@@ -6,12 +6,15 @@ from prepare.connection import Connection
 
 
 class Mute(object):
-    """Class for working with mutes and unmutes.
+    """Class for handling the request associated with the mute.
 
-    :Methods:
+        :param event: object with information about the request
+
+    Methods:
     shut_up()
     redemption()
     """
+
     def __init__(self, event):
         self.chat_id = event.chat_id
         self.text = event.msg.text

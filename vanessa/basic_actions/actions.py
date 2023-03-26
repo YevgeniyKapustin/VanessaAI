@@ -9,9 +9,8 @@ _vk = Connection().vk
 def send_text(chat_id: int, text: str) -> str:
     """Text is returned.
 
-    :param chat_id: int: 
-    :param text: str: 
-
+    :param chat_id: id of the chat to which the message will be sent
+    :param text: message sent by user
     """
     _vk.messages.send(chat_id=chat_id, message=text, random_id=0)
     return text
@@ -20,25 +19,23 @@ def send_text(chat_id: int, text: str) -> str:
 def send_stick(chat_id: int, stick_id: int) -> int:
     """Stick_id is returned.
 
-    :param chat_id: int: 
-    :param stick_id: int: 
-
+    :param chat_id: id of the chat to which the message will be sent
+    :param stick_id: VK sticker ID
     """
     try:
         _vk.messages.send(chat_id=chat_id, sticker_id=int(stick_id),
                           random_id=0)
         return stick_id
     except ApiError:
-        send_text(chat_id, f'чота не дает мне вк кинуть {stick_id} '
-                           f'стик')
+        send_text(chat_id, f'чота не дает мне вк кинуть {stick_id} стик')
 
 
 def send_file(chat_id: int, url: str) -> str:
     """Url is returned or error string.
 
-    :param chat_id: int: 
-    :param url: str: 
-
+    :param chat_id: id of the chat to which the message will be sent
+    :param url: link to the file in the public domain
+    (that is, the link should not be from the conversation)
     """
     try:
         _vk.messages.send(chat_id=chat_id, attachment=url, random_id=0)

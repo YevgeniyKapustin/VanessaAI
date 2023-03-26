@@ -4,12 +4,12 @@ from configparser import ConfigParser
 
 class Config:
     """Class for working with the bot config."""
+
     def get_config(self):
-        """Returns the bot config.
+        """Return the bot config.
+
         if it does not exist, you will be prompted to create it
         by entering data in the console.
-
-
         """
         config_patch = "service_files/config.ini"
 

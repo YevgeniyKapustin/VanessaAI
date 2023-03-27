@@ -18,7 +18,7 @@ class Config(object):
         if it does not exist, you will be prompted to create it
         by entering data in the console.
         """
-        config_patch = "service_files/config.ini"
+        config_patch = "config.ini"
 
         if not path.exists(config_patch):
             with open(config_patch, 'w') as write_f:

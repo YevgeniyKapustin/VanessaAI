@@ -1,7 +1,7 @@
 import pytest
 
 from basic_actions.actions import send_text, send_file, send_stick, remove_msg
-from tests.vars_for_test import chat_id, vk_error_100, Event, vk_error_15
+from tests.vars_for_test import chat_id, vk_error_100, MockEvent, vk_error_15
 
 text_commands = [
     ('теКст для теСта 1', 'теКст для теСта 1'),
@@ -40,7 +40,7 @@ def test_send_stick(stick_id, expect):
 
 
 remove_commands = [
-    (Event, vk_error_15),
+    (MockEvent, vk_error_15),
 ]
 
 

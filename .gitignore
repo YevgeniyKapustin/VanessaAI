@@ -2,3 +2,4 @@
 config.ini
 log.txt
 vanessa.db
+.pytest_cache

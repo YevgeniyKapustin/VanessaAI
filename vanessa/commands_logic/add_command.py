@@ -4,7 +4,6 @@ from sqlite3 import IntegrityError
 
 from basic_actions.actions import send_text
 from basic_actions.database import DataBase
-from service_files.big_strings import commands_list_postfix
 
 
 @dataclass
@@ -37,7 +36,16 @@ class Commands(object):
     def get_commands(self) -> str:
         """Return all commands from db."""
         prefix = 'Команды на текущий момент:<br>Запрос, Ответ, Тип, Контекст'
-        postfix = commands_list_postfix
+        postfix = f'''Прочие команды:<br>
+        фракция - генерирует случайную фракцию из героев 5
+        д* - генерирует случайное число в диапазоне от 1 до указанного числа
+        что такое* - отвечает первыми тремя предложениями из википедии
+        мут* - удаляет все новые сообщения этого пользователя(только для админов)
+        размут* - выключает мут для этого пользователя(только для админов)
+        добавить команду помощь - показывает информацию о добавлении команд
+        рарити - отправляет случайную рарити
+        абоба - абоба
+        команды - показывает полный список команд'''
         commands = ''
 
         for index, i in enumerate(self.db.get_all_commands_data()):

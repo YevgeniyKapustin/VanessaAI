@@ -3,10 +3,9 @@ from random import randint
 
 from basic_actions.actions import send_text, send_file
 from prepare.connection import Connection
-
 _vk_admin = Connection().vk_admin
 
-zmiysphrases = [
+zmiys_phrases = [
     'эно как',
     'тюй блин',
     'понял, спасибо',
@@ -23,13 +22,7 @@ zmiysphrases = [
     'кошмар',
     'не ну такое'
 ]
-position = [
-    'верх лево',
-    'верх право',
-    'низ лево',
-    'низ право'
-]
-herofractions = [
+hero_fractions = [
     'орден порядка',
     'инферно',
     'лесной союз',
@@ -57,7 +50,7 @@ def send_random_zmiys_phrases(chat_id: int) -> str:
 
     :param chat_id: id of the chat to which the message will be sent
     """
-    return send_text(chat_id, f'{zmiysphrases[randint(0, 14)]}')
+    return send_text(chat_id, f'{zmiys_phrases[randint(0, 14)]}')
 
 
 def send_random_fraction(chat_id: int) -> str:
@@ -65,7 +58,7 @@ def send_random_fraction(chat_id: int) -> str:
 
     :param chat_id: id of the chat to which the message will be sent
     """
-    return send_text(chat_id, f'🎲 {herofractions[randint(0, 7)]}')
+    return send_text(chat_id, f'🎲 {hero_fractions[randint(0, 7)]}')
 
 
 def send_random_rarity(chat_id: int) -> str:

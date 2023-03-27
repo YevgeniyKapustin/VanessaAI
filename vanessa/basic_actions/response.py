@@ -6,7 +6,6 @@ from commands_logic.randomize import send_random_fraction, \
     send_random_zmiys_phrases, send_random_rarity, send_roll_dice
 from commands_logic.wiki import Wikipedia
 from basic_actions.actions import send_text, send_stick, send_file
-from service_files.big_strings import commands_add_help
 
 
 class Response(object):
@@ -14,6 +13,7 @@ class Response(object):
 
     :param event: object with information about the request
     """
+
     def __init__(self, event):
         self.chat_id = event.chat_id
         self.text = event.msg.text
@@ -21,7 +21,6 @@ class Response(object):
         self.event = event
         self.msg = event.msg
         self.db = DataBase()
-        self.add_help = commands_add_help
 
     def definition(self):
         """Causes questions to be checked for an answer."""
@@ -64,7 +63,12 @@ class Response(object):
                 Mute(self.event))
 
         elif self.text == 'добавить команду помощь':
-            return send_text(self.chat_id, self.add_help)
+            return send_text(self.chat_id, '''добавить команду (тип ответа)(_) 
+            (запрос): (ответ) например: добавить команду текст_ амогус: тутуту
+            нижнее подчеркивание нужно добавить если вы хотите, чтобы команда 
+            писалась в случае если запрос содержится в сообщении, а не целиком 
+            его составляла в случае ответадля гиф или изображения нужен его url
+            , для стикера id типы команд: текст, гиф, изображение, стикер''')
 
         elif self.text[:16] == 'добавить команду':
             return Commands.add_command(Commands(), self.event)
@@ -74,9 +78,6 @@ class Response(object):
 
         elif self.text == 'абоба':
             return send_random_zmiys_phrases(self.chat_id)
-
-        elif self.db.get_all_shut_up_person() and self.text == 'зверинец':
-            return send_text(self.chat_id, self.db.get_all_shut_up_person())
 
         elif self.text == 'рарити':
             return send_random_rarity(self.chat_id)

@@ -2,8 +2,15 @@ from os import path
 from configparser import ConfigParser
 
 
-class Config:
+class Config(object):
     """Class for working with the bot config."""
+
+    __instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = super(cls, cls).__new__(cls)
+        return cls.__instance
 
     def get_config(self):
         """Return the bot config.

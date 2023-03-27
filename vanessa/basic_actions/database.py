@@ -17,11 +17,12 @@ class DataBase(object):
     get_shut_up_person(user_id)
     remove_from_shut_up_people(user_id)
     """
+
     __instance = None
 
     def __new__(cls, *args, **kwargs):
         if not cls.__instance:
-            cls.__instance = super(DataBase, cls).__new__(cls)
+            cls.__instance = super(cls, cls).__new__(cls)
         return cls.__instance
 
     def __init__(self):

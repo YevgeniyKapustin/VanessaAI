@@ -2,63 +2,39 @@
 
 For questions, you can contact me at:
 VK - https://vk.com/kapystaevg
-TG - @kapustaevg03
+TG - https://t.me/kapustaevg03
 """
 from datetime import datetime
 from os import path
 
-from pydantic import BaseModel
 from requests import ReadTimeout
 from requests.exceptions import ProxyError
 from vk_api.bot_longpoll import VkBotEventType
 
 from basic_actions.actions import remove_msg
 from basic_actions.database import DataBase
+from basic_actions.events import Msg, EventBuilder
 from basic_actions.response import Response
 from prepare.connection import Connection
 
 
-class Msg(BaseModel):
-    peer_id: int
-    from_id: int
-    conversation_message_id: int
-    text: str
-    reply_message: dict = None
+class Controller(object):
+    """Controls the processing of events and sends them to the business logic.
 
+    :Methods:
+    launch()
+    """
 
-class Event(object):
-    msg: Msg
-    chat_id: int
-    attachments: dict = None
+    __instance = None
 
-
-class EventBuilder(object):
-
-    def __init__(self):
-        self.__event = Event
-
-    def get_event(self):
-        return self.__event
-
-    def set_msg(self, msg: object):
-        self.__event.msg = msg
-        return self
-
-    def set_chat_id(self, chat_id: int):
-        self.__event.chat_id = chat_id
-        return self
-
-    def set_attachment(self, event):
-        self.__event.attachments = event.message.attachments
-        return self
-
-
-class Vanessa:
-    """The main class for the bot that implements its main work cycle."""
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = super(cls, cls).__new__(cls)
+        return cls.__instance
 
     def __init__(self):
         self.__starting_counter = 0
-        self.__exception = 'No issue occurred'
+        self.__exception = 'No exception occurred'
         self.db = DataBase()
         self.longpoll = Connection().longpoll
 
@@ -66,8 +42,6 @@ class Vanessa:
         """Start and reloading the bot in case of an exception.
         
         Also monitors data updates for logs and triggers logging.
-
-
         """
         while True:
             self.__starting_counter += 1
@@ -88,11 +62,11 @@ class Vanessa:
 
         print(log)
 
-        if path.isfile('service_files/log.txt'):
-            with open('service_files/log.txt', 'r') as read_f:
+        if path.isfile('log.txt'):
+            with open('log.txt', 'r') as read_f:
                 previous_logs = read_f.read()
 
-        with open('service_files/log.txt', 'w') as write_f:
+        with open('log.txt', 'w') as write_f:
             write_f.write(f'{previous_logs}{log}\n')
 
     def __run(self):
@@ -117,4 +91,4 @@ class Vanessa:
 
 
 if __name__ == '__main__':
-    Vanessa().launch()
+    Controller().launch()

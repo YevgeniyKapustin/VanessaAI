@@ -15,6 +15,7 @@ class Wikipedia(object):
     Methods:
     send_wiki_article()
     """
+
     set_lang('ru')
 
     def __init__(self, event):

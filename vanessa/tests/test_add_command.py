@@ -1,15 +1,45 @@
-import pytest
+from mock.mock import patch
 
-from basic_actions.actions import send_text, send_file, send_stick, remove_msg
-from tests.vars_for_test import chat_id, vk_error_100, Event, vk_error_15
-
-text_commands = [
-    ('теКст для теСта 1', 'теКст для теСта 1'),
-    (1, 1),
-    ('', vk_error_100),
-]
+from commands_logic.add_command import Commands
+from tests.test_actions import MockEvent
 
 
-@pytest.mark.parametrize('text, expect', text_commands)
-def test_send_text(text, expect):
-    assert send_text(chat_id, text) == expect
+@patch('basic_actions.database.DataBase.set_command')
+def test_add_command(mock_set_command):
+    mock_set_command.return_value = None
+
+    mock_event = MockEvent()
+    mock_event.msg.text = 'добавить команду текст биба: и боба'
+
+    assert Commands().add_command(mock_event) == 'команда биба была добавлена'
+
+
+@patch('basic_actions.database.DataBase.remove_command')
+def test_remove_command(mock_remove_command):
+    mock_remove_command.return_value = None
+
+    mock_event = MockEvent()
+    mock_event.msg.text = 'удалить команду текст биба'
+
+    assert Commands().remove_command(mock_event) == 'команда биба была удалена'
+
+
+@patch('basic_actions.database.DataBase.get_all_commands_data')
+def test_get_commands(mock_get_all_commands_data):
+    mock_get_all_commands_data.return_value = (
+        ('текст', 'normal', 'биба', 'боба'),)
+
+    assert Commands().get_commands() == (
+        'Команды на текущий момент:<br>Запрос, Ответ, Тип, Контекст<br><br>1. боба: '
+        'биба, текст, normal<br><br><br>Прочие команды:<br>\n'
+        '        фракция - генерирует случайную фракцию из героев 5\n'
+        '        д* - генерирует случайное число в диапазоне от 1 до указанного '
+        'числа\n'
+        '        что такое* - отвечает первыми тремя предложениями из википедии\n'
+        '        мут* - удаляет все новые сообщения этого пользователя(только для '
+        'админов)\n'
+        '        размут* - выключает мут для этого пользователя(только для админов)\n'
+        '        добавить команду помощь - показывает информацию о добавлении команд\n'
+        '        рарити - отправляет случайную рарити\n'
+        '        абоба - абоба\n'
+        '        команды - показывает полный список команд')

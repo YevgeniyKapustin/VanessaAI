@@ -1,13 +1,27 @@
 import pytest
 
 from basic_actions.actions import send_text, send_file, send_stick, remove_msg
-from tests.vars_for_test import chat_id, vk_error_100, MockEvent, vk_error_15
+from tests.vars_for_test import chat_id, vk_error_100, vk_error_15
 
 text_commands = [
     ('теКст для теСта 1', 'теКст для теСта 1'),
     (1, 1),
     ('', vk_error_100),
 ]
+
+
+class MockMsg:
+    peer_id = 2000000004
+    from_id = 465630601
+    conversation_message_id = 4644
+    text = 'добавить команду текст биба: и боба'
+    reply_message = None
+
+
+class MockEvent:
+    msg = MockMsg
+    chat_id = chat_id
+    attachments = None
 
 
 @pytest.mark.parametrize('text, expect', text_commands)

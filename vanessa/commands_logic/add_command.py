@@ -80,7 +80,7 @@ class Commands(object):
                     self.db.set_command(cmd)
                 except IntegrityError:
                     self.db.update_command(cmd)
-                self._success_add(chat_id, cmd)
+                return self._success_add(chat_id, cmd)
             else:
                 return self._something_wrong(chat_id)
         except (IndexError, ValueError):
@@ -91,8 +91,7 @@ class Commands(object):
 
         :param event: object with information about the event
         """
-        msg = event.msg.text.split(':')
-        request = msg[0].strip()
+        request = self._filtering(event.msg.text)[1].strip()
         chat_id = event.chat_id
 
         if request == 'сус':

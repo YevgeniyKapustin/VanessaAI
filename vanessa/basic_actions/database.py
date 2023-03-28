@@ -1,6 +1,5 @@
 import sqlite3 as sql
-from sqlite3 import OperationalError
-
+from sqlite3 import OperationalError, IntegrityError
 
 class DataBase(object):
     """ORM for Vanessa.
@@ -35,12 +34,15 @@ class DataBase(object):
 
         :param cmd: command object
         """
-        with sql.connect('vanessa.db') as connect:
-            cursor = connect.cursor()
-            cursor.execute(f'''INSERT INTO commands(type, strategy, 
-            request, response) VALUES ("{cmd.type}", "{cmd.strategy}", 
-            "{cmd.request}", "{cmd.response}")''')
-            return True
+        try:
+            with sql.connect('vanessa.db') as connect:
+                cursor = connect.cursor()
+                cursor.execute(f'''INSERT INTO commands(type, strategy, 
+                request, response) VALUES ("{cmd.type}", "{cmd.strategy}", 
+                "{cmd.request}", "{cmd.response}")''')
+                return True
+        except IntegrityError:
+            return False
 
     @staticmethod
     def set_shut_up_person(user_id):
@@ -74,11 +76,14 @@ class DataBase(object):
 
         :param request: a request made to invoke a command
         """
-        with sql.connect('vanessa.db') as connect:
-            cursor = connect.cursor()
-            cursor.execute(f'''DELETE FROM commands
-            WHERE request = "{request}"
-            ''')
+        try:
+            with sql.connect('vanessa.db') as connect:
+                cursor = connect.cursor()
+                cursor.execute(f'''DELETE FROM commands
+                WHERE request = "{request}"
+                ''')
+        except OperationalError:
+            return False
         return True
 
     @staticmethod
@@ -107,7 +112,7 @@ class DataBase(object):
                 WHERE request == "{request}" ''')
             return cursor.fetchone()
         except OperationalError:
-            return None
+            return False
 
     @staticmethod
     def get_all_commands_for_strategy(strategy='contextual'):
@@ -142,7 +147,7 @@ class DataBase(object):
                 WHERE user_id == "{user_id}"''')
             return cursor.fetchone()
         except OperationalError:
-            return None
+            return False
 
     @staticmethod
     def get_all_shut_up_person():

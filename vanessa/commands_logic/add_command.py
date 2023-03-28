@@ -1,6 +1,5 @@
 """Module for interactive addition of commands by users."""
 from dataclasses import dataclass
-from sqlite3 import IntegrityError
 
 from basic_actions.actions import send_text
 from basic_actions.database import DataBase
@@ -76,11 +75,11 @@ class Commands(object):
                 cmd.response = f'{cmd.type}{attch["owner_id"]}_{attch["id"]}'
 
             if cmd.request and cmd.response and cmd.type and cmd.strategy:
-                try:
-                    self.db.set_command(cmd)
-                except IntegrityError:
+                if self.db.set_command(cmd):
+                    return self._success_add(chat_id, cmd)
+                else:
                     self.db.update_command(cmd)
-                return self._success_add(chat_id, cmd)
+                    return self._success_add(chat_id, cmd)
             else:
                 return self._something_wrong(chat_id)
         except (IndexError, ValueError):
@@ -91,13 +90,13 @@ class Commands(object):
 
         :param event: object with information about the event
         """
-        request = self._filtering(event.msg.text)[1].strip()
+        request = self._filtering(event.msg.text)
+        request = request.split(' ')[1].strip()
         chat_id = event.chat_id
 
         if request == 'сус':
             return send_text(chat_id, 'сус священен')
-        if request:
-            self.db.remove_command(request)
+        if request and self.db.remove_command(request):
             return send_text(chat_id, f'команда {request} была удалена')
         else:
             return send_text(chat_id, 'чета ты насусил братик')

@@ -13,6 +13,7 @@ class DataBase(object):
     get_all_commands_for_strategy(strategy)
     get_all_commands_data()
 
+    set_shut_up_person(user_id)
     get_all_shut_up_person()
     get_shut_up_person(user_id)
     remove_from_shut_up_people(user_id)
@@ -29,7 +30,7 @@ class DataBase(object):
         self.__tables_validation()
 
     @staticmethod
-    def set_command(cmd):
+    def set_command(cmd) -> bool:
         """Add command to database.
 
         :param cmd: command object
@@ -39,7 +40,7 @@ class DataBase(object):
             cursor.execute(f'''INSERT INTO commands(type, strategy, 
             request, response) VALUES ("{cmd.type}", "{cmd.strategy}", 
             "{cmd.request}", "{cmd.response}")''')
-        return cursor.fetchone()
+            return True
 
     @staticmethod
     def set_shut_up_person(user_id):
@@ -51,10 +52,10 @@ class DataBase(object):
             cursor = connect.cursor()
             cursor.execute(f'''INSERT INTO shut_up_people(user_id) 
             VALUES ("{user_id}")''')
-        return cursor.fetchone()
+        return True
 
     @staticmethod
-    def update_command(cmd):
+    def update_command(cmd) -> bool:
         """Update command to database.
 
         :param cmd: command object
@@ -65,7 +66,7 @@ class DataBase(object):
             strategy = "{cmd.strategy}", response = "{cmd.response}"
             WHERE request = "{cmd.request}"
             ''')
-        return cursor.fetchone()
+        return True
 
     @staticmethod
     def remove_command(request):
@@ -76,9 +77,9 @@ class DataBase(object):
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
             cursor.execute(f'''DELETE FROM commands
-            WHERE request = {request}
+            WHERE request = "{request}"
             ''')
-        return cursor.fetchone()
+        return True
 
     @staticmethod
     def remove_from_shut_up_people(user_id):
@@ -91,7 +92,7 @@ class DataBase(object):
             cursor.execute(f'''DELETE FROM shut_up_people
             WHERE user_id = {user_id}
             ''')
-        return cursor.fetchone()
+        return True
 
     @staticmethod
     def get_response_and_type(request):

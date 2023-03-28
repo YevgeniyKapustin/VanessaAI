@@ -67,15 +67,15 @@ class Commands(object):
             if self._define_prohibitions(cmd.request, chat_id):
                 return None
 
-            strategy = self._define_strategy(cmd.type)
-            if strategy == 'contextual':
+            cmd.strategy = self._define_strategy(cmd.type)
+            if cmd.strategy == 'contextual':
                 cmd.type = cmd.type[:-1]
 
             attch = self._define_attachment(cmd.type, event)
             if attch:
                 cmd.response = f'{cmd.type}{attch["owner_id"]}_{attch["id"]}'
 
-            if cmd.request and cmd.response and cmd.type and strategy:
+            if cmd.request and cmd.response and cmd.type and cmd.strategy:
                 try:
                     self.db.set_command(cmd)
                 except IntegrityError:
@@ -107,12 +107,13 @@ class Commands(object):
 
         :param text: message sent by user
         """
-        data: list = self._filtering(text)
+        data = self._filtering(text)
+        data = data.split(' ')
 
         _type: str = self._get_command_type(data)
         data.remove(data[0])
 
-        msg: list = ''.join(data).split(':')
+        msg: list = ' '.join(data).split(':')
 
         request = msg[0]
         response = msg[1]
@@ -139,7 +140,7 @@ class Commands(object):
             return str(error)
 
     @staticmethod
-    def _filtering(text: str) -> list:
+    def _filtering(text: str) -> str:
         """Remove redundant information from the message.
 
         :param text: message sent by user
@@ -151,7 +152,7 @@ class Commands(object):
             text.remove('добавить')
         else:
             text.remove('удалить')
-        return text
+        return ' '.join(text)
 
     @staticmethod
     def _define_strategy(_type: str) -> str:

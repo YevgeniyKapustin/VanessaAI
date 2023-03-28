@@ -1,7 +1,7 @@
 chat_id = 4
 
 vk_error_100 = '[100] One of the parameters specified was missing or invalid: message is empty or invalid'
-vk_error_15 = '[15] Access denied: message can not be deleted (admin message)'
+vk_error_15 = '[15] Access denied: message can not be deleted (old message)'
 
 
 class MockMsg:

@@ -1,6 +1,7 @@
 import sqlite3 as sql
 from sqlite3 import OperationalError, IntegrityError
 
+
 class DataBase(object):
     """ORM for Vanessa.
 
@@ -131,7 +132,7 @@ class DataBase(object):
         """Return all commands with full data about them."""
         with sql.connect('vanessa.db') as connect:
             cursor = connect.cursor()
-            cursor.execute(f'''SELECT * FROM commands''')
+            cursor.execute(f'''SELECT * FROM commands ORDER BY request''')
         return cursor.fetchall()
 
     @staticmethod

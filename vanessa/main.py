@@ -79,6 +79,7 @@ class Controller(object):
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg = Msg.parse_obj(event.object.message)
+                msg.text = msg.text.lower()
                 event = (
                     EventBuilder().set_msg(msg).set_chat_id(event.chat_id).
                     set_attachment(event).get_event()

@@ -48,7 +48,7 @@ class Commands(object):
         commands = ''
 
         for index, i in enumerate(self.db.get_all_commands_data()):
-            commands += f'{index + 1}. {i[3]}: {i[2]}, {i[0]}, {i[1]}<br>'
+            commands += f'{index + 1}. {i[2]}: {i[3]}, {i[0]}, {i[1]}<br>'
 
         return f'{prefix}<br><br>{commands}<br><br>{postfix}'
 
@@ -91,15 +91,17 @@ class Commands(object):
         :param event: object with information about the event
         """
         request = self._filtering(event.msg.text)
-        request = request.split(' ')[1].strip()
         chat_id = event.chat_id
+
+        if not len(request) > 1:
+            return self._something_wrong(chat_id)
 
         if request == 'сус':
             return send_text(chat_id, 'сус священен')
         if request and self.db.remove_command(request):
             return send_text(chat_id, f'команда {request} была удалена')
         else:
-            return send_text(chat_id, 'чета ты насусил братик')
+            return self._something_wrong(chat_id)
 
     def _define_command(self, text: str) -> tuple:
         """Extract data from a message.

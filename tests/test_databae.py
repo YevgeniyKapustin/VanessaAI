@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 from basic_actions.database import DataBase
@@ -16,7 +17,10 @@ user_id = 1111
 
 
 def test_set_command():
-    assert DataBase.set_command(cmd)
+    db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),'vanessa.db')
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    assert DataBase().set_command(cmd)
 
 
 def test_update_command():

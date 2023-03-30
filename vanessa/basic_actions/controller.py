@@ -8,7 +8,7 @@ from commands_logic.wiki import Wikipedia
 from basic_actions.actions import send_text, send_stick, send_file
 
 
-class Response(object):
+class Controller(object):
     """The intermediary class between commands and responses.
 
     :param event: object with information about the request

@@ -14,11 +14,11 @@ from vk_api.bot_longpoll import VkBotEventType
 from basic_actions.actions import remove_msg
 from basic_actions.database import DataBase
 from basic_actions.events import Msg, EventBuilder
-from basic_actions.response import Response
+from basic_actions.controller import Controller
 from prepare.connection import Connection
 
 
-class Controller(object):
+class Main(object):
     """Controls the processing of events and sends them to the business logic.
 
     :Methods:
@@ -88,8 +88,8 @@ class Controller(object):
                 if self.db.get_shut_up_person(event.msg.from_id):
                     remove_msg(event)
                 else:
-                    Response(event).definition()
+                    Controller(event).definition()
 
 
 if __name__ == '__main__':
-    Controller().launch()
+    Main().launch()

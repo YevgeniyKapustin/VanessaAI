@@ -82,7 +82,7 @@ class Commands(object):
                     return self._success_add(chat_id, cmd)
             else:
                 return self._something_wrong(chat_id)
-        except (IndexError, ValueError):
+        except (IndexError, ValueError, KeyError):
             return self._something_wrong(chat_id)
 
     def remove_command(self, event) -> str:

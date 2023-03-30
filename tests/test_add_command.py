@@ -6,7 +6,7 @@ from tests.test_actions import MockEvent
 
 @patch('basic_actions.database.DataBase.set_command')
 def test_add_command(mock_set_command):
-    mock_set_command.return_value = None
+    mock_set_command.return_value = True
 
     mock_event = MockEvent()
     mock_event.msg.text = 'добавить команду текст биба: и боба'
@@ -16,10 +16,10 @@ def test_add_command(mock_set_command):
 
 @patch('basic_actions.database.DataBase.remove_command')
 def test_remove_command(mock_remove_command):
-    mock_remove_command.return_value = None
+    mock_remove_command.return_value = True
 
     mock_event = MockEvent()
-    mock_event.msg.text = 'удалить команду текст биба'
+    mock_event.msg.text = 'удалить команду биба'
 
     assert Commands().remove_command(mock_event) == 'команда биба была удалена'
 
@@ -30,8 +30,8 @@ def test_get_commands(mock_get_all_commands_data):
         ('текст', 'normal', 'биба', 'боба'),)
 
     assert Commands().get_commands() == (
-        'Команды на текущий момент:<br>Запрос, Ответ, Тип, Контекст<br><br>1. боба: '
-        'биба, текст, normal<br><br><br>Прочие команды:<br>\n'
+        'Команды на текущий момент:<br>Запрос, Ответ, Тип, Контекст<br><br>1. биба: '
+        'боба, текст, normal<br><br><br>Прочие команды:<br>\n'
         '        фракция - генерирует случайную фракцию из героев 5\n'
         '        д* - генерирует случайное число в диапазоне от 1 до указанного '
         'числа\n'

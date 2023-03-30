@@ -37,19 +37,11 @@ class Mute(object):
             if victim_id == 'ub2121387' or victim_id == '-212138773':
                 return self._send_response('mute_for_bot')
 
-            found = False
-
-            for member in members['items']:
-                try:
-                    if str(member['member_id']) == victim_id:
-                        found = True
-                        if member['is_admin']:
-                            return self._send_response('no_power')
-                        break
-                except KeyError:
-                    pass
+            found = self._founding_member(members, victim_id)
 
             if not found:
+                if not found == bool:
+                    return self._send_response('no_power')
                 return self._send_response('no_found_victim')
 
             elif victim_id == self.db.get_shut_up_person(victim_id):
@@ -145,3 +137,19 @@ class Mute(object):
     def _id_definition_by_mention(mention):
         """Cut id from mention."""
         return mention.strip()[3:12]
+
+    @staticmethod
+    def _founding_member(members, victim_id):
+        found = False
+
+        for member in members['items']:
+            try:
+                if str(member['member_id']) == victim_id:
+                    found = True
+                    if member['is_admin']:
+                        return 'victim_admin'
+                    break
+            except KeyError:
+                pass
+
+        return found

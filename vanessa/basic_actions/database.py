@@ -30,7 +30,7 @@ class DataBase(object):
         self.__tables_validation()
 
     @staticmethod
-    def open_db(func):
+    def __open_db(func):
         def wrapper(*args, **kwargs):
             try:
                 with sql.connect('vanessa.db') as connect:
@@ -42,7 +42,7 @@ class DataBase(object):
         return wrapper
 
     @staticmethod
-    @open_db
+    @__open_db
     def set_command(cmd, cursor) -> bool:
         """Add command to database.
 
@@ -55,7 +55,7 @@ class DataBase(object):
         return True
 
     @staticmethod
-    @open_db
+    @__open_db
     def set_shut_up_person(user_id, cursor) -> bool:
         """Add person to database of muted.
 
@@ -67,7 +67,7 @@ class DataBase(object):
         return True
 
     @staticmethod
-    @open_db
+    @__open_db
     def update_command(cmd, cursor):
         """Update command to database.
 
@@ -81,7 +81,7 @@ class DataBase(object):
         return True
 
     @staticmethod
-    @open_db
+    @__open_db
     def remove_command(request, cursor):
         """Remove command from database.
 
@@ -94,7 +94,7 @@ class DataBase(object):
         return True
 
     @staticmethod
-    @open_db
+    @__open_db
     def remove_from_shut_up_people(user_id, cursor):
         """Remove person from database of muted.
 
@@ -107,7 +107,7 @@ class DataBase(object):
         return True
 
     @staticmethod
-    @open_db
+    @__open_db
     def get_response_and_type(request, cursor):
         """Return command from database or None.
 
@@ -119,7 +119,7 @@ class DataBase(object):
         return cursor.fetchone()
 
     @staticmethod
-    @open_db
+    @__open_db
     def get_all_commands_for_strategy(strategy, cursor):
         """Return all commands from database.
 
@@ -131,7 +131,7 @@ class DataBase(object):
         return cursor.fetchall()
 
     @staticmethod
-    @open_db
+    @__open_db
     def get_all_commands_data(cursor):
         """Return all commands with full data about them.
 
@@ -141,7 +141,7 @@ class DataBase(object):
         return cursor.fetchall()
 
     @staticmethod
-    @open_db
+    @__open_db
     def get_shut_up_person(user_id, cursor):
         """Return person data.
 
@@ -153,7 +153,7 @@ class DataBase(object):
         return cursor.fetchone()
 
     @staticmethod
-    @open_db
+    @__open_db
     def get_all_shut_up_person(cursor):
         """Return all shut_up_person with full data about them.
 
@@ -163,7 +163,7 @@ class DataBase(object):
         return cursor.fetchall()
 
     @staticmethod
-    @open_db
+    @__open_db
     def __tables_validation(cursor):
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS commands (

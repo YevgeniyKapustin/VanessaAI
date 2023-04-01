@@ -63,11 +63,14 @@ class Mute(object):
 
         if self._member_status_check(members):
             victim_id = self._victim_id_search()
-            if int(victim_id) == self.db.get_shut_up_person(victim_id)[0]:
-                self.db.remove_from_shut_up_people(victim_id)
-                return self._send_response('redemption')
-            else:
-                return self._send_response('already_unmuted')
+            try:
+                if int(victim_id) == self.db.get_shut_up_person(victim_id)[0]:
+                    self.db.remove_from_shut_up_people(victim_id)
+                    return self._send_response('redemption')
+                else:
+                    return self._send_response('already_unmuted')
+            except TypeError:
+                return self._send_response('no_found_victim')
         else:
             return self._send_response('no_power')
 
@@ -153,3 +156,4 @@ class Mute(object):
                 pass
 
         return found
+7

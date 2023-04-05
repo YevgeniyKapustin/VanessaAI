@@ -9,6 +9,7 @@ from os import path
 
 from requests import ReadTimeout
 from requests.exceptions import ProxyError
+from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
 from basic_actions.actions import remove_msg
@@ -51,7 +52,7 @@ class Main(object):
 
             try:
                 self.__run()
-            except (ReadTimeout, ProxyError) as exception:
+            except (ReadTimeout, ProxyError, ApiError) as exception:
                 self.__exception = exception
 
     def __log_about_launch(self):

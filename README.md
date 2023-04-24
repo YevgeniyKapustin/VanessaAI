@@ -9,7 +9,7 @@
 
 > git clone https://github.com/Kapusta-fairy/VKBot-Vanessa
 
-> cd *your patch to main.py*
+> cd *your pach to main.py*
 
 > python main.py 
 

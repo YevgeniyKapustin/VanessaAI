@@ -3,7 +3,8 @@ from commands_logic.cabbagesite import get_winrate
 from commands_logic.add_command import Commands
 from commands_logic.mute import Mute
 from commands_logic.randomize import send_random_fraction, \
-    send_random_zmiys_phrases, send_random_rarity, send_roll_dice
+    send_random_zmiys_phrases, send_random_rarity, send_roll_dice, \
+    send_random_civ_from_civ6
 from commands_logic.wiki import Wikipedia
 from basic_actions.actions import send_text, send_stick, send_file
 
@@ -51,6 +52,9 @@ class Controller(object):
 
         elif self.text == 'фракция':
             return send_random_fraction(self.chat_id)
+
+        elif self.text == 'цивилизация':
+            return send_random_civ_from_civ6(self.chat_id)
 
         elif self.text[:9] in ['что такое', 'кто такая', 'кто такой']:
             return Wikipedia(self.event).send_wiki_article()

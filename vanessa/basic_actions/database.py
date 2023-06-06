@@ -1,10 +1,10 @@
 import sqlite3 as sql
 from sqlite3 import OperationalError, IntegrityError
 
-
+# todo: injection vulnerability
 class DataBase(object):
     """ORM for Vanessa.
-
+        
     :Methods:
     set_command(cmd)
     update_command(cmd)

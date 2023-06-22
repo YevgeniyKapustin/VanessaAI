@@ -1,3 +1,3 @@
-from src.handlers import ping
+from src.handlers import chat
 
-labelers = [ping.bl]
+labelers = [chat.bl]

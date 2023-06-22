@@ -129,11 +129,23 @@ optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
+python-dotenv = {version = ">=0.10.4", optional = true, markers = "extra == \"dotenv\""}
 typing-extensions = ">=4.2.0"
 
 [package.extras]
 dotenv = ["python-dotenv (>=0.10.4)"]
 email = ["email-validator (>=1.0.3)"]
+
+[[package]]
+name = "python-dotenv"
+version = "1.0.0"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.extras]
+cli = ["click (>=5.0)"]
 
 [[package]]
 name = "sniffio"
@@ -218,7 +230,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.11"
-content-hash = "1b4ff59c7109cba2cf55982a762d70b3ccebeef595d6dc7a0c83ba2023d80a7d"
+content-hash = "db1a4d513ed9f257c06a8bf4c7a5d43bac4c2b4548e090110eab4468c3cb8535"
 
 [metadata.files]
 aiofiles = []
@@ -233,6 +245,7 @@ frozenlist = []
 idna = []
 multidict = []
 pydantic = []
+python-dotenv = []
 sniffio = []
 typing-extensions = []
 vbml = []

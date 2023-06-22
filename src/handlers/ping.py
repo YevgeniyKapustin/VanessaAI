@@ -1,6 +1,8 @@
-from config import labeler
+from vkbottle.framework.labeler import BotLabeler
+
+bl = BotLabeler()
 
 
-@labeler.message(text="ping")
+@bl.message(text="ping")
 async def ping_handler(message):
     await message.answer("pong")

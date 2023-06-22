@@ -1,12 +1,10 @@
-from vkbottle import BuiltinStateDispenser
 from vkbottle.bot import Bot
-from vkbottle.framework.labeler import BotLabeler
 
-import config
+from src.handlers import labelers
+from src.config import settings
 
-labeler = BotLabeler()
-state_dispenser = BuiltinStateDispenser()
 
-bot = Bot(config.Settings.COMMUNITY_TOKEN)
+bot = Bot(settings.COMMUNITY_TOKEN)
+[bot.labeler.load(labeler) for labeler in labelers]
 
 bot.run_forever()

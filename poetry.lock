@@ -1,0 +1,242 @@
+[[package]]
+name = "aiofiles"
+version = "22.1.0"
+description = "File support for asyncio."
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+
+[[package]]
+name = "aiohttp"
+version = "3.8.4"
+description = "Async http client/server framework (asyncio)"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+aiosignal = ">=1.1.2"
+async-timeout = ">=4.0.0a3,<5.0"
+attrs = ">=17.3.0"
+charset-normalizer = ">=2.0,<4.0"
+frozenlist = ">=1.1.1"
+multidict = ">=4.5,<7.0"
+yarl = ">=1.0,<2.0"
+
+[package.extras]
+speedups = ["aiodns", "brotli", "cchardet"]
+
+[[package]]
+name = "aiosignal"
+version = "1.3.1"
+description = "aiosignal: a list of registered asynchronous callbacks"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+frozenlist = ">=1.1.0"
+
+[[package]]
+name = "anyio"
+version = "3.7.0"
+description = "High level compatibility layer for multiple asynchronous event loop implementations"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+idna = ">=2.8"
+sniffio = ">=1.1"
+
+[package.extras]
+doc = ["packaging", "Sphinx (>=6.1.0)", "sphinx-rtd-theme", "sphinxcontrib-jquery", "sphinx-autodoc-typehints (>=1.2.0)"]
+test = ["anyio", "coverage[toml] (>=4.5)", "hypothesis (>=4.0)", "psutil (>=5.9)", "pytest (>=7.0)", "pytest-mock (>=3.6.1)", "trustme", "uvloop (>=0.17)", "mock (>=4)"]
+trio = ["trio (<0.22)"]
+
+[[package]]
+name = "async-timeout"
+version = "4.0.2"
+description = "Timeout context manager for asyncio programs"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
+name = "attrs"
+version = "23.1.0"
+description = "Classes Without Boilerplate"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+cov = ["attrs", "coverage[toml] (>=5.3)"]
+dev = ["attrs", "pre-commit"]
+docs = ["furo", "myst-parser", "sphinx", "sphinx-notfound-page", "sphinxcontrib-towncrier", "towncrier", "zope-interface"]
+tests = ["attrs", "zope-interface"]
+tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest-mypy-plugins", "pytest-xdist", "pytest (>=4.3.0)"]
+
+[[package]]
+name = "charset-normalizer"
+version = "3.1.0"
+description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
+category = "main"
+optional = false
+python-versions = ">=3.7.0"
+
+[[package]]
+name = "choicelib"
+version = "0.1.5"
+description = "Choice a best similar-interface library from given list"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+
+[package.dependencies]
+typing-extensions = ">=4.0.1,<5.0.0"
+
+[[package]]
+name = "frozenlist"
+version = "1.3.3"
+description = "A list-like structure which implements collections.abc.MutableSequence"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "idna"
+version = "3.4"
+description = "Internationalized Domain Names in Applications (IDNA)"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[[package]]
+name = "multidict"
+version = "6.0.4"
+description = "multidict implementation"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "pydantic"
+version = "1.10.9"
+description = "Data validation and settings management using python type hints"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+typing-extensions = ">=4.2.0"
+
+[package.extras]
+dotenv = ["python-dotenv (>=0.10.4)"]
+email = ["email-validator (>=1.0.3)"]
+
+[[package]]
+name = "sniffio"
+version = "1.3.0"
+description = "Sniff out which async library your code is running under"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "typing-extensions"
+version = "4.6.3"
+description = "Backported and Experimental Type Hints for Python 3.7+"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "vbml"
+version = "1.1.post1"
+description = "Way to check, match & resist. Sofisticated object oriented regex-based text parser"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+
+[package.dependencies]
+typing_extensions = "*"
+
+[[package]]
+name = "vkbottle"
+version = "4.3.12"
+description = "Homogenic! Customizable asynchronous VK API framework implementing comfort and speed"
+category = "main"
+optional = false
+python-versions = ">=3.7.2,<4.0.0"
+
+[package.dependencies]
+aiofiles = ">=0.8,<22.2"
+aiohttp = ">=3.8.1,<4.0.0"
+choicelib = ">=0.1.5,<0.2.0"
+pydantic = ">=1.9.1,<2.0.0"
+typing-extensions = ">=4.3.0,<5.0.0"
+vbml = ">=1.1.post1,<2.0"
+vkbottle-types = ">=5.131.146.9,<6.0.0.0"
+watchfiles = ">=0.15,<0.19"
+
+[[package]]
+name = "vkbottle-types"
+version = "5.131.146.16"
+description = "Types for vkbottle"
+category = "main"
+optional = false
+python-versions = ">=3.7.2,<4.0.0"
+
+[package.dependencies]
+pydantic = ">=1.10.6,<2.0.0"
+vkbottle = ">=4.3.12,<5.0.0"
+
+[[package]]
+name = "watchfiles"
+version = "0.18.1"
+description = "Simple, modern and high performance file watching and code reload in python."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+anyio = ">=3.0.0"
+
+[[package]]
+name = "yarl"
+version = "1.9.2"
+description = "Yet another URL library"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+idna = ">=2.0"
+multidict = ">=4.0"
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.11"
+content-hash = "1b4ff59c7109cba2cf55982a762d70b3ccebeef595d6dc7a0c83ba2023d80a7d"
+
+[metadata.files]
+aiofiles = []
+aiohttp = []
+aiosignal = []
+anyio = []
+async-timeout = []
+attrs = []
+charset-normalizer = []
+choicelib = []
+frozenlist = []
+idna = []
+multidict = []
+pydantic = []
+sniffio = []
+typing-extensions = []
+vbml = []
+vkbottle = []
+vkbottle-types = []
+watchfiles = []
+yarl = []

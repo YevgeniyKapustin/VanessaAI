@@ -85,3 +85,11 @@ hero_fractions = [
     'подгорный народ',
     'великая орда'
 ]
+attachment_types = [
+    'audio',
+    'doc',
+    'graffiti',
+    'photo',
+    'sticker',
+    'wall'
+]

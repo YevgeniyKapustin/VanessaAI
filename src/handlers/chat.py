@@ -5,7 +5,8 @@ from random import randint, choice
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
-from src.services import create_json, get_data
+from src.rules import DiceRule
+from src.services import create_response_json, get_data
 from src.constants import civilizations, zmiys_phrases, hero_fractions
 from src.utils import web_query
 
@@ -24,10 +25,16 @@ async def random_zmiys_phrases(message: Message):
     await message.answer(f'{choice(zmiys_phrases)}')
 
 
-@bl.message(text='фракций')
+@bl.message(text='фракция')
 async def random_fraction(message: Message):
     """Send a random faction from the hero_fractions."""
     await message.answer(f'🎲 {choice(hero_fractions)}')
+
+
+@bl.message(DiceRule())
+async def roll_dice(message: Message):
+    """Send the result from 1 to the number after 'д'."""
+    await message.answer(f'🎲 {randint(1, int(message.text.replace("д", "")))}')
 
 
 @bl.message(text='добавить<type_> команду<request>:<response>')
@@ -37,23 +44,26 @@ async def add_command(
         request: str,
         response: str
 ):
-    await web_query.create_command(
-        type_,
-        request,
-        await create_json(message, response)
-    )
-    await message.answer(f'команда "{request}" добавлена')
+    type_ = 'contextual' if type_ == '_' else 'normal'
+    if request:
+        res = await web_query.create_command(
+            type_,
+            request,
+            await create_response_json(message, response)
+        )
+        if (msg := res[0].get('message')) == 'Create':
+            await message.answer(f'команда "{request}" добавлена')
+        else:
+            await message.answer(f'вы этого не должны видеть: {msg}')
+    elif not request:
+        await message.answer(f'не хватает запроса, он пишется перед ":"')
 
 
 @bl.message(text='<request>')
 async def get_command(message: Message, request: str):
-    a = await get_data(request)
-    data = json.load(a)
-    await message.answer(message=data.message, attachment=data.attachements)
-
-
-@bl.message(text=['д<sides>', 'd<sides>'])
-async def roll_dice(message: Message, sides: str | None):
-    """Send the result from 1 to the number after 'д' or 'd'."""
-    if sides.isdigit() and sides != '0':
-        await message.answer(f'🎲 {randint(1, int(sides))}')
+    data = json.loads(await get_data(request))
+    if data.get('message') or data.get('attch'):
+        await message.answer(
+            message=data.get('message'),
+            attachment=data.get('attch')
+        )

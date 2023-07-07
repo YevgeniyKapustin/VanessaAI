@@ -10,7 +10,7 @@ async def create_command(
     return await http_client.request_json(
         url=f'{settings.SERVER_URI}/api/v1/commands',
         method='POST',
-        data={
+        json={
             'type': type_.strip(),
             'request': request.strip(),
             'response': response.strip()

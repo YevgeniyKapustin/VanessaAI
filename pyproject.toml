@@ -8,6 +8,7 @@ authors = ["Yevgeniy Kap <kapustaevg@gmail.com>"]
 python = "^3.11"
 vkbottle = "^4.3.12"
 pydantic = {extras = ["dotenv"], version = "^1.10.9"}
+loguru = "^0.7.0"
 
 [tool.poetry.dev-dependencies]
 

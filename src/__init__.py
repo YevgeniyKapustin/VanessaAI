@@ -5,4 +5,4 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-sys.path.append(str(Path(sys.path[0]).joinpath('src')))
+sys.path.append(str(Path(sys.path[0]).joinpath('..')))

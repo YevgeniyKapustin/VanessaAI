@@ -4,8 +4,8 @@ from random import randint, choice
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
-from src.rules import DiceRule
-from src.constants import civilizations, zmiys_phrases, hero_fractions
+from rules import DiceRule
+from constants import civilizations, zmiys_phrases, hero_fractions
 
 bl = BotLabeler()
 

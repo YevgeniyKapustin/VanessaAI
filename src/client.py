@@ -1,3 +1,6 @@
-from vkbottle import AiohttpClient
+from vkbottle import AiohttpClient, Bot
 
-http_client = AiohttpClient()
+from src.config import settings
+
+bot: Bot = Bot(settings.COMMUNITY_TOKEN)
+http_client: AiohttpClient = AiohttpClient()

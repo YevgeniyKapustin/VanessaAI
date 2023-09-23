@@ -1,8 +1,5 @@
-from vkbottle.bot import Bot
-
+from src.client import bot
 from src.handlers import labelers
-from src.config import settings
 
 
-bot: Bot = Bot(settings.COMMUNITY_TOKEN)
 [bot.labeler.load(labeler) for labeler in labelers]

@@ -4,7 +4,8 @@ from random import randint, choice
 from vkbottle.bot import Message
 from vkbottle.framework.labeler import BotLabeler
 
-from src.rules import DiceRule, TextRule
+from src.client import bot
+from src.rules import DiceRule, TextRule, TextInRule
 from src.constants import civilizations, zmiys_phrases, hero_fractions
 
 bl = BotLabeler()
@@ -233,3 +234,12 @@ async def command(message: Message):
 @bl.message(TextRule('гитхаб'))
 async def command(message: Message):
     await message.answer('https://github.com/Kapusta-fairy')
+
+
+@bl.message(TextInRule('[id570713472|'))
+async def command(message: Message):
+    await bot.api.messages.delete(
+        cmids=[message.message_id],
+        peer_id=message.peer_id,
+        delete_for_all=True,
+    )

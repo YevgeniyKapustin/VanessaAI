@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "Vanessa"
+version = "2.1.0"
+description = "Бот для ВК"
+authors = ["Yevgeniy Kapustin <kapustaevg@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

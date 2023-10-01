@@ -12,11 +12,11 @@ from requests.exceptions import ProxyError
 from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
-from basic_actions.actions import remove_msg
-from basic_actions.database import DataBase
-from basic_actions.events import Msg, EventBuilder
-from basic_actions.controller import Controller
-from prepare.connection import Connection
+from src.utils.actions import remove_msg
+from src.utils.database import DataBase
+from src.utils import Msg, EventBuilder
+from src.utils import Controller
+from src.utils.connection import Connection
 
 
 class Main(object):

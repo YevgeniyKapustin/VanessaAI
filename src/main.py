@@ -17,6 +17,7 @@ class Bot(object):
     def launch(self):
         while True:
             try:
+                logger.info('launch...')
                 self.__run()
             except (ReadTimeout, ProxyError, ApiError) as exception:
                 logger.critical(exception)
@@ -24,7 +25,7 @@ class Bot(object):
     @staticmethod
     def __run():
         for event in vk.get_longpoll().listen():
-
+            logger.info(f'catch {event}')
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg: Msg = extract_msg_from_event(event)
                 event = Event(msg, event.chat_id, event.message.attachments)

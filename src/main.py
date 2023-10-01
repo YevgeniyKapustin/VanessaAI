@@ -7,7 +7,7 @@ from vk_api.bot_longpoll import VkBotEventType
 from src.utils import vk
 from src.utils.controller import Controller
 from src.utils.database import DataBase
-from src.utils.events import Event, convert_json_event_to_msg_object, Msg
+from src.utils.events import Event, extract_msg_from_event, Msg
 
 
 class Bot(object):
@@ -26,7 +26,7 @@ class Bot(object):
         for event in vk.get_longpoll().listen():
 
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
-                msg: Msg = convert_json_event_to_msg_object(event)
+                msg: Msg = extract_msg_from_event(event)
                 event = Event(msg, event.chat_id, event.message.attachments)
 
                 Controller(event).definition()

@@ -23,7 +23,7 @@ class Event(object):
         self.attachments = attachments
 
 
-def convert_json_event_to_msg_object(event: VkBotMessageEvent) -> Msg:
+def extract_msg_from_event(event: VkBotMessageEvent) -> Msg:
     msg = Msg.model_validate(event.object.message)
     msg.text = msg.text.lower()
     return msg

@@ -1,9 +1,9 @@
 """Contains the basic actions for VK api."""
 from vk_api import ApiError
 
-from prepare.connection import Connection
+from src.utils.connection import Connection
 
-_vk = Connection().vk
+_vk = Connection().get_bot_api()
 
 
 def send_text(chat_id: int, text: str) -> str:

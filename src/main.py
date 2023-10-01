@@ -1,9 +1,4 @@
-"""The main module of the bot, containing the methods for launching it.
-
-For questions, you can contact me at:
-VK - https://vk.com/kapystaevg
-TG - https://t.me/kapustaevg03
-"""
+"""The main module of the bot, containing the methods for launching it."""
 from datetime import datetime
 from os import path
 
@@ -12,20 +7,15 @@ from requests.exceptions import ProxyError
 from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
+from src.utils import VK
 from src.utils.actions import remove_msg
+from src.utils.controller import Controller
 from src.utils.database import DataBase
-from src.utils import Msg, EventBuilder
-from src.utils import Controller
-from src.utils.connection import Connection
+
+from src.utils.events import EventBuilder, Msg
 
 
-class Main(object):
-    """Controls the processing of events and sends them to the business logic.
-
-    :Methods:
-    launch()
-    """
-
+class Bot(object):
     __instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -34,10 +24,8 @@ class Main(object):
         return cls.__instance
 
     def __init__(self):
-        self.__starting_counter = 0
-        self.__exception = 'No exception occurred'
         self.db = DataBase()
-        self.longpoll = Connection().longpoll
+        self.longpoll = VK().get_longpoll()
 
     def launch(self):
         """Start and reloading the bot in case of an exception.
@@ -45,8 +33,6 @@ class Main(object):
         Also monitors data updates for logs and triggers logging.
         """
         while True:
-            self.__starting_counter += 1
-
             self.__log_about_launch()
             self.__exception = 'No exception occurred'
 

@@ -1,41 +1,29 @@
 from vk_api.bot_longpoll import VkBotLongPoll
-from vk_api.vk_api import VkApiGroup
+from vk_api.vk_api import VkApiGroup, VkApiMethod
 from vk_api import VkApi, VkUpload
 
-from prepare.config import Config
+from src import config
 
 
-class Connection(object):
-    """Establishes a connection with VK and serves to store variables.
-
-    :Variables:
-        vk: vk api object using a community token
-        vk_admin: vk api object using an admin token
-        longpoll: object for working with community events
-        upload: file upload object
-    """
-
-    __instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls.__instance:
-            cls.__instance = super(cls, cls).__new__(cls)
-        return cls.__instance
+class VK(object):
+    __slots__ = ('__bot_api', '__admin_api', '__uploader', '__longpoll')
 
     def __init__(self):
-        self.__config = Config().get_config()
+        vk_session = VkApiGroup(token=config.COMMUNITY_TOKEN)
+        vk_admin_session = VkApi(token=config.ADMIN_TOKEN)
+        self.__bot_api: VkApiMethod = vk_session.get_api()
+        self.__admin_api: VkApiMethod = vk_admin_session.get_api()
+        self.__uploader = VkUpload(vk_admin_session)
+        self.__longpoll = VkBotLongPoll(vk_session, config.GROUP_ID)
 
-        self.__vk_session = VkApiGroup(
-            token=self.__config.get('connection', 'community_token')
-        )
-        self.__vk_admin_session = VkApi(
-            token=self.__config.get('connection', 'admin_token'))
+    def get_bot_api(self) -> VkApiMethod:
+        return self.__bot_api
 
-        self.vk = self.__vk_session.get_api()
-        self.vk_admin = self.__vk_admin_session.get_api()
-        self.upload = VkUpload(self.__vk_admin_session)
+    def get_admin_api(self) -> VkApiMethod:
+        return self.__admin_api
 
-        self.longpoll = VkBotLongPoll(
-            self.__vk_session,
-            self.__config.get('connection', 'group_id')
-        )
+    def get_upload(self) -> VkUpload:
+        return self.__uploader
+
+    def get_longpoll(self) -> VkBotLongPoll:
+        return self.__longpoll

@@ -5,7 +5,7 @@ from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
 from src.utils import vk
-from src.utils.controller import Controller, controller
+from src.utils.controller import controller
 from src.utils.database import DataBase
 from src.utils.events import Event, extract_msg_from_event, Message
 

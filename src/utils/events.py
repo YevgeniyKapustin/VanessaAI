@@ -1,8 +1,10 @@
 from pydantic import BaseModel
 from vk_api.bot_longpoll import VkBotMessageEvent
 
+from src.utils import vk
 
-class Msg(BaseModel):
+
+class Message(BaseModel):
     """Message object."""
     peer_id: int
     from_id: int
@@ -13,17 +15,20 @@ class Msg(BaseModel):
 
 class Event(object):
     """Event object."""
-    msg: Msg
+    message: Message
     chat_id: int
     attachments: dict
 
-    def __init__(self, msg, chat_id, attachments=None):
-        self.msg = msg
+    def __init__(self, message, chat_id, attachments=None):
+        self.message = message
         self.chat_id = chat_id
         self.attachments = attachments
 
+    def answer(self, text):
+        vk.get_bot_api().messages.send(chat_id=self.chat_id, message=text, random_id=0)
 
-def extract_msg_from_event(event: VkBotMessageEvent) -> Msg:
-    msg = Msg.model_validate(event.object.message)
+
+def extract_msg_from_event(event: VkBotMessageEvent) -> Message:
+    msg = Message.model_validate(event.object.message)
     msg.text = msg.text.lower()
     return msg

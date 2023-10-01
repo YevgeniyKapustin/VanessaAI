@@ -5,9 +5,9 @@ from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
 from src.utils import vk
-from src.utils.controller import Controller
+from src.utils.controller import Controller, controller
 from src.utils.database import DataBase
-from src.utils.events import Event, extract_msg_from_event, Msg
+from src.utils.events import Event, extract_msg_from_event, Message
 
 
 class Bot(object):
@@ -27,10 +27,10 @@ class Bot(object):
         for event in vk.get_longpoll().listen():
             logger.info(f'catch {event}')
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
-                msg: Msg = extract_msg_from_event(event)
+                msg: Message = extract_msg_from_event(event)
                 event = Event(msg, event.chat_id, event.message.attachments)
 
-                Controller(event).definition()
+                controller(event)
 
 
 if __name__ == '__main__':

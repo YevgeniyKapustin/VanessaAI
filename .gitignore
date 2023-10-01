@@ -4,3 +4,4 @@ log.txt
 vanessa.db
 .pytest_cache
 .coverage
+.env

@@ -1,12 +1,12 @@
-from basic_actions.database import DataBase
-from commands_logic.cabbagesite import get_winrate
-from commands_logic.add_command import Commands
-from commands_logic.mute import Mute
-from commands_logic.randomize import send_random_fraction, \
-    send_random_zmiys_phrases, send_random_rarity, send_roll_dice, \
-    send_random_civ_from_civ6
-from commands_logic.wiki import Wikipedia
-from basic_actions.actions import send_text, send_stick, send_file
+from src.services.add_command import Commands
+from src.services.cabbagesite import get_winrate
+from src.services.mute import Mute
+from src.services.randomize import send_random_fraction, \
+    send_random_civ_from_civ6, send_random_zmiys_phrases, send_random_rarity, \
+    send_roll_dice
+from src.services.wiki import Wikipedia
+from src.utils.actions import send_text, send_file, send_stick
+from src.utils.database import DataBase
 
 
 class Controller(object):

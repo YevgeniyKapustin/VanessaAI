@@ -1,8 +1,8 @@
 """Module for interactive addition of commands by users."""
 from dataclasses import dataclass
 
-from basic_actions.actions import send_text
-from basic_actions.database import DataBase
+from src.utils.actions import send_text
+from src.utils.database import DataBase
 
 
 @dataclass

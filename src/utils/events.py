@@ -1,9 +1,9 @@
 from pydantic import BaseModel
+from vk_api.bot_longpoll import VkBotMessageEvent
 
 
 class Msg(BaseModel):
     """Message object."""
-
     peer_id: int
     from_id: int
     conversation_message_id: int
@@ -13,36 +13,17 @@ class Msg(BaseModel):
 
 class Event(object):
     """Event object."""
-
     msg: Msg
     chat_id: int
-    attachments: dict = None
+    attachments: dict
+
+    def __init__(self, msg, chat_id, attachments=None):
+        self.msg = msg
+        self.chat_id = chat_id
+        self.attachments = attachments
 
 
-class EventBuilder(object):
-    """Provides methods for creating an event object.
-
-    :Methods:
-    get_event()
-
-    set_msg()
-    set_chat_id()
-    set_attachment()
-    """
-    def __init__(self):
-        self.__event = Event
-
-    def get_event(self):
-        return self.__event
-
-    def set_msg(self, msg: object):
-        self.__event.msg = msg
-        return self
-
-    def set_chat_id(self, chat_id: int):
-        self.__event.chat_id = chat_id
-        return self
-
-    def set_attachment(self, event):
-        self.__event.attachments = event.message.attachments
-        return self
+def convert_json_event_to_msg_object(event: VkBotMessageEvent) -> Msg:
+    msg = Msg.model_validate(event.object.message)
+    msg.text = msg.text.lower()
+    return msg

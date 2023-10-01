@@ -1,9 +1,10 @@
 """Contains various functions that somehow use random."""
 from random import randint, choice
 
-from basic_actions.actions import send_text, send_file
-from prepare.connection import Connection
-_vk_admin = Connection().vk_admin
+from src.utils import vk
+from src.utils.actions import send_text, send_file
+
+_vk_admin = vk.get_admin_api()
 civilizations = [
     'Россия/Пётр I',
     'Англия/Виктория',

@@ -1,8 +1,8 @@
 from vk_api import ApiError
 
-from basic_actions.actions import send_text, send_file
-from basic_actions.database import DataBase
-from prepare.connection import Connection
+from src.utils import vk
+from src.utils.actions import send_text, send_file
+from src.utils.database import DataBase
 
 
 class Mute(object):
@@ -19,7 +19,7 @@ class Mute(object):
         self.chat_id = event.chat_id
         self.text = event.msg.text
         self.peer_id = event.msg.peer_id
-        self.vk = Connection().vk
+        self.vk = vk.get_bot_api()
         self.db = DataBase()
         self.event = event
         self.msg = event.msg

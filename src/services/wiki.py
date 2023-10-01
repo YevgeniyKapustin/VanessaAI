@@ -4,7 +4,7 @@ from random import choice
 from wikipedia import summary, set_lang, PageError, DisambiguationError, \
     WikipediaException
 
-from basic_actions.actions import send_text
+from src.utils.actions import send_text
 
 
 class Wikipedia(object):

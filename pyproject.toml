@@ -7,6 +7,10 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+vk-api = "^11.9.9"
+requests = "^2.31.0"
+pydantic = "^2.4.2"
+pydantic-settings = "^2.0.3"
 
 
 [build-system]

@@ -78,15 +78,6 @@ class Controller(object):
 #         if self.text == 'команды':
 #             return send_text(self.chat_id, Commands().get_commands())
 #
-#         elif self.text == 'фракция':
-#             return send_random_fraction(self.chat_id)
-#
-#         elif self.text == 'цивилизация':
-#             return send_random_civ_from_civ6(self.chat_id)
-#
-#         elif self.text[:9] in ['что такое', 'кто такая', 'кто такой']:
-#             return Wikipedia(self.event).send_wiki_article()
-#
 #         elif self.text[:3] == 'мут':
 #             return Mute(self.event).shut_up()
 #
@@ -107,10 +98,6 @@ class Controller(object):
 #
 #         elif self.text[:15] == 'удалить команду':
 #             return Commands.remove_command(Commands(), self.event)
-#
-#         elif self.text == 'абоба':
-#             return send_random_zmiys_phrases(self.chat_id)
-#
 #         elif self.text == 'рарити':
 #             return send_random_rarity(self.chat_id)
 #
@@ -119,8 +106,3 @@ class Controller(object):
 #
 #         elif self.text == 'статистика фракций':
 #             return send_text(self.chat_id, get_winrate('fractions'))
-#
-#         elif self.text[:1] == 'д':
-#             return send_roll_dice(self.chat_id, self.text)
-#
-#         return None

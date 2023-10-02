@@ -1,1 +1,1 @@
-from src.handlers import randomize
+from src.handlers import randomize, wiki

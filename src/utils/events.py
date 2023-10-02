@@ -27,11 +27,11 @@ class Event(object):
         self.attachments = attachments
         self.api = vk.get_bot_api()
 
-    def answer(self, text):
+    def answer(self, text: str):
         self.api.messages.send(chat_id=self.chat_id, message=text, random_id=0)
 
 
 def extract_msg_from_event(event: VkBotMessageEvent) -> Message:
-    msg = Message.model_validate(event.object.message)
-    msg.text = msg.text.lower()
-    return msg
+    message = Message.model_validate(event.object.message)
+    message.text = message.text.lower()
+    return message

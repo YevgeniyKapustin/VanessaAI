@@ -1,3 +1,4 @@
+from src.constans import wiki_queries
 from src.rules.base import BaseRule
 
 
@@ -14,3 +15,8 @@ class TextRule(BaseRule):
 
     def check(self) -> bool:
         return self._message == self._user_msg
+
+
+class WikiRule(BaseRule):
+    def check(self) -> bool:
+        return self._message[:9] in wiki_queries

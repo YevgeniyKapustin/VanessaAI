@@ -1,17 +1,20 @@
 [tool.poetry]
-name = "vkbot-vanessa"
-version = "0.1.0"
-description = ""
-authors = ["Yevgeniy Kap <kapustaevg@gmail.com>"]
+name = "Vanessa"
+version = "2.1.0"
+description = "Бот для ВК"
+authors = ["Yevgeniy Kapustin <kapustaevg@gmail.com>"]
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-vkbottle = "^4.3.12"
-pydantic = {extras = ["dotenv"], version = "^1.10.9"}
-loguru = "^0.7.0"
+vk-api = "^11.9.9"
+requests = "^2.31.0"
+pydantic = "^2.4.2"
+pydantic-settings = "^2.0.3"
+logger = "^1.4"
+wikipedia = "^1.4.0"
 
-[tool.poetry.dev-dependencies]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -1,3 +1,1 @@
-from src.handlers import chat
-
-labelers = [chat.bl]
+from src.handlers import randomize, wiki

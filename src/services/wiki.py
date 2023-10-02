@@ -2,7 +2,7 @@ from random import choice
 
 from wikipedia import summary, set_lang
 
-from src.constans import wiki_queries
+from src.constants import wiki_queries
 from src.utils.decorators import wiki_exception_handler
 
 

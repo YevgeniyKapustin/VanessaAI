@@ -1,4 +1,4 @@
-from src.constans import wiki_queries
+from src.constants import wiki_queries
 from src.rules.base import BaseRule
 
 

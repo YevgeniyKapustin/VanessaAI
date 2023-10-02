@@ -5,7 +5,7 @@ from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
 from src.utils import vk
-from src.utils.controller import controller
+from src.utils.controller import Controller
 from src.utils.database import DataBase
 from src.utils.events import Event, extract_msg_from_event, Message
 
@@ -30,7 +30,7 @@ class Bot(object):
                 msg: Message = extract_msg_from_event(event)
                 event = Event(msg, event.chat_id, event.message.attachments)
 
-                controller(event)
+                Controller(event).recognition()
 
 
 if __name__ == '__main__':

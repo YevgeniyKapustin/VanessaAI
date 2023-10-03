@@ -1,3 +1,3 @@
-from src.utils.connection import VK
+from src.utils.vk import Connection
 
-vk = VK()
+vk = Connection()

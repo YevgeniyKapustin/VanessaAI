@@ -5,7 +5,7 @@ from vk_api import VkApi, VkUpload
 from src import config
 
 
-class VK(object):
+class Connection(object):
     __slots__ = ('__bot_api', '__admin_api', '__uploader', '__longpoll')
 
     def __init__(self):

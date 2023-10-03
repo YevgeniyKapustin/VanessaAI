@@ -10,6 +10,17 @@ def get_commands(request: str, is_inline: bool = True) -> Response:
         url=f'{config.SERVER_URI}/api/v1/commands',
         params={
             'request': request,
-            'is_inline': is_inline,
+            'is_inline': is_inline
+        }
+    )
+
+
+def create_command(request: str, response: str, type_: str) -> Response:
+    return session.post(
+        url=f'{config.SERVER_URI}/api/v1/commands',
+        json={
+            'request': request.strip(),
+            'response': response.strip(),
+            'type': type_.strip()
         }
     )

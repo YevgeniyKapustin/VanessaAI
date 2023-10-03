@@ -6,13 +6,10 @@ from vk_api.bot_longpoll import VkBotEventType
 
 from src.utils import vk
 from src.utils.controller import Controller
-from src.utils.database import DataBase
-from src.utils.events import Event, extract_msg_from_event, Message
+from src.services.events import Event, extract_msg_from_event, Message
 
 
 class Bot(object):
-    def __init__(self):
-        self.db = DataBase()
 
     def launch(self):
         while True:

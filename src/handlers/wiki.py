@@ -1,9 +1,9 @@
-from src.rules.decorator import handle_message
 from src.rules.rules import WikiRule
 from src.services.wiki import Wikipedia
-from src.utils.events import Event
+from src.services.events import Event
+from src.utils.decorators import handle_message
 
 
 @handle_message(WikiRule())
 def handler_random_fraction(event: Event):
-    event.answer(Wikipedia(event).send_wiki_article())
+    event.text_answer(Wikipedia(event).send_wiki_article())

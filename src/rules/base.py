@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from src.utils.events import Event
+from src.services.events import Event
 
 
 class BaseRule(ABC):

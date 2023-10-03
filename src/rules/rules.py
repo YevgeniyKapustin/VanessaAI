@@ -14,6 +14,8 @@ class TextRule(BaseRule):
         self._user_msg = message
 
     def check(self) -> bool:
+        if self._user_msg == '<any>':
+            return True
         return self._message == self._user_msg
 
 

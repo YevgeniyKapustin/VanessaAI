@@ -1,17 +1,8 @@
-from pydantic import BaseModel
 from vk_api.bot_longpoll import VkBotMessageEvent
 from vk_api.vk_api import VkApiMethod
 
+from src.services.schemas import Message
 from src.utils import vk
-
-
-class Message(BaseModel):
-    """Message object."""
-    peer_id: int
-    from_id: int
-    conversation_message_id: int
-    text: str
-    reply_message: dict = None
 
 
 class Event(object):
@@ -27,8 +18,19 @@ class Event(object):
         self.attachments = attachments
         self.api = vk.get_bot_api()
 
-    def answer(self, text: str):
-        self.api.messages.send(chat_id=self.chat_id, message=text, random_id=0)
+    def text_answer(self, text: str):
+        self.api.messages.send(
+            chat_id=self.chat_id,
+            message=text,
+            random_id=0
+        )
+
+    def gif_answer(self, url: str):
+        self.api.messages.send(
+            chat_id=self.chat_id,
+            attachment=url,
+            random_id=0
+        )
 
 
 def extract_msg_from_event(event: VkBotMessageEvent) -> Message:

@@ -2,7 +2,7 @@ FROM python:3.11.3
 
 WORKDIR /bot/
 
-RUN pip install 'poetry==2.1.0'
+RUN pip install 'poetry==1.6.1'
 COPY poetry.lock pyproject.toml /bot/
 
 RUN poetry config virtualenvs.create false &&  \

@@ -28,7 +28,3 @@ class Bot(object):
                 event = Event(msg, event.chat_id, event.message.attachments)
 
                 Controller(event).recognition()
-
-
-if __name__ == '__main__':
-    Bot().launch()

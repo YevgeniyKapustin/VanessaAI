@@ -8,3 +8,9 @@ class Message(BaseModel):
     conversation_message_id: int
     text: str
     reply_message: dict = None
+
+
+class Command(BaseModel):
+    type: str
+    request: str
+    response: str

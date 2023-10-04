@@ -30,3 +30,8 @@ def create_command_obj(event: Event) -> Command:
     response: str = text_list[1].strip()
 
     return Command(type=type_, request=request, response=response)
+
+
+def get_command_id(request: str) -> int:
+    commands: list = get_commands(request, False).json()
+    return commands[0].get('id') if isinstance(commands, list) else 0

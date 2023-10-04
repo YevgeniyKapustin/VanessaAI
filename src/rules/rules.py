@@ -27,3 +27,8 @@ class InlineTextRule(BaseRule):
 class WikiRule(BaseRule):
     def check(self) -> bool:
         return self._message[:9] in wiki_queries
+
+
+class AnyRule(BaseRule):
+    def check(self) -> bool:
+        return True

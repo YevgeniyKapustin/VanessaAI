@@ -1,2 +1,3 @@
-OK_200 = 200
-CREATE_201 = 201
+OK_200: int = 200
+CREATE_201: int = 201
+NOT_FOUND_404: int = 404

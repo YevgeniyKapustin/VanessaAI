@@ -11,7 +11,7 @@ def answer_for_custom_msg(event: Event, is_inline: bool):
         prefix = 'внутристрочный_' if is_inline else ''
         if type_ == f'{prefix}текст':
             event.text_answer(command.get('response'))
-        elif type_ == f'{prefix}текст':
+        elif type_ == f'{prefix}гиф':
             event.gif_answer(command.get('response'))
 
 

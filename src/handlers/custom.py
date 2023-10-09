@@ -3,10 +3,10 @@ from requests import Response
 from src.rules.rules import InlineText, Any
 from src.services.events import Event
 from src.services.schemas import Command
-from src.utils.custom_commands import answer_for_custom_msg, \
+from src.services.custom_commands import answer_for_custom_msg, \
     create_command_obj, get_command_id
 from src.utils.decorators import handle_message
-from src.utils.queries import create_command, delete_command, get_commands
+from src.utils.queries import create_command, delete_command
 from src.utils.status_cods import OK_200, CREATE_201, NOT_FOUND_404
 
 

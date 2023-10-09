@@ -2,7 +2,7 @@ from vk_api.bot_longpoll import VkBotMessageEvent
 from vk_api.vk_api import VkApiMethod
 
 from src.services.schemas import Message
-from src.utils import vk
+from src.services import vk
 
 
 class Event(object):

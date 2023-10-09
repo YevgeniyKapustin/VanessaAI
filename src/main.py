@@ -4,7 +4,7 @@ from requests.exceptions import ProxyError
 from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
-from src.utils import vk
+from src.services import vk
 from src.utils.controller import Controller
 from src.services.events import Event, extract_msg_from_event, Message
 

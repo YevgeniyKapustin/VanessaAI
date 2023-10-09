@@ -29,7 +29,7 @@ class Wikipedia(object):
 
     @staticmethod
     def _handling_wiki_exception():
-        return 'сусня какая-то'
+        return 'абоба какая-то'
 
     @staticmethod
     def _filtering(text):

@@ -16,7 +16,7 @@ class Bot(object):
             try:
                 logger.info('launch...')
                 self.__run()
-            except (ReadTimeout, ProxyError, ApiError) as exception:
+            except (ReadTimeout, ProxyError, ApiError, Exception) as exception:
                 logger.critical(exception)
 
     @staticmethod

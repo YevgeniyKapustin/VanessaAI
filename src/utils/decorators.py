@@ -1,4 +1,4 @@
-from wikipedia import PageError, DisambiguationError
+from wikipedia import PageError, DisambiguationError, WikipediaException
 
 from src.rules.base import BaseRule
 from src.services.events import Event
@@ -15,7 +15,6 @@ def handle_message(rule: BaseRule):
 def wiki_exception_handler(func):
 
     def wrapper(self):
-        from wikipedia import WikipediaException
         try:
             return func(self)
         except PageError:

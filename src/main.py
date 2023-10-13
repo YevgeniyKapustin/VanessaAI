@@ -1,6 +1,6 @@
 from logger import logger
 from requests import ReadTimeout
-from requests.exceptions import ProxyError
+from requests.exceptions import ProxyError, ConnectionError
 from vk_api import ApiError
 from vk_api.bot_longpoll import VkBotEventType
 
@@ -16,7 +16,9 @@ class Bot(object):
             try:
                 logger.info('launch...')
                 self.__run()
-            except (ReadTimeout, ProxyError, ApiError, Exception) as exception:
+            except (
+                    ReadTimeout, ProxyError, ApiError, ConnectionError
+            ) as exception:
                 logger.critical(exception)
 
     @staticmethod

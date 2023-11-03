@@ -12,15 +12,25 @@ def handle_message(rule: BaseRule):
     return decorator
 
 
-def wiki_exception_handler(func):
+def wiki_exception_handler(func: callable):
 
     def wrapper(self):
         try:
             return func(self)
+
         except PageError:
             return self._handling_page_error()
+
         except DisambiguationError as error:
+            options: set[str] = set()
+            for var in error.args[1]:
+                if '«' in var and '»' in var:
+                    var = var.replace('«', '').replace('»', '')
+                options.add(var)
+            if len(options) < 2:  # Должно быть хотя бы 2 варианта ответа
+                return self._handling_wiki_exception()
             return self._handling_disambiguation(error)
+
         except WikipediaException:
             return self._handling_wiki_exception()
 

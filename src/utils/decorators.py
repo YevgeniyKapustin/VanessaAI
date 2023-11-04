@@ -5,7 +5,7 @@ from src.rules.base import BaseRule
 from src.services.events import Event
 
 
-def handle_message(rule: BaseRule):
+def handle_message(rule: BaseRule) -> callable:
     """Вызывает функцию, к которой прикреплен, если её правило сработало."""
     def decorator(func: callable):
         def wrapper(event: Event):

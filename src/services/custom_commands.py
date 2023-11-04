@@ -1,9 +1,16 @@
+"""Модуль для работы с кастомными командами."""
 from src.services.events import Event
 from src.services.schemas import Command
 from src.utils.queries import get_commands
 
 
 def answer_for_custom_msg(event: Event, is_inline: bool) -> None:
+    """Ответить кастомной командой на ивент
+
+    Аргументы:
+    event -- ивент, на которой нужно ответить
+    is_inline -- является ли текст из ивента командой или нужно искать ее
+    """
     data: list = get_commands(event.message.text, is_inline).json()
 
     if isinstance(data, list) and data is not None:
@@ -19,6 +26,11 @@ def answer_for_custom_msg(event: Event, is_inline: bool) -> None:
 
 
 def create_command_obj(event: Event) -> Command:
+    """Создает команду из ивента
+
+    Аргументы:
+    event -- ивент, из которого нужно достать информацию и ответить
+    """
     text: str = event.message.text.lower()
 
     text_list: list = text.split(' ')
@@ -36,5 +48,6 @@ def create_command_obj(event: Event) -> Command:
 
 
 def get_command_id(request: str) -> int:
+    """Возвращает ID команды, если она существует, иначе 0."""
     commands: list = get_commands(request, False).json()
     return commands[0].get('id') if isinstance(commands, list) else 0

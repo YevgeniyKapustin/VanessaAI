@@ -11,8 +11,8 @@ vk-api = "^11.9.9"
 requests = "^2.31.0"
 pydantic = "^2.4.2"
 pydantic-settings = "^2.0.3"
-logger = "^1.4"
 wikipedia = "^1.4.0"
+loguru = "^0.7.2"
 
 
 [build-system]

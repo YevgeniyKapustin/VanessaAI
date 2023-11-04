@@ -1,3 +1,4 @@
+from loguru import logger
 from vk_api.bot_longpoll import VkBotMessageEvent
 from vk_api.vk_api import VkApiMethod
 
@@ -19,6 +20,7 @@ class Event(object):
         self.api = vk.get_bot_api()
 
     def text_answer(self, text: str):
+        logger.info(f'text answer: {text}')
         self.api.messages.send(
             chat_id=self.chat_id,
             message=text,
@@ -26,6 +28,7 @@ class Event(object):
         )
 
     def gif_answer(self, url: str):
+        logger.info(f'url answer: {url}')
         self.api.messages.send(
             chat_id=self.chat_id,
             attachment=url,

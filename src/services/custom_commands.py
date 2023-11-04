@@ -3,16 +3,19 @@ from src.services.schemas import Command
 from src.utils.queries import get_commands
 
 
-def answer_for_custom_msg(event: Event, is_inline: bool):
+def answer_for_custom_msg(event: Event, is_inline: bool) -> None:
     data: list = get_commands(event.message.text, is_inline).json()
+
     if isinstance(data, list) and data is not None:
-        type_ = data[0].get('type')
-        command = data[0]
-        prefix = 'внутристрочный_' if is_inline else ''
+        prefix: str = 'внутристрочный_' if is_inline else ''
+        response: str = data[0].get('response')
+        type_: str = data[0].get('type')
+
         if type_ == f'{prefix}текст':
-            event.text_answer(command.get('response'))
+            event.text_answer(response)
+
         elif type_ == f'{prefix}гиф':
-            event.gif_answer(command.get('response'))
+            event.gif_answer(response)
 
 
 def create_command_obj(event: Event) -> Command:

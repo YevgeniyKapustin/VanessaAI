@@ -1,4 +1,4 @@
-from logger import logger
+from loguru import logger
 from requests import ReadTimeout
 from requests.exceptions import ProxyError, ConnectionError
 from vk_api import ApiError
@@ -11,20 +11,22 @@ from src.services.events import Event, extract_msg_from_event, Message
 
 class Bot(object):
 
+    def __init__(self):
+        logger.add('.log')
+
+    @logger.catch()
     def launch(self):
         while True:
             try:
                 logger.info('launch...')
                 self.__run()
-            except (
-                    ReadTimeout, ProxyError, ApiError, ConnectionError
-            ) as exception:
+            except Exception as exception:
                 logger.critical(exception)
 
     @staticmethod
     def __run():
         for event in vk.get_longpoll().listen():
-            logger.info(f'catch {event}')
+            logger.debug(f'catch {event}')
             if event.type == VkBotEventType.MESSAGE_NEW and event.from_chat:
                 msg: Message = extract_msg_from_event(event)
                 event = Event(msg, event.chat_id, event.message.attachments)

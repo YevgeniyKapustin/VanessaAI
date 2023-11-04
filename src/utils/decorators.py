@@ -1,3 +1,4 @@
+"""Декораторы."""
 from wikipedia import PageError, DisambiguationError, WikipediaException
 
 from src.rules.base import BaseRule
@@ -5,6 +6,7 @@ from src.services.events import Event
 
 
 def handle_message(rule: BaseRule):
+    """Вызывает функцию, к которой прикреплен, если её правило сработало."""
     def decorator(func: callable):
         def wrapper(event: Event):
             func(event) if rule.set_event(event).check() else ...
@@ -12,8 +14,11 @@ def handle_message(rule: BaseRule):
     return decorator
 
 
-def wiki_exception_handler(func: callable):
+def wiki_exception_handler(func: callable) -> callable:
+    """Декоратор для обработки ошибок библиотеки wikipedia.
+    Пригоден только для использования внутри объекта Wikipedia из services.
 
+    """
     def wrapper(self):
         try:
             return func(self)

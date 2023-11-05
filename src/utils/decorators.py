@@ -1,4 +1,5 @@
 """Декораторы."""
+from pydantic import ValidationError
 from wikipedia import PageError, DisambiguationError, WikipediaException
 
 from src.rules.base import BaseRule
@@ -9,7 +10,13 @@ def handle_message(rule: BaseRule) -> callable:
     """Вызывает функцию, к которой прикреплен, если её правило сработало."""
     def decorator(func: callable):
         def wrapper(event: Event):
-            func(event) if rule.set_event(event).check() else ...
+            try:
+                func(event) if rule.set_event(event).check() else ...
+            except ValidationError as exception:
+                errors: list = [
+                    error['msg'][18:] for error in exception.errors()
+                ]
+                event.text_answer('<br>'.join(errors))
         return wrapper
     return decorator
 

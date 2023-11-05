@@ -1,5 +1,8 @@
 """Pydantic объекты."""
-from pydantic import BaseModel
+from pydantic import BaseModel, AfterValidator
+from typing_extensions import Annotated
+
+from src.utils.validators import check_type, check_mention
 
 
 class Message(BaseModel):
@@ -13,6 +16,6 @@ class Message(BaseModel):
 
 class Command(BaseModel):
     """Объект для команд."""
-    type: str
-    request: str
-    response: str
+    type: Annotated[str, AfterValidator(check_type)]
+    request: Annotated[str, AfterValidator(check_mention)]
+    response: Annotated[str, AfterValidator(check_mention)]

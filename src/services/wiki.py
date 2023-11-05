@@ -3,7 +3,7 @@ from random import choice
 
 from wikipedia import summary, set_lang, DisambiguationError
 
-from src.constants import wiki_queries
+from src.utils.constants import wiki_queries
 from src.services.events import Event
 from src.utils.decorators import wiki_exception_handler
 

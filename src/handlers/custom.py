@@ -26,7 +26,7 @@ def handler_any_message_inline(event: Event):
     answer_for_custom_msg(event, True)
 
 
-@handle_message(InlineText('добавить команду'))
+@handle_message(InlineText('добавить команду '))
 def handler_add_command(event: Event):
     command: Command = create_command_obj(event)
     query_response: Response = create_command(

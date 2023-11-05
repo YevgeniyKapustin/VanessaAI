@@ -3,7 +3,7 @@
 Здесь нужно добавлять свои правила, можете использовать как пример
 существующие.
 """
-from src.constants import wiki_queries
+from src.utils.constants import wiki_queries
 from src.rules.base import BaseRule
 
 

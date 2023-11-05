@@ -59,10 +59,11 @@ class Text(BaseRule):
 ивента, а второй это сообщение юзера из того-же ивента.
 
 А теперь то, как выглядит хэндлер для такого правила:
+
 ```python
 from random import choice
 
-from src.constants import zmiys_phrases
+from src.utils.constants import zmiys_phrases
 from src.rules.rules import Text
 from src.services.events import Event
 from src.utils.decorators import handle_message

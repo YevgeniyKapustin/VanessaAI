@@ -1,6 +1,6 @@
 from random import randint, choice
 
-from src.constants import civilizations, zmiys_phrases, hero_fractions
+from src.utils.constants import civilizations, zmiys_phrases, hero_fractions
 from src.rules.rules import Dice, Text
 from src.services.events import Event
 from src.utils.decorators import handle_message

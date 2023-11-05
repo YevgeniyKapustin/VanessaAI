@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.config import Settings
+from src.utils.config import Settings
 
 load_dotenv()
 config = Settings()

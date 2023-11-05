@@ -1,7 +1,8 @@
 """Модуль для работы с кастомными командами."""
-from src.constants import commands_types
+from src.utils.constants import commands_types
 from src.services.events import Event
 from src.services.schemas import Command
+from src.utils.exceptions import CreateCommandException
 from src.utils.queries import get_commands
 
 
@@ -35,16 +36,16 @@ def create_command_obj(event: Event) -> Command:
     Аргументы:
     event -- ивент, из которого нужно достать информацию и ответить
     """
-    text: str = event.message.text.lower()
+    text: str = event.message.text.lower().replace('добавить команду ', '')
 
     text_list: list = text.split(' ')
-    text_list.remove('добавить')
-    text_list.remove('команду')
     type_: str = text_list[0] if text_list is not None else ''
     text_list.remove(type_)
 
-    command_text: str = ' '.join(text_list)
-    text_list: list = command_text.split(':')
+    if len(text_list) != 2:
+        raise CreateCommandException('Неверный синтаксис команды')
+
+    text_list: list = ''.join(text_list).split(':')
     request: str = text_list[0].strip()
     response: str = text_list[1].strip()
 

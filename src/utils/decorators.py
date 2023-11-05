@@ -4,6 +4,7 @@ from wikipedia import PageError, DisambiguationError, WikipediaException
 
 from src.rules.base import BaseRule
 from src.services.events import Event
+from src.utils.exceptions import CreateCommandException
 
 
 def handle_message(rule: BaseRule) -> callable:
@@ -12,7 +13,7 @@ def handle_message(rule: BaseRule) -> callable:
         def wrapper(event: Event):
             try:
                 func(event) if rule.set_event(event).check() else ...
-            except ValidationError as exception:
+            except (ValidationError, CreateCommandException) as exception:
                 errors: list = [
                     error['msg'][18:] for error in exception.errors()
                 ]

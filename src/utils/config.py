@@ -12,5 +12,5 @@ class Settings(BaseSettings):
 
     class Config:
         """Настройка файла .env."""
-        env_file = '../.env'
+        env_file = '../../.env'
         env_file_encoding = 'utf-8'

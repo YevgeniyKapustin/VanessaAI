@@ -22,13 +22,12 @@ class Bot(object):
     def launch(self):
         """Запускает бота: прослушивает ивенты, отлавливает исключения."""
         while True:
+            logger.info('launch...')
             if not config.DEBUG:
                 try:
-                    logger.info('launch...')
                     self.__run()
                 except Exception as exception:
                     logger.critical(exception)
-            logger.info('launch...')
             self.__run()
 
     @staticmethod

@@ -29,12 +29,12 @@ class Event(object):
         text -- текст для ответа
 
         """
-        logger.info(f'text answer: {text}')
         self.api.messages.send(
             chat_id=self.chat_id,
             message=text,
             random_id=0
         )
+        logger.info(f'Ответ текстом: {text}')
 
     def attachment_answer(self, url: str) -> None:
         """Отвечает на ивент файлом.
@@ -43,12 +43,12 @@ class Event(object):
         url -- URI файлом на серверах ВК
 
         """
-        logger.info(f'url answer: {url}')
         self.api.messages.send(
             chat_id=self.chat_id,
             attachment=url,
             random_id=0
         )
+        logger.info(f'Ответ вложением: {url}')
 
 
 def extract_msg_from_event(event: VkBotMessageEvent) -> Message:

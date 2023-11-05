@@ -7,15 +7,15 @@ from src import config
 session: Session = Session()
 
 
-def get_commands(request: str, is_inline: bool = True) -> Response:
+def get_commands(request: str = '', is_inline: bool = True) -> Response:
     """Возвращает Response объект с информацией о запрашиваемой команде.
 
     Аргументы:
-    request -- текст запроса команды
-    is_inline -- искать ли команду внутри request? По умолчанию True.
+    request -- текст запроса команды. По умолчанию возвращает все команды
+    is_inline -- искать ли команду внутри request? По умолчанию True
 
     """
-    logger.info(f'GET {config.SERVER_URI}/api/v1/commands')
+    logger.debug(f'GET {config.SERVER_URI}/api/v1/commands')
     return session.get(
         url=f'{config.SERVER_URI}/api/v1/commands',
         params={
@@ -34,7 +34,7 @@ def create_command(request: str, response: str, type_: str) -> Response:
     type_ -- тип команды
 
     """
-    logger.info(f'CREATE {config.SERVER_URI}/api/v1/commands')
+    logger.debug(f'CREATE {config.SERVER_URI}/api/v1/commands')
     return session.post(
         url=f'{config.SERVER_URI}/api/v1/commands',
         json={
@@ -52,7 +52,7 @@ def delete_command(id_: int) -> Response:
     id_ -- идентификатор команды, которую нужно удалить
 
     """
-    logger.info(f'DELETE {config.SERVER_URI}/api/v1/commands')
+    logger.debug(f'DELETE {config.SERVER_URI}/api/v1/commands')
     return session.delete(
         url=f'{config.SERVER_URI}/api/v1/commands',
         params={

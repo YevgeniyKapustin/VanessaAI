@@ -2,6 +2,7 @@
 from loguru import logger
 from vk_api.bot_longpoll import VkBotEventType
 
+from src import config
 from src.services import vk
 from src.utils.controller import Controller
 from src.services.events import Event, extract_msg_from_event, Message
@@ -21,11 +22,14 @@ class Bot(object):
     def launch(self):
         """Запускает бота: прослушивает ивенты, отлавливает исключения."""
         while True:
-            try:
-                logger.info('launch...')
-                self.__run()
-            except Exception as exception:
-                logger.critical(exception)
+            if not config.DEBUG:
+                try:
+                    logger.info('launch...')
+                    self.__run()
+                except Exception as exception:
+                    logger.critical(exception)
+            logger.info('launch...')
+            self.__run()
 
     @staticmethod
     def __run():

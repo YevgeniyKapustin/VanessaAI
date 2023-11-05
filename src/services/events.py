@@ -36,11 +36,11 @@ class Event(object):
             random_id=0
         )
 
-    def gif_answer(self, url: str) -> None:
-        """Отвечает на ивент гифкой.
+    def attachment_answer(self, url: str) -> None:
+        """Отвечает на ивент файлом.
 
         Аргументы:
-        url -- URI гифки на серверах ВК
+        url -- URI файлом на серверах ВК
 
         """
         logger.info(f'url answer: {url}')

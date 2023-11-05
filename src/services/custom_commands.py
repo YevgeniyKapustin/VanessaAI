@@ -1,4 +1,5 @@
 """Модуль для работы с кастомными командами."""
+from src.constants import commands_types
 from src.services.events import Event
 from src.services.schemas import Command
 from src.utils.queries import get_commands
@@ -18,11 +19,14 @@ def answer_for_custom_msg(event: Event, is_inline: bool) -> None:
         response: str = data[0].get('response')
         type_: str = data[0].get('type')
 
-        if type_ == f'{prefix}текст':
+        if type_ == f'{prefix}{commands_types[0]}':
             event.text_answer(response)
 
-        elif type_ == f'{prefix}гиф':
-            event.gif_answer(response)
+        elif (
+                type_ == f'{prefix}{commands_types[1]}' or
+                type_ == f'{prefix}{commands_types[2]}'
+        ):
+            event.attachment_answer(response)
 
 
 def create_command_obj(event: Event) -> Command:

@@ -13,21 +13,22 @@ def answer_for_custom_msg(event: Event, is_inline: bool) -> None:
     event -- ивент, на которой нужно ответить
     is_inline -- является ли текст из ивента командой или нужно искать ее
     """
-    data: list = get_commands(event.message.text, is_inline).json()
+    if message := event.message.text:
+        data: list = get_commands(message, is_inline).json()
 
-    if isinstance(data, list) and data is not None:
-        prefix: str = 'внутристрочный_' if is_inline else ''
-        response: str = data[0].get('response')
-        type_: str = data[0].get('type')
+        if isinstance(data, list) and data is not None:
+            prefix: str = 'внутристрочный_' if is_inline else ''
+            response: str = data[0].get('response')
+            type_: str = data[0].get('type')
 
-        if type_ == f'{prefix}{commands_types[0]}':
-            event.text_answer(response)
+            if type_ == f'{prefix}{commands_types[0]}':
+                event.text_answer(response)
 
-        elif (
-                type_ == f'{prefix}{commands_types[1]}' or
-                type_ == f'{prefix}{commands_types[2]}'
-        ):
-            event.attachment_answer(response)
+            elif (
+                    type_ == f'{prefix}{commands_types[1]}' or
+                    type_ == f'{prefix}{commands_types[2]}'
+            ):
+                event.attachment_answer(response)
 
 
 def create_command_obj(event: Event) -> Command:
@@ -42,10 +43,10 @@ def create_command_obj(event: Event) -> Command:
     type_: str = text_list[0] if text_list is not None else ''
     text_list.remove(type_)
 
-    if len(text_list) != 2:
+    if len(text_list) < 2:
         raise CreateCommandException('Неверный синтаксис команды')
 
-    text_list: list = ''.join(text_list).split(':')
+    text_list: list = ' '.join(text_list).split(':')
     request: str = text_list[0].strip()
     response: str = text_list[1].strip()
 

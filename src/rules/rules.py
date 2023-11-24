@@ -37,3 +37,11 @@ class Wiki(BaseRule):
 class Any(BaseRule):
     def check(self) -> bool:
         return True
+
+
+class Prefix(BaseRule):
+    def __init__(self, prefix: str = None):
+        self.__prefix: str = prefix
+
+    def check(self) -> bool:
+        return self.__prefix in self._message[:len(self.__prefix)]

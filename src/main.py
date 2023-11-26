@@ -28,7 +28,8 @@ class Bot(object):
                     self.__run()
                 except Exception as exception:
                     logger.critical(exception)
-            self.__run()
+            else:
+                self.__run()
 
     @staticmethod
     def __run():

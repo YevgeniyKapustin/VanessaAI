@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
     sender_last_name: str | None = None
     mentions_bot: bool = False
     reply_to_bot: bool = False
+    reply_to_other_user: bool = False
 
 
 class ChatResponse(BaseModel):

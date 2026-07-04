@@ -7,6 +7,7 @@ from aiogram.types import Message as TelegramMessage
 class AddressingSignals:
     mentions_bot: bool = False
     reply_to_bot: bool = False
+    reply_to_other_user: bool = False
 
     @property
     def directly_addressed(self) -> bool:
@@ -32,12 +33,15 @@ def extract_addressing(message: TelegramMessage) -> AddressingSignals:
     text = message.text or ""
 
     reply_to_bot = False
+    reply_to_other_user = False
     if (
         bot_id is not None
         and message.reply_to_message is not None
         and message.reply_to_message.from_user is not None
     ):
-        reply_to_bot = message.reply_to_message.from_user.id == bot_id
+        reply_author_id = message.reply_to_message.from_user.id
+        reply_to_bot = reply_author_id == bot_id
+        reply_to_other_user = reply_author_id != bot_id
 
     mentions_bot = False
     if bot_username and f"@{bot_username}" in text.lower():
@@ -54,4 +58,5 @@ def extract_addressing(message: TelegramMessage) -> AddressingSignals:
     return AddressingSignals(
         mentions_bot=mentions_bot,
         reply_to_bot=reply_to_bot,
+        reply_to_other_user=reply_to_other_user,
     )

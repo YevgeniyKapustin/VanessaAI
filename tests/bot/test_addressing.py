@@ -47,7 +47,29 @@ def test_extract_addressing_reply_to_bot_without_bot_username():
     signals = extract_addressing(message)  # type: ignore[arg-type]
 
     assert signals.reply_to_bot is True
+    assert signals.reply_to_other_user is False
     assert signals.mentions_bot is False
+
+
+def test_extract_addressing_reply_to_other_user():
+    bot_user = FakeUser(id=1)
+    other = FakeUser(id=99)
+    reply = type("Reply", (), {"from_user": other})()
+    message = type(
+        "Message",
+        (),
+        {
+            "bot": FakeBot(id=1),
+            "text": "Личь не делает карты",
+            "reply_to_message": reply,
+            "entities": None,
+        },
+    )()
+
+    signals = extract_addressing(message)  # type: ignore[arg-type]
+
+    assert signals.reply_to_other_user is True
+    assert signals.reply_to_bot is False
 
 
 def test_extract_addressing_mention_in_text():

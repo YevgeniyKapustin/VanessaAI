@@ -27,9 +27,9 @@ def _preview(text: str) -> str:
 async def _send_reply(telegram_message: TelegramMessage, reply: str) -> None:
     formatted = markdown_to_telegram_html(reply)
     try:
-        await telegram_message.answer(formatted, parse_mode=ParseMode.HTML)
+        await telegram_message.reply(formatted, parse_mode=ParseMode.HTML)
     except TelegramBadRequest:
-        await telegram_message.answer(reply)
+        await telegram_message.reply(reply)
 
 
 def create_messages_router(services: BotServices) -> Router:
@@ -79,7 +79,7 @@ def create_messages_router(services: BotServices) -> Router:
         try:
             result = await services.chat_client.process(incoming)
         except httpx.HTTPError:
-            await telegram_message.answer(services.texts.error_api)
+            await telegram_message.reply(services.texts.error_api)
             return
 
         if result.action != DecisionAction.REPLY or not result.reply:

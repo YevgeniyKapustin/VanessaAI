@@ -29,22 +29,22 @@ def test_create_bot_services_wires_dependencies():
 @pytest.mark.asyncio
 async def test_send_reply_falls_back_on_bad_html():
     message = make_telegram_message()
-    message.answer = AsyncMock(
+    message.reply = AsyncMock(
         side_effect=[TelegramBadRequest(MagicMock(), "bad"), None]
     )
     await _send_reply(message, "plain text")
-    assert message.answer.await_count == 2
-    second_call = message.answer.await_args_list[1]
+    assert message.reply.await_count == 2
+    second_call = message.reply.await_args_list[1]
     assert second_call.args[0] == "plain text"
 
 
 @pytest.mark.asyncio
 async def test_send_reply_uses_html_parse_mode():
     message = make_telegram_message()
-    message.answer = AsyncMock()
+    message.reply = AsyncMock()
     await _send_reply(message, "code `x`")
-    message.answer.assert_awaited_once()
-    assert message.answer.await_args.kwargs["parse_mode"] == ParseMode.HTML
+    message.reply.assert_awaited_once()
+    assert message.reply.await_args.kwargs["parse_mode"] == ParseMode.HTML
 
 
 def _services(
@@ -100,16 +100,16 @@ async def test_handle_text_ignores_when_access_denied():
 @pytest.mark.asyncio
 async def test_handle_text_reports_api_error():
     message = make_telegram_message()
-    message.answer = AsyncMock()
+    message.reply = AsyncMock()
     services = _services(api_error=httpx.ConnectError("down"))
     await _call_text_handler(services, message)
-    message.answer.assert_awaited_once_with(services.texts.error_api)
+    message.reply.assert_awaited_once_with(services.texts.error_api)
 
 
 @pytest.mark.asyncio
 async def test_handle_text_sends_reply():
     message = make_telegram_message(text="Vanessa?")
-    message.answer = AsyncMock()
+    message.reply = AsyncMock()
     services = _services(
         api_result=ChatProcessResult(
             action="reply",
@@ -120,13 +120,14 @@ async def test_handle_text_sends_reply():
     )
     await _call_text_handler(services, message)
     message.bot.send_chat_action.assert_awaited_once()
-    message.answer.assert_awaited_once()
+    message.reply.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_handle_text_ignores_non_reply():
     message = make_telegram_message(text="просто болтовня")
     message.answer = AsyncMock()
+    message.reply = AsyncMock()
     services = _services(
         api_result=ChatProcessResult(
             action="ignore",
@@ -137,6 +138,7 @@ async def test_handle_text_ignores_non_reply():
     )
     await _call_text_handler(services, message)
     message.answer.assert_not_awaited()
+    message.reply.assert_not_awaited()
     message.bot.send_chat_action.assert_not_awaited()
 
 

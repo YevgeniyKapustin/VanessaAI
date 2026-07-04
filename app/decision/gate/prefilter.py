@@ -64,6 +64,7 @@ class PlannerPrefilter:
         *,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        reply_to_other_user: bool = False,
     ) -> PlannerPrefilterResult:
         directly_addressed = mentions_bot or reply_to_bot
         intent = self._intent.detect(text)
@@ -74,6 +75,9 @@ class PlannerPrefilter:
             return PlannerPrefilterResult(False, "dismissal")
 
         if is_third_party_about_bot(text) and not directly_addressed:
+            return PlannerPrefilterResult(False, "side_talk")
+
+        if reply_to_other_user and not directly_addressed and not intent.mentions_bot:
             return PlannerPrefilterResult(False, "side_talk")
 
         in_listen_window = in_post_reply_listen_window(

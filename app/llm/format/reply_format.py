@@ -5,6 +5,11 @@ _SENTENCE_START = re.compile(
     r"(^|[.!?…]\s+|\.{3}\s+)([a-zа-яё])",
 )
 _FENCED_CODE = re.compile(r"```[\s\S]*?```", re.DOTALL)
+_LICH_SPELLING = re.compile(r"(?<![а-яё])([Лл])ич(?![ьЬа-яё])")
+
+
+def fix_participant_spelling(text: str) -> str:
+    return _LICH_SPELLING.sub(r"\1ичь", text)
 
 
 def capitalize_sentences(text: str) -> str:
@@ -23,7 +28,8 @@ def capitalize_sentences(text: str) -> str:
         last = match.end()
     if last < len(stripped):
         parts.append(_capitalize_prose(stripped[last:]))
-    return "".join(parts) if parts else _capitalize_prose(stripped)
+    result = "".join(parts) if parts else _capitalize_prose(stripped)
+    return fix_participant_spelling(result)
 
 
 def _capitalize_prose(text: str) -> str:

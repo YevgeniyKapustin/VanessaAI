@@ -31,6 +31,7 @@ priority = "explicit"
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.0"
 pytest-asyncio = ">=0.24.0"
+pytest-cov = "^7.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.9.0"]
@@ -39,3 +40,11 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+show_missing = true
+precision = 0
+fail_under = 90

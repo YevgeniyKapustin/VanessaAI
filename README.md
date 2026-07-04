@@ -152,10 +152,23 @@ tests/          162 tests
 
 ## Configuration (essentials)
 
-| Variable | Purpose |
-|----------|---------|
-| `DECISION_SESSION_IDLE_SECONDS` | Session idle timeout (default 300) |
-| `DECISION_POST_REPLY_LISTEN_COUNT` | Follow-up window after a bot reply |
+Behavior tuning lives in **`config/content.yaml`** (persona, conversation window,
+LLM sampling). Environment variables cover secrets and infrastructure.
+
+| `content.yaml` key | Purpose |
+|--------------------|---------|
+| `conversation.session_window_size` | Recent messages in session context |
+| `conversation.session_idle_seconds` | Session idle timeout |
+| `conversation.post_reply_listen_count` | Follow-up window after bot reply |
+| `llm.generation.composer` | temperature, top_p, max_tokens for replies |
+| `llm.generation.planner` | Sampling params for turn planner |
+| `persona.*` | System prompt: identity, voice, rules |
+
+`presence_penalty` / `frequency_penalty` are stored for portability; Anthropic API
+does not apply them today.
+
+| Env variable | Purpose |
+|--------------|---------|
 | `DECISION_RELEVANCE_THRESHOLD` | Semantic relevance threshold |
 | `ANTHROPIC_PLANNER_MODEL` | Separate planner model (optional) |
 | `RAG_REACT_MAX_STEPS` | ReAct steps for deep search |

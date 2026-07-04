@@ -7,6 +7,52 @@ from pydantic import BaseModel, Field
 from app.config.settings import settings
 
 
+class LLMGenerationProfile(BaseModel):
+    temperature: float = Field(default=0.8, ge=0.0, le=1.0)
+    top_p: float = Field(default=0.9, ge=0.0, le=1.0)
+    max_tokens: int = Field(default=512, ge=64, le=4096)
+    presence_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
+    frequency_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
+
+    def to_params(self):
+        from app.llm.generation_config import LLMGenerationParams
+
+        return LLMGenerationParams(
+            temperature=self.temperature,
+            top_p=self.top_p,
+            max_tokens=self.max_tokens,
+            presence_penalty=self.presence_penalty,
+            frequency_penalty=self.frequency_penalty,
+        )
+
+
+class LLMGenerationProfiles(BaseModel):
+    composer: LLMGenerationProfile = Field(
+        default_factory=lambda: LLMGenerationProfile(
+            temperature=0.8,
+            top_p=0.9,
+            max_tokens=512,
+            presence_penalty=0.4,
+            frequency_penalty=0.35,
+        )
+    )
+    planner: LLMGenerationProfile = Field(
+        default_factory=lambda: LLMGenerationProfile(
+            temperature=0.1,
+            top_p=0.85,
+            max_tokens=192,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+        )
+    )
+
+
+class ConversationContent(BaseModel):
+    session_window_size: int = Field(default=12, ge=4, le=50)
+    session_idle_seconds: int = Field(default=300, ge=60, le=3600)
+    post_reply_listen_count: int = Field(default=5, ge=1, le=20)
+
+
 class PersonaContent(BaseModel):
     identity: str = ""
     voice: str = ""
@@ -44,6 +90,7 @@ class LLMContent(BaseModel):
     user_line: str = "{time} [user:{sender}]{anchor} {content}"
     humor_quotes_header: str = "Узнаваемые мемы и подколы из беседы (если уместно):"
     humor_quote_line: str = "- {quote}"
+    generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
 
     def task_text(self) -> str:
         return (self.task or self.reply_instruction).strip()
@@ -96,6 +143,7 @@ class RagContent(BaseModel):
 class AppContent(BaseModel):
     persona: PersonaContent
     llm: LLMContent
+    conversation: ConversationContent = Field(default_factory=ConversationContent)
     bot: BotMessagesContent
     decision: DecisionContent
     profanity: ProfanityContent = Field(default_factory=ProfanityContent)

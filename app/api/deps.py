@@ -4,6 +4,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.content import get_bot_name_aliases, get_trigger_keywords
+from app.config.conversation_config import load_conversation_config
 from app.config.settings import settings
 from app.core.protocols import (
     ContextRetrieverProtocol,
@@ -58,8 +59,9 @@ _embedding_provider: EmbeddingProviderProtocol | None = None
 _vector_store: VectorStoreProtocol | None = None
 _intent_detector = IntentDetector(bot_names=get_bot_name_aliases())
 _trigger_checker = TriggerKeywordChecker(keywords=get_trigger_keywords())
+_conversation_config = load_conversation_config()
 _session_analyzer = SessionWindowAnalyzer(
-    window_size=settings.decision_session_window_size,
+    window_size=_conversation_config.session_window_size,
     intent_detector=_intent_detector,
     trigger_checker=_trigger_checker,
 )
@@ -68,8 +70,8 @@ _planner_prefilter = PlannerPrefilter(
     intent_detector=_intent_detector,
     trigger_checker=_trigger_checker,
     noise_filter=_noise_filter,
-    post_reply_listen_count=settings.decision_post_reply_listen_count,
-    post_reply_listen_idle_seconds=settings.decision_session_idle_seconds,
+    post_reply_listen_count=_conversation_config.post_reply_listen_count,
+    post_reply_listen_idle_seconds=_conversation_config.session_idle_seconds,
 )
 
 

@@ -34,6 +34,7 @@ from app.decision import (
     SessionWindowAnalyzer,
     TriggerKeywordChecker,
 )
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.llm.providers.claude import ClaudeLLMProvider
 from app.rag.embeddings.embeddings import LocalEmbeddingProvider
 from app.rag.search.hybrid_search import HybridSearchService
@@ -55,6 +56,7 @@ _rate_limiter = RateLimiter(
     max_replies=settings.decision_rate_limit_per_minute,
     window_seconds=60,
 )
+_ignore_registry = ChatIgnoreRegistry()
 _embedding_provider: EmbeddingProviderProtocol | None = None
 _vector_store: VectorStoreProtocol | None = None
 _intent_detector = IntentDetector(bot_names=get_bot_name_aliases())
@@ -70,6 +72,7 @@ _planner_prefilter = PlannerPrefilter(
     intent_detector=_intent_detector,
     trigger_checker=_trigger_checker,
     noise_filter=_noise_filter,
+    ignore_registry=_ignore_registry,
     post_reply_listen_count=_conversation_config.post_reply_listen_count,
     post_reply_listen_idle_seconds=_conversation_config.session_idle_seconds,
 )
@@ -117,6 +120,7 @@ def create_decision_engine(
         rate_limiter=_rate_limiter,
         noise_filter=_noise_filter,
         relevance_threshold=settings.decision_relevance_threshold,
+        ignore_registry=_ignore_registry,
     )
 
 
@@ -216,6 +220,7 @@ async def get_incoming_turn_handler(
         metrics,
         messages,
         indexing,
+        _ignore_registry,
     )
     retrieve = RetrieveStage(hybrid_search, humor, uow)
     compose = ComposeStage(llm)

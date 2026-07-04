@@ -6,6 +6,7 @@ from app.config.content import (
     get_modal_verbs,
     get_question_words,
 )
+from app.decision.gate.bot_names import compile_bot_name_pattern
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,10 +37,7 @@ class IntentDetector:
             re.IGNORECASE,
         )
         names = bot_names if bot_names is not None else get_bot_name_aliases()
-        patterns = [rf"\b{re.escape(name)}\b" for name in names if name]
-        self._bot_re = (
-            re.compile("|".join(patterns), re.IGNORECASE) if patterns else None
-        )
+        self._bot_re = compile_bot_name_pattern(names)
 
     def detect(self, text: str) -> IntentResult:
         has_question = bool(self._question_re.search(text))

@@ -52,6 +52,21 @@ _DIRECT_BOT_ADDRESS = re.compile(
     re.IGNORECASE,
 )
 
+_IMPERATIVE_START = re.compile(
+    r"^(?:"
+    r"продолжай|продолжи|дальше|ещё|еще|"
+    r"напиши|скажи|давай|добавь|перечисли|"
+    r"повтори|ответь|расскажи|слушай|"
+    r"ну\s+(?:давай|продолжай|дальше)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_VOCATIVE_COMMA = re.compile(
+    r"^[a-zа-яё]{2,}\s*,",
+    re.IGNORECASE,
+)
+
 
 def is_conversation_closure(text: str) -> bool:
     normalized = text.strip()
@@ -81,6 +96,21 @@ def is_third_party_about_bot(text: str) -> bool:
     if not normalized or _DIRECT_BOT_ADDRESS.search(normalized):
         return False
     return bool(_THIRD_PARTY_BOT_RE.search(normalized))
+
+
+def is_contextual_vocative_address(text: str) -> bool:
+    normalized = text.strip()
+    if not normalized:
+        return False
+    if is_unsolicited_remark(normalized):
+        return False
+    if is_third_party_about_bot(normalized):
+        return False
+    if _IMPERATIVE_START.search(normalized):
+        return True
+    if _VOCATIVE_COMMA.search(normalized):
+        return True
+    return False
 
 
 def listen_window_warrants_reply(

@@ -4,12 +4,14 @@ from app.core.session.chat_session_state import in_post_reply_listen_window
 from app.core.messages import ContextMessage
 from app.decision.detectors.intent import IntentDetector
 from app.decision.detectors.noise import NoiseFilter
+from app.decision.gate.quote_echo import is_recursive_quote_loop
 from app.decision.gate.reply_expectation import (
     is_conversation_closure,
     is_dismissal_request,
     is_third_party_about_bot,
     is_unsolicited_remark,
 )
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.detectors.triggers import TriggerKeywordChecker
 
 __all__ = [
@@ -48,12 +50,14 @@ class PlannerPrefilter:
         trigger_checker: TriggerKeywordChecker,
         noise_filter: NoiseFilter,
         *,
+        ignore_registry: ChatIgnoreRegistry | None = None,
         post_reply_listen_count: int = 5,
         post_reply_listen_idle_seconds: float = 0,
     ) -> None:
         self._intent = intent_detector
         self._triggers = trigger_checker
         self._noise = noise_filter
+        self._ignore_registry = ignore_registry or ChatIgnoreRegistry()
         self._post_reply_listen_count = post_reply_listen_count
         self._post_reply_listen_idle_seconds = post_reply_listen_idle_seconds
 
@@ -62,10 +66,22 @@ class PlannerPrefilter:
         text: str,
         recent_messages: list[ContextMessage],
         *,
+        telegram_chat_id: int = 0,
+        sender_telegram_id: int = 0,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
     ) -> PlannerPrefilterResult:
+        if (
+            telegram_chat_id
+            and sender_telegram_id
+            and self._ignore_registry.is_ignored(
+                telegram_chat_id,
+                sender_telegram_id,
+            )
+        ):
+            return PlannerPrefilterResult(False, "ignored_user")
+
         directly_addressed = mentions_bot or reply_to_bot
         intent = self._intent.detect(text)
         trigger = self._triggers.detect(text)
@@ -73,6 +89,13 @@ class PlannerPrefilter:
 
         if is_dismissal_request(text):
             return PlannerPrefilterResult(False, "dismissal")
+
+        if is_recursive_quote_loop(
+            text,
+            recent_messages,
+            reply_to_bot=reply_to_bot,
+        ):
+            return PlannerPrefilterResult(False, "quote_echo")
 
         if is_third_party_about_bot(text) and not directly_addressed:
             return PlannerPrefilterResult(False, "side_talk")

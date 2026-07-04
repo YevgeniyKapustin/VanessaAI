@@ -28,6 +28,7 @@ class IncomingMessage:
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
+    reply_to_sender_telegram_id: int | None = None
 
     @classmethod
     def from_telegram(cls, message: TelegramMessage) -> "IncomingMessage":
@@ -48,6 +49,7 @@ class IncomingMessage:
             mentions_bot=addressing.mentions_bot,
             reply_to_bot=addressing.reply_to_bot,
             reply_to_other_user=addressing.reply_to_other_user,
+            reply_to_sender_telegram_id=addressing.reply_to_sender_telegram_id,
         )
 
     def to_api_payload(self) -> dict[str, Any]:
@@ -63,6 +65,7 @@ class IncomingMessage:
             "mentions_bot": self.mentions_bot,
             "reply_to_bot": self.reply_to_bot,
             "reply_to_other_user": self.reply_to_other_user,
+            "reply_to_sender_telegram_id": self.reply_to_sender_telegram_id,
         }
 
     @property

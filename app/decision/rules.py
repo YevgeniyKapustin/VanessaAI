@@ -2,6 +2,8 @@ from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.gate.planner_gate import planner_affirms_reply
+from app.decision.gate.quote_echo import is_recursive_quote_loop
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
@@ -51,6 +53,32 @@ class DismissalRule(_PreRelevanceRuleMixin):
         if not is_dismissal_request(context.text):
             return None
         return _ignore(context, DecisionReason.DISMISSAL)
+
+
+class QuoteEchoRule(_PreRelevanceRuleMixin):
+    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if not is_recursive_quote_loop(
+            context.text,
+            context.recent_messages,
+            reply_to_bot=context.reply_to_bot,
+        ):
+            return None
+        return _ignore(context, DecisionReason.QUOTE_ECHO)
+
+
+class IgnoredUserRule(_PreRelevanceRuleMixin):
+    def __init__(self, ignore_registry: ChatIgnoreRegistry) -> None:
+        self._ignore_registry = ignore_registry
+
+    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if not context.sender_telegram_id:
+            return None
+        if not self._ignore_registry.is_ignored(
+            context.telegram_chat_id,
+            context.sender_telegram_id,
+        ):
+            return None
+        return _ignore(context, DecisionReason.USER_IGNORED)
 
 
 class ThirdPartyAboutBotRule(_PreRelevanceRuleMixin):

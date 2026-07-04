@@ -82,3 +82,42 @@ async def test_gate_stage_blocks_reply_without_address_or_humor():
     assert ctx.result is not None
     assert ctx.result.action == DecisionAction.IGNORE.value
     assert ctx.result.reason == DecisionReason.NOT_EXPECTED.value
+
+
+@pytest.mark.asyncio
+async def test_gate_stage_allows_contextual_nickname_address():
+    config = OrchestratorConfig(
+        session_window_size=10,
+        session_idle_seconds=300.0,
+        post_reply_listen_count=3,
+        planner_prefilter_enabled=False,
+        defer_index_on_ignore=True,
+    )
+    gate = GateStage(
+        FakePlanner(),  # type: ignore[arg-type]
+        FakeDecision(),  # type: ignore[arg-type]
+        None,
+        config,
+        TurnMetrics(),
+        FakeMessageRepo(),  # type: ignore[arg-type]
+        FakeIndexing(),  # type: ignore[arg-type]
+    )
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-100,
+            message="продолжай список гомункул",
+            sender_telegram_id=1,
+        ),
+        user_msg=StoredMessage(id=1, role="user", content="продолжай список гомункул"),
+        session=ChatSessionState(
+            messages=[],
+            in_listen_window=True,
+            idle_since_last_bot_seconds=None,
+            idle_expired=False,
+            has_recent_dismissal=False,
+        ),
+    )
+
+    should_continue = await gate.run(ctx)
+
+    assert should_continue is True

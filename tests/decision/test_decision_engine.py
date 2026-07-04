@@ -498,3 +498,28 @@ async def test_decision_engine_ignores_closure_after_bot_chat(
 
     assert result.action == DecisionAction.IGNORE
     assert result.reason == DecisionReason.NO_REPLY_NEEDED
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_ignores_quote_echo_reply_to_bot(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    bot_line = (
+        "Котгаст, ты уже третий круг, скоро Данте тебя запишет в отдельный котёл"
+    )
+    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    recent = [
+        ContextMessage(id=1, role="assistant", content=bot_line),
+    ]
+
+    result = await engine.decide(
+        text=bot_line,
+        telegram_chat_id=1,
+        recent_messages=recent,
+        reply_to_bot=True,
+        should_reply=True,
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.QUOTE_ECHO

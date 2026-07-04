@@ -27,6 +27,7 @@ async def chat(
             mentions_bot=body.mentions_bot,
             reply_to_bot=body.reply_to_bot,
             reply_to_other_user=body.reply_to_other_user,
+            reply_to_sender_telegram_id=body.reply_to_sender_telegram_id,
         )
     )
     return ChatResponse(

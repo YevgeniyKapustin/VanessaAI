@@ -24,6 +24,7 @@ class TurnPlan:
     humor_ok: bool = False
     humor_query: str = ""
     should_reply: bool | None = None
+    deep_search: bool = False
 
 
 class TurnPlanner:
@@ -42,7 +43,7 @@ class TurnPlanner:
             else settings.rag_query_rewrite_use_llm
         )
         self._client = llm_client
-        self._model = llm_model or settings.anthropic_model
+        self._model = llm_model or settings.planner_model
 
     async def prepare(
         self,
@@ -83,12 +84,13 @@ class TurnPlanner:
         else:
             logger.info(
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
-                "humor_ok=%s humor_query=%r",
+                "humor_ok=%s humor_query=%r deep_search=%s",
                 result.text,
                 result.skip_search,
                 result.should_reply,
                 result.humor_ok,
                 result.humor_query,
+                result.deep_search,
             )
         return result
 
@@ -154,6 +156,7 @@ class TurnPlanner:
         if humor_ok and not humor_query:
             humor_ok = False
         should_reply = _parse_should_reply(payload.get("should_reply"))
+        deep_search = payload.get("deep_search") is True
         return TurnPlan(
             original=original,
             text=text,
@@ -161,6 +164,7 @@ class TurnPlanner:
             humor_ok=humor_ok,
             humor_query=humor_query if humor_ok else "",
             should_reply=should_reply,
+            deep_search=deep_search,
         )
 
     @staticmethod

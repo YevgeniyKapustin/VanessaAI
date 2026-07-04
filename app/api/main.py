@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from app.api.deps import create_embedding_provider, create_vector_store
 from app.api.middleware import register_request_id_middleware
-from app.api.routes import chat, health
+from app.api.routes import chat, health, metrics
 from app.config import settings
 from app.core.logging_setup import configure_logging
 from app.db.base import Base
@@ -41,3 +41,4 @@ register_request_id_middleware(app)
 
 app.include_router(health.router, tags=["health"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
+app.include_router(metrics.router, prefix="/api/v1", tags=["metrics"])

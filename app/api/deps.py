@@ -13,8 +13,10 @@ from app.core.protocols import (
     MessageIndexerProtocol,
     MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
+    TurnMetricsProtocol,
     TurnQueryProtocol,
     UnitOfWorkProtocol,
+    UserRepositoryProtocol,
     VectorStoreProtocol,
 )
 from app.decision.protocols import DecisionEngineProtocol
@@ -37,7 +39,16 @@ from app.rag.hybrid_search import HybridSearchService
 from app.rag.qdrant_client import QdrantVectorStore
 from app.rag.query_rewriter import QueryRewriter
 from app.services.conversation_orchestrator import ConversationOrchestrator
+from app.services.humor_pipeline import HumorPipeline
 from app.services.message_indexing import MessageIndexingService
+from app.services.orchestrator_config import OrchestratorConfig
+from app.services.pipeline.stages import (
+    ComposeStage,
+    FinalizeStage,
+    GateStage,
+    RetrieveStage,
+)
+from app.services.turn_metrics import turn_metrics
 
 _rate_limiter = RateLimiter(
     max_replies=settings.decision_rate_limit_per_minute,
@@ -127,7 +138,7 @@ async def get_message_repository(
 
 async def get_user_repository(
     session: AsyncSession = Depends(get_session),
-) -> UserRepository:
+) -> UserRepositoryProtocol:
     return UserRepository(session)
 
 
@@ -178,26 +189,41 @@ def get_message_indexing(
     )
 
 
+def get_turn_metrics() -> TurnMetricsProtocol:
+    return turn_metrics
+
+
 async def get_incoming_turn_handler(
     messages: MessageRepository = Depends(get_message_repository),
-    users: UserRepository = Depends(get_user_repository),
+    users: UserRepositoryProtocol = Depends(get_user_repository),
     hybrid_search: HybridSearchService = Depends(get_hybrid_search),
     indexing: MessageIndexingSchedulerProtocol = Depends(get_message_indexing),
     llm: LLMProviderProtocol = Depends(get_llm_provider),
     decision_engine: DecisionEngineProtocol = Depends(get_decision_engine),
     query_rewriter: QueryRewriter = Depends(get_query_rewriter),
     uow: UnitOfWorkProtocol = Depends(get_unit_of_work),
+    metrics: TurnMetricsProtocol = Depends(get_turn_metrics),
 ) -> IncomingTurnHandlerProtocol:
+    config = OrchestratorConfig.from_settings()
+    humor = HumorPipeline(hybrid_search, hybrid_search, config)
+    gate = GateStage(
+        query_rewriter,
+        decision_engine,
+        _planner_prefilter,
+        config,
+        metrics,
+        messages,
+        indexing,
+    )
+    retrieve = RetrieveStage(hybrid_search, humor, uow)
+    compose = ComposeStage(llm)
+    finalize = FinalizeStage(messages, indexing, decision_engine, config, metrics)
     return ConversationOrchestrator(
         messages=messages,
         users=users,
-        turn_query=hybrid_search,
-        context_retriever=hybrid_search,
-        indexing=indexing,
-        llm=llm,
-        decision_engine=decision_engine,
-        query_rewriter=query_rewriter,
-        planner_prefilter=_planner_prefilter,
-        session_window_size=settings.decision_session_window_size,
-        uow=uow,
+        config=config,
+        gate=gate,
+        retrieve=retrieve,
+        compose=compose,
+        finalize=finalize,
     )

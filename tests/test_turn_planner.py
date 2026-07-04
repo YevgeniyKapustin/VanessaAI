@@ -42,6 +42,19 @@ async def test_turn_planner_humor_ok_without_query_disabled():
 
 
 @pytest.mark.asyncio
+async def test_turn_planner_parse_deep_search():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "сравни меш и текстуры",
+        '{"should_reply": true, "search_query": "меш текстуры", "skip": false, '
+        '"humor_ok": false, "humor_query": "", "deep_search": true}',
+    )
+
+    assert result.deep_search is True
+    assert result.text == "меш текстуры"
+
+
+@pytest.mark.asyncio
 async def test_turn_planner_strips_markdown_fence():
     planner = TurnPlanner(use_llm=False)
     result = planner._parse_llm_response(

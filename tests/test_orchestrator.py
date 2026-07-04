@@ -7,6 +7,15 @@ from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.llm.turn_planner import TurnPlan
 from app.rag.query_rewriter import QueryRewriter
 from app.services.conversation_orchestrator import ConversationOrchestrator
+from app.services.humor_pipeline import HumorPipeline
+from app.services.orchestrator_config import OrchestratorConfig
+from app.services.pipeline.stages import (
+    ComposeStage,
+    FinalizeStage,
+    GateStage,
+    RetrieveStage,
+)
+from app.services.turn_metrics import TurnMetrics
 
 
 class FakeMessageRepo:
@@ -190,20 +199,56 @@ class FakeDecisionEngine:
         self.recorded_chats.append(telegram_chat_id)
 
 
+def _build_orchestrator(
+    *,
+    messages: FakeMessageRepo,
+    indexing: FakeIndexing,
+    decision: FakeDecisionEngine,
+    retriever: FakeContextRetriever | None = None,
+    llm: FakeLLM | None = None,
+    query_rewriter: QueryRewriter | None = None,
+    defer_index_on_ignore: bool = True,
+) -> ConversationOrchestrator:
+    retriever = retriever or FakeContextRetriever()
+    llm = llm or FakeLLM()
+    metrics = TurnMetrics()
+    config = OrchestratorConfig(
+        session_window_size=10,
+        session_idle_seconds=300.0,
+        post_reply_listen_count=5,
+        planner_prefilter_enabled=False,
+        defer_index_on_ignore=defer_index_on_ignore,
+    )
+    humor = HumorPipeline(retriever, FakeTurnQuery(), config)
+    gate = GateStage(
+        query_rewriter or QueryRewriter(use_llm=False),
+        decision,
+        None,
+        config,
+        metrics,
+        messages,
+        indexing,
+    )
+    return ConversationOrchestrator(
+        messages=messages,
+        users=FakeUserRepo(),
+        config=config,
+        gate=gate,
+        retrieve=RetrieveStage(retriever, humor, None),
+        compose=ComposeStage(llm),
+        finalize=FinalizeStage(messages, indexing, decision, config, metrics),
+    )
+
+
 @pytest.mark.asyncio
 async def test_orchestrator_replies_and_indexes_both_messages():
     messages = FakeMessageRepo()
     indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
-    orchestrator = ConversationOrchestrator(
+    orchestrator = _build_orchestrator(
         messages=messages,
-        users=FakeUserRepo(),
-        turn_query=FakeTurnQuery(),
-        context_retriever=FakeContextRetriever(),
         indexing=indexing,
-        llm=FakeLLM(),
-        decision_engine=decision,
-        session_window_size=10,
+        decision=decision,
         defer_index_on_ignore=False,
     )
 
@@ -227,15 +272,10 @@ async def test_orchestrator_replies_and_indexes_both_messages():
 async def test_orchestrator_ignores_without_reply():
     messages = FakeMessageRepo()
     indexing = FakeIndexing()
-    orchestrator = ConversationOrchestrator(
+    orchestrator = _build_orchestrator(
         messages=messages,
-        users=FakeUserRepo(),
-        turn_query=FakeTurnQuery(),
-        context_retriever=FakeContextRetriever(),
         indexing=indexing,
-        llm=FakeLLM(),
-        decision_engine=FakeDecisionEngine(DecisionAction.IGNORE),
-        session_window_size=10,
+        decision=FakeDecisionEngine(DecisionAction.IGNORE),
     )
 
     result = await orchestrator.handle_incoming(
@@ -268,15 +308,12 @@ async def test_orchestrator_runs_humor_rag_when_planner_requests_it():
             humor_query="личь работа",
         ),
     )
-    orchestrator = ConversationOrchestrator(
+    orchestrator = _build_orchestrator(
         messages=messages,
-        users=FakeUserRepo(),
-        turn_query=FakeTurnQuery(),
-        context_retriever=retriever,
         indexing=indexing,
+        decision=FakeDecisionEngine(DecisionAction.REPLY),
+        retriever=retriever,
         llm=llm,
-        decision_engine=FakeDecisionEngine(DecisionAction.REPLY),
-        session_window_size=10,
         query_rewriter=planner,
         defer_index_on_ignore=False,
     )

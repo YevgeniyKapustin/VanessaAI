@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
+    anthropic_planner_model: str = ""
     anthropic_max_tokens: int = 4096
 
     rag_context_min: int = 20
@@ -45,6 +46,8 @@ class Settings(BaseSettings):
     rag_embed_max_chars: int = 2000
     rag_query_rewrite_use_llm: bool = True
     rag_query_rewrite_max_tokens: int = 256
+    rag_react_max_steps: int = 3
+    rag_react_min_blocks: int = 2
     rag_vector_min_score: float = 0.35
 
     qdrant_on_disk: bool = True
@@ -78,6 +81,12 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
 
     log_level: str = "INFO"
+
+    @property
+    def planner_model(self) -> str:
+        if self.anthropic_planner_model.strip():
+            return self.anthropic_planner_model.strip()
+        return self.anthropic_model
 
     @property
     def database_url(self) -> str:

@@ -13,6 +13,8 @@ class ChatRequest(BaseModel):
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
+    reply_to_sender_telegram_id: int | None = None
+    reply_to_sender_telegram_id: int | None = None
 
 
 class ChatResponse(BaseModel):

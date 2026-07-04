@@ -21,6 +21,8 @@ class DecisionReason(StrEnum):
     PREFILTER = "prefilter"
     LISTEN_WINDOW = "listen_window"
     DISMISSAL = "dismissal"
+    QUOTE_ECHO = "quote_echo"
+    USER_IGNORED = "user_ignored"
 
 
 @dataclass(frozen=True, slots=True)

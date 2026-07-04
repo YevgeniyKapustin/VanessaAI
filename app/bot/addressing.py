@@ -8,6 +8,7 @@ class AddressingSignals:
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
+    reply_to_sender_telegram_id: int | None = None
 
     @property
     def directly_addressed(self) -> bool:
@@ -34,12 +35,14 @@ def extract_addressing(message: TelegramMessage) -> AddressingSignals:
 
     reply_to_bot = False
     reply_to_other_user = False
+    reply_to_sender_telegram_id: int | None = None
     if (
         bot_id is not None
         and message.reply_to_message is not None
         and message.reply_to_message.from_user is not None
     ):
         reply_author_id = message.reply_to_message.from_user.id
+        reply_to_sender_telegram_id = reply_author_id
         reply_to_bot = reply_author_id == bot_id
         reply_to_other_user = reply_author_id != bot_id
 
@@ -59,4 +62,5 @@ def extract_addressing(message: TelegramMessage) -> AddressingSignals:
         mentions_bot=mentions_bot,
         reply_to_bot=reply_to_bot,
         reply_to_other_user=reply_to_other_user,
+        reply_to_sender_telegram_id=reply_to_sender_telegram_id,
     )

@@ -160,3 +160,21 @@ def test_prefilter_skips_third_party_gossip(prefilter: PlannerPrefilter):
 
     assert result.run_planner is False
     assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_quote_echo_reply_to_bot(prefilter: PlannerPrefilter):
+    bot_line = (
+        "Котгаст, ты уже третий круг, скоро Данте тебя запишет в отдельный котёл"
+    )
+    recent = [
+        ContextMessage(id=1, role="assistant", content=bot_line),
+    ]
+
+    result = prefilter.evaluate(
+        bot_line,
+        recent,
+        reply_to_bot=True,
+    )
+
+    assert result.run_planner is False
+    assert result.reason == "quote_echo"

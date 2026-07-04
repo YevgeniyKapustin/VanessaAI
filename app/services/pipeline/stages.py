@@ -9,11 +9,16 @@ from app.core.protocols import (
     TurnMetricsProtocol,
     UnitOfWorkProtocol,
 )
+from app.config.settings import settings
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
 from app.decision.gate.addressing import is_addressed_to_bot
 from app.decision.gate.prefilter import PlannerPrefilter
+from app.decision.gate.user_ignore import (
+    ChatIgnoreRegistry,
+    apply_owner_ignore_command,
+)
 from app.decision.protocols import DecisionEngineProtocol
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.query_rewriter import QueryRewriter
@@ -35,6 +40,7 @@ class GateStage:
         metrics: TurnMetricsProtocol,
         messages: MessageRepositoryProtocol,
         indexing: MessageIndexingSchedulerProtocol,
+        ignore_registry: ChatIgnoreRegistry | None = None,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
@@ -43,8 +49,44 @@ class GateStage:
         self._metrics = metrics
         self._messages = messages
         self._indexing = indexing
+        self._ignore_registry = ignore_registry or ChatIgnoreRegistry()
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
+        owner_id = settings.required_user_telegram_id
+        if owner_id:
+            apply_owner_ignore_command(
+                self._ignore_registry,
+                chat_id=ctx.turn.telegram_chat_id,
+                owner_id=owner_id,
+                sender_id=ctx.turn.sender_telegram_id,
+                text=ctx.turn.message,
+                recent_messages=ctx.recent,
+                reply_to_sender_id=ctx.turn.reply_to_sender_telegram_id,
+            )
+
+        if (
+            self._ignore_registry.is_ignored(
+                ctx.turn.telegram_chat_id,
+                ctx.turn.sender_telegram_id,
+            )
+        ):
+            logger.info(
+                "turn_stage ignored_user request_id=%s sender=%s action=ignore",
+                get_request_id(),
+                ctx.turn.sender_telegram_id,
+            )
+            await self._index_user_message(ctx)
+            ctx.result = ConversationTurnResult(
+                action=DecisionAction.IGNORE.value,
+                reason=DecisionReason.USER_IGNORED.value,
+            )
+            self._metrics.record_turn(
+                action=ctx.result.action,
+                reason=ctx.result.reason,
+                planner_skipped=True,
+            )
+            return False
+
         if (
             self._config.planner_prefilter_enabled
             and self._prefilter is not None
@@ -52,6 +94,8 @@ class GateStage:
             prefilter = self._prefilter.evaluate(
                 ctx.turn.message,
                 ctx.recent,
+                telegram_chat_id=ctx.turn.telegram_chat_id,
+                sender_telegram_id=ctx.turn.sender_telegram_id,
                 mentions_bot=ctx.turn.mentions_bot,
                 reply_to_bot=ctx.turn.reply_to_bot,
                 reply_to_other_user=ctx.turn.reply_to_other_user,
@@ -64,11 +108,14 @@ class GateStage:
                     prefilter.reason,
                 )
                 await self._index_user_message(ctx)
-                reason = (
-                    DecisionReason.DISMISSAL.value
-                    if prefilter.reason == "dismissal"
-                    else DecisionReason.PREFILTER.value
-                )
+                if prefilter.reason == "dismissal":
+                    reason = DecisionReason.DISMISSAL.value
+                elif prefilter.reason == "quote_echo":
+                    reason = DecisionReason.QUOTE_ECHO.value
+                elif prefilter.reason == "ignored_user":
+                    reason = DecisionReason.USER_IGNORED.value
+                else:
+                    reason = DecisionReason.PREFILTER.value
                 ctx.result = ConversationTurnResult(
                     action=DecisionAction.IGNORE.value,
                     reason=reason,
@@ -102,6 +149,7 @@ class GateStage:
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
             in_listen_window=ctx.session.in_listen_window,
+            sender_telegram_id=ctx.turn.sender_telegram_id,
         )
         ctx.decision_ms = (time.perf_counter() - decision_started) * 1000
 
@@ -142,6 +190,9 @@ class GateStage:
             ctx.turn.message,
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
+            reply_to_other_user=ctx.turn.reply_to_other_user,
+            should_reply=ctx.turn_plan.should_reply,
+            in_listen_window=ctx.session.in_listen_window,
         ) and not ctx.turn_plan.humor_ok:
             logger.info(
                 "turn_stage side_talk_block request_id=%s reply_to_other=%s "

@@ -50,6 +50,7 @@ class DecisionEngineProtocol(Protocol):
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         in_listen_window: bool = False,
+        sender_telegram_id: int = 0,
     ) -> DecisionResult: ...
 
     def record_reply(self, telegram_chat_id: int) -> None: ...

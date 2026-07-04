@@ -10,15 +10,18 @@ from app.decision.protocols import (
     SessionWindowProtocol,
     TriggerCheckerProtocol,
 )
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.rules import (
     ConsecutiveReplyRule,
     DirectAddressRule,
     DismissalRule,
+    IgnoredUserRule,
     IntentRule,
     ListenWindowRule,
     NoiseRule,
     PlannerOverreachRule,
     PlannerReplyRule,
+    QuoteEchoRule,
     RateLimitRule,
     RelevanceRule,
     ThirdPartyAboutBotRule,
@@ -39,6 +42,7 @@ class DecisionEngine:
         relevance_threshold: float,
         rules: list[DecisionRule] | None = None,
         block_consecutive_replies: bool | None = None,
+        ignore_registry: ChatIgnoreRegistry | None = None,
     ) -> None:
         self._intent = intent_detector
         self._triggers = trigger_checker
@@ -54,6 +58,8 @@ class DecisionEngine:
             RateLimitRule(rate_limiter),
             NoiseRule(noise_filter),
             DismissalRule(),
+            QuoteEchoRule(),
+            IgnoredUserRule(ignore_registry or ChatIgnoreRegistry()),
             ThirdPartyAboutBotRule(),
             DirectAddressRule(),
             ConsecutiveReplyRule(
@@ -88,6 +94,7 @@ class DecisionEngine:
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         in_listen_window: bool = False,
+        sender_telegram_id: int = 0,
     ) -> DecisionResult:
         intent = self._intent.detect(text)
         trigger = self._triggers.detect(text)
@@ -105,6 +112,7 @@ class DecisionEngine:
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
             in_listen_window=in_listen_window,
+            sender_telegram_id=sender_telegram_id,
         )
         for rule in self._pre_relevance_rules:
             result = rule.evaluate(base_context)
@@ -129,6 +137,7 @@ class DecisionEngine:
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
             in_listen_window=in_listen_window,
+            sender_telegram_id=sender_telegram_id,
         )
         for rule in self._relevance_rules:
             result = rule.evaluate(context)

@@ -1,5 +1,6 @@
 from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
+    is_contextual_vocative_address,
     is_conversation_closure,
     is_dismissal_request,
     is_third_party_about_bot,
@@ -76,3 +77,14 @@ def test_third_party_about_bot_detects_gossip():
 def test_third_party_about_bot_allows_direct_address():
     assert is_third_party_about_bot("ванесса, почему ты меня игнорируешь") is False
     assert is_third_party_about_bot("почему ты меня игнорируешь") is False
+
+
+def test_contextual_vocative_address_detects_nickname_imperative():
+    assert is_contextual_vocative_address("продолжай список гомункул") is True
+    assert is_contextual_vocative_address("гомункул, продолжай список") is True
+    assert is_contextual_vocative_address("напиши ещё пункты") is True
+
+
+def test_contextual_vocative_address_rejects_status_remarks():
+    assert is_contextual_vocative_address("гомункул работает") is False
+    assert is_contextual_vocative_address("видите, гомункул работает") is False

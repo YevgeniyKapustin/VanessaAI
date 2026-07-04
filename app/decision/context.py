@@ -21,6 +21,7 @@ class DecisionContext:
     mentions_bot: bool = False
     reply_to_bot: bool = False
     in_listen_window: bool = False
+    sender_telegram_id: int = 0
 
     @property
     def directly_addressed(self) -> bool:

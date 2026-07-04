@@ -117,7 +117,7 @@ decision:
     - можно
     - нужно
     - стоит
-ы
+
 rag:
   vector_min_score: 0.35
   turn_planner_prompt: |

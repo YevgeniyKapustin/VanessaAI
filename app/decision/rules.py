@@ -4,6 +4,9 @@ from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
+    is_dismissal_request,
+    is_unsolicited_remark,
+    listen_window_warrants_reply,
 )
 from app.decision.protocols import (
     IntentDetectorProtocol,
@@ -35,6 +38,13 @@ class NoiseRule:
         return _ignore(context, DecisionReason.NOISE)
 
 
+class DismissalRule:
+    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if not is_dismissal_request(context.text):
+            return None
+        return _ignore(context, DecisionReason.DISMISSAL)
+
+
 class DirectAddressRule:
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.directly_addressed:
@@ -62,6 +72,8 @@ class ConsecutiveReplyRule:
             return None
         if context.directly_addressed:
             return None
+        if context.in_listen_window:
+            return None
         intent = self._intent.detect(context.text)
         trigger = self._triggers.detect(context.text)
         if intent.detected or trigger.detected:
@@ -71,8 +83,33 @@ class ConsecutiveReplyRule:
         return _ignore(context, DecisionReason.CONSECUTIVE)
 
 
+class ListenWindowRule:
+    def __init__(self, noise_filter: NoiseFilterProtocol) -> None:
+        self._noise = noise_filter
+
+    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if not context.in_listen_window:
+            return None
+        if context.directly_addressed or context.intent.mentions_bot:
+            return None
+        if self._noise.is_noise(context.text) and not context.trigger.detected:
+            return None
+        if is_conversation_closure(context.text):
+            return None
+        if not listen_window_warrants_reply(
+            context.text,
+            should_reply=context.should_reply,
+            has_question=context.intent.has_question,
+            trigger_detected=context.trigger.detected,
+        ):
+            return None
+        return _reply(context, DecisionReason.LISTEN_WINDOW)
+
+
 class PlannerReplyRule:
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if context.in_listen_window:
+            return None
         if context.should_reply is not False:
             return None
         if context.directly_addressed or context.intent.mentions_bot:

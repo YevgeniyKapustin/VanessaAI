@@ -2,11 +2,14 @@ import logging
 
 import httpx
 from aiogram import F, Router
+from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import Message as TelegramMessage
 
 from app.bot.container import BotServices
 from app.bot.messages import IncomingMessage
+from app.bot.telegram_format import markdown_to_telegram_html
 from app.decision.models import DecisionAction
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,14 @@ def _preview(text: str) -> str:
     if len(normalized) <= _PREVIEW_LEN:
         return normalized
     return f"{normalized[:_PREVIEW_LEN]}..."
+
+
+async def _send_reply(telegram_message: TelegramMessage, reply: str) -> None:
+    formatted = markdown_to_telegram_html(reply)
+    try:
+        await telegram_message.answer(formatted, parse_mode=ParseMode.HTML)
+    except TelegramBadRequest:
+        await telegram_message.answer(reply)
 
 
 def create_messages_router(services: BotServices) -> Router:
@@ -84,7 +95,7 @@ def create_messages_router(services: BotServices) -> Router:
             incoming.telegram_chat_id,
             "typing",
         )
-        await telegram_message.answer(result.reply)
+        await _send_reply(telegram_message, result.reply)
         logger.info(
             "reply_sent chat_id=%s reply_len=%s",
             incoming.telegram_chat_id,

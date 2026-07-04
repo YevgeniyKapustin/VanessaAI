@@ -71,6 +71,21 @@ def test_session_window_detects_prior_question(
     assert analyzer.has_active_request(messages) is True
 
 
+def test_session_window_closes_after_dismissal(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    analyzer = SessionWindowAnalyzer(10, intent_detector, trigger_checker)
+    messages = [
+        ContextMessage(id=1, role="user", content="Vanessa, как дела?"),
+        ContextMessage(id=2, role="assistant", content="Хорошо"),
+        ContextMessage(id=3, role="user", content="хватит"),
+        ContextMessage(id=4, role="user", content="а про токены?"),
+    ]
+
+    assert analyzer.has_active_request(messages) is False
+
+
 def test_rate_limiter_blocks_after_max_replies():
     limiter = RateLimiter(max_replies=2, window_seconds=60)
 
@@ -127,6 +142,109 @@ def build_engine(
         relevance_threshold=0.75,
         block_consecutive_replies=block_consecutive,
     )
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_in_listen_window_after_bot(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(
+            id=1,
+            role="user",
+            content="ванесса подскажи алгоритм генерации меша",
+        ),
+        ContextMessage(id=2, role="assistant", content="Кратко про меш"),
+        ContextMessage(
+            id=3,
+            role="user",
+            content="Гриша меш гексы поле боя генерация",
+        ),
+    ]
+
+    result = await engine.decide(
+        text="Гриша меш гексы поле боя генерация",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=False,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.LISTEN_WINDOW
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_in_listen_window_after_other_user(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса подскажи меш"),
+        ContextMessage(id=2, role="assistant", content="Кратко про меш"),
+        ContextMessage(id=3, role="user", content="ок"),
+        ContextMessage(
+            id=4,
+            role="user",
+            content="Гриша меш гексы поле боя генерация",
+        ),
+    ]
+
+    result = await engine.decide(
+        text="Гриша меш гексы поле боя генерация",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=False,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.LISTEN_WINDOW
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_ignores_status_remark_in_listen_window(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса как дела"),
+        ContextMessage(id=2, role="assistant", content="Норм"),
+        ContextMessage(id=3, role="user", content="видите"),
+        ContextMessage(id=4, role="user", content="гомункул работает"),
+    ]
+
+    result = await engine.decide(
+        text="гомункул работает",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=False,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.IGNORE
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_ignores_dismissal_even_when_addressed(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    result = await engine.decide(
+        text="ванесса хватит",
+        telegram_chat_id=1,
+        recent_messages=[],
+        mentions_bot=True,
+        should_reply=True,
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.DISMISSAL
 
 
 @pytest.mark.asyncio

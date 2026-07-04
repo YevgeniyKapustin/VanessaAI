@@ -51,6 +51,7 @@ class TurnPlanner:
         *,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        in_listen_window: bool = False,
     ) -> TurnPlan:
         if not self._use_llm:
             result = self._fallback(message)
@@ -71,6 +72,7 @@ class TurnPlanner:
                 recent_messages or [],
                 mentions_bot=mentions_bot,
                 reply_to_bot=reply_to_bot,
+                in_listen_window=in_listen_window,
             )
         except Exception:
             logger.exception(
@@ -97,6 +99,7 @@ class TurnPlanner:
         *,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        in_listen_window: bool = False,
     ) -> TurnPlan:
         client = self._client or AsyncAnthropic(api_key=settings.anthropic_api_key)
         prompt = self._content.rag.planner_prompt.format(
@@ -105,6 +108,7 @@ class TurnPlanner:
             nicknames=format_nicknames_for_planner(),
             mentions_bot="да" if mentions_bot else "нет",
             reply_to_bot="да" if reply_to_bot else "нет",
+            listen_window="да" if in_listen_window else "нет",
         )
         response = await client.messages.create(
             model=self._model,

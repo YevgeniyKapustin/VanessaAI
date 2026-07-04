@@ -13,7 +13,9 @@ from app.decision.protocols import (
 from app.decision.rules import (
     ConsecutiveReplyRule,
     DirectAddressRule,
+    DismissalRule,
     IntentRule,
+    ListenWindowRule,
     NoiseRule,
     PlannerReplyRule,
     RateLimitRule,
@@ -49,12 +51,14 @@ class DecisionEngine:
         self._rules = rules or [
             RateLimitRule(rate_limiter),
             NoiseRule(noise_filter),
+            DismissalRule(),
             DirectAddressRule(),
             ConsecutiveReplyRule(
                 intent_detector,
                 trigger_checker,
                 enabled=block_consecutive,
             ),
+            ListenWindowRule(noise_filter),
             PlannerReplyRule(),
             IntentRule(),
             TriggerRule(),
@@ -75,6 +79,7 @@ class DecisionEngine:
         should_reply: bool | None = None,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        in_listen_window: bool = False,
     ) -> DecisionResult:
         intent = self._intent.detect(text)
         trigger = self._triggers.detect(text)
@@ -91,6 +96,7 @@ class DecisionEngine:
             should_reply=should_reply,
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
+            in_listen_window=in_listen_window,
         )
         for rule in self._rules:
             if isinstance(rule, RelevanceRule):
@@ -116,6 +122,7 @@ class DecisionEngine:
             should_reply=should_reply,
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
+            in_listen_window=in_listen_window,
         )
         for rule in self._rules:
             if not isinstance(rule, RelevanceRule):

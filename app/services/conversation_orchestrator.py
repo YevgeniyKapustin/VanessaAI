@@ -20,7 +20,7 @@ from app.core.protocols import (
 from app.core.request_context import get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
-from app.decision.prefilter import PlannerPrefilter
+from app.decision.prefilter import PlannerPrefilter, in_post_reply_listen_window
 from app.decision.protocols import DecisionEngineProtocol
 from app.rag.query_rewriter import QueryRewriter
 
@@ -112,7 +112,11 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                     await self._indexing.index_now(user_msg)
                 result = ConversationTurnResult(
                     action=DecisionAction.IGNORE.value,
-                    reason=DecisionReason.PREFILTER.value,
+                    reason=(
+                        DecisionReason.DISMISSAL.value
+                        if prefilter.reason == "dismissal"
+                        else DecisionReason.PREFILTER.value
+                    ),
                 )
                 logger.info(
                     "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "
@@ -127,11 +131,16 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 return result
 
         rewrite_started = time.perf_counter()
+        in_listen_window = in_post_reply_listen_window(
+            recent,
+            max_messages=settings.decision_post_reply_listen_count,
+        )
         turn_plan = await self._query_rewriter.prepare(
             turn.message,
             recent_messages=recent,
             mentions_bot=turn.mentions_bot,
             reply_to_bot=turn.reply_to_bot,
+            in_listen_window=in_listen_window,
         )
         plan_ms = (time.perf_counter() - rewrite_started) * 1000
 
@@ -144,6 +153,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             should_reply=turn_plan.should_reply,
             mentions_bot=turn.mentions_bot,
             reply_to_bot=turn.reply_to_bot,
+            in_listen_window=in_listen_window,
         )
         decision_ms = (time.perf_counter() - decision_started) * 1000
 

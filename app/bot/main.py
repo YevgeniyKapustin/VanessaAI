@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 async def main() -> None:
     services = create_bot_services()
     bot = Bot(token=settings.telegram_bot_token)
+    me = await bot.get_me()
+    logger.info("Bot started as @%s id=%s", me.username, me.id)
     dp = Dispatcher()
     router = create_router(services)
     router.message.middleware(BotLoggingMiddleware())

@@ -175,6 +175,7 @@ class FakeDecisionEngine:
         should_reply: bool | None = None,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        in_listen_window: bool = False,
     ) -> DecisionResult:
         return DecisionResult(
             action=self._action,

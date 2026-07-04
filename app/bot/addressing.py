@@ -13,10 +13,22 @@ class AddressingSignals:
         return self.mentions_bot or self.reply_to_bot
 
 
+def _bot_username(bot: object | None) -> str:
+    if bot is None:
+        return ""
+    me = getattr(bot, "_me", None)
+    if me is not None and getattr(me, "username", None):
+        return str(me.username).lower()
+    username = getattr(bot, "username", None)
+    if username:
+        return str(username).lower()
+    return ""
+
+
 def extract_addressing(message: TelegramMessage) -> AddressingSignals:
     bot = message.bot
     bot_id = bot.id if bot is not None else None
-    bot_username = (bot.username or "").lower() if bot is not None else ""
+    bot_username = _bot_username(bot)
     text = message.text or ""
 
     reply_to_bot = False

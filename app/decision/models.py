@@ -19,6 +19,8 @@ class DecisionReason(StrEnum):
     NO_REPLY_NEEDED = "no_reply_needed"
     NOT_EXPECTED = "not_expected"
     PREFILTER = "prefilter"
+    LISTEN_WINDOW = "listen_window"
+    DISMISSAL = "dismissal"
 
 
 @dataclass(frozen=True, slots=True)

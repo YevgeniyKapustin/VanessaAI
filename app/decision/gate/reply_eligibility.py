@@ -208,3 +208,39 @@ class ReplyEligibility:
             trigger_detected=trigger_detected,
             intent=intent,
         )
+
+    def should_block_compose(
+        self,
+        text: str,
+        *,
+        mentions_bot: bool = False,
+        reply_to_bot: bool = False,
+        reply_to_other_user: bool = False,
+        should_reply: bool | None = None,
+        in_listen_window: bool = False,
+        humor_ok: bool = False,
+        trigger_detected: bool = False,
+        intent: IntentResult | None = None,
+    ) -> bool:
+        if humor_ok:
+            return False
+        if (
+            reply_to_other_user
+            and not mentions_bot
+            and not reply_to_bot
+        ):
+            return True
+        if should_reply is False:
+            return True
+        if in_listen_window:
+            return False
+        return not self.allows_compose(
+            text,
+            mentions_bot=mentions_bot,
+            reply_to_bot=reply_to_bot,
+            reply_to_other_user=reply_to_other_user,
+            should_reply=should_reply,
+            in_listen_window=in_listen_window,
+            trigger_detected=trigger_detected,
+            intent=intent,
+        )

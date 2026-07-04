@@ -173,6 +173,51 @@ async def test_decision_engine_replies_in_listen_window_when_planner_affirms(
 
 
 @pytest.mark.asyncio
+async def test_decision_engine_replies_listen_window_follow_up_without_planner(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.87)
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса..."),
+        ContextMessage(id=2, role="assistant", content="Здесь, слушаю"),
+        ContextMessage(id=3, role="user", content="втф чё с тобой"),
+    ]
+
+    result = await engine.decide(
+        text="втф чё с тобой",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=None,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.REPLY
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_bot_pronoun_in_listen_window(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.87)
+    recent = [
+        ContextMessage(id=1, role="user", content="Ладно я не злюсь на ванессу"),
+        ContextMessage(id=2, role="assistant", content="Это великодушно"),
+    ]
+
+    result = await engine.decide(
+        text="Я её уважаю",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=None,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.REPLY
+
+
+@pytest.mark.asyncio
 async def test_decision_engine_ignores_side_talk_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,

@@ -1,0 +1,9 @@
+from typing import Protocol
+
+
+class ChatIgnoreRegistryProtocol(Protocol):
+    def ignore(self, chat_id: int, user_id: int) -> None: ...
+
+    def unignore(self, chat_id: int, user_id: int) -> None: ...
+
+    def is_ignored(self, chat_id: int, user_id: int) -> bool: ...

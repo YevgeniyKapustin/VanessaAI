@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
 from app.core.turn import ChatTurnInput
 from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
-from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.llm.planner.turn_planner import TurnPlan
@@ -190,6 +189,7 @@ class FakeDecisionEngine:
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
+        humor_ok: bool = False,
     ) -> DecisionResult:
         return DecisionResult(
             action=self._action,
@@ -226,17 +226,10 @@ def _build_orchestrator(
     )
     humor = HumorPipeline(retriever, FakeTurnQuery(), config)
     registry = ChatIgnoreRegistry()
-    eligibility = ReplyEligibility(
-        IntentDetector(),
-        TriggerKeywordChecker(()),
-        NoiseFilter(),
-        registry,
-    )
     gate = GateStage(
         query_rewriter or QueryRewriter(use_llm=False),
         decision,
         None,
-        eligibility,
         config,
         metrics,
         messages,

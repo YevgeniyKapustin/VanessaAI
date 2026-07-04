@@ -49,8 +49,10 @@ class DecisionEngineProtocol(Protocol):
         should_reply: bool | None = None,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
+        humor_ok: bool = False,
     ) -> DecisionResult: ...
 
     def record_reply(self, telegram_chat_id: int) -> None: ...

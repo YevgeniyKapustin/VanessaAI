@@ -14,5 +14,4 @@ class LLMGenerationParams:
         return {
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
-            "top_p": self.top_p,
         }

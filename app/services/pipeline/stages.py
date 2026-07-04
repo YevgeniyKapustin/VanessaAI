@@ -9,16 +9,12 @@ from app.core.protocols import (
     TurnMetricsProtocol,
     UnitOfWorkProtocol,
 )
-from app.config.settings import settings
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
-from app.decision.models import DecisionAction, DecisionReason
-from app.decision.gate.addressing import is_addressed_to_bot
-from app.decision.gate.prefilter import PlannerPrefilter
-from app.decision.gate.user_ignore import (
-    ChatIgnoreRegistry,
-    apply_owner_ignore_command,
-)
+from app.decision.models import DecisionAction
+from app.decision.gate.protocols import PlannerPrefilterProtocol, TurnPlannerProtocol
+from app.decision.gate.reply_eligibility import ReplyEligibility
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.protocols import DecisionEngineProtocol
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.query_rewriter import QueryRewriter
@@ -27,65 +23,42 @@ from app.rag.search.search_plan import build_main_rag_plan
 from app.services.humor_pipeline import HumorPipelineProtocol
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
+from app.services.pipeline.gate_support import (
+    apply_owner_ignore_if_needed,
+    decision_reason_from_prefilter_tag,
+    finish_decision_ignore,
+    finish_ignore_turn,
+    finish_side_talk_block,
+)
+
 logger = logging.getLogger(__name__)
 
 
 class GateStage:
     def __init__(
         self,
-        query_rewriter: QueryRewriter,
+        query_rewriter: TurnPlannerProtocol,
         decision_engine: DecisionEngineProtocol,
-        planner_prefilter: PlannerPrefilter | None,
+        planner_prefilter: PlannerPrefilterProtocol | None,
+        reply_eligibility: ReplyEligibility,
         config: OrchestratorConfig,
         metrics: TurnMetricsProtocol,
         messages: MessageRepositoryProtocol,
         indexing: MessageIndexingSchedulerProtocol,
-        ignore_registry: ChatIgnoreRegistry | None = None,
+        ignore_registry: ChatIgnoreRegistry,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
         self._prefilter = planner_prefilter
+        self._eligibility = reply_eligibility
         self._config = config
         self._metrics = metrics
         self._messages = messages
         self._indexing = indexing
-        self._ignore_registry = ignore_registry or ChatIgnoreRegistry()
+        self._ignore_registry = ignore_registry
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
-        owner_id = settings.required_user_telegram_id
-        if owner_id:
-            apply_owner_ignore_command(
-                self._ignore_registry,
-                chat_id=ctx.turn.telegram_chat_id,
-                owner_id=owner_id,
-                sender_id=ctx.turn.sender_telegram_id,
-                text=ctx.turn.message,
-                recent_messages=ctx.recent,
-                reply_to_sender_id=ctx.turn.reply_to_sender_telegram_id,
-            )
-
-        if (
-            self._ignore_registry.is_ignored(
-                ctx.turn.telegram_chat_id,
-                ctx.turn.sender_telegram_id,
-            )
-        ):
-            logger.info(
-                "turn_stage ignored_user request_id=%s sender=%s action=ignore",
-                get_request_id(),
-                ctx.turn.sender_telegram_id,
-            )
-            await self._index_user_message(ctx)
-            ctx.result = ConversationTurnResult(
-                action=DecisionAction.IGNORE.value,
-                reason=DecisionReason.USER_IGNORED.value,
-            )
-            self._metrics.record_turn(
-                action=ctx.result.action,
-                reason=ctx.result.reason,
-                planner_skipped=True,
-            )
-            return False
+        await apply_owner_ignore_if_needed(self._ignore_registry, ctx)
 
         if (
             self._config.planner_prefilter_enabled
@@ -102,28 +75,14 @@ class GateStage:
             )
             if not prefilter.run_planner:
                 ctx.planner_skipped = True
-                logger.info(
-                    "turn_stage prefilter request_id=%s reason=%s action=ignore",
-                    get_request_id(),
-                    prefilter.reason,
-                )
-                await self._index_user_message(ctx)
-                if prefilter.reason == "dismissal":
-                    reason = DecisionReason.DISMISSAL.value
-                elif prefilter.reason == "quote_echo":
-                    reason = DecisionReason.QUOTE_ECHO.value
-                elif prefilter.reason == "ignored_user":
-                    reason = DecisionReason.USER_IGNORED.value
-                else:
-                    reason = DecisionReason.PREFILTER.value
-                ctx.result = ConversationTurnResult(
-                    action=DecisionAction.IGNORE.value,
-                    reason=reason,
-                )
-                self._metrics.record_turn(
-                    action=ctx.result.action,
-                    reason=ctx.result.reason,
+                await finish_ignore_turn(
+                    ctx,
+                    reason=decision_reason_from_prefilter_tag(prefilter.reason),
+                    metrics=self._metrics,
+                    indexing=self._indexing,
+                    config=self._config,
                     planner_skipped=True,
+                    log_event="turn_stage prefilter",
                 )
                 return False
 
@@ -148,6 +107,7 @@ class GateStage:
             should_reply=ctx.turn_plan.should_reply,
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
+            reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=ctx.session.in_listen_window,
             sender_telegram_id=ctx.turn.sender_telegram_id,
         )
@@ -172,56 +132,50 @@ class GateStage:
         )
 
         if ctx.decision.action == DecisionAction.IGNORE:
-            await self._index_user_message(ctx)
-            ctx.result = ConversationTurnResult(
-                action=ctx.decision.action.value,
-                reason=ctx.decision.reason.value,
-                relevance_score=ctx.decision.relevance_score,
-            )
-            self._metrics.record_turn(
-                action=ctx.result.action,
-                reason=ctx.result.reason,
-                planner_skipped=ctx.planner_skipped,
+            await finish_decision_ignore(
+                ctx,
+                metrics=self._metrics,
+                indexing=self._indexing,
+                config=self._config,
             )
             return False
 
         assert ctx.turn_plan is not None
-        if not is_addressed_to_bot(
+        if self._needs_side_talk_block(ctx):
+            await finish_side_talk_block(
+                ctx,
+                metrics=self._metrics,
+                indexing=self._indexing,
+                config=self._config,
+            )
+            return False
+
+        return True
+
+    def _needs_side_talk_block(self, ctx: TurnPipelineContext) -> bool:
+        assert ctx.turn_plan is not None
+        assert ctx.session is not None
+        if ctx.turn_plan.humor_ok:
+            return False
+        if self._eligibility.allows_compose(
             ctx.turn.message,
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
             should_reply=ctx.turn_plan.should_reply,
             in_listen_window=ctx.session.in_listen_window,
-        ) and not ctx.turn_plan.humor_ok:
-            logger.info(
-                "turn_stage side_talk_block request_id=%s reply_to_other=%s "
-                "humor_ok=%s action=ignore",
-                get_request_id(),
-                ctx.turn.reply_to_other_user,
-                ctx.turn_plan.humor_ok,
-            )
-            await self._index_user_message(ctx)
-            ctx.result = ConversationTurnResult(
-                action=DecisionAction.IGNORE.value,
-                reason=DecisionReason.NOT_EXPECTED.value,
-                relevance_score=ctx.decision.relevance_score,
-            )
-            self._metrics.record_turn(
-                action=ctx.result.action,
-                reason=ctx.result.reason,
-                planner_skipped=ctx.planner_skipped,
-            )
+            humor_ok=ctx.turn_plan.humor_ok,
+        ):
             return False
-
+        if (
+            ctx.turn.reply_to_other_user
+            and not ctx.turn.mentions_bot
+            and not ctx.turn.reply_to_bot
+        ):
+            return True
+        if ctx.session.in_listen_window:
+            return ctx.turn_plan.should_reply is False
         return True
-
-    async def _index_user_message(self, ctx: TurnPipelineContext) -> None:
-        assert ctx.user_msg is not None
-        if self._config.defer_index_on_ignore:
-            self._indexing.schedule(ctx.user_msg)
-        else:
-            await self._indexing.index_now(ctx.user_msg)
 
 
 class RetrieveStage:

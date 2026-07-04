@@ -38,4 +38,4 @@ def test_conversation_config_from_content():
     config = load_conversation_config()
     assert config.session_window_size == 12
     assert config.session_idle_seconds == 300.0
-    assert config.post_reply_listen_count == 5
+    assert config.post_reply_listen_count == 2

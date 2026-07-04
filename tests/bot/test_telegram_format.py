@@ -23,6 +23,33 @@ def test_markdown_escapes_html_in_prose():
     assert html == "a &lt; b &amp;&amp; c &gt; d"
 
 
+def test_markdown_bold():
+    html = markdown_to_telegram_html("**Евгений (Капуста)** — создатель")
+
+    assert html == "<b>Евгений (Капуста)</b> — создатель"
+
+
+def test_markdown_bold_skips_inline_code():
+    html = markdown_to_telegram_html("**не жирный** и `**код**`")
+
+    assert html == "<b>не жирный</b> и <code>**код**</code>"
+
+
+def test_markdown_italic():
+    html = markdown_to_telegram_html("это *важно*")
+
+    assert html == "это <i>важно</i>"
+
+
+def test_markdown_bold_list_item():
+    text = "**Крабер** — делает сырки\n**Гриша** — рассуждает"
+    html = markdown_to_telegram_html(text)
+
+    assert "<b>Крабер</b>" in html
+    assert "<b>Гриша</b>" in html
+    assert "**" not in html
+
+
 def test_capitalize_skips_fenced_code():
     text = "вот код:\n```python\nx = 1. y = 2\n```"
     result = capitalize_sentences(text)

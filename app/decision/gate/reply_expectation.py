@@ -14,7 +14,9 @@ _DISMISSAL_PATTERNS = (
     r"\b(не\s+)?(отвечай|пиши)\b",
     r"\bхватит\b(?!\s+ли\b)(\s*(тебе|мне))?\s*(отвечать|писать)?",
     r"^хватит[.!?]?\s*$",
-    r"\bзакрой\s+(контекст|диалог)\b",
+    r"\bзакрой\s+(контекст|диалог|сессию)\b",
+    r"\b(уйди|уходи|убирайся|сгинь|сгиньте|исчезни|исчезай|"
+    r"свали|отвали|отстань)\b",
     r"\b(оставь|не\s+трогай)\s+(меня|нас)(\s+в\s+покое)?\b",
     r"\bдостаточно\b(\s*(тебе|мне))?\s*(отвечать|писать)?",
     r"\bможешь\s+молчать\b",
@@ -40,6 +42,11 @@ _THIRD_PARTY_BOT_PATTERNS = (
     r")\b",
     r"\b(почему|зачем|когда|что|разве)\b[^?.!]{0,40}\b(она|её)\b",
     r"\b(она|её)\b[^?.!]{0,20}\b(меня|тебя|нас)\b",
+    r"\bона\b[^.!]{0,80}\b("
+    r"понимает|не\s+понимает|плохо\s+понимает|"
+    r"не\s+всегда\s+понимает|думает|ошибается|теряет"
+    r")\b",
+    r"\b(ей|её)\b[^.!]{0,40}\b(отвечают|писали|обращаются)\b",
 )
 _THIRD_PARTY_BOT_RE = re.compile(
     "|".join(_THIRD_PARTY_BOT_PATTERNS),
@@ -93,7 +100,9 @@ def is_unsolicited_remark(text: str) -> bool:
 
 def is_third_party_about_bot(text: str) -> bool:
     normalized = text.strip()
-    if not normalized or _DIRECT_BOT_ADDRESS.search(normalized):
+    if not normalized:
+        return False
+    if re.search(r"\b(ванесса|vanessa)\b", normalized, re.IGNORECASE):
         return False
     return bool(_THIRD_PARTY_BOT_RE.search(normalized))
 
@@ -113,6 +122,23 @@ def is_contextual_vocative_address(text: str) -> bool:
     return False
 
 
+_BOT_PRONOUN_REPLY = re.compile(
+    r"^я\s+(её|ей)\b|"
+    r"\b(она|её)\b[^.!]{0,30}\b("
+    r"уважаю|люблю|обожаю|крутая|классная|норм|молодец|"
+    r"согласен|согласна"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def is_bot_pronoun_reply(text: str) -> bool:
+    normalized = text.strip()
+    if not normalized or is_third_party_about_bot(normalized):
+        return False
+    return bool(_BOT_PRONOUN_REPLY.search(normalized))
+
+
 def listen_window_warrants_reply(
     text: str,
     *,
@@ -122,11 +148,13 @@ def listen_window_warrants_reply(
 ) -> bool:
     if is_unsolicited_remark(text) or is_third_party_about_bot(text):
         return False
-    if should_reply is True or has_question or trigger_detected:
+    if should_reply is True or trigger_detected:
         return True
-    if should_reply is False:
-        return len(text.split()) >= 3
-    return len(text.split()) >= 3
+    if is_bot_pronoun_reply(text):
+        return True
+    if expects_follow_up_after_bot(text, last_prior_role="assistant"):
+        return True
+    return False
 
 
 def expects_follow_up_after_bot(text: str, *, last_prior_role: str | None) -> bool:

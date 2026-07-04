@@ -3,6 +3,9 @@ import pytest
 from app.core.messages import StoredMessage
 from app.core.session.chat_session_state import ChatSessionState
 from app.core.turn import ChatTurnInput
+from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
+from app.decision.gate.reply_eligibility import ReplyEligibility
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.llm.planner.turn_planner import TurnPlan
 from app.rag.query_rewriter import QueryRewriter
@@ -41,6 +44,32 @@ class FakeIndexing:
         pass
 
 
+def _gate_stage(
+    planner: FakePlanner,
+    decision: FakeDecision,
+    config: OrchestratorConfig,
+    metrics: TurnMetrics,
+) -> GateStage:
+    registry = ChatIgnoreRegistry()
+    eligibility = ReplyEligibility(
+        IntentDetector(),
+        TriggerKeywordChecker(()),
+        NoiseFilter(),
+        registry,
+    )
+    return GateStage(
+        planner,  # type: ignore[arg-type]
+        decision,  # type: ignore[arg-type]
+        None,
+        eligibility,
+        config,
+        metrics,
+        FakeMessageRepo(),  # type: ignore[arg-type]
+        FakeIndexing(),  # type: ignore[arg-type]
+        registry,
+    )
+
+
 @pytest.mark.asyncio
 async def test_gate_stage_blocks_reply_without_address_or_humor():
     config = OrchestratorConfig(
@@ -50,15 +79,7 @@ async def test_gate_stage_blocks_reply_without_address_or_humor():
         planner_prefilter_enabled=False,
         defer_index_on_ignore=True,
     )
-    gate = GateStage(
-        FakePlanner(),  # type: ignore[arg-type]
-        FakeDecision(),  # type: ignore[arg-type]
-        None,
-        config,
-        TurnMetrics(),
-        FakeMessageRepo(),  # type: ignore[arg-type]
-        FakeIndexing(),  # type: ignore[arg-type]
-    )
+    gate = _gate_stage(FakePlanner(), FakeDecision(), config, TurnMetrics())
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
             telegram_chat_id=-100,
@@ -93,15 +114,7 @@ async def test_gate_stage_allows_contextual_nickname_address():
         planner_prefilter_enabled=False,
         defer_index_on_ignore=True,
     )
-    gate = GateStage(
-        FakePlanner(),  # type: ignore[arg-type]
-        FakeDecision(),  # type: ignore[arg-type]
-        None,
-        config,
-        TurnMetrics(),
-        FakeMessageRepo(),  # type: ignore[arg-type]
-        FakeIndexing(),  # type: ignore[arg-type]
-    )
+    gate = _gate_stage(FakePlanner(), FakeDecision(), config, TurnMetrics())
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
             telegram_chat_id=-100,

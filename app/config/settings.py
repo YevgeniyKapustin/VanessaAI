@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     decision_bot_names: str = ""
     decision_trigger_keywords: str = ""
     decision_planner_prefilter: bool = True
-    decision_post_reply_listen_count: int = 5
+    decision_post_reply_listen_count: int = 2
     decision_session_idle_seconds: int = 300
 
     content_config_path: str = "config/content.yaml"

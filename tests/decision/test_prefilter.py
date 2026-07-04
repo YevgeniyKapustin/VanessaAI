@@ -4,6 +4,8 @@ from app.core.messages import ContextMessage
 from app.decision.detectors.intent import IntentDetector
 from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
 from app.decision.gate.prefilter import PlannerPrefilter
+from app.decision.gate.reply_eligibility import ReplyEligibility
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.detectors.triggers import TriggerKeywordChecker
 
 
@@ -11,11 +13,14 @@ from app.decision.detectors.triggers import TriggerKeywordChecker
 def prefilter() -> PlannerPrefilter:
     intent = IntentDetector()
     triggers = TriggerKeywordChecker(("помоги", "объясни", "найди", "расскажи"))
-    return PlannerPrefilter(
-        intent_detector=intent,
-        trigger_checker=triggers,
-        noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
+    noise = NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12))
+    eligibility = ReplyEligibility(
+        intent,
+        triggers,
+        noise,
+        ChatIgnoreRegistry(),
     )
+    return PlannerPrefilter(eligibility)
 
 
 def test_prefilter_skips_side_talk(prefilter: PlannerPrefilter):
@@ -95,17 +100,14 @@ def test_prefilter_listen_window_covers_side_talk_after_bot_reply(
     assert result.reason == "listen_window"
 
 
-def test_prefilter_listen_window_expires_after_five_user_messages(
+def test_prefilter_listen_window_expires_after_two_user_messages(
     prefilter: PlannerPrefilter,
 ):
     recent = [
         ContextMessage(id=1, role="assistant", content="Ответ бота"),
         ContextMessage(id=2, role="user", content="один"),
         ContextMessage(id=3, role="user", content="два"),
-        ContextMessage(id=4, role="user", content="три"),
-        ContextMessage(id=5, role="user", content="четыре"),
-        ContextMessage(id=6, role="user", content="пять"),
-        ContextMessage(id=7, role="user", content="что думаешь про тик така"),
+        ContextMessage(id=4, role="user", content="что думаешь про тик така"),
     ]
 
     result = prefilter.evaluate("что думаешь про тик така", recent)
@@ -114,11 +116,9 @@ def test_prefilter_listen_window_expires_after_five_user_messages(
     assert result.reason == "side_talk"
 
 
-def test_prefilter_skips_dismissal(prefilter: PlannerPrefilter):
-    result = prefilter.evaluate("ванесса хватит", [])
-
-    assert result.run_planner is False
-    assert result.reason == "dismissal"
+def test_prefilter_skips_dismissal_go_away(prefilter: PlannerPrefilter):
+    assert prefilter.evaluate("да всё сгинь", []).reason == "dismissal"
+    assert prefilter.evaluate("уйди, закрой сессию", []).reason == "dismissal"
 
 
 def test_prefilter_closes_listen_window_after_dismissal(prefilter: PlannerPrefilter):

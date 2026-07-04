@@ -50,7 +50,7 @@ class LLMGenerationProfiles(BaseModel):
 class ConversationContent(BaseModel):
     session_window_size: int = Field(default=12, ge=4, le=50)
     session_idle_seconds: int = Field(default=300, ge=60, le=3600)
-    post_reply_listen_count: int = Field(default=5, ge=1, le=20)
+    post_reply_listen_count: int = Field(default=2, ge=1, le=20)
 
 
 class PersonaContent(BaseModel):

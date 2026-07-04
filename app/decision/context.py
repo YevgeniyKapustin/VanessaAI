@@ -20,6 +20,7 @@ class DecisionContext:
     should_reply: bool | None = None
     mentions_bot: bool = False
     reply_to_bot: bool = False
+    reply_to_other_user: bool = False
     in_listen_window: bool = False
     sender_telegram_id: int = 0
 

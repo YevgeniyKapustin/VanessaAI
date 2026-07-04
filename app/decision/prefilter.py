@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
+from app.core.chat_session_state import in_post_reply_listen_window
 from app.core.messages import ContextMessage
-from app.core.session_trim import seconds_since_last_role
 from app.decision.intent import IntentDetector
 from app.decision.noise import NoiseFilter
 from app.decision.reply_expectation import (
@@ -11,6 +11,12 @@ from app.decision.reply_expectation import (
     is_unsolicited_remark,
 )
 from app.decision.triggers import TriggerKeywordChecker
+
+__all__ = [
+    "PlannerPrefilter",
+    "PlannerPrefilterResult",
+    "in_post_reply_listen_window",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,32 +39,6 @@ def user_messages_since_last_bot(recent_messages: list[ContextMessage]) -> int:
         if message.role == "user":
             count += 1
     return count
-
-
-def in_post_reply_listen_window(
-    recent_messages: list[ContextMessage],
-    *,
-    max_messages: int,
-    max_idle_seconds: float = 0,
-) -> bool:
-    if max_messages <= 0 or not recent_messages:
-        return False
-    if max_idle_seconds > 0:
-        idle = seconds_since_last_role(
-            recent_messages,
-            "assistant",
-        )
-        if idle is not None and idle > max_idle_seconds:
-            return False
-    user_count = 0
-    for message in reversed(recent_messages):
-        if message.role == "assistant":
-            return 0 < user_count <= max_messages
-        if message.role == "user":
-            if is_dismissal_request(message.content):
-                return False
-            user_count += 1
-    return False
 
 
 class PlannerPrefilter:

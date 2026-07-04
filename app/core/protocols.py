@@ -1,9 +1,11 @@
 from datetime import datetime
-from typing import Protocol, TypedDict
+from typing import TYPE_CHECKING, Protocol, TypedDict
 
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 
+if TYPE_CHECKING:
+    from app.services.turn_metrics import TurnMetricsSnapshot
 
 class VectorSearchHit(TypedDict):
     message_id: int
@@ -141,3 +143,34 @@ class IncomingTurnHandlerProtocol(Protocol):
         self,
         turn: ChatTurnInput,
     ) -> ConversationTurnResult: ...
+
+
+class ChatUserProtocol(Protocol):
+    nickname: str | None
+    first_name: str | None
+    username: str | None
+
+
+class UserRepositoryProtocol(Protocol):
+    async def get_or_create(
+        self,
+        telegram_id: int,
+        username: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+    ) -> ChatUserProtocol: ...
+
+
+class TurnMetricsProtocol(Protocol):
+    def record_turn(
+        self,
+        *,
+        action: str,
+        reason: str,
+        planner_skipped: bool = False,
+        deep_search: bool = False,
+    ) -> None: ...
+
+    def snapshot(self) -> "TurnMetricsSnapshot": ...
+
+    def reset(self) -> None: ...

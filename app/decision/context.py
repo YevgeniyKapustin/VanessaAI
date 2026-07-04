@@ -28,4 +28,7 @@ class DecisionContext:
 
 
 class DecisionRule(Protocol):
+    @property
+    def needs_relevance(self) -> bool: ...
+
     def evaluate(self, context: DecisionContext) -> DecisionResult | None: ...

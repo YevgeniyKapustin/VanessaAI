@@ -17,6 +17,7 @@ from app.decision.rules import (
     IntentRule,
     ListenWindowRule,
     NoiseRule,
+    PlannerOverreachRule,
     PlannerReplyRule,
     RateLimitRule,
     RelevanceRule,
@@ -62,10 +63,15 @@ class DecisionEngine:
             ),
             ListenWindowRule(noise_filter),
             PlannerReplyRule(),
+            PlannerOverreachRule(),
             IntentRule(),
             TriggerRule(),
             RelevanceRule(relevance_threshold),
         ]
+        self._pre_relevance_rules = [
+            r for r in self._rules if not r.needs_relevance
+        ]
+        self._relevance_rules = [r for r in self._rules if r.needs_relevance]
 
     def record_reply(self, telegram_chat_id: int) -> None:
         self._rate_limiter.record_reply(telegram_chat_id)
@@ -100,9 +106,7 @@ class DecisionEngine:
             reply_to_bot=reply_to_bot,
             in_listen_window=in_listen_window,
         )
-        for rule in self._rules:
-            if isinstance(rule, RelevanceRule):
-                continue
+        for rule in self._pre_relevance_rules:
             result = rule.evaluate(base_context)
             if result is not None:
                 return result
@@ -126,9 +130,7 @@ class DecisionEngine:
             reply_to_bot=reply_to_bot,
             in_listen_window=in_listen_window,
         )
-        for rule in self._rules:
-            if not isinstance(rule, RelevanceRule):
-                continue
+        for rule in self._relevance_rules:
             result = rule.evaluate(context)
             if result is not None:
                 return result

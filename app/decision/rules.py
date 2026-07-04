@@ -1,6 +1,7 @@
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
+from app.decision.planner_gate import planner_affirms_reply
 from app.decision.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
@@ -17,7 +18,13 @@ from app.decision.protocols import (
 )
 
 
-class RateLimitRule:
+class _PreRelevanceRuleMixin:
+    @property
+    def needs_relevance(self) -> bool:
+        return False
+
+
+class RateLimitRule(_PreRelevanceRuleMixin):
     def __init__(self, rate_limiter: RateLimiterProtocol) -> None:
         self._rate_limiter = rate_limiter
 
@@ -27,7 +34,7 @@ class RateLimitRule:
         return _ignore(context, DecisionReason.RATE_LIMITED)
 
 
-class NoiseRule:
+class NoiseRule(_PreRelevanceRuleMixin):
     def __init__(self, noise_filter: NoiseFilterProtocol) -> None:
         self._noise = noise_filter
 
@@ -39,14 +46,14 @@ class NoiseRule:
         return _ignore(context, DecisionReason.NOISE)
 
 
-class DismissalRule:
+class DismissalRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not is_dismissal_request(context.text):
             return None
         return _ignore(context, DecisionReason.DISMISSAL)
 
 
-class ThirdPartyAboutBotRule:
+class ThirdPartyAboutBotRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.directly_addressed or context.intent.mentions_bot:
             return None
@@ -55,14 +62,14 @@ class ThirdPartyAboutBotRule:
         return _ignore(context, DecisionReason.NOT_EXPECTED)
 
 
-class DirectAddressRule:
+class DirectAddressRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.directly_addressed:
             return None
         return _reply(context, DecisionReason.ADDRESSING)
 
 
-class ConsecutiveReplyRule:
+class ConsecutiveReplyRule(_PreRelevanceRuleMixin):
     def __init__(
         self,
         intent_detector: IntentDetectorProtocol,
@@ -93,7 +100,7 @@ class ConsecutiveReplyRule:
         return _ignore(context, DecisionReason.CONSECUTIVE)
 
 
-class ListenWindowRule:
+class ListenWindowRule(_PreRelevanceRuleMixin):
     def __init__(self, noise_filter: NoiseFilterProtocol) -> None:
         self._noise = noise_filter
 
@@ -116,7 +123,7 @@ class ListenWindowRule:
         return _reply(context, DecisionReason.LISTEN_WINDOW)
 
 
-class PlannerReplyRule:
+class PlannerReplyRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.in_listen_window:
             return None
@@ -127,7 +134,18 @@ class PlannerReplyRule:
         return _ignore(context, DecisionReason.NOT_EXPECTED)
 
 
-class IntentRule:
+class PlannerOverreachRule(_PreRelevanceRuleMixin):
+    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if context.should_reply is not True:
+            return None
+        if planner_affirms_reply(context):
+            return None
+        if context.directly_addressed or context.in_listen_window:
+            return None
+        return _ignore(context, DecisionReason.NOT_EXPECTED)
+
+
+class IntentRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.intent.detected:
             return None
@@ -139,7 +157,7 @@ class IntentRule:
             return None
         if context.directly_addressed or context.intent.mentions_bot:
             return _reply(context, DecisionReason.INTENT, intent_detected=True)
-        if context.should_reply is True:
+        if planner_affirms_reply(context):
             return _reply(context, DecisionReason.INTENT, intent_detected=True)
         if context.should_reply is False:
             return None
@@ -148,14 +166,14 @@ class IntentRule:
         return None
 
 
-class TriggerRule:
+class TriggerRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.trigger.detected:
             return None
         if (
             context.directly_addressed
             or context.intent.mentions_bot
-            or context.should_reply is True
+            or planner_affirms_reply(context)
             or context.session_active
         ):
             return _reply(
@@ -177,6 +195,10 @@ class TriggerRule:
 class RelevanceRule:
     def __init__(self, threshold: float) -> None:
         self._threshold = threshold
+
+    @property
+    def needs_relevance(self) -> bool:
+        return True
 
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.relevance_score < self._threshold or not context.session_active:

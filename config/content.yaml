@@ -1,3 +1,17 @@
+bot:
+  welcome: |
+    Привет мимими.
+  error_api: "Ошибочка"
+  access:
+    private_chat: |
+      Я работаю только в групповых беседах.
+      Добавь бота в чат и напиши сообщение там.
+    required_user_missing: |
+      Я доступна только в беседах,
+      где присутствует мой хозяин.
+    required_user_not_configured: |
+      Я не настроена: не указан ID моего хозяина.
+
 persona:
   identity: |
     Ты — Ванесса, участница групповой Telegram-беседы. Живой собеседник, не
@@ -72,20 +86,6 @@ llm:
   assistant_line: "{time} [assistant]{anchor} {content}"
   user_line: "{time} [user:{sender}]{anchor} {content}"
 
-bot:
-  welcome: |
-    Привет мимими.
-  error_api: "Ошибочка"
-  access:
-    private_chat: |
-      Я работаю только в групповых беседах.
-      Добавь бота в чат и напиши сообщение там.
-    required_user_missing: |
-      Я доступна только в беседах,
-      где присутствует мой хозяин.
-    required_user_not_configured: |
-      Я не настроена: не указан ID моего хозяина.
-
 decision:
   block_consecutive_replies: true
   noise_max_words: 1
@@ -143,7 +143,8 @@ rag:
       "search_query": "...",
       "skip": false,
       "humor_ok": false,
-      "humor_query": ""
+      "humor_query": "",
+      "deep_search": false
     }}
 
     ## should_reply
@@ -172,7 +173,9 @@ rag:
     - частые шутки беседы, не разовые реплики;
     - humor_ok=false → humor_query="".
 
-  query_rewrite_prompt: |
+    ## deep_search
+    true — сложный вопрос, нужен многошаговый поиск по истории (сравнение, несколько
+    тем, «как было с X и Y», технический разбор). false — обычный короткий запрос.
     ## Задача
     Подготовь search_query для базы сообщений группового чата.
 

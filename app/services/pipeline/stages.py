@@ -12,6 +12,7 @@ from app.core.protocols import (
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
+from app.decision.gate.addressing import is_addressed_to_bot
 from app.decision.gate.prefilter import PlannerPrefilter
 from app.decision.protocols import DecisionEngineProtocol
 from app.llm.prompts.session_format import session_context_messages
@@ -53,6 +54,7 @@ class GateStage:
                 ctx.recent,
                 mentions_bot=ctx.turn.mentions_bot,
                 reply_to_bot=ctx.turn.reply_to_bot,
+                reply_to_other_user=ctx.turn.reply_to_other_user,
             )
             if not prefilter.run_planner:
                 ctx.planner_skipped = True
@@ -85,6 +87,7 @@ class GateStage:
             recent_messages=ctx.recent,
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
+            reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=ctx.session.in_listen_window,
         )
         ctx.plan_ms = (time.perf_counter() - rewrite_started) * 1000
@@ -133,6 +136,33 @@ class GateStage:
                 planner_skipped=ctx.planner_skipped,
             )
             return False
+
+        assert ctx.turn_plan is not None
+        if not is_addressed_to_bot(
+            ctx.turn.message,
+            mentions_bot=ctx.turn.mentions_bot,
+            reply_to_bot=ctx.turn.reply_to_bot,
+        ) and not ctx.turn_plan.humor_ok:
+            logger.info(
+                "turn_stage side_talk_block request_id=%s reply_to_other=%s "
+                "humor_ok=%s action=ignore",
+                get_request_id(),
+                ctx.turn.reply_to_other_user,
+                ctx.turn_plan.humor_ok,
+            )
+            await self._index_user_message(ctx)
+            ctx.result = ConversationTurnResult(
+                action=DecisionAction.IGNORE.value,
+                reason=DecisionReason.NOT_EXPECTED.value,
+                relevance_score=ctx.decision.relevance_score,
+            )
+            self._metrics.record_turn(
+                action=ctx.result.action,
+                reason=ctx.result.reason,
+                planner_skipped=ctx.planner_skipped,
+            )
+            return False
+
         return True
 
     async def _index_user_message(self, ctx: TurnPipelineContext) -> None:

@@ -1,4 +1,5 @@
 from app.config.content import AppContent, get_content
+from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.messages import ContextBlock, ContextMessage
 from app.llm.prompts.context_format import block_time_range, format_message_time
@@ -92,6 +93,14 @@ class PromptBuilder:
             sender_name=sender_name,
         )
         parts.append(f"{llm.current_message_header}\n{current_line}")
+        owner_id = settings.required_user_telegram_id
+        owner_note = llm.owner_message_note.strip()
+        if (
+            owner_id
+            and sender_telegram_id == owner_id
+            and owner_note
+        ):
+            parts.append(owner_note)
         return "\n\n".join(parts)
 
     @property

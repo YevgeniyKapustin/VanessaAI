@@ -49,6 +49,17 @@ def test_prefilter_runs_on_reply_to_bot(prefilter: PlannerPrefilter):
     assert result.reason == "direct_address"
 
 
+def test_prefilter_skips_reply_to_other_user(prefilter: PlannerPrefilter):
+    result = prefilter.evaluate(
+        "Личь не делает карты по героям",
+        [],
+        reply_to_other_user=True,
+    )
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
 def test_prefilter_skips_noise(prefilter: PlannerPrefilter):
     result = prefilter.evaluate("ок", [])
 

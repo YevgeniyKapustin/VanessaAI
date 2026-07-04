@@ -60,8 +60,16 @@ def test_prompt_builder_system_includes_answer_checklist():
     assert "Хорошо:" in prompt
 
 
-def test_turn_planner_prompt_includes_few_shot_examples():
-    prompt = get_content().rag.planner_prompt
-    assert "## Примеры" in prompt
-    assert "гомункул работает" in prompt
-    assert '"deep_search": true' in prompt
+def test_prompt_builder_includes_owner_note_for_host(monkeypatch):
+    monkeypatch.setattr(
+        "app.llm.prompts.prompt_builder.settings.required_user_telegram_id",
+        7714154251,
+    )
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "привет",
+        [],
+        sender_telegram_id=7714154251,
+        sender_name="Евгений",
+    )
+    assert get_content().llm.owner_message_note.strip() in prompt

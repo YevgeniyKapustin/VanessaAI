@@ -91,6 +91,7 @@ class LLMContent(BaseModel):
     user_line: str = "{time} [user:{sender}]{anchor} {content}"
     humor_quotes_header: str = "Узнаваемые мемы и подколы из беседы (если уместно):"
     humor_quote_line: str = "- {quote}"
+    owner_message_note: str = ""
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
 
     def task_text(self) -> str:

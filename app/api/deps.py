@@ -3,8 +3,7 @@ from collections.abc import AsyncGenerator
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config.content import get_bot_name_aliases, get_trigger_keywords
-from app.config.conversation_config import load_conversation_config
+from app.api.container import get_app_container
 from app.config.settings import settings
 from app.core.protocols import (
     ContextRetrieverProtocol,
@@ -26,15 +25,8 @@ from app.db.session import async_session_factory, get_session
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.decision import (
     DecisionEngine,
-    IntentDetector,
-    NoiseFilter,
-    PlannerPrefilter,
     QdrantRelevanceChecker,
-    RateLimiter,
-    SessionWindowAnalyzer,
-    TriggerKeywordChecker,
 )
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.llm.providers.claude import ClaudeLLMProvider
 from app.rag.embeddings.embeddings import LocalEmbeddingProvider
 from app.rag.search.hybrid_search import HybridSearchService
@@ -52,30 +44,8 @@ from app.services.pipeline.stages import (
 )
 from app.services.turn_metrics import turn_metrics
 
-_rate_limiter = RateLimiter(
-    max_replies=settings.decision_rate_limit_per_minute,
-    window_seconds=60,
-)
-_ignore_registry = ChatIgnoreRegistry()
 _embedding_provider: EmbeddingProviderProtocol | None = None
 _vector_store: VectorStoreProtocol | None = None
-_intent_detector = IntentDetector(bot_names=get_bot_name_aliases())
-_trigger_checker = TriggerKeywordChecker(keywords=get_trigger_keywords())
-_conversation_config = load_conversation_config()
-_session_analyzer = SessionWindowAnalyzer(
-    window_size=_conversation_config.session_window_size,
-    intent_detector=_intent_detector,
-    trigger_checker=_trigger_checker,
-)
-_noise_filter = NoiseFilter()
-_planner_prefilter = PlannerPrefilter(
-    intent_detector=_intent_detector,
-    trigger_checker=_trigger_checker,
-    noise_filter=_noise_filter,
-    ignore_registry=_ignore_registry,
-    post_reply_listen_count=_conversation_config.post_reply_listen_count,
-    post_reply_listen_idle_seconds=_conversation_config.session_idle_seconds,
-)
 
 
 def create_embedding_provider() -> EmbeddingProviderProtocol:
@@ -108,19 +78,22 @@ def create_decision_engine(
     embeddings: EmbeddingProviderProtocol,
     vector_store: VectorStoreProtocol,
 ) -> DecisionEngineProtocol:
+    container = get_app_container()
     relevance = QdrantRelevanceChecker(
         embedding_provider=embeddings,
         vector_store=vector_store,
     )
     return DecisionEngine(
-        intent_detector=_intent_detector,
-        trigger_checker=_trigger_checker,
+        intent_detector=container.intent_detector,
+        trigger_checker=container.trigger_checker,
         relevance_checker=relevance,
-        session_analyzer=_session_analyzer,
-        rate_limiter=_rate_limiter,
-        noise_filter=_noise_filter,
+        session_analyzer=container.session_analyzer,
+        rate_limiter=container.rate_limiter,
+        noise_filter=container.noise_filter,
         relevance_threshold=settings.decision_relevance_threshold,
-        ignore_registry=_ignore_registry,
+        reply_eligibility=container.reply_eligibility,
+        block_consecutive_replies=container.block_consecutive_replies,
+        ignore_registry=container.ignore_registry,
     )
 
 
@@ -211,16 +184,18 @@ async def get_incoming_turn_handler(
     metrics: TurnMetricsProtocol = Depends(get_turn_metrics),
 ) -> IncomingTurnHandlerProtocol:
     config = OrchestratorConfig.from_settings()
+    container = get_app_container()
     humor = HumorPipeline(hybrid_search, hybrid_search, config)
     gate = GateStage(
         query_rewriter,
         decision_engine,
-        _planner_prefilter,
+        container.planner_prefilter,
+        container.reply_eligibility,
         config,
         metrics,
         messages,
         indexing,
-        _ignore_registry,
+        container.ignore_registry,
     )
     retrieve = RetrieveStage(hybrid_search, humor, uow)
     compose = ComposeStage(llm)

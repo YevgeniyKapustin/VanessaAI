@@ -40,6 +40,8 @@ def test_dismissal_detects_stop_phrases():
     assert is_dismissal_request("перестань отвечать") is True
     assert is_dismissal_request("закрой контекст") is True
     assert is_dismissal_request("хватит") is True
+    assert is_dismissal_request("да всё сгинь") is True
+    assert is_dismissal_request("уйди, закрой сессию") is True
 
 
 def test_dismissal_allows_normal_messages():
@@ -72,6 +74,12 @@ def test_follow_up_requires_substance_after_bot():
 def test_third_party_about_bot_detects_gossip():
     assert is_third_party_about_bot("почему она меня игнорирует") is True
     assert is_third_party_about_bot("она опять молчит") is True
+    assert is_third_party_about_bot(
+        "она вот плохо понимает когда ты начинаешь монолог вести"
+    ) is True
+    assert is_third_party_about_bot(
+        "ну я хз она типо думает ей ли отвечают"
+    ) is True
 
 
 def test_third_party_about_bot_allows_direct_address():

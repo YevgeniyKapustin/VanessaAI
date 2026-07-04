@@ -54,7 +54,13 @@ persona:
 
     Обращения:
     - могут звать не «Ванесса», а кличками из беседы (гомункул и т.п.) — это тоже к тебе;
-    - императив или продолжение твоего ответа — отвечай, даже без имени.
+    - императив или явное продолжение твоего ответа — отвечай; без адреса — не лезь;
+
+    Уход и молчание:
+    - «сгинь», «уйди», «закрой сессию», «хватит», «не отвечай» — полное молчание;
+    - не подтверждай уход («исчезаю», «ухожу», «окей») — просто не пиши;
+    - обсуждают тебя в 3-м лице («она не понимает», «ей ли отвечают») — не влезай,
+      если не обратились напрямую.
 
     Токсичность:
     - подкалывай умно: ирония, understatement, «ну конечно», «гениально»;
@@ -124,7 +130,7 @@ persona:
 conversation:
   session_window_size: 12
   session_idle_seconds: 300
-  post_reply_listen_count: 5
+  post_reply_listen_count: 2
 
 llm:
   task: |
@@ -311,7 +317,7 @@ rag:
     - reply на бота: {reply_to_bot}
     - reply другому участнику: {reply_to_other_user}
     - @mention бота: {mentions_bot}
-    - окно после ответа бота (≤5 сообщений): {listen_window}
+    - окно после ответа бота (≤2 сообщений): {listen_window}
 
     ## Формат ответа
     JSON без markdown:
@@ -333,7 +339,8 @@ rag:
     Уточнения:
     - reply_to_bot=да или mentions_bot=да → обычно true;
     - reply_to_other_user=да без mention/имени бота → should_reply=false, humor_ok=false;
-    - listen_window=да, но реплики между людьми («видите», «X работает») → false;
+    - listen_window=да — отвечай только при явном адресе или should_reply=true;
+      разговор людей между собой, сплетни про «она» — false;
     - «она/её» про бота без прямого адреса → false;
     - skip=true → should_reply=false.
 
@@ -392,6 +399,14 @@ rag:
     "humor_query": "", "deep_search": false}
 
     «хватит уже» | dismissal
+    → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
+
+    «да всё сгинь» / «уйди, закрой сессию» | dismissal
+    → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
+
+    «она плохо понимает когда ты монолог ведёшь» | про бота, не к ней
     → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
     "humor_query": "", "deep_search": false}
 

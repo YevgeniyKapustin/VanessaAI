@@ -1,23 +1,14 @@
 from dataclasses import dataclass
 
-from app.core.session.chat_session_state import in_post_reply_listen_window
 from app.core.messages import ContextMessage
-from app.decision.detectors.intent import IntentDetector
-from app.decision.detectors.noise import NoiseFilter
-from app.decision.gate.quote_echo import is_recursive_quote_loop
-from app.decision.gate.reply_expectation import (
-    is_conversation_closure,
-    is_dismissal_request,
-    is_third_party_about_bot,
-    is_unsolicited_remark,
-)
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
-from app.decision.detectors.triggers import TriggerKeywordChecker
+from app.core.session.chat_session_state import in_post_reply_listen_window
+from app.decision.gate.reply_eligibility import ReplyEligibility
 
 __all__ = [
     "PlannerPrefilter",
     "PlannerPrefilterResult",
     "in_post_reply_listen_window",
+    "user_messages_since_last_bot",
 ]
 
 
@@ -25,12 +16,6 @@ __all__ = [
 class PlannerPrefilterResult:
     run_planner: bool
     reason: str = ""
-
-
-def _follows_bot(recent_messages: list[ContextMessage]) -> bool:
-    if len(recent_messages) < 2:
-        return False
-    return recent_messages[-2].role == "assistant"
 
 
 def user_messages_since_last_bot(recent_messages: list[ContextMessage]) -> int:
@@ -44,22 +29,8 @@ def user_messages_since_last_bot(recent_messages: list[ContextMessage]) -> int:
 
 
 class PlannerPrefilter:
-    def __init__(
-        self,
-        intent_detector: IntentDetector,
-        trigger_checker: TriggerKeywordChecker,
-        noise_filter: NoiseFilter,
-        *,
-        ignore_registry: ChatIgnoreRegistry | None = None,
-        post_reply_listen_count: int = 5,
-        post_reply_listen_idle_seconds: float = 0,
-    ) -> None:
-        self._intent = intent_detector
-        self._triggers = trigger_checker
-        self._noise = noise_filter
-        self._ignore_registry = ignore_registry or ChatIgnoreRegistry()
-        self._post_reply_listen_count = post_reply_listen_count
-        self._post_reply_listen_idle_seconds = post_reply_listen_idle_seconds
+    def __init__(self, eligibility: ReplyEligibility) -> None:
+        self._eligibility = eligibility
 
     def evaluate(
         self,
@@ -72,73 +43,13 @@ class PlannerPrefilter:
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
     ) -> PlannerPrefilterResult:
-        if (
-            telegram_chat_id
-            and sender_telegram_id
-            and self._ignore_registry.is_ignored(
-                telegram_chat_id,
-                sender_telegram_id,
-            )
-        ):
-            return PlannerPrefilterResult(False, "ignored_user")
-
-        directly_addressed = mentions_bot or reply_to_bot
-        intent = self._intent.detect(text)
-        trigger = self._triggers.detect(text)
-        follows_bot = _follows_bot(recent_messages)
-
-        if is_dismissal_request(text):
-            return PlannerPrefilterResult(False, "dismissal")
-
-        if is_recursive_quote_loop(
+        verdict = self._eligibility.evaluate_prefilter(
             text,
             recent_messages,
+            telegram_chat_id=telegram_chat_id,
+            sender_telegram_id=sender_telegram_id,
+            mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
-        ):
-            return PlannerPrefilterResult(False, "quote_echo")
-
-        if is_third_party_about_bot(text) and not directly_addressed:
-            return PlannerPrefilterResult(False, "side_talk")
-
-        if reply_to_other_user and not directly_addressed and not intent.mentions_bot:
-            return PlannerPrefilterResult(False, "side_talk")
-
-        in_listen_window = in_post_reply_listen_window(
-            recent_messages,
-            max_messages=self._post_reply_listen_count,
-            max_idle_seconds=self._post_reply_listen_idle_seconds,
+            reply_to_other_user=reply_to_other_user,
         )
-
-        if directly_addressed:
-            return PlannerPrefilterResult(True, "direct_address")
-
-        if intent.mentions_bot:
-            return PlannerPrefilterResult(True, "bot_name")
-
-        if in_listen_window:
-            if self._noise.is_noise(text) and not trigger.detected:
-                return PlannerPrefilterResult(False, "noise")
-            if is_unsolicited_remark(text):
-                return PlannerPrefilterResult(False, "side_talk")
-            if is_conversation_closure(text):
-                return PlannerPrefilterResult(False, "closure")
-            return PlannerPrefilterResult(True, "listen_window")
-
-        if self._noise.is_noise(text) and not trigger.detected:
-            return PlannerPrefilterResult(False, "noise")
-
-        if is_conversation_closure(text):
-            return PlannerPrefilterResult(False, "closure")
-
-        if follows_bot and not self._noise.is_noise(text):
-            if directly_addressed or intent.mentions_bot or trigger.detected:
-                return PlannerPrefilterResult(True, "follow_up")
-            if intent.has_question:
-                return PlannerPrefilterResult(True, "follow_up_question")
-
-        if trigger.detected and (
-            directly_addressed or intent.mentions_bot or follows_bot
-        ):
-            return PlannerPrefilterResult(True, "trigger")
-
-        return PlannerPrefilterResult(False, "side_talk")
+        return PlannerPrefilterResult(verdict.run_planner, verdict.reason)

@@ -2,12 +2,10 @@ from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.gate.planner_gate import planner_affirms_reply
-from app.decision.gate.quote_echo import is_recursive_quote_loop
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
+from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
-    is_dismissal_request,
     is_third_party_about_bot,
     is_unsolicited_remark,
     listen_window_warrants_reply,
@@ -48,46 +46,24 @@ class NoiseRule(_PreRelevanceRuleMixin):
         return _ignore(context, DecisionReason.NOISE)
 
 
-class DismissalRule(_PreRelevanceRuleMixin):
-    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if not is_dismissal_request(context.text):
-            return None
-        return _ignore(context, DecisionReason.DISMISSAL)
+class HardIgnoreRule(_PreRelevanceRuleMixin):
+    def __init__(self, eligibility: ReplyEligibility) -> None:
+        self._eligibility = eligibility
 
-
-class QuoteEchoRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if not is_recursive_quote_loop(
+        hard = self._eligibility.hard_ignore(
             context.text,
             context.recent_messages,
+            telegram_chat_id=context.telegram_chat_id,
+            sender_telegram_id=context.sender_telegram_id,
+            mentions_bot=context.mentions_bot,
             reply_to_bot=context.reply_to_bot,
-        ):
+            reply_to_other_user=context.reply_to_other_user,
+            intent=context.intent,
+        )
+        if hard is None:
             return None
-        return _ignore(context, DecisionReason.QUOTE_ECHO)
-
-
-class IgnoredUserRule(_PreRelevanceRuleMixin):
-    def __init__(self, ignore_registry: ChatIgnoreRegistry) -> None:
-        self._ignore_registry = ignore_registry
-
-    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if not context.sender_telegram_id:
-            return None
-        if not self._ignore_registry.is_ignored(
-            context.telegram_chat_id,
-            context.sender_telegram_id,
-        ):
-            return None
-        return _ignore(context, DecisionReason.USER_IGNORED)
-
-
-class ThirdPartyAboutBotRule(_PreRelevanceRuleMixin):
-    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if context.directly_addressed or context.intent.mentions_bot:
-            return None
-        if not is_third_party_about_bot(context.text):
-            return None
-        return _ignore(context, DecisionReason.NOT_EXPECTED)
+        return _ignore(context, hard.decision_reason)
 
 
 class DirectAddressRule(_PreRelevanceRuleMixin):

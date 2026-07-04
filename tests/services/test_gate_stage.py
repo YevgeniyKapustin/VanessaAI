@@ -5,6 +5,8 @@ from app.core.session.chat_session_state import ChatSessionState
 from app.core.turn import ChatTurnInput
 from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
 from app.decision.gate.prefilter import PlannerPrefilter
+from app.decision.gate.reply_eligibility import ReplyEligibility
+from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionAction, DecisionReason
 from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
@@ -31,16 +33,36 @@ class NoDecision:
         raise AssertionError("decision should not run")
 
 
+def _gate_stage(
+    prefilter: PlannerPrefilter | None,
+    *,
+    config: OrchestratorConfig,
+    indexing: FakeIndexing,
+) -> GateStage:
+    registry = ChatIgnoreRegistry()
+    eligibility = ReplyEligibility(
+        IntentDetector(bot_names=["vanessa"]),
+        TriggerKeywordChecker(keywords=[]),
+        NoiseFilter(),
+        registry,
+        post_reply_listen_count=config.post_reply_listen_count,
+        post_reply_listen_idle_seconds=config.session_idle_seconds,
+    )
+    return GateStage(
+        QueryRewriter(use_llm=False),
+        NoDecision(),
+        prefilter,
+        eligibility,
+        config,
+        TurnMetrics(),
+        FakeMessageRepo(),  # type: ignore[arg-type]
+        indexing,  # type: ignore[arg-type]
+        registry,
+    )
+
+
 @pytest.mark.asyncio
 async def test_gate_stage_prefilter_skips_planner():
-    prefilter = PlannerPrefilter(
-        intent_detector=IntentDetector(bot_names=["vanessa"]),
-        trigger_checker=TriggerKeywordChecker(keywords=[]),
-        noise_filter=NoiseFilter(),
-        post_reply_listen_count=3,
-        post_reply_listen_idle_seconds=300.0,
-    )
-    metrics = TurnMetrics()
     config = OrchestratorConfig(
         session_window_size=10,
         session_idle_seconds=300.0,
@@ -48,16 +70,19 @@ async def test_gate_stage_prefilter_skips_planner():
         planner_prefilter_enabled=True,
         defer_index_on_ignore=True,
     )
-    indexing = FakeIndexing()
-    gate = GateStage(
-        QueryRewriter(use_llm=False),
-        NoDecision(),
-        prefilter,
-        config,
-        metrics,
-        FakeMessageRepo(),  # type: ignore[arg-type]
-        indexing,  # type: ignore[arg-type]
+    registry = ChatIgnoreRegistry()
+    prefilter = PlannerPrefilter(
+        ReplyEligibility(
+            IntentDetector(bot_names=["vanessa"]),
+            TriggerKeywordChecker(keywords=[]),
+            NoiseFilter(),
+            registry,
+            post_reply_listen_count=3,
+            post_reply_listen_idle_seconds=300.0,
+        )
     )
+    indexing = FakeIndexing()
+    gate = _gate_stage(prefilter, config=config, indexing=indexing)
     user_msg = StoredMessage(id=1, role="user", content="ок")
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(

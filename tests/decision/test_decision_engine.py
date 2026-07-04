@@ -145,7 +145,35 @@ def build_engine(
 
 
 @pytest.mark.asyncio
-async def test_decision_engine_replies_in_listen_window_after_bot(
+async def test_decision_engine_replies_in_listen_window_when_planner_affirms(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(
+            id=1,
+            role="user",
+            content="ванесса подскажи алгоритм генерации меша",
+        ),
+        ContextMessage(id=2, role="assistant", content="Кратко про меш"),
+        ContextMessage(id=3, role="user", content="а про текстуры?"),
+    ]
+
+    result = await engine.decide(
+        text="а про текстуры?",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=True,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.LISTEN_WINDOW
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_ignores_side_talk_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
@@ -172,12 +200,11 @@ async def test_decision_engine_replies_in_listen_window_after_bot(
         in_listen_window=True,
     )
 
-    assert result.action == DecisionAction.REPLY
-    assert result.reason == DecisionReason.LISTEN_WINDOW
+    assert result.action == DecisionAction.IGNORE
 
 
 @pytest.mark.asyncio
-async def test_decision_engine_replies_in_listen_window_after_other_user(
+async def test_decision_engine_ignores_listen_window_without_planner_affirm(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
@@ -201,8 +228,7 @@ async def test_decision_engine_replies_in_listen_window_after_other_user(
         in_listen_window=True,
     )
 
-    assert result.action == DecisionAction.REPLY
-    assert result.reason == DecisionReason.LISTEN_WINDOW
+    assert result.action == DecisionAction.IGNORE
 
 
 @pytest.mark.asyncio

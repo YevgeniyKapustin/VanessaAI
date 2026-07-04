@@ -1,4 +1,3 @@
-from app.config.content import get_content
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext, DecisionRule
 from app.decision.models import DecisionResult
@@ -10,21 +9,19 @@ from app.decision.protocols import (
     SessionWindowProtocol,
     TriggerCheckerProtocol,
 )
+from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.rules import (
     ConsecutiveReplyRule,
     DirectAddressRule,
-    DismissalRule,
-    IgnoredUserRule,
+    HardIgnoreRule,
     IntentRule,
     ListenWindowRule,
     NoiseRule,
     PlannerOverreachRule,
     PlannerReplyRule,
-    QuoteEchoRule,
     RateLimitRule,
     RelevanceRule,
-    ThirdPartyAboutBotRule,
     TriggerRule,
     _base,
 )
@@ -40,8 +37,10 @@ class DecisionEngine:
         rate_limiter: RateLimiterProtocol,
         noise_filter: NoiseFilterProtocol,
         relevance_threshold: float,
+        *,
         rules: list[DecisionRule] | None = None,
-        block_consecutive_replies: bool | None = None,
+        block_consecutive_replies: bool = False,
+        reply_eligibility: ReplyEligibility | None = None,
         ignore_registry: ChatIgnoreRegistry | None = None,
     ) -> None:
         self._intent = intent_detector
@@ -49,23 +48,22 @@ class DecisionEngine:
         self._relevance = relevance_checker
         self._session = session_analyzer
         self._rate_limiter = rate_limiter
-        block_consecutive = (
-            block_consecutive_replies
-            if block_consecutive_replies is not None
-            else get_content().decision.block_consecutive_replies
+        registry = ignore_registry or ChatIgnoreRegistry()
+        eligibility = reply_eligibility or ReplyEligibility(
+            intent_detector,
+            trigger_checker,
+            noise_filter,
+            registry,
         )
         self._rules = rules or [
             RateLimitRule(rate_limiter),
             NoiseRule(noise_filter),
-            DismissalRule(),
-            QuoteEchoRule(),
-            IgnoredUserRule(ignore_registry or ChatIgnoreRegistry()),
-            ThirdPartyAboutBotRule(),
+            HardIgnoreRule(eligibility),
             DirectAddressRule(),
             ConsecutiveReplyRule(
                 intent_detector,
                 trigger_checker,
-                enabled=block_consecutive,
+                enabled=block_consecutive_replies,
             ),
             ListenWindowRule(noise_filter),
             PlannerReplyRule(),
@@ -93,6 +91,7 @@ class DecisionEngine:
         should_reply: bool | None = None,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
+        reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
     ) -> DecisionResult:
@@ -111,6 +110,7 @@ class DecisionEngine:
             should_reply=should_reply,
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
+            reply_to_other_user=reply_to_other_user,
             in_listen_window=in_listen_window,
             sender_telegram_id=sender_telegram_id,
         )
@@ -136,6 +136,7 @@ class DecisionEngine:
             should_reply=should_reply,
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
+            reply_to_other_user=reply_to_other_user,
             in_listen_window=in_listen_window,
             sender_telegram_id=sender_telegram_id,
         )

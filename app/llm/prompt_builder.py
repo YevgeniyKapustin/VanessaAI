@@ -98,14 +98,17 @@ class PromptBuilder:
     def system_prompt(self) -> str:
         persona = self._content.persona
         llm = self._content.llm
-        parts = [
-            persona.role.strip(),
-            persona.style.strip(),
-            llm.reply_instruction.strip(),
+        sections = [
+            ("Личность", persona.identity_text()),
+            ("Голос", persona.voice_text()),
+            ("Правила контента", persona.rules_text()),
+            ("Работа с контекстом", llm.task_text()),
+            ("Формулировка ответа", llm.answer_text()),
         ]
-        if llm.compose_instruction.strip():
-            parts.append(llm.compose_instruction.strip())
+        parts = [
+            f"## {title}\n{body}" for title, body in sections if body
+        ]
         profanity = self._content.profanity
         if profanity.enabled and profanity.instruction.strip():
-            parts.append(profanity.instruction.strip())
-        return "\n\n".join(part for part in parts if part)
+            parts.append(f"## Эмоциональная лексика\n{profanity.instruction.strip()}")
+        return "\n\n".join(parts)

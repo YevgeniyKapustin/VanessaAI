@@ -4,6 +4,7 @@ import time
 from app.config import settings
 from app.core.display_names import resolve_user_display_name
 from app.core.messages import context_block_message_count, stored_to_context
+from app.core.session_trim import trim_session_by_idle_gap
 from app.db.repository import UserRepository
 from app.llm.humor_quotes import extract_humor_quotes
 from app.llm.session_format import session_context_messages
@@ -82,12 +83,15 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             sender_telegram_id=turn.sender_telegram_id,
         )
 
-        recent = [
-            stored_to_context(message)
-            for message in await self._messages.get_recent(
-                limit=self._session_window_size,
-            )
-        ]
+        recent = trim_session_by_idle_gap(
+            [
+                stored_to_context(message)
+                for message in await self._messages.get_recent(
+                    limit=self._session_window_size,
+                )
+            ],
+            max_idle_seconds=settings.decision_session_idle_seconds,
+        )
 
         plan_ms = 0.0
         if (
@@ -134,6 +138,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         in_listen_window = in_post_reply_listen_window(
             recent,
             max_messages=settings.decision_post_reply_listen_count,
+            max_idle_seconds=settings.decision_session_idle_seconds,
         )
         turn_plan = await self._query_rewriter.prepare(
             turn.message,

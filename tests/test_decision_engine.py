@@ -230,6 +230,30 @@ async def test_decision_engine_ignores_status_remark_in_listen_window(
 
 
 @pytest.mark.asyncio
+async def test_decision_engine_ignores_third_party_gossip_in_listen_window(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса про векторы"),
+        ContextMessage(id=2, role="assistant", content="1500+ норма"),
+        ContextMessage(id=3, role="user", content="почему она меня игнорирует"),
+    ]
+
+    result = await engine.decide(
+        text="почему она меня игнорирует",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=True,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.NOT_EXPECTED
+
+
+@pytest.mark.asyncio
 async def test_decision_engine_ignores_dismissal_even_when_addressed(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,

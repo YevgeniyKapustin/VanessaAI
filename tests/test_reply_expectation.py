@@ -2,6 +2,7 @@ from app.decision.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
     is_dismissal_request,
+    is_third_party_about_bot,
     is_unsolicited_remark,
 )
 
@@ -65,3 +66,13 @@ def test_follow_up_requires_substance_after_bot():
         "а про токены?",
         last_prior_role="assistant",
     ) is True
+
+
+def test_third_party_about_bot_detects_gossip():
+    assert is_third_party_about_bot("почему она меня игнорирует") is True
+    assert is_third_party_about_bot("она опять молчит") is True
+
+
+def test_third_party_about_bot_allows_direct_address():
+    assert is_third_party_about_bot("ванесса, почему ты меня игнорируешь") is False
+    assert is_third_party_about_bot("почему ты меня игнорируешь") is False

@@ -33,6 +33,25 @@ _GROUP_REMARK_PATTERNS = (
 )
 _GROUP_REMARK_RE = re.compile("|".join(_GROUP_REMARK_PATTERNS), re.IGNORECASE)
 
+_THIRD_PARTY_BOT_PATTERNS = (
+    r"\b(она|её|ей)\b.*\b("
+    r"игнорирует|молчит|не\s+отвечает|не\s+пишет|"
+    r"тупит|глючит|сломалась|не\s+работает|опять\s+молчит"
+    r")\b",
+    r"\b(почему|зачем|когда|что|разве)\b[^?.!]{0,40}\b(она|её)\b",
+    r"\b(она|её)\b[^?.!]{0,20}\b(меня|тебя|нас)\b",
+)
+_THIRD_PARTY_BOT_RE = re.compile(
+    "|".join(_THIRD_PARTY_BOT_PATTERNS),
+    re.IGNORECASE,
+)
+
+_DIRECT_BOT_ADDRESS = re.compile(
+    r"\b(ванесса|vanessa|@)\b|"
+    r"\b(ты|тебя|тебе|тобой)\b",
+    re.IGNORECASE,
+)
+
 
 def is_conversation_closure(text: str) -> bool:
     normalized = text.strip()
@@ -57,6 +76,13 @@ def is_unsolicited_remark(text: str) -> bool:
     return bool(_GROUP_REMARK_RE.search(normalized))
 
 
+def is_third_party_about_bot(text: str) -> bool:
+    normalized = text.strip()
+    if not normalized or _DIRECT_BOT_ADDRESS.search(normalized):
+        return False
+    return bool(_THIRD_PARTY_BOT_RE.search(normalized))
+
+
 def listen_window_warrants_reply(
     text: str,
     *,
@@ -64,7 +90,7 @@ def listen_window_warrants_reply(
     has_question: bool,
     trigger_detected: bool,
 ) -> bool:
-    if is_unsolicited_remark(text):
+    if is_unsolicited_remark(text) or is_third_party_about_bot(text):
         return False
     if should_reply is True or has_question or trigger_detected:
         return True
@@ -77,6 +103,8 @@ def expects_follow_up_after_bot(text: str, *, last_prior_role: str | None) -> bo
     if last_prior_role != "assistant":
         return False
     if is_conversation_closure(text) or is_unsolicited_remark(text):
+        return False
+    if is_third_party_about_bot(text):
         return False
     normalized = text.strip()
     if "?" in normalized:

@@ -5,6 +5,7 @@ from app.decision.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
     is_dismissal_request,
+    is_third_party_about_bot,
     is_unsolicited_remark,
     listen_window_warrants_reply,
 )
@@ -43,6 +44,15 @@ class DismissalRule:
         if not is_dismissal_request(context.text):
             return None
         return _ignore(context, DecisionReason.DISMISSAL)
+
+
+class ThirdPartyAboutBotRule:
+    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        if context.directly_addressed or context.intent.mentions_bot:
+            return None
+        if not is_third_party_about_bot(context.text):
+            return None
+        return _ignore(context, DecisionReason.NOT_EXPECTED)
 
 
 class DirectAddressRule:
@@ -120,6 +130,12 @@ class PlannerReplyRule:
 class IntentRule:
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.intent.detected:
+            return None
+        if (
+            not context.directly_addressed
+            and not context.intent.mentions_bot
+            and is_third_party_about_bot(context.text)
+        ):
             return None
         if context.directly_addressed or context.intent.mentions_bot:
             return _reply(context, DecisionReason.INTENT, intent_detected=True)

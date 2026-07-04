@@ -17,6 +17,14 @@ from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.gate.prefilter import PlannerPrefilter
 
 
+from app.core.protocols import (
+    EmbeddingProviderProtocol,
+    VectorStoreProtocol,
+)
+from app.rag.embeddings.embeddings import LocalEmbeddingProvider
+from app.rag.qdrant_client import QdrantVectorStore
+
+
 @dataclass
 class AppContainer:
     rate_limiter: RateLimiter
@@ -28,6 +36,8 @@ class AppContainer:
     reply_eligibility: ReplyEligibility
     planner_prefilter: PlannerPrefilter
     block_consecutive_replies: bool
+    embedding_provider: EmbeddingProviderProtocol
+    vector_store: VectorStoreProtocol
 
 
 _container: AppContainer | None = None
@@ -65,6 +75,8 @@ def build_app_container() -> AppContainer:
         reply_eligibility=eligibility,
         planner_prefilter=PlannerPrefilter(eligibility),
         block_consecutive_replies=content.decision.block_consecutive_replies,
+        embedding_provider=LocalEmbeddingProvider(),
+        vector_store=QdrantVectorStore(),
     )
 
 

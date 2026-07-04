@@ -71,3 +71,41 @@ def test_allows_compose_blocks_reply_to_other(eligibility: ReplyEligibility):
         reply_to_other_user=True,
         should_reply=True,
     ) is False
+
+
+def test_should_block_compose_allows_listen_window_follow_up(
+    eligibility: ReplyEligibility,
+):
+    assert eligibility.should_block_compose(
+        "втф чё с тобой",
+        in_listen_window=True,
+        should_reply=None,
+    ) is False
+
+
+def test_should_block_compose_blocks_outside_listen_window(
+    eligibility: ReplyEligibility,
+):
+    assert eligibility.should_block_compose(
+        "что думаешь про тик така",
+        in_listen_window=False,
+        should_reply=None,
+    ) is True
+
+
+def test_should_block_compose_blocks_reply_to_other(eligibility: ReplyEligibility):
+    assert eligibility.should_block_compose(
+        "ответ другому",
+        reply_to_other_user=True,
+        should_reply=True,
+    ) is True
+
+
+def test_should_block_compose_blocks_planner_veto_in_listen_window(
+    eligibility: ReplyEligibility,
+):
+    assert eligibility.should_block_compose(
+        "втф чё с тобой",
+        in_listen_window=True,
+        should_reply=False,
+    ) is True

@@ -28,9 +28,7 @@ from app.decision import (
     QdrantRelevanceChecker,
 )
 from app.llm.providers.claude import ClaudeLLMProvider
-from app.rag.embeddings.embeddings import LocalEmbeddingProvider
 from app.rag.search.hybrid_search import HybridSearchService
-from app.rag.qdrant_client import QdrantVectorStore
 from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from app.services.humor_pipeline import HumorPipeline
@@ -44,22 +42,13 @@ from app.services.pipeline.stages import (
 )
 from app.services.turn_metrics import turn_metrics
 
-_embedding_provider: EmbeddingProviderProtocol | None = None
-_vector_store: VectorStoreProtocol | None = None
-
 
 def create_embedding_provider() -> EmbeddingProviderProtocol:
-    global _embedding_provider
-    if _embedding_provider is None:
-        _embedding_provider = LocalEmbeddingProvider()
-    return _embedding_provider
+    return get_app_container().embedding_provider
 
 
 def create_vector_store() -> VectorStoreProtocol:
-    global _vector_store
-    if _vector_store is None:
-        _vector_store = QdrantVectorStore()
-    return _vector_store
+    return get_app_container().vector_store
 
 
 def create_hybrid_search(
@@ -190,7 +179,6 @@ async def get_incoming_turn_handler(
         query_rewriter,
         decision_engine,
         container.planner_prefilter,
-        container.reply_eligibility,
         config,
         metrics,
         messages,

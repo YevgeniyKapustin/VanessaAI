@@ -4,6 +4,7 @@ import re
 
 from app.core.messages import ContextMessage
 from app.decision.gate.bot_names import text_mentions_bot_name
+from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.config.content import get_bot_name_aliases
 
 _IGNORE_CMD = re.compile(
@@ -86,7 +87,7 @@ def resolve_ignore_target(
 
 
 def apply_owner_ignore_command(
-    registry: ChatIgnoreRegistry,
+    registry: ChatIgnoreRegistryProtocol,
     *,
     chat_id: int,
     owner_id: int,

@@ -12,9 +12,8 @@ from app.core.protocols import (
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.models import DecisionAction
+from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.decision.gate.protocols import PlannerPrefilterProtocol, TurnPlannerProtocol
-from app.decision.gate.reply_eligibility import ReplyEligibility
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.protocols import DecisionEngineProtocol
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.query_rewriter import QueryRewriter
@@ -28,7 +27,6 @@ from app.services.pipeline.gate_support import (
     decision_reason_from_prefilter_tag,
     finish_decision_ignore,
     finish_ignore_turn,
-    finish_side_talk_block,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,17 +38,15 @@ class GateStage:
         query_rewriter: TurnPlannerProtocol,
         decision_engine: DecisionEngineProtocol,
         planner_prefilter: PlannerPrefilterProtocol | None,
-        reply_eligibility: ReplyEligibility,
         config: OrchestratorConfig,
         metrics: TurnMetricsProtocol,
         messages: MessageRepositoryProtocol,
         indexing: MessageIndexingSchedulerProtocol,
-        ignore_registry: ChatIgnoreRegistry,
+        ignore_registry: ChatIgnoreRegistryProtocol,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
         self._prefilter = planner_prefilter
-        self._eligibility = reply_eligibility
         self._config = config
         self._metrics = metrics
         self._messages = messages
@@ -110,6 +106,7 @@ class GateStage:
             reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=ctx.session.in_listen_window,
             sender_telegram_id=ctx.turn.sender_telegram_id,
+            humor_ok=ctx.turn_plan.humor_ok,
         )
         ctx.decision_ms = (time.perf_counter() - decision_started) * 1000
 
@@ -140,41 +137,6 @@ class GateStage:
             )
             return False
 
-        assert ctx.turn_plan is not None
-        if self._needs_side_talk_block(ctx):
-            await finish_side_talk_block(
-                ctx,
-                metrics=self._metrics,
-                indexing=self._indexing,
-                config=self._config,
-            )
-            return False
-
-        return True
-
-    def _needs_side_talk_block(self, ctx: TurnPipelineContext) -> bool:
-        assert ctx.turn_plan is not None
-        assert ctx.session is not None
-        if ctx.turn_plan.humor_ok:
-            return False
-        if self._eligibility.allows_compose(
-            ctx.turn.message,
-            mentions_bot=ctx.turn.mentions_bot,
-            reply_to_bot=ctx.turn.reply_to_bot,
-            reply_to_other_user=ctx.turn.reply_to_other_user,
-            should_reply=ctx.turn_plan.should_reply,
-            in_listen_window=ctx.session.in_listen_window,
-            humor_ok=ctx.turn_plan.humor_ok,
-        ):
-            return False
-        if (
-            ctx.turn.reply_to_other_user
-            and not ctx.turn.mentions_bot
-            and not ctx.turn.reply_to_bot
-        ):
-            return True
-        if ctx.session.in_listen_window:
-            return ctx.turn_plan.should_reply is False
         return True
 
 

@@ -1,6 +1,6 @@
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext, DecisionRule
-from app.decision.models import DecisionResult
+from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.protocols import (
     IntentDetectorProtocol,
     NoiseFilterProtocol,
@@ -9,6 +9,8 @@ from app.decision.protocols import (
     SessionWindowProtocol,
     TriggerCheckerProtocol,
 )
+from app.decision.gate.compose_gate import ComposeGatePolicy
+from app.decision.gate.protocols import ReplyEligibilityProtocol
 from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.rules import (
@@ -24,6 +26,7 @@ from app.decision.rules import (
     RelevanceRule,
     TriggerRule,
     _base,
+    _ignore,
 )
 
 
@@ -40,8 +43,9 @@ class DecisionEngine:
         *,
         rules: list[DecisionRule] | None = None,
         block_consecutive_replies: bool = False,
-        reply_eligibility: ReplyEligibility | None = None,
+        reply_eligibility: ReplyEligibilityProtocol | None = None,
         ignore_registry: ChatIgnoreRegistry | None = None,
+        compose_gate: ComposeGatePolicy | None = None,
     ) -> None:
         self._intent = intent_detector
         self._triggers = trigger_checker
@@ -55,6 +59,7 @@ class DecisionEngine:
             noise_filter,
             registry,
         )
+        self._compose_gate = compose_gate or ComposeGatePolicy(eligibility)
         self._rules = rules or [
             RateLimitRule(rate_limiter),
             NoiseRule(noise_filter),
@@ -94,6 +99,7 @@ class DecisionEngine:
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
+        humor_ok: bool = False,
     ) -> DecisionResult:
         intent = self._intent.detect(text)
         trigger = self._triggers.detect(text)
@@ -117,7 +123,11 @@ class DecisionEngine:
         for rule in self._pre_relevance_rules:
             result = rule.evaluate(base_context)
             if result is not None:
-                return result
+                return self._finalize(
+                    result,
+                    base_context,
+                    humor_ok=humor_ok,
+                )
 
         relevance_score = await self._relevance.score(
             text,
@@ -143,5 +153,24 @@ class DecisionEngine:
         for rule in self._relevance_rules:
             result = rule.evaluate(context)
             if result is not None:
-                return result
-        return _base(context)
+                return self._finalize(
+                    result,
+                    context,
+                    humor_ok=humor_ok,
+                )
+        return self._finalize(_base(context), context, humor_ok=humor_ok)
+
+    def _finalize(
+        self,
+        result: DecisionResult,
+        context: DecisionContext,
+        *,
+        humor_ok: bool,
+    ) -> DecisionResult:
+        if self._compose_gate.should_downgrade_to_ignore(
+            result,
+            context,
+            humor_ok=humor_ok,
+        ):
+            return _ignore(context, DecisionReason.NOT_EXPECTED)
+        return result

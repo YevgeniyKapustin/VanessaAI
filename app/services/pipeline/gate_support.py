@@ -10,8 +10,8 @@ from app.core.protocols import (
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.gate.reply_eligibility import prefilter_tag_to_decision_reason
+from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.decision.gate.user_ignore import (
-    ChatIgnoreRegistry,
     apply_owner_ignore_command,
 )
 from app.decision.models import DecisionAction, DecisionReason
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 async def apply_owner_ignore_if_needed(
-    registry: ChatIgnoreRegistry,
+    registry: ChatIgnoreRegistryProtocol,
     ctx: TurnPipelineContext,
 ) -> None:
     owner_id = settings.required_user_telegram_id
@@ -102,24 +102,4 @@ async def finish_decision_ignore(
         planner_skipped=ctx.planner_skipped,
         relevance_score=ctx.decision.relevance_score,
         log_event="turn_stage decision_ignore",
-    )
-
-
-async def finish_side_talk_block(
-    ctx: TurnPipelineContext,
-    *,
-    metrics: TurnMetricsProtocol,
-    indexing: MessageIndexingSchedulerProtocol,
-    config: OrchestratorConfig,
-) -> None:
-    assert ctx.decision is not None
-    await finish_ignore_turn(
-        ctx,
-        reason=DecisionReason.NOT_EXPECTED.value,
-        metrics=metrics,
-        indexing=indexing,
-        config=config,
-        planner_skipped=ctx.planner_skipped,
-        relevance_score=ctx.decision.relevance_score,
-        log_event="turn_stage side_talk_block",
     )

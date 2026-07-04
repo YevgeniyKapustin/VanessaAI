@@ -1,5 +1,7 @@
 import re
 
+from app.core.messages import ContextMessage
+
 _CLOSURE_PATTERNS = (
     r"\b(ладно|окей|ну\s+ладно)\b.*\b(пойду|иду|пойти|поработать|работать|спать|отойду|уйду)\b",
     r"\b(надо|пора)\b.*\b(поработать|работать|идти|пойти|уйти|спать)\b",
@@ -139,6 +141,12 @@ def is_bot_pronoun_reply(text: str) -> bool:
     return bool(_BOT_PRONOUN_REPLY.search(normalized))
 
 
+def last_prior_role(messages: list[ContextMessage]) -> str | None:
+    if len(messages) < 2:
+        return None
+    return messages[-2].role
+
+
 def listen_window_warrants_reply(
     text: str,
     *,
@@ -152,7 +160,7 @@ def listen_window_warrants_reply(
         return True
     if is_bot_pronoun_reply(text):
         return True
-    if expects_follow_up_after_bot(text, last_prior_role="assistant"):
+    if is_contextual_vocative_address(text):
         return True
     return False
 

@@ -40,19 +40,10 @@ def _gate_stage(
     indexing: FakeIndexing,
 ) -> GateStage:
     registry = ChatIgnoreRegistry()
-    eligibility = ReplyEligibility(
-        IntentDetector(bot_names=["vanessa"]),
-        TriggerKeywordChecker(keywords=[]),
-        NoiseFilter(),
-        registry,
-        post_reply_listen_count=config.post_reply_listen_count,
-        post_reply_listen_idle_seconds=config.session_idle_seconds,
-    )
     return GateStage(
         QueryRewriter(use_llm=False),
         NoDecision(),
         prefilter,
-        eligibility,
         config,
         TurnMetrics(),
         FakeMessageRepo(),  # type: ignore[arg-type]

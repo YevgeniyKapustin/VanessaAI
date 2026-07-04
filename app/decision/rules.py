@@ -1,13 +1,13 @@
-from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.gate.planner_gate import planner_affirms_reply
-from app.decision.gate.reply_eligibility import ReplyEligibility
+from app.decision.gate.protocols import ReplyEligibilityProtocol
 from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
     is_third_party_about_bot,
     is_unsolicited_remark,
+    last_prior_role,
     listen_window_warrants_reply,
 )
 from app.decision.protocols import (
@@ -47,7 +47,7 @@ class NoiseRule(_PreRelevanceRuleMixin):
 
 
 class HardIgnoreRule(_PreRelevanceRuleMixin):
-    def __init__(self, eligibility: ReplyEligibility) -> None:
+    def __init__(self, eligibility: ReplyEligibilityProtocol) -> None:
         self._eligibility = eligibility
 
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
@@ -211,16 +211,13 @@ class RelevanceRule:
             return _reply(context, DecisionReason.RELEVANT)
         if is_conversation_closure(context.text):
             return _ignore(context, DecisionReason.NO_REPLY_NEEDED)
-        prior_role = _last_prior_role(context.recent_messages)
-        if expects_follow_up_after_bot(context.text, last_prior_role=prior_role):
+        prior_role = last_prior_role(context.recent_messages)
+        if expects_follow_up_after_bot(
+            context.text,
+            last_prior_role=prior_role,
+        ):
             return _reply(context, DecisionReason.RELEVANT)
         return _ignore(context, DecisionReason.NO_REPLY_NEEDED)
-
-
-def _last_prior_role(messages: list[ContextMessage]) -> str | None:
-    if len(messages) < 2:
-        return None
-    return messages[-2].role
 
 
 def _base(context: DecisionContext) -> DecisionResult:

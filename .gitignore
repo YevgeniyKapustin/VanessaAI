@@ -1,0 +1,16 @@
+.env
+.venv/
+poetry.toml
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+*.log
+dist/
+build/

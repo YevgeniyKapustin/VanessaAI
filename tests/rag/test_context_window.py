@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -273,3 +274,145 @@ async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
     assert seen["anchor_count"] == 10
     assert seen["max_total"] == effective_window_max_total(10)
     assert len(result) == 10
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_empty_query_returns_nothing():
+    from app.rag.search.hybrid_search import HybridSearchService
+
+    service = HybridSearchService(AsyncMock(), AsyncMock(), AsyncMock())
+    assert await service.search("   ") == []
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_embed_query():
+    from app.rag.search.hybrid_search import HybridSearchService
+
+    embeddings = AsyncMock()
+    embeddings.embed = AsyncMock(return_value=[0.1, 0.2])
+    service = HybridSearchService(AsyncMock(), embeddings, AsyncMock())
+
+    assert await service.embed_query("q") == [0.1, 0.2]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_index_skips_non_user_role():
+    from app.rag.search.hybrid_search import HybridSearchService
+
+    embeddings = AsyncMock()
+    vector_store = AsyncMock()
+    service = HybridSearchService(AsyncMock(), embeddings, vector_store)
+
+    assert await service.index(1, "assistant", "bot", point_id="keep") == "keep"
+    embeddings.embed.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_uses_semantic_queries(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.rag.search.hybrid_search import HybridSearchService
+
+    class FakeRepo:
+        async def fulltext_search(self, query: str, limit: int = 30):
+            return []
+
+        async def get_by_ids(self, message_ids: list[int]):
+            return [
+                StoredMessage(id=mid, role="user", content=f"m-{mid}")
+                for mid in message_ids
+            ]
+
+        async def get_conversation_window_blocks(self, **kwargs):
+            anchor_ids = kwargs["anchor_ids"]
+            return [
+                (anchor_id, [StoredMessage(id=anchor_id, role="user", content="x")])
+                for anchor_id in anchor_ids
+            ]
+
+    embeddings = AsyncMock()
+    embeddings.embed_batch = AsyncMock(return_value=[[0.1], [0.2]])
+    vector_store = AsyncMock()
+    vector_store.search = AsyncMock(
+        return_value=[{"message_id": 5, "score": 0.9}]
+    )
+
+    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 5)
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_context_window_before",
+        1,
+    )
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_context_window_after",
+        1,
+    )
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_context_window_max_total",
+        80,
+    )
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_vector_min_score",
+        0.1,
+    )
+    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.get_content",
+        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.1})()})(),
+    )
+
+    service = HybridSearchService(FakeRepo(), embeddings, vector_store)
+    result = await service.search(
+        "",
+        semantic_queries=["Alpha", "alpha", "  ", "Beta"],
+        skip_fts=True,
+    )
+
+    embeddings.embed_batch.assert_awaited_once_with(["Alpha", "Beta"])
+    assert len(result) == 1
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_without_window_expansion(monkeypatch):
+    from app.rag.search.hybrid_search import HybridSearchService
+
+    class FakeRepo:
+        async def fulltext_search(self, query: str, limit: int = 30):
+            return []
+
+        async def get_by_ids(self, message_ids: list[int]):
+            return [
+                StoredMessage(id=mid, role="user", content=f"m-{mid}")
+                for mid in message_ids
+            ]
+
+    embeddings = AsyncMock()
+    embeddings.embed = AsyncMock(return_value=[0.1])
+    vector_store = AsyncMock()
+    vector_store.search = AsyncMock(
+        return_value=[{"message_id": 7, "score": 0.95}]
+    )
+
+    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 5)
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_context_window_before",
+        0,
+    )
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_context_window_after",
+        0,
+    )
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.settings.rag_vector_min_score",
+        0.1,
+    )
+    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr(
+        "app.rag.search.hybrid_search.get_content",
+        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.1})()})(),
+    )
+
+    service = HybridSearchService(FakeRepo(), embeddings, vector_store)
+    result = await service.search("крабер")
+
+    assert len(result) == 1
+    assert result[0].anchor_id == 7

@@ -23,6 +23,7 @@ def make_telegram_message(
     message.from_user.first_name = "Test"
     message.from_user.last_name = "User"
     message.bot = MagicMock()
+    message.bot.send_chat_action = AsyncMock()
     return message
 
 

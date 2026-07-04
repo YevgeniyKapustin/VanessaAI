@@ -48,3 +48,30 @@ def test_extract_addressing_reply_to_bot_without_bot_username():
 
     assert signals.reply_to_bot is True
     assert signals.mentions_bot is False
+
+
+def test_extract_addressing_mention_in_text():
+    message = type(
+        "Message",
+        (),
+        {
+            "bot": FakeBot(id=1, _me=FakeUser(id=1, username="VanessaBot")),
+            "text": "Привет @VanessaBot",
+            "reply_to_message": None,
+            "entities": None,
+        },
+    )()
+
+    signals = extract_addressing(message)  # type: ignore[arg-type]
+
+    assert signals.mentions_bot is True
+    assert signals.directly_addressed is True
+
+
+def test_bot_username_from_bot_username_attr():
+    bot = type("Bot", (), {"username": "DirectName"})()
+    assert _bot_username(bot) == "directname"
+
+
+def test_bot_username_none_bot():
+    assert _bot_username(None) == ""

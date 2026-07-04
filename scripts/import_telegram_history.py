@@ -18,8 +18,8 @@ from app.db.session import async_session_factory
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.ingest.importer import HistoryImporter
 from app.ingest.telegram_export import parse_telegram_export
-from app.rag.embeddings import LocalEmbeddingProvider
-from app.rag.local_embeddings import preload_embedding_model
+from app.rag.embeddings.embeddings import LocalEmbeddingProvider
+from app.rag.embeddings.local_embeddings import preload_embedding_model
 from app.rag.qdrant_client import QdrantVectorStore
 
 configure_logging("import")

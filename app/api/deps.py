@@ -34,15 +34,15 @@ from app.decision import (
     SessionWindowAnalyzer,
     TriggerKeywordChecker,
 )
-from app.llm.claude import ClaudeLLMProvider
-from app.rag.embeddings import LocalEmbeddingProvider
-from app.rag.hybrid_search import HybridSearchService
+from app.llm.providers.claude import ClaudeLLMProvider
+from app.rag.embeddings.embeddings import LocalEmbeddingProvider
+from app.rag.search.hybrid_search import HybridSearchService
 from app.rag.qdrant_client import QdrantVectorStore
 from app.rag.query_rewriter import QueryRewriter
-from app.services.conversation_orchestrator import ConversationOrchestrator
+from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from app.services.humor_pipeline import HumorPipeline
-from app.services.message_indexing import MessageIndexingService
-from app.services.orchestrator_config import OrchestratorConfig
+from app.services.indexing.message_indexing import MessageIndexingService
+from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.stages import (
     ComposeStage,
     FinalizeStage,

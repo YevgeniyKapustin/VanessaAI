@@ -1,8 +1,8 @@
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
-from app.decision.planner_gate import planner_affirms_reply
-from app.decision.reply_expectation import (
+from app.decision.gate.planner_gate import planner_affirms_reply
+from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
     is_dismissal_request,

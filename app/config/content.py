@@ -73,6 +73,7 @@ class PersonaContent(BaseModel):
 class LLMContent(BaseModel):
     task: str = ""
     answer: str = ""
+    answer_examples: str = ""
     reply_instruction: str = ""
     compose_instruction: str = ""
     context_header: str
@@ -96,7 +97,10 @@ class LLMContent(BaseModel):
         return (self.task or self.reply_instruction).strip()
 
     def answer_text(self) -> str:
-        return (self.answer or self.compose_instruction).strip()
+        parts = [(self.answer or self.compose_instruction).strip()]
+        if self.answer_examples.strip():
+            parts.append(self.answer_examples.strip())
+        return "\n\n".join(part for part in parts if part)
 
 
 class BotAccessMessages(BaseModel):

@@ -56,3 +56,12 @@ def test_prompt_builder_system_includes_answer_checklist():
 
     assert "## Формулировка ответа" in prompt
     assert "Перед ответом проверь" in prompt
+    assert "Плохо:" in prompt
+    assert "Хорошо:" in prompt
+
+
+def test_turn_planner_prompt_includes_few_shot_examples():
+    prompt = get_content().rag.planner_prompt
+    assert "## Примеры" in prompt
+    assert "гомункул работает" in prompt
+    assert '"deep_search": true' in prompt

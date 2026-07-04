@@ -77,6 +77,33 @@ llm:
     5. Голые оскорбления («ты лох») не бери — только узнаваемые мемы беседы.
     6. Нечего сказать — «хз» или коротко по делу.
 
+    ## Примеры (ориентир, не копируй дословно)
+
+  answer_examples: |
+    Сообщение: «Ванесса, кто такой Тик так?»
+    Плохо: «Я Ванесса, участница беседы, родилась 25 марта 2022...»
+    Хорошо: «Тик так — это чел из беседы, у него своя история с ...»
+
+    Сообщение: «почему она меня игнорирует» (про тебя, 3-е лицо)
+    Плохо: «Она иногда не отвечает, потому что занята»
+    Хорошо: «Я не игнорю, просто не ко мне было»
+
+    Сообщение: «где там» (после обсуждения файла)
+    Плохо: «Где что? Уточни вопрос»
+    Хорошо: «В той папке на диске, про которую писали выше»
+
+    Сообщение: «ну ладно поработаю» + мем «найди работу» в контексте
+    Плохо: длинная лекция про трудовую этику
+    Хорошо: «Ну давай, не забудь отчёт к вечеру» (лёгкий подкол по мему)
+
+    Сообщение: «как починить импорт в unity»
+    Плохо: общая статья на 10 абзацев
+    Хорошо: 2–4 предложения по делу; код — только если спрашивали
+
+    Сообщение: «ты лох»
+    Плохо: цитировать оскорбление как мем
+    Хорошо: короткий ответ без подхватывания оскорбления
+
   humor_quotes_header: "Узнаваемые мемы (если уместно):"
   humor_quote_line: "- {quote}"
   context_header: "Из старых разговоров в беседе:"
@@ -195,26 +222,48 @@ rag:
     ## deep_search
     true — сложный вопрос, нужен многошаговый поиск по истории (сравнение, несколько
     тем, «как было с X и Y», технический разбор). false — обычный короткий запрос.
-    ## Задача
-    Подготовь search_query для базы сообщений группового чата.
 
-    ## Вход
-    Сообщение:
-    {message}
+    ## Примеры (вход → JSON)
 
-    Недавний контекст:
-    {recent_messages}
+    «Ванесса, привет» | reply=да, mention=да
+    → {"should_reply": true, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
 
-    ## Формат ответа
-    JSON без markdown:
-    {{"search_query": "...", "skip": false}}
+    «ок» | боковой чат
+    → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
 
-    ## Правила
-    - search_query: 1–8 слов, суть для поиска;
-    - короткое/неясное — тема из недавней переписки;
-    - не ищи «так/там/где» без темы;
-    - убери обращения к боту, приветствия, мусор;
-    - skip=true для приветствий, «ок», смайликов.
+    «видите, гомункул работает» | listen_window=да, между людьми
+    → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
+
+    «почему она меня игнорирует» | про бота, без ты/ванесса
+    → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
+
+    «хватит уже» | dismissal
+    → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+    "humor_query": "", "deep_search": false}
+
+    «что думаете про тик така» | вопрос группе, не боту
+    → {"should_reply": false, "search_query": "тик так", "skip": false,
+    "humor_ok": false, "humor_query": "", "deep_search": false}
+
+    «Ванесса, кто такой Тик так» | reply=да
+    → {"should_reply": true, "search_query": "тик так", "skip": false,
+    "humor_ok": false, "humor_query": "", "deep_search": false}
+
+    «где там» | контекст: обсуждали файл на диске
+    → {"should_reply": true, "search_query": "файл диск", "skip": false,
+    "humor_ok": false, "humor_query": "", "deep_search": false}
+
+    «ну ладно поработаю» | лёгкий тон
+    → {"should_reply": true, "search_query": "работа", "skip": false,
+    "humor_ok": true, "humor_query": "личь работа", "deep_search": false}
+
+    «сравни как мы чинили меш и текстуры в unity»
+    → {"should_reply": true, "search_query": "меш текстуры unity", "skip": false,
+    "humor_ok": false, "humor_query": "", "deep_search": true}
 
 profanity:
   enabled: true

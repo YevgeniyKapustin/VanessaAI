@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.config import settings
+from app.config.conversation_config import load_conversation_config
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,10 +20,11 @@ class OrchestratorConfig:
 
     @classmethod
     def from_settings(cls) -> "OrchestratorConfig":
+        conversation = load_conversation_config()
         return cls(
-            session_window_size=settings.decision_session_window_size,
-            session_idle_seconds=float(settings.decision_session_idle_seconds),
-            post_reply_listen_count=settings.decision_post_reply_listen_count,
+            session_window_size=conversation.session_window_size,
+            session_idle_seconds=conversation.session_idle_seconds,
+            post_reply_listen_count=conversation.post_reply_listen_count,
             planner_prefilter_enabled=settings.decision_planner_prefilter,
             humor_top_k=settings.rag_humor_top_k,
             humor_anchor_max=settings.rag_humor_anchor_max,

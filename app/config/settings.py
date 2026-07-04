@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     rag_hybrid_top_k: int = 20
     rag_humor_top_k: int = 15
     rag_humor_anchor_max: int = 5
-    rag_humor_max_quotes: int = 3
+    rag_humor_max_quotes: int = 2
     rag_humor_min_quote_score: float = 2.5
     rag_humor_window_before: int = 8
     rag_humor_window_after: int = 4
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 2
 
-    decision_relevance_threshold: float = 0.75
+    decision_relevance_threshold: float = 0.76
     decision_session_window_size: int = 10
     decision_rate_limit_per_minute: int = 10
     decision_bot_names: str = ""

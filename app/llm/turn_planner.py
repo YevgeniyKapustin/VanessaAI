@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from anthropic import AsyncAnthropic
 
 from app.config.content import AppContent, get_content
+from app.config.conversation_config import load_conversation_config
 from app.config.settings import settings
+from app.llm.generation_config import LLMGenerationParams
 from app.core.messages import ContextMessage
 from app.core.nicknames import format_nicknames_for_planner
 from app.llm.session_format import format_session_messages, session_context_messages
@@ -35,6 +37,7 @@ class TurnPlanner:
         use_llm: bool | None = None,
         llm_client: AsyncAnthropic | None = None,
         llm_model: str | None = None,
+        generation: LLMGenerationParams | None = None,
     ) -> None:
         self._content = content or get_content()
         self._use_llm = (
@@ -44,6 +47,10 @@ class TurnPlanner:
         )
         self._client = llm_client
         self._model = llm_model or settings.planner_model
+        self._generation = (
+            generation
+            or self._content.llm.generation.planner.to_params()
+        )
 
     async def prepare(
         self,
@@ -114,8 +121,8 @@ class TurnPlanner:
         )
         response = await client.messages.create(
             model=self._model,
-            max_tokens=settings.rag_query_rewrite_max_tokens,
             messages=[{"role": "user", "content": prompt}],
+            **self._generation.to_anthropic_kwargs(),
         )
         raw = response.content[0].text.strip()
         return self._parse_llm_response(message, raw)
@@ -179,7 +186,7 @@ class TurnPlanner:
 
     def _format_recent(self, recent_messages: list[ContextMessage]) -> str:
         prior = session_context_messages(recent_messages)
-        limit = settings.decision_session_window_size
+        limit = load_conversation_config().session_window_size
         return format_session_messages(prior[-limit:], self._content)
 
 

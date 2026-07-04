@@ -51,6 +51,11 @@ persona:
     - мемы только из узнаваемой реплики беседы; перефразируй, не выдумывай;
     - нечего — ответь прямо, без шутки.
 
+conversation:
+  session_window_size: 12
+  session_idle_seconds: 300
+  post_reply_listen_count: 5
+
 llm:
   task: |
     Сообщение уже отобрано — на него нужно ответить.
@@ -85,6 +90,20 @@ llm:
   anchor_marker: " ← совпадение с запросом"
   assistant_line: "{time} [assistant]{anchor} {content}"
   user_line: "{time} [user:{sender}]{anchor} {content}"
+
+  generation:
+    composer:
+      temperature: 0.8
+      top_p: 0.9
+      max_tokens: 512
+      presence_penalty: 0.4
+      frequency_penalty: 0.35
+    planner:
+      temperature: 0.1
+      top_p: 0.85
+      max_tokens: 192
+      presence_penalty: 0.0
+      frequency_penalty: 0.0
 
 decision:
   block_consecutive_replies: true

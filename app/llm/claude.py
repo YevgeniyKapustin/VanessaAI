@@ -3,8 +3,10 @@ import logging
 
 from anthropic import APIStatusError, AsyncAnthropic
 
-from app.config import settings
+from app.config.content import AppContent, get_content
+from app.config.settings import settings
 from app.core.messages import ContextBlock, ContextMessage
+from app.llm.generation_config import LLMGenerationParams
 from app.llm.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompt_builder import PromptBuilder
 from app.llm.reply_format import capitalize_sentences
@@ -20,15 +22,22 @@ class ClaudeLLMProvider:
         prompt_builder: PromptBuilder | None = None,
         profanity_substitutor: ProfanitySubstitutor | None = None,
         max_retries: int | None = None,
+        generation: LLMGenerationParams | None = None,
+        content: AppContent | None = None,
     ) -> None:
+        self._content = content or get_content()
         self._client = client or AsyncAnthropic(api_key=settings.anthropic_api_key)
         self._model = model or settings.anthropic_model
-        self._prompts = prompt_builder or PromptBuilder()
+        self._prompts = prompt_builder or PromptBuilder(self._content)
         self._profanity = profanity_substitutor
         self._max_retries = (
             max_retries
             if max_retries is not None
             else settings.llm_max_retries
+        )
+        self._generation = (
+            generation
+            or self._content.llm.generation.composer.to_params()
         )
 
     def _should_retry(self, exc: Exception) -> bool:
@@ -67,13 +76,17 @@ class ClaudeLLMProvider:
         message_count = sum(len(block.messages) for block in context_blocks)
         logger.info(
             "llm_prompt_prepared model=%s context_blocks=%s context_messages=%s "
-            "humor_quotes=%s system_chars=%s user_chars=%s",
+            "humor_quotes=%s system_chars=%s user_chars=%s temperature=%s "
+            "top_p=%s max_tokens=%s",
             self._model,
             len(context_blocks),
             message_count,
             len(humor_quotes or []),
             len(system),
             len(user_prompt),
+            self._generation.temperature,
+            self._generation.top_p,
+            self._generation.max_tokens,
         )
         logger.info("llm_system_prompt:\n%s", system)
         logger.info("llm_user_prompt:\n%s", user_prompt)
@@ -83,7 +96,6 @@ class ClaudeLLMProvider:
             try:
                 response = await self._client.messages.create(
                     model=self._model,
-                    max_tokens=settings.anthropic_max_tokens,
                     system=system,
                     messages=[
                         {
@@ -91,6 +103,7 @@ class ClaudeLLMProvider:
                             "content": user_prompt,
                         }
                     ],
+                    **self._generation.to_anthropic_kwargs(),
                 )
                 return capitalize_sentences(
                     self._substitute_profanity(response.content[0].text)

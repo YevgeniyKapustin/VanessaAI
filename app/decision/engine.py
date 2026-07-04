@@ -20,6 +20,7 @@ from app.decision.rules import (
     PlannerReplyRule,
     RateLimitRule,
     RelevanceRule,
+    ThirdPartyAboutBotRule,
     TriggerRule,
     _base,
 )
@@ -52,6 +53,7 @@ class DecisionEngine:
             RateLimitRule(rate_limiter),
             NoiseRule(noise_filter),
             DismissalRule(),
+            ThirdPartyAboutBotRule(),
             DirectAddressRule(),
             ConsecutiveReplyRule(
                 intent_detector,

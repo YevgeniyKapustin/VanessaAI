@@ -8,11 +8,25 @@ from app.config.settings import settings
 
 
 class PersonaContent(BaseModel):
-    role: str
-    style: str
+    identity: str = ""
+    voice: str = ""
+    rules: str = ""
+    role: str = ""
+    style: str = ""
+
+    def identity_text(self) -> str:
+        return (self.identity or self.role).strip()
+
+    def voice_text(self) -> str:
+        return (self.voice or self.style).strip()
+
+    def rules_text(self) -> str:
+        return self.rules.strip()
 
 
 class LLMContent(BaseModel):
+    task: str = ""
+    answer: str = ""
     reply_instruction: str = ""
     compose_instruction: str = ""
     context_header: str
@@ -30,6 +44,12 @@ class LLMContent(BaseModel):
     user_line: str = "{time} [user:{sender}]{anchor} {content}"
     humor_quotes_header: str = "Узнаваемые мемы и подколы из беседы (если уместно):"
     humor_quote_line: str = "- {quote}"
+
+    def task_text(self) -> str:
+        return (self.task or self.reply_instruction).strip()
+
+    def answer_text(self) -> str:
+        return (self.answer or self.compose_instruction).strip()
 
 
 class BotAccessMessages(BaseModel):

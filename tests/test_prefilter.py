@@ -137,3 +137,15 @@ def test_prefilter_skips_status_remark_in_listen_window(
 
     assert result.run_planner is False
     assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_third_party_gossip(prefilter: PlannerPrefilter):
+    recent = [
+        ContextMessage(id=1, role="assistant", content="Ответ"),
+        ContextMessage(id=2, role="user", content="почему она меня игнорирует"),
+    ]
+
+    result = prefilter.evaluate("почему она меня игнорирует", recent)
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"

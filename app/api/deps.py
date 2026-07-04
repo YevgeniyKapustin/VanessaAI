@@ -58,6 +58,7 @@ _planner_prefilter = PlannerPrefilter(
     trigger_checker=_trigger_checker,
     noise_filter=_noise_filter,
     post_reply_listen_count=settings.decision_post_reply_listen_count,
+    post_reply_listen_idle_seconds=settings.decision_session_idle_seconds,
 )
 
 

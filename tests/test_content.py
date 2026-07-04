@@ -5,7 +5,7 @@ from app.llm.prompt_builder import PromptBuilder
 def test_content_loads_persona_and_templates():
     content = get_content()
 
-    assert "Ванесса" in content.persona.role
+    assert "Ванесса" in content.persona.identity_text()
     assert content.llm.context_header
     assert content.decision.noise_max_words >= 1
 
@@ -16,10 +16,12 @@ def test_prompt_builder_assembles_system_prompt_from_persona():
     content = get_content()
 
     assert "Ванесса" in prompt
-    assert "Стиль" in prompt
-    assert content.llm.reply_instruction.strip() in prompt
+    assert "## Личность" in prompt
+    assert "## Голос" in prompt
+    assert "## Правила контента" in prompt
+    assert content.llm.task_text() in prompt
     if content.profanity.enabled:
-        assert content.profanity.instruction.strip() in prompt
+        assert "## Эмоциональная лексика" in prompt
 
 
 def test_prompt_builder_builds_user_prompt():
@@ -48,9 +50,9 @@ def test_prompt_builder_includes_humor_quotes_block():
     assert "- найди работу" in prompt
 
 
-def test_prompt_builder_system_includes_compose_instruction():
+def test_prompt_builder_system_includes_answer_checklist():
     builder = PromptBuilder()
     prompt = builder.system_prompt
 
-    assert "Финальный ответ" in prompt
-    assert "как было" in prompt.lower()
+    assert "## Формулировка ответа" in prompt
+    assert "Перед ответом проверь" in prompt

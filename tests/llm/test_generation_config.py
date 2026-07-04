@@ -29,7 +29,6 @@ def test_anthropic_kwargs_include_sampling_params():
     assert params.to_anthropic_kwargs() == {
         "max_tokens": 512,
         "temperature": 0.7,
-        "top_p": 0.9,
     }
 
 

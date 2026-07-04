@@ -11,7 +11,7 @@ from app.config import settings
 from app.core.logging_setup import configure_logging
 from app.db.base import Base
 from app.db.session import engine
-from app.rag.local_embeddings import preload_embedding_model
+from app.rag.embeddings.local_embeddings import preload_embedding_model
 
 configure_logging("api")
 logger = logging.getLogger(__name__)

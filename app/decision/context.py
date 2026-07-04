@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.messages import ContextMessage
-from app.decision.intent import IntentResult
+from app.decision.detectors.intent import IntentResult
 from app.decision.models import DecisionResult
-from app.decision.triggers import TriggerResult
+from app.decision.detectors.triggers import TriggerResult
 
 
 @dataclass(frozen=True, slots=True)

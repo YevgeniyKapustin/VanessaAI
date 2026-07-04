@@ -1,4 +1,4 @@
-from app.llm.turn_planner import TurnPlan, TurnPlanner
+from app.llm.planner.turn_planner import TurnPlan, TurnPlanner
 
 SearchQuery = TurnPlan
 QueryRewriter = TurnPlanner

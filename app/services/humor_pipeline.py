@@ -1,10 +1,10 @@
 from typing import Protocol
 
 from app.core.protocols import ContextRetrieverProtocol, TurnQueryProtocol
-from app.llm.humor_quotes import extract_humor_quotes
-from app.llm.humor_reflexion import reflexion_filter_humor_quotes
-from app.llm.turn_planner import TurnPlan
-from app.services.orchestrator_config import OrchestratorConfig
+from app.llm.humor.humor_quotes import extract_humor_quotes
+from app.llm.humor.humor_reflexion import reflexion_filter_humor_quotes
+from app.llm.planner.turn_planner import TurnPlan
+from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 
 
 class HumorPipelineProtocol(Protocol):

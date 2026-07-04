@@ -15,7 +15,7 @@ class LLMGenerationProfile(BaseModel):
     frequency_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
 
     def to_params(self):
-        from app.llm.generation_config import LLMGenerationParams
+        from app.llm.planner.generation_config import LLMGenerationParams
 
         return LLMGenerationParams(
             temperature=self.temperature,

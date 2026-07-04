@@ -12,14 +12,14 @@ from app.core.protocols import (
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
-from app.decision.prefilter import PlannerPrefilter
+from app.decision.gate.prefilter import PlannerPrefilter
 from app.decision.protocols import DecisionEngineProtocol
-from app.llm.session_format import session_context_messages
+from app.llm.prompts.session_format import session_context_messages
 from app.rag.query_rewriter import QueryRewriter
-from app.rag.react_retriever import retrieve_with_react
-from app.rag.search_plan import build_main_rag_plan
+from app.rag.search.react_retriever import retrieve_with_react
+from app.rag.search.search_plan import build_main_rag_plan
 from app.services.humor_pipeline import HumorPipelineProtocol
-from app.services.orchestrator_config import OrchestratorConfig
+from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
 logger = logging.getLogger(__name__)
 

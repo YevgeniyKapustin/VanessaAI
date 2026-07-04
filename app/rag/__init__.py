@@ -1,6 +1,6 @@
-from app.rag.embeddings import LocalEmbeddingProvider
-from app.rag.hybrid_search import HybridSearchService
-from app.rag.merger import merge_hybrid_results
+from app.rag.embeddings.embeddings import LocalEmbeddingProvider
+from app.rag.search.hybrid_search import HybridSearchService
+from app.rag.search.merger import merge_hybrid_results
 from app.rag.qdrant_client import QdrantVectorStore
 
 __all__ = [

@@ -1,4 +1,4 @@
-from app.llm.claude import ClaudeLLMProvider
-from app.llm.prompt_builder import PromptBuilder
+from app.llm.providers.claude import ClaudeLLMProvider
+from app.llm.prompts.prompt_builder import PromptBuilder
 
 __all__ = ["ClaudeLLMProvider", "PromptBuilder"]

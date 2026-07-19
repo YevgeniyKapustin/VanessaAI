@@ -68,9 +68,12 @@ def _services(
         )
     access_guard = AsyncMock()
     access_guard.ensure_access = AsyncMock(return_value=access_error)
+    notes = AsyncMock()
+    notes.is_configured = False
     return BotServices(
         chat_client=chat_client,
         access_guard=access_guard,
+        notes=notes,
         texts=get_content().bot,
     )
 

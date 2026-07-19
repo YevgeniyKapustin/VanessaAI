@@ -1,4 +1,6 @@
 .env
+.ssh/
+data/
 .venv/
 poetry.toml
 __pycache__/

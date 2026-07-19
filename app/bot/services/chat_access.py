@@ -48,3 +48,16 @@ class ChatAccessGuard:
         if not await self.required_user_in_chat(message):
             return self._messages.required_user_missing.strip()
         return None
+
+    def is_private_chat(self, message: IncomingMessage) -> bool:
+        return message.chat_type == _enum_to_str(ChatType.PRIVATE)
+
+    def ensure_owner_dm(self, message: IncomingMessage) -> str | None:
+        notes = get_content().bot.notes
+        if not self._required_user_id:
+            return self._messages.required_user_not_configured.strip()
+        if not self.is_private_chat(message):
+            return notes.owner_dm_only.strip()
+        if message.sender_telegram_id != self._required_user_id:
+            return notes.owner_only.strip()
+        return None

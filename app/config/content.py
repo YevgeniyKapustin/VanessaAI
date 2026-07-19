@@ -110,10 +110,20 @@ class BotAccessMessages(BaseModel):
     required_user_not_configured: str
 
 
+class BotNotesMessages(BaseModel):
+    owner_dm_only: str
+    owner_only: str
+    not_configured: str
+    empty: str
+    success: str
+    error: str
+
+
 class BotMessagesContent(BaseModel):
     welcome: str
     error_api: str
     access: BotAccessMessages
+    notes: BotNotesMessages
 
 
 class DecisionContent(BaseModel):

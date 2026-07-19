@@ -58,3 +58,32 @@ async def test_group_with_required_user_allowed():
     error = await guard.ensure_access(incoming)
 
     assert error is None
+
+
+def test_owner_dm_allowed():
+    guard = ChatAccessGuard(required_user_telegram_id=42)
+    incoming = make_incoming(chat_type=ChatType.PRIVATE)
+
+    error = guard.ensure_owner_dm(incoming)
+
+    assert error is None
+
+
+def test_owner_dm_rejects_group():
+    guard = ChatAccessGuard(required_user_telegram_id=42)
+    incoming = make_incoming(chat_type=ChatType.GROUP)
+    texts = get_content().bot.notes
+
+    error = guard.ensure_owner_dm(incoming)
+
+    assert error == texts.owner_dm_only.strip()
+
+
+def test_owner_dm_rejects_other_user():
+    guard = ChatAccessGuard(required_user_telegram_id=999)
+    incoming = make_incoming(chat_type=ChatType.PRIVATE)
+    texts = get_content().bot.notes
+
+    error = guard.ensure_owner_dm(incoming)
+
+    assert error == texts.owner_only.strip()

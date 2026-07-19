@@ -82,6 +82,15 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    obsidian_vault_path: str = ""
+    obsidian_notes_subdir: str = "telegram"
+    obsidian_attachments_subdir: str = "attachments"
+    obsidian_git_enabled: bool = True
+    obsidian_git_remote: str = "origin"
+    obsidian_git_branch: str = ""
+    obsidian_git_user_name: str = "VanessaAI Bot"
+    obsidian_git_user_email: str = "bot@vanessa.local"
+
     @property
     def planner_model(self) -> str:
         if self.anthropic_planner_model.strip():

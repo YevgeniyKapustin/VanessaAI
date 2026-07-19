@@ -11,6 +11,19 @@ bot:
       где присутствует мой хозяин.
     required_user_not_configured: |
       Я не настроена: не указан ID моего хозяина.
+  notes:
+    owner_dm_only: |
+      /note работает только в личке со мной
+    owner_only: |
+      Эта команда только для хозяина
+    not_configured: |
+      Vault не настроен: укажи OBSIDIAN_VAULT_PATH
+    empty: |
+      Напиши текст после /note или прикрепи фото
+    success: |
+      Заметка сохранена: {filename}
+    error: |
+      Не удалось сохранить заметку: {detail}
 
 persona:
   identity: |

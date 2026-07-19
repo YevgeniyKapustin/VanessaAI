@@ -84,6 +84,8 @@ services:
     volumes:
       - ./app:/app/app
       - ./config:/app/config
+      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
+      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
 
 volumes:
   postgres_data:

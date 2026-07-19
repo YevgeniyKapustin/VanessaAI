@@ -16,7 +16,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gcc \
+    git \
     libpq-dev \
+    openssh-client \
     && curl -sSL https://install.python-poetry.org | python3 - \
     && rm -rf /var/lib/apt/lists/*
 

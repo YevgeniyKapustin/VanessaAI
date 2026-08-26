@@ -13,9 +13,25 @@ logger = logging.getLogger(__name__)
 class StickerService:
     """Glue between the Telegram handler, the catalog and the anti-spam decider."""
 
-    def __init__(self, catalog: StickerCatalog, decider: StickerDecider) -> None:
+    def __init__(
+        self,
+        catalog: StickerCatalog,
+        decider: StickerDecider,
+        sticker_only_tags: tuple[str, ...] = (),
+    ) -> None:
         self._catalog = catalog
         self._decider = decider
+        self._sticker_only_tags = frozenset(
+            tag.lower() for tag in sticker_only_tags
+        )
+
+    def is_sticker_only(self, tag: str | None) -> bool:
+        """True when the tag is sent as a bare sticker, no text reply.
+
+        The sticker image itself carries the message (e.g. bemused 😐 has a
+        caption on it), so the handler suppresses the accompanying text.
+        """
+        return bool(tag) and tag.lower() in self._sticker_only_tags
 
     async def resolve_file_ids(self, bot) -> None:
         await resolve_file_ids(self._catalog, bot)

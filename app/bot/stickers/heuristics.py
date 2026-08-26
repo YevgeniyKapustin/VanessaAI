@@ -31,11 +31,22 @@ _APPROVAL = re.compile(
 # Explicit user requests to send a sticker. When matched the sticker gate is
 # bypassed entirely (no probability roll, no cooldown) — a direct request must
 # always be honoured.
+#
+# Allowed verbs include «отправь/отправить/отправляй» (the most natural Russian
+# way to say "send a sticker") alongside the imperative forms. Between the verb
+# and the sticker word an optional «мне» and/or a polite particle («пожалуйста»,
+# «плиз») are allowed: «отправь стикер», «отправь мне наклейку»,
+# «кинь плиз стикер», «скинь пожалуйста стикер», «стикер отправь».
+_STICKER_VERBS = (
+    r"кинь|скинь|дай|сбрось|пришли|покажи|кидай|брось|дропни"
+    r"|отправь|отправить|отправляй|шли|шлёшь|шлите"
+)
 _STICKER_REQUEST = re.compile(
-    r"\b(кинь|скинь|дай|сбрось|пришли|покажи|кидай|брось|дропни|шл(и|ёшь))\s+"
-    r"(мне\s+)?(стикер|стик|наклейку)\b"
-    r"|\b(стикер|стик)\s+(кинь|скинь|дай|сбрось|пришли|кидай|брось)\b"
-    r"|send\s+(me\s+)?a\s+sticker\b",
+    rf"\b(?:{_STICKER_VERBS})\s+(?:мне\s+)?(?:пожалуйста\s+|плиз\s+)?"
+    r"(?:стикер|стик|наклейку)\b"
+    rf"|\b(?:стикер|стик|наклейку)\s+(?:мне\s+)?(?:пожалуйста\s+|плиз\s+)?"
+    rf"(?:{_STICKER_VERBS})\b"
+    r"|send\s+(?:me\s+)?a\s+sticker\b",
     re.IGNORECASE,
 )
 

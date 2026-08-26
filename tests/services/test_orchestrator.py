@@ -36,6 +36,10 @@ class FakeMessageRepo:
         qdrant_point_id: str | None = None,
         created_at=None,
         telegram_message_id: int | None = None,
+        reply_to_message_id: int | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> StoredMessage:
         message = StoredMessage(
             id=self._next_id,
@@ -44,6 +48,10 @@ class FakeMessageRepo:
             sender_telegram_id=sender_telegram_id,
             qdrant_point_id=qdrant_point_id,
             telegram_message_id=telegram_message_id,
+            reply_to_message_id=reply_to_message_id,
+            reply_to_text=reply_to_text,
+            reply_to_sender_telegram_id=reply_to_sender_telegram_id,
+            reply_to_sender_name=reply_to_sender_name,
         )
         self._messages[message.id] = message
         self._next_id += 1
@@ -177,6 +185,9 @@ class FakeLLM:
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> str:
         self.last_metrics_block = metrics_block
         self.last_humor_quotes = humor_quotes
@@ -186,6 +197,9 @@ class FakeLLM:
         self.last_sender_name = sender_name
         self.last_critic_feedback = critic_feedback
         self.last_tone = tone
+        self.last_reply_to_text = reply_to_text
+        self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
+        self.last_reply_to_sender_name = reply_to_sender_name
         return f"echo: {user_message}"
 
 
@@ -511,3 +525,43 @@ async def test_orchestrator_extracts_sticker_tag_from_reply():
     stored = [m for m in messages._messages.values() if m.role == "assistant"]
     assert len(stored) == 1
     assert stored[0].content == "Успех!"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_passes_reply_context_to_llm():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    llm = FakeLLM()
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=FakeDecisionEngine(DecisionAction.REPLY),
+        llm=llm,
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="а я про то и говорю",
+            sender_telegram_id=42,
+            reply_to_message_id=555,
+            reply_to_sender_telegram_id=99,
+            reply_to_text="Личь не делает карты",
+            reply_to_sender_name="Личь",
+        )
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert llm.last_reply_to_sender_telegram_id == 99
+    assert llm.last_reply_to_text == "Личь не делает карты"
+    assert llm.last_reply_to_sender_name == "Личь"
+
+    # the reply context is persisted on the stored user message so the next
+    # turn can render it inside the recent/session block
+    user_stored = [m for m in messages._messages.values() if m.role == "user"]
+    assert len(user_stored) == 1
+    assert user_stored[0].reply_to_message_id == 555
+    assert user_stored[0].reply_to_text == "Личь не делает карты"
+    assert user_stored[0].reply_to_sender_telegram_id == 99
+    assert user_stored[0].reply_to_sender_name == "Личь"

@@ -65,6 +65,10 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             role="user",
             content=turn.message,
             sender_telegram_id=turn.sender_telegram_id,
+            reply_to_message_id=turn.reply_to_message_id,
+            reply_to_text=turn.reply_to_text,
+            reply_to_sender_telegram_id=turn.reply_to_sender_telegram_id,
+            reply_to_sender_name=turn.reply_to_sender_name,
         )
 
         ctx.session = await load_chat_session_state(

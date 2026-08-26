@@ -37,6 +37,31 @@ def test_prompt_builder_builds_user_prompt():
     assert "[user:Евгений] Привет" in prompt
 
 
+def test_prompt_builder_includes_reply_context():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "а я про то и говорю",
+        [],
+        reply_to_text="Личь не делает карты",
+        reply_to_sender_telegram_id=99,
+        reply_to_sender_name="Личь",
+    )
+
+    content = get_content()
+    assert content.llm.reply_message_header.strip() in prompt
+    assert "[Личь] Личь не делает карты" in prompt
+    # the reply block appears before the current message line
+    assert prompt.index(content.llm.reply_message_header) < prompt.index(
+        content.llm.current_message_header
+    )
+
+
+def test_prompt_builder_omits_reply_context_when_absent():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [])
+    assert get_content().llm.reply_message_header.strip() not in prompt
+
+
 def test_prompt_builder_includes_humor_quotes_block():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt(

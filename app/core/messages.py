@@ -13,6 +13,10 @@ class ContextMessage:
     sender_name: str | None = None
     created_at: datetime | None = None
     is_anchor: bool = False
+    reply_to_message_id: int | None = None
+    reply_to_text: str | None = None
+    reply_to_sender_telegram_id: int | None = None
+    reply_to_sender_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +35,10 @@ class StoredMessage:
     telegram_message_id: int | None = None
     sender_name: str | None = None
     created_at: datetime | None = None
+    reply_to_message_id: int | None = None
+    reply_to_text: str | None = None
+    reply_to_sender_telegram_id: int | None = None
+    reply_to_sender_name: str | None = None
 
 
 def stored_to_context(
@@ -46,6 +54,10 @@ def stored_to_context(
         sender_name=message.sender_name,
         created_at=message.created_at,
         is_anchor=is_anchor,
+        reply_to_message_id=message.reply_to_message_id,
+        reply_to_text=message.reply_to_text,
+        reply_to_sender_telegram_id=message.reply_to_sender_telegram_id,
+        reply_to_sender_name=message.reply_to_sender_name,
     )
 
 

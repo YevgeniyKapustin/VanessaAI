@@ -1,7 +1,8 @@
 vector_min_score: 0.35
 turn_planner_prompt: |
   ## Task
-  Step 1 before the bot replies: plan the search over the group chat history.
+  Step 1 before the bot replies: plan the search over the group chat history and
+  Vanessa's semantic archive (People dossiers, Lore events, Culture, Logs).
 
   ## Input
   Message:
@@ -12,6 +13,10 @@ turn_planner_prompt: |
 
   Participant nicknames:
   {nicknames}
+
+  Participant summaries (what Vanessa knows about each person — mood, recent
+  facts, habits; use them to disambiguate and to compose the search query):
+  {participants}
 
   Telegram signals:
   - reply to the bot: {reply_to_bot}
@@ -77,10 +82,18 @@ turn_planner_prompt: |
   - if the bot just answered on the topic — a dialogue continuation → often true.
 
   ## search_query
-  1–8 words for searching facts:
-  - a short message — restore the topic from the recent correspondence;
+  A 1–10 word semantic query for embedding search over the archive and history.
+  The query is matched BY MEANING, not verbatim, so compose it to express the
+  underlying topic using the vocabulary that appears in the archive:
+
+  - keep the concrete entities: participant nicknames/aliases (e.g. «личь», not
+    «он»), game/film titles, real names, places, distinct topics;
   - a participant's nickname — search as a person («Тик так», not TikTok);
-  - remove addresses to the bot, greetings, junk;
+  - use the Participant summaries: if a fact there mentions a game, a habit or a
+    running joke, reuse those exact words so the search hits that note;
+  - replace pronouns and vague wording with the concrete subject from the message
+    or recent context («про то самое» → «меш текстуры unity»);
+  - remove addresses to the bot, greetings, filler, «подскажи/расскажи»;
   - skip=true for «ок», emoticons, goodbyes without a question.
 
   ## humor_ok / humor_query
@@ -95,76 +108,94 @@ turn_planner_prompt: |
   topics, «как было с X и Y», technical analysis). false — a regular short query.
 
   ## knowledge_indexes / knowledge_query
-  When my own archive is needed (structured memory, NOT message history):
+  The semantic archive (structured memory Vanessa maintains, NOT raw message
+  history) is the primary source when the question is about people, local lore,
+  recommendations or logs:
   - people — about a participant: nickname, who they are, habits, mood («что там у Лича»);
   - lore — internal memes, local jokes, old events («что было про Макса и утку»);
   - culture — recommendations: movies/games/music;
   - logs — how the week/day went.
-  knowledge_query: 1–6 words for the archive search.
+  knowledge_query: 2–8 words for the archive search; compose it semantically too
+  (entities + topic, words from the summaries), e.g. «личь сварщик игра»,
+  «конфликт зонов опоздания». If no specific archive is needed, still consider
+  setting knowledge_indexes=["people","lore"] when the message names a participant
+  or a local meme — the semantic archive gives a much better match than raw history.
   Without an explicit need — knowledge_indexes=[] and knowledge_query="".
 
   ## Examples (input → JSON)
 
   «Ванесса, привет» | reply=yes, mention=yes
-  → {"should_reply": true, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": true, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «ок» | side chat
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «Личь не делает карты по героям» | reply to another, not the bot
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «видите, гомункул работает» | listen_window=yes, between people
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «почему она меня игнорирует» | about the bot, without ты/ванесса
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «хватит уже» | dismissal
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «да всё сгинь» / «уйди, закрой сессию» | dismissal
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «она плохо понимает когда ты монолог ведёшь» | about the bot, not to her
-  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}}
 
   «что думаете про тик така» | question to the group, not the bot
-  → {"should_reply": false, "search_query": "тик так", "skip": false,
-  "humor_ok": false, "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "тик так", "skip": false,
+  "knowledge_indexes": ["people"], "knowledge_query": "тик так",
+  "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «Ванесса, кто такой Тик так» | reply=yes
-  → {"should_reply": true, "search_query": "тик так", "skip": false,
-  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}
+  → {{"should_reply": true, "search_query": "тик так", "skip": false,
+  "tone": "neutral", "knowledge_indexes": ["people"], "knowledge_query": "тик так",
+  "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «где там» | context: discussing a file on the disk
-  → {"should_reply": true, "search_query": "файл диск", "skip": false,
-  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}
+  → {{"should_reply": true, "search_query": "файл диск", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «ну ладно поработаю» | light tone
-  → {"should_reply": true, "search_query": "работа", "skip": false,
-  "tone": "ironic", "humor_ok": true, "humor_query": "Личь работа", "deep_search": false}
+  → {{"should_reply": true, "search_query": "работа", "skip": false,
+  "tone": "ironic", "humor_ok": true, "humor_query": "Личь работа", "deep_search": false}}
 
   «сравни как мы чинили меш и текстуры в unity»
-  → {"should_reply": true, "search_query": "меш текстуры unity", "skip": false,
-  "humor_ok": false, "humor_query": "", "deep_search": true}
+  → {{"should_reply": true, "search_query": "меш текстуры unity", "skip": false,
+  "humor_ok": false, "humor_query": "", "deep_search": true}}
+
+  «что там у Лича с работой» | participant + habit from his summary
+  → {{"should_reply": true, "search_query": "личь работа сварщик", "skip": false,
+  "tone": "neutral", "knowledge_indexes": ["people"], "knowledge_query": "личь работа",
+  "humor_ok": false, "humor_query": "", "deep_search": false}}
+
+  «помнишь конфликт из-за опозданий» | local event, semantic archive
+  → {{"should_reply": true, "search_query": "опоздания игровая катка", "skip": false,
+  "tone": "neutral", "knowledge_indexes": ["lore"], "knowledge_query": "конфликт зонов опоздания",
+  "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «продолжай список гомункул» | listen_window=yes, nickname instead of the name
-  → {"should_reply": true, "search_query": "список", "skip": false,
-  "humor_ok": false, "humor_query": "", "deep_search": false}
+  → {{"should_reply": true, "search_query": "список", "skip": false,
+  "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «Котгаст, ты уже третий круг...» | reply=yes, verbatim quote of the bot's reply
-  → {"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
-  "humor_ok": false, "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «ванесса, а что там с починкой unity» | already asked and answered above
-  → {"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
-  "humor_ok": false, "humor_query": "", "deep_search": false}
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false}}

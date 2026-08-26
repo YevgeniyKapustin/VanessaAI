@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
     qdrant_collection: str = "messages"
+    # Dedicated collection for the semantic knowledge vault notes (People/Lore/
+    # Culture/Logs) — the primary embedding search source; raw messages stay in
+    # qdrant_collection as a fallback.
+    qdrant_knowledge_collection: str = "knowledge"
 
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dimensions: int = 384
@@ -99,6 +103,16 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # File logging — persist logs to disk with rotation (one file per service:
+    # api.log / bot.log / import.log / preflight.log). Set LOG_FILE_ENABLED=false
+    # to keep console-only logging.
+    log_dir: str = "logs"
+    log_file_enabled: bool = True
+    log_file_max_bytes: int = 5_242_880  # 5 MiB per file before rotation
+    log_file_backup_count: int = 5
+    # Optional; empty string falls back to LOG_LEVEL.
+    log_file_level: str = ""
+
     obsidian_vault_path: str = ""
     obsidian_notes_subdir: str = "telegram"
     obsidian_attachments_subdir: str = "attachments"
@@ -122,6 +136,14 @@ class Settings(BaseSettings):
     knowledge_sweep_window_size: int = 40
     knowledge_sweep_window_overlap: int = 10
     knowledge_sweep_poll_seconds: int = 60
+
+    # Semantic vector search over the knowledge vault (Qdrant "knowledge").
+    knowledge_vector_top_k: int = 10
+    knowledge_vector_min_score: float = 0.3
+
+    # Participants digest injected into the query-composition prompt.
+    knowledge_participant_max_people: int = 20
+    knowledge_participant_max_facts: int = 5
 
     # Mood & relationship metrics (knowledge vault).
     knowledge_metrics_enabled: bool = True

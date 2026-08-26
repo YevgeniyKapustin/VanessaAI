@@ -41,6 +41,38 @@ def _service() -> tuple[StickerService, StickerDecider]:
     return StickerService(catalog, decider), decider
 
 
+def test_is_sticker_only():
+    catalog = StickerCatalog(
+        set_name="test",
+        stickers=[
+            StickerDef(
+                name="bemused",
+                tags=("bemused",),
+                resolved_file_id="f:bemused",
+            ),
+        ],
+    )
+    service = StickerService(
+        catalog,
+        StickerDecider(catalog),
+        sticker_only_tags=("bemused", "weary"),
+    )
+    assert service.is_sticker_only("bemused") is True
+    assert service.is_sticker_only("BEMUSED") is True
+    assert service.is_sticker_only("delight") is False
+    assert service.is_sticker_only(None) is False
+    assert service.is_sticker_only("") is False
+
+
+def test_is_sticker_only_default_empty():
+    catalog = StickerCatalog(
+        set_name="test",
+        stickers=[StickerDef(name="bemused", tags=("bemused",))],
+    )
+    service = StickerService(catalog, StickerDecider(catalog))
+    assert service.is_sticker_only("bemused") is False
+
+
 @pytest.mark.asyncio
 async def test_send_if_any_sends_sticker():
     message = make_telegram_message()

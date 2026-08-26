@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 
 from qdrant_client import AsyncQdrantClient
@@ -13,7 +14,7 @@ from qdrant_client.models import (
 )
 
 from app.config import settings
-from app.core.protocols import VectorSearchHit
+from app.core.protocols import KnowledgeVectorHit, VectorSearchHit
 
 
 class QdrantVectorStore:
@@ -125,3 +126,136 @@ class QdrantVectorStore:
             for hit in response.points
             if hit.payload
         ]
+
+
+class KnowledgeQdrantStore:
+    """Vector store for the semantic knowledge vault notes.
+
+    A separate Qdrant collection holds one point per vault note, keyed by the
+    note's vault-relative path (deterministic point id). Re-embedding a note
+    after a memory write overwrites its point in place, so the index never
+    accumulates stale vectors for renamed/merged cards.
+    """
+
+    def __init__(
+        self,
+        client: AsyncQdrantClient | None = None,
+        collection: str | None = None,
+        vector_size: int | None = None,
+    ) -> None:
+        self._client = client or AsyncQdrantClient(url=settings.qdrant_url)
+        self._collection = collection or settings.qdrant_knowledge_collection
+        self._vector_size = vector_size or settings.embedding_dimensions
+
+    @staticmethod
+    def point_id(path: str) -> str:
+        return "k:" + hashlib.sha256(path.encode("utf-8")).hexdigest()
+
+    async def reset(self) -> None:
+        """Drop the whole collection (used by a full reindex)."""
+        await self._client.delete_collection(self._collection)
+
+    async def ensure_collection(self) -> None:
+        collections = await self._client.get_collections()
+        names = {collection.name for collection in collections.collections}
+        if self._collection in names:
+            return
+        await self._client.create_collection(
+            collection_name=self._collection,
+            vectors_config=VectorParams(
+                size=self._vector_size,
+                distance=Distance.COSINE,
+                on_disk=settings.qdrant_on_disk,
+            ),
+            optimizers_config=OptimizersConfigDiff(
+                indexing_threshold=settings.qdrant_indexing_threshold,
+            ),
+            hnsw_config=HnswConfigDiff(
+                m=settings.qdrant_hnsw_m,
+                ef_construct=settings.qdrant_hnsw_ef_construct,
+                on_disk=settings.qdrant_on_disk,
+            ),
+            **(
+                {
+                    "quantization_config": ScalarQuantization(
+                        scalar=ScalarQuantizationConfig(
+                            type=ScalarType.INT8,
+                            always_ram=False,
+                        ),
+                    )
+                }
+                if settings.qdrant_quantization_enabled
+                else {}
+            ),
+        )
+
+    async def upsert_note(
+        self,
+        path: str,
+        kind: str,
+        title: str,
+        vector: list[float],
+    ) -> str:
+        pid = self.point_id(path)
+        await self._client.upsert(
+            collection_name=self._collection,
+            points=[
+                PointStruct(
+                    id=pid,
+                    vector=vector,
+                    payload={"path": path, "kind": kind, "title": title},
+                )
+            ],
+        )
+        return pid
+
+    async def upsert_notes(
+        self,
+        items: list[tuple[str, str, str, list[float]]],
+    ) -> list[str]:
+        points: list[PointStruct] = []
+        point_ids: list[str] = []
+        for path, kind, title, vector in items:
+            pid = self.point_id(path)
+            point_ids.append(pid)
+            points.append(
+                PointStruct(
+                    id=pid,
+                    vector=vector,
+                    payload={"path": path, "kind": kind, "title": title},
+                )
+            )
+        if not points:
+            return []
+        await self._client.upsert(
+            collection_name=self._collection,
+            points=points,
+        )
+        return point_ids
+
+    async def search(
+        self,
+        vector: list[float],
+        limit: int = 30,
+    ) -> list[KnowledgeVectorHit]:
+        response = await self._client.query_points(
+            collection_name=self._collection,
+            query=vector,
+            limit=limit,
+            with_payload=True,
+        )
+        hits: list[KnowledgeVectorHit] = []
+        for hit in response.points:
+            payload = hit.payload or {}
+            path = payload.get("path")
+            if not path:
+                continue
+            hits.append(
+                KnowledgeVectorHit(
+                    path=str(path),
+                    kind=str(payload.get("kind") or ""),
+                    title=str(payload.get("title") or ""),
+                    score=hit.score,
+                )
+            )
+        return hits

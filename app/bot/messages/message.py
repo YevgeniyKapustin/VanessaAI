@@ -29,6 +29,9 @@ class IncomingMessage:
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
     reply_to_sender_telegram_id: int | None = None
+    reply_to_message_id: int | None = None
+    reply_to_text: str | None = None
+    reply_to_sender_name: str | None = None
 
     @classmethod
     def from_telegram(cls, message: TelegramMessage) -> "IncomingMessage":
@@ -50,6 +53,9 @@ class IncomingMessage:
             reply_to_bot=addressing.reply_to_bot,
             reply_to_other_user=addressing.reply_to_other_user,
             reply_to_sender_telegram_id=addressing.reply_to_sender_telegram_id,
+            reply_to_message_id=addressing.reply_to_message_id,
+            reply_to_text=addressing.reply_to_text,
+            reply_to_sender_name=addressing.reply_to_sender_name,
         )
 
     def to_api_payload(self) -> dict[str, Any]:
@@ -66,6 +72,9 @@ class IncomingMessage:
             "reply_to_bot": self.reply_to_bot,
             "reply_to_other_user": self.reply_to_other_user,
             "reply_to_sender_telegram_id": self.reply_to_sender_telegram_id,
+            "reply_to_message_id": self.reply_to_message_id,
+            "reply_to_text": self.reply_to_text,
+            "reply_to_sender_name": self.reply_to_sender_name,
         }
 
     @property

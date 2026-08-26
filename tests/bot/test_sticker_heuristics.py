@@ -46,6 +46,32 @@ def test_is_sticker_request_matches_russian_phrases():
         assert is_sticker_request(text), text
 
 
+def test_is_sticker_request_matches_otprav_variants():
+    for text in (
+        "отправь стикер",
+        "отправить стикер",
+        "отправь наклейку",
+        "отправь мне стикер",
+        "отправь пожалуйста стикер",
+        "ванесса, отправь стикер",
+        "стикер отправь",
+        "наклейку отправь",
+        "отправляй стикер",
+    ):
+        assert is_sticker_request(text), text
+
+
+def test_is_sticker_request_matches_polite_particle_variants():
+    for text in (
+        "кинь плиз стикер",
+        "скинь пожалуйста стикер",
+        "дай плиз наклейку",
+        "кинь мне плиз стикер",
+        "отправь плиз стикер",
+    ):
+        assert is_sticker_request(text), text
+
+
 def test_is_sticker_request_matches_english():
     assert is_sticker_request("send me a sticker")
     assert is_sticker_request("send a sticker please")

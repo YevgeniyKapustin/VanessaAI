@@ -56,6 +56,28 @@ def test_to_api_payload_contains_chat_context():
     assert payload["sender_telegram_id"] == 42
 
 
+def test_to_api_payload_contains_reply_context():
+    message = make_telegram_message()
+    reply = MagicMock()
+    reply.message_id = 555
+    reply.text = "Личь не делает карты"
+    reply.caption = None
+    reply.sticker = None
+    reply.from_user.id = 99
+    reply.from_user.username = "lich"
+    reply.from_user.first_name = None
+    reply.from_user.last_name = None
+    message.reply_to_message = reply
+
+    incoming = IncomingMessage.from_telegram(message)
+    payload = incoming.to_api_payload()
+
+    assert payload["reply_to_message_id"] == 555
+    assert payload["reply_to_text"] == "Личь не делает карты"
+    assert payload["reply_to_sender_name"] == "lich"
+    assert payload["reply_to_other_user"] is True
+
+
 def test_is_text_false_for_empty_message():
     incoming = IncomingMessage.from_telegram(make_telegram_message(text="  "))
 

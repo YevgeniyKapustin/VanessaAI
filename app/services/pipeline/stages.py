@@ -187,12 +187,41 @@ class RetrieveStage:
             embed_started = time.perf_counter()
             ctx.embed_ms = (time.perf_counter() - embed_started) * 1000
 
+        # Semantic archive (People/Lore/Culture/Logs) is the primary RAG source —
+        # those notes are already semantic summaries, unlike raw message history.
+        semantic_query = self._semantic_query(ctx.turn_plan, ctx.turn.message)
+        semantic_started = time.perf_counter()
+        semantic_found = False
+        if self._knowledge is not None:
+            try:
+                ctx.knowledge_blocks = await self._knowledge.fetch_semantic(
+                    semantic_query,
+                    knowledge_indexes=ctx.turn_plan.knowledge_indexes,
+                    knowledge_query=ctx.turn_plan.knowledge_query,
+                    humor_ok=ctx.turn_plan.humor_ok,
+                    humor_query=ctx.turn_plan.humor_query,
+                    user_message=ctx.turn.message,
+                )
+            except Exception:
+                # Fail-open: a semantic-search failure (e.g. Qdrant down) must
+                # never block the turn — fall back to raw-message RAG.
+                logger.exception(
+                    "semantic_search_failed query=%r, using raw RAG fallback",
+                    semantic_query,
+                )
+                ctx.knowledge_blocks = []
+            semantic_found = bool(ctx.knowledge_blocks)
+        ctx.semantic_ms = (time.perf_counter() - semantic_started) * 1000
+
         rag_started = time.perf_counter()
-        ctx.context_blocks = await retrieve_with_react(
-            self._retriever,
-            ctx.turn.message,
-            ctx.turn_plan,
-        )
+        # Raw-message history is only a fallback: run it when the archive had
+        # nothing relevant, or as an extra pass for deep multi-step searches.
+        if not semantic_found or ctx.turn_plan.deep_search:
+            ctx.context_blocks = await retrieve_with_react(
+                self._retriever,
+                ctx.turn.message,
+                ctx.turn_plan,
+            )
         ctx.rag_ms = (time.perf_counter() - rag_started) * 1000
 
         humor_started = time.perf_counter()
@@ -210,15 +239,6 @@ class RetrieveStage:
                 ctx.turn_plan.humor_query,
                 len(ctx.humor_quotes),
                 ctx.humor_rag_ms,
-            )
-
-        if self._knowledge is not None and ctx.turn_plan is not None:
-            ctx.knowledge_blocks = await self._knowledge.fetch(
-                knowledge_indexes=ctx.turn_plan.knowledge_indexes,
-                knowledge_query=ctx.turn_plan.knowledge_query,
-                humor_ok=ctx.turn_plan.humor_ok,
-                humor_query=ctx.turn_plan.humor_query,
-                user_message=ctx.turn.message,
             )
 
         # Curated memes (hybrid): when the planner allows humor, a keyword match
@@ -243,17 +263,28 @@ class RetrieveStage:
                     self._meme_decider.register_meme(ctx.turn.telegram_chat_id)
 
         logger.info(
-            "turn_stage rag request_id=%s context=%s deep_search=%s "
-            "knowledge=%s meme_blocks=%s meme_menu=%s rag_ms=%.1f",
+            "turn_stage rag request_id=%s context=%s semantic_found=%s "
+            "deep_search=%s knowledge=%s meme_blocks=%s meme_menu=%s "
+            "semantic_ms=%.1f rag_ms=%.1f",
             get_request_id(),
             ctx.context_count,
+            semantic_found,
             ctx.turn_plan.deep_search,
             len(ctx.knowledge_blocks),
             len(ctx.meme_blocks),
             len(ctx.meme_menu),
+            ctx.semantic_ms,
             ctx.rag_ms,
         )
         return True
+
+    @staticmethod
+    def _semantic_query(turn_plan, message: str) -> str:
+        """Prefer the composed archive query, then the embedding query, then raw."""
+        for candidate in (turn_plan.knowledge_query, turn_plan.text):
+            if candidate and candidate.strip():
+                return candidate.strip()
+        return message.strip()
 
 
 class ComposeStage:
@@ -282,6 +313,9 @@ class ComposeStage:
             sender_telegram_id=ctx.turn.sender_telegram_id,
             sender_name=ctx.sender_name,
             tone=ctx.turn_plan.tone,
+            reply_to_text=ctx.turn.reply_to_text,
+            reply_to_sender_telegram_id=ctx.turn.reply_to_sender_telegram_id,
+            reply_to_sender_name=ctx.turn.reply_to_sender_name,
         )
         ctx.llm_ms = (time.perf_counter() - llm_started) * 1000
         logger.info(

@@ -90,3 +90,48 @@ async def test_llm_failure_uses_fallback():
 
     assert result.text == "расскажи про крабера"
     assert result.skip_search is False
+
+
+class _FakeCompleter:
+    def __init__(self) -> None:
+        self.prompt: str | None = None
+
+    async def complete(self, model, messages, **kwargs):
+        self.prompt = messages[0]["content"]
+        return '{"search_query": "личь сварщик", "skip": false, "humor_ok": false, "humor_query": ""}'
+
+
+@pytest.mark.asyncio
+async def test_llm_prompt_includes_participants():
+    async def provider() -> str:
+        return "Личь — сварщик, играет в ХСР. Крабер — любит пещеры."
+
+    client = _FakeCompleter()
+    rewriter = QueryRewriter(
+        use_llm=True,
+        llm_client=client,
+        participants_provider=provider,
+    )
+
+    await rewriter.prepare("что там у Лича с работой")
+
+    assert client.prompt is not None
+    assert "Личь — сварщик" in client.prompt
+
+
+@pytest.mark.asyncio
+async def test_llm_prompt_participants_failure_uses_placeholder():
+    async def provider() -> str:
+        raise RuntimeError("vault down")
+
+    client = _FakeCompleter()
+    rewriter = QueryRewriter(
+        use_llm=True,
+        llm_client=client,
+        participants_provider=provider,
+    )
+
+    result = await rewriter.prepare("расскажи про крабера")
+
+    assert result.text == "личь сварщик"
+    assert "(нет данных)" in client.prompt

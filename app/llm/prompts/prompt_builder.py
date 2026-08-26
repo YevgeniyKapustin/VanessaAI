@@ -69,6 +69,9 @@ class PromptBuilder:
         sender_name: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> str:
         llm = self._content.llm
         if context_blocks:
@@ -129,6 +132,16 @@ class PromptBuilder:
         )
         if session_text:
             parts.append(f"{llm.session_header}\n{session_text}")
+        if reply_to_text:
+            reply_sender = resolve_sender_display_name(
+                reply_to_sender_telegram_id,
+                reply_to_sender_name,
+            )
+            reply_line = llm.reply_message_line.format(
+                sender=reply_sender,
+                content=reply_to_text,
+            )
+            parts.append(f"{llm.reply_message_header}\n{reply_line}")
         current_line = self.format_current_message(
             user_message,
             sender_telegram_id=sender_telegram_id,

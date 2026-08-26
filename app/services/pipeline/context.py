@@ -38,6 +38,7 @@ class TurnPipelineContext:
     plan_ms: float = 0.0
     decision_ms: float = 0.0
     rag_ms: float = 0.0
+    semantic_ms: float = 0.0
     humor_rag_ms: float = 0.0
     llm_ms: float = 0.0
     embed_ms: float = 0.0

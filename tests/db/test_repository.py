@@ -96,6 +96,39 @@ async def test_message_create_assigns_id_and_updates_fts():
 
 
 @pytest.mark.asyncio
+async def test_message_create_persists_reply_context():
+    session = AsyncMock()
+    session.execute = AsyncMock()
+
+    async def flush() -> None:
+        for call in session.add.call_args_list:
+            message = call.args[0]
+            if isinstance(message, Message):
+                message.id = 11
+
+    session.flush = AsyncMock(side_effect=flush)
+    repo = MessageRepository(session)
+    stored = await repo.create(
+        role=RAG_SOURCE_ROLE,
+        content="а я про то и говорю",
+        sender_telegram_id=1,
+        reply_to_message_id=555,
+        reply_to_text="Личь не делает карты",
+        reply_to_sender_telegram_id=99,
+        reply_to_sender_name="Личь",
+    )
+    assert stored.id == 11
+    added = session.add.call_args.args[0]
+    assert isinstance(added, Message)
+    assert added.reply_to_message_id == 555
+    assert added.reply_to_text == "Личь не делает карты"
+    assert added.reply_to_sender_telegram_id == 99
+    assert added.reply_to_sender_name == "Личь"
+    assert stored.reply_to_text == "Личь не делает карты"
+    assert stored.reply_to_sender_name == "Личь"
+
+
+@pytest.mark.asyncio
 async def test_message_get_existing_ids_empty():
     session = AsyncMock()
     repo = MessageRepository(session)

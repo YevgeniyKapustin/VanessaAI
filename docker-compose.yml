@@ -71,6 +71,7 @@ services:
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
       - ./knowledge:/app/knowledge
+      - ./data/logs:/app/logs
       - huggingface_cache:/app/.cache/huggingface
 
   bot:
@@ -86,6 +87,7 @@ services:
       - ./app:/app/app
       - ./config:/app/config
       - ./knowledge:/app/knowledge
+      - ./data/logs:/app/logs
       - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
       - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
 

@@ -33,5 +33,9 @@ def create_bot_services() -> BotServices:
         access_guard=ChatAccessGuard(),
         knowledge=KnowledgeVault(),
         texts=content.bot,
-        stickers=StickerService(catalog, decider),
+        stickers=StickerService(
+            catalog,
+            decider,
+            sticker_only_tags=tuple(stickers_config.sticker_only_tags),
+        ),
     )

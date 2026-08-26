@@ -98,6 +98,32 @@ def create_messages_router(services: BotServices) -> Router:
             )
             return
 
+        sticker_only = (
+            services.stickers is not None
+            and services.stickers.is_sticker_only(result.sticker_tag)
+        )
+        if sticker_only:
+            # The sticker itself is the whole reply — it already carries a caption
+            # on the image, so no text accompanies it. Send it forced: the sticker
+            # IS the reply, the anti-spam gate must not swallow the only thing we
+            # send. If the sticker can't be sent, fall back to the text answer.
+            services.stickers.register_reply(incoming.telegram_chat_id)
+            sent = await services.stickers.send_if_any(
+                telegram_message,
+                sticker_tag=result.sticker_tag,
+                reply_text=None,
+                force=True,
+            )
+            logger.info(
+                "sticker_only chat_id=%s tag=%s sent=%s",
+                incoming.telegram_chat_id,
+                result.sticker_tag,
+                sent,
+            )
+            if sent is None:
+                await _send_reply(telegram_message, result.reply)
+            return
+
         await telegram_message.bot.send_chat_action(
             incoming.telegram_chat_id,
             "typing",

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import logging.handlers
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import ClassVar, Literal
 
 from app.core.request_context import get_request_id
@@ -135,6 +137,29 @@ def _enable_windows_ansi() -> None:
         return
 
 
+def create_file_handler(
+    service: ServiceName,
+    level: str,
+    log_dir: Path,
+    *,
+    max_bytes: int,
+    backup_count: int,
+) -> logging.Handler:
+    """Build a rotating file handler writing plain (uncolored) log lines."""
+    log_dir.mkdir(parents=True, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(
+        log_dir / f"{service}.log",
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    handler.setLevel(level)
+    handler.addFilter(RequestIdFilter())
+    handler.addFilter(ServiceNameFilter(service))
+    handler.setFormatter(LoguruStyleFormatter(colorize=False))
+    return handler
+
+
 def configure_logging(
     service: ServiceName,
     level: str | None = None,
@@ -156,6 +181,24 @@ def configure_logging(
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(log_level)
+
+    if settings.log_file_enabled:
+        file_level = (settings.log_file_level or settings.log_level).upper()
+        try:
+            root.addHandler(
+                create_file_handler(
+                    service,
+                    file_level,
+                    Path(settings.log_dir),
+                    max_bytes=settings.log_file_max_bytes,
+                    backup_count=settings.log_file_backup_count,
+                )
+            )
+        except OSError:
+            logging.getLogger(__name__).exception(
+                "failed to open log file at %s, continuing without file logging",
+                settings.log_dir,
+            )
 
     for logger_name in _NOISY_LOGGERS:
         logging.getLogger(logger_name).setLevel(logging.WARNING)

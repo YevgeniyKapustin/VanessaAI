@@ -4,6 +4,7 @@ import logging
 
 from fastapi import FastAPI
 
+from app.api.container import get_app_container
 from app.api.deps import create_embedding_provider, create_vector_store
 from app.api.middleware import register_request_id_middleware
 from app.api.routes import chat, health, metrics
@@ -19,6 +20,7 @@ from app.knowledge.metrics.planner import MetricsPlanner
 from app.knowledge.metrics.store import MetricsStore
 from app.knowledge.sweep import SweepAnalyzer, SweepWorker
 from app.knowledge.vault import KnowledgeVault
+from app.knowledge.vector_index import KnowledgeVectorIndexer
 from app.knowledge.writer import KnowledgeVaultWriter
 from app.rag.embeddings.local_embeddings import preload_embedding_model
 
@@ -35,10 +37,15 @@ async def lifespan(app: FastAPI):
     await create_vector_store().ensure_collection()
     vault = KnowledgeVault()
     await vault.ensure_structure()
+    vault_index = KnowledgeIndex(vault)
+    knowledge_vector_indexer = KnowledgeVectorIndexer(
+        vault,
+        create_embedding_provider(),
+        get_app_container().knowledge_vector_store,
+    )
 
     sweep_task: asyncio.Task | None = None
     if settings.knowledge_sweep_enabled:
-        vault_index = KnowledgeIndex(vault)
         metrics_pipeline = MetricsPipeline(
             MetricsStore(vault, vault_index),
             MetricsPlanner(),
@@ -50,7 +57,11 @@ async def lifespan(app: FastAPI):
         sweep = SweepAnalyzer(
             vault,
             MemoryPlanner(),
-            KnowledgeVaultWriter(vault, vault_index),
+            KnowledgeVaultWriter(
+                vault,
+                vault_index,
+                vector_indexer=knowledge_vector_indexer,
+            ),
             interval_messages=settings.knowledge_sweep_interval_messages,
             batch_size=settings.knowledge_sweep_batch_size,
             window_size=settings.knowledge_sweep_window_size,
@@ -66,6 +77,12 @@ async def lifespan(app: FastAPI):
 
     await asyncio.to_thread(preload_embedding_model)
     await create_embedding_provider().embed("warmup")
+    # Seed/refresh the semantic vault vector index once at startup (fail-open —
+    # a full reindex can be rerun via scripts/reindex_knowledge_vectors.py).
+    try:
+        await knowledge_vector_indexer.index_all()
+    except Exception:
+        logger.exception("knowledge_vector_index_all_failed at startup")
     yield
 
     if sweep_task is not None:

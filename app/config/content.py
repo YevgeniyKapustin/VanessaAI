@@ -118,9 +118,12 @@ class LLMContent(BaseModel):
     context_block_separator: str = "\n\n"
     current_message_header: str
     current_message_line: str = "[user:{sender}] {content}"
+    reply_message_header: str = "The user's message is a reply to this message:"
+    reply_message_line: str = "[{sender}] {content}"
     session_header: str = "Recent correspondence in the chat:"
     session_user_line: str = "{time} [user:{sender}] {content}"
     session_assistant_line: str = "{time} [assistant] {content}"
+    session_reply_line: str = "  ↳ reply to [{sender}]: {content}"
     anchor_marker: str = " ← matches the query"
     assistant_line: str = "{time} [assistant]{anchor} {content}"
     user_line: str = "{time} [user:{sender}]{anchor} {content}"
@@ -231,6 +234,7 @@ class StickerDefContent(BaseModel):
     file_id: str | None = None
     index: int | None = None
     emoji: str | None = None
+    description: str = ""
 
 
 class StickersContent(BaseModel):
@@ -251,6 +255,11 @@ class StickersContent(BaseModel):
     probability: float = Field(default=0.6, ge=0.0, le=1.0)
     heuristic_probability: float = Field(default=0.45, ge=0.0, le=1.0)
     min_messages_between: int = Field(default=3, ge=1, le=100)
+    # Tags whose sticker fully replaces the text reply: the bot sends ONLY the
+    # sticker because the image already carries the message (e.g. bemused 😐 has
+    # a caption on it). The anti-spam gate is bypassed for these — the sticker IS
+    # the reply.
+    sticker_only_tags: list[str] = Field(default_factory=list)
     stickers: list[StickerDefContent] = Field(default_factory=list)
 
     @property
@@ -265,8 +274,19 @@ class StickersContent(BaseModel):
             tags.update(tag.lower() for tag in sticker.tags)
         return tuple(sorted(tags))
 
+    def is_sticker_only(self, tag: str | None) -> bool:
+        """True when the tag should be sent as a bare sticker, no text reply."""
+        if not tag:
+            return False
+        lowered = tag.lower()
+        return any(lowered == candidate.lower() for candidate in self.sticker_only_tags)
+
     def tag_lines(self) -> list[str]:
-        """Human-readable tag list for the LLM prompt (tag + emoji hint)."""
+        """Human-readable tag list for the LLM prompt (tag + emoji + meaning).
+
+        Each line advertises one tag with its sticker emoji hint and, when the
+        sticker has a ``description``, a short note on when to use that emotion.
+        """
         lines: list[str] = []
         seen: set[str] = set()
         for sticker in self.stickers:
@@ -276,7 +296,10 @@ class StickersContent(BaseModel):
                     continue
                 seen.add(key)
                 hint = sticker.emoji or sticker.name
-                lines.append(f"- {key} ({hint})" if hint else f"- {key}")
+                label = f"- {key} ({hint})" if hint else f"- {key}"
+                if sticker.description:
+                    label += f" — {sticker.description.strip()}"
+                lines.append(label)
         return lines
 
 

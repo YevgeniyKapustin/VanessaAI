@@ -20,10 +20,11 @@ from app.llm.memes import MemeCatalog, MemeDecider
 
 from app.core.protocols import (
     EmbeddingProviderProtocol,
+    KnowledgeVectorStoreProtocol,
     VectorStoreProtocol,
 )
 from app.rag.embeddings.embeddings import LocalEmbeddingProvider
-from app.rag.qdrant_client import QdrantVectorStore
+from app.rag.qdrant_client import KnowledgeQdrantStore, QdrantVectorStore
 
 
 @dataclass
@@ -39,6 +40,7 @@ class AppContainer:
     block_consecutive_replies: bool
     embedding_provider: EmbeddingProviderProtocol
     vector_store: VectorStoreProtocol
+    knowledge_vector_store: KnowledgeVectorStoreProtocol
     meme_catalog: MemeCatalog
     meme_decider: MemeDecider
 
@@ -87,6 +89,7 @@ def build_app_container() -> AppContainer:
         block_consecutive_replies=content.decision.block_consecutive_replies,
         embedding_provider=LocalEmbeddingProvider(),
         vector_store=QdrantVectorStore(),
+        knowledge_vector_store=KnowledgeQdrantStore(),
         meme_catalog=meme_catalog,
         meme_decider=meme_decider,
     )

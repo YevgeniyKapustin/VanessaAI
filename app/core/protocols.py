@@ -14,6 +14,13 @@ class VectorSearchHit(TypedDict):
     score: float
 
 
+class KnowledgeVectorHit(TypedDict):
+    path: str
+    kind: str
+    title: str
+    score: float
+
+
 class UnitOfWorkProtocol(Protocol):
     async def commit(self) -> None: ...
 
@@ -29,6 +36,10 @@ class MessageRepositoryProtocol(Protocol):
         qdrant_point_id: str | None = None,
         created_at: datetime | None = None,
         telegram_message_id: int | None = None,
+        reply_to_message_id: int | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> StoredMessage: ...
 
     async def fulltext_search(
@@ -103,6 +114,35 @@ class VectorStoreProtocol(Protocol):
     ) -> list[VectorSearchHit]: ...
 
 
+class KnowledgeVectorStoreProtocol(Protocol):
+    """Vector store for the semantic knowledge vault notes (People/Lore/...).
+
+    Points are keyed by the note's vault-relative path, so re-embedding a note
+    overwrites its vector in place (idempotent reindex).
+    """
+
+    async def ensure_collection(self) -> None: ...
+
+    async def upsert_note(
+        self,
+        path: str,
+        kind: str,
+        title: str,
+        vector: list[float],
+    ) -> str: ...
+
+    async def upsert_notes(
+        self,
+        items: list[tuple[str, str, str, list[float]]],
+    ) -> list[str]: ...
+
+    async def search(
+        self,
+        vector: list[float],
+        limit: int = 30,
+    ) -> list[KnowledgeVectorHit]: ...
+
+
 class TurnQueryProtocol(Protocol):
     async def embed_query(self, query: str) -> list[float]: ...
 
@@ -155,6 +195,9 @@ class LLMProviderProtocol(Protocol):
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> str: ...
 
 

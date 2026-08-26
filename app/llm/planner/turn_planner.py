@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.llm.format.llm_json import normalize_llm_json
@@ -51,6 +52,7 @@ class TurnPlanner:
         llm_client: LLMChatCompleter | None = None,
         llm_model: str | None = None,
         generation: LLMGenerationParams | None = None,
+        participants_provider: Callable[[], Awaitable[str]] | None = None,
     ) -> None:
         self._content = content or get_content()
         self._use_llm = (
@@ -64,6 +66,9 @@ class TurnPlanner:
             generation
             or self._content.llm.generation.planner.to_params()
         )
+        # Optional per-participant summaries (from the knowledge vault) that
+        # help the model compose queries matching the semantic archive.
+        self._participants_provider = participants_provider
 
     async def prepare(
         self,
@@ -134,10 +139,17 @@ class TurnPlanner:
         in_listen_window: bool = False,
     ) -> TurnPlan:
         client = self._client or create_chat_completer()
+        participants = "(нет данных)"
+        if self._participants_provider is not None:
+            try:
+                participants = (await self._participants_provider()).strip() or participants
+            except Exception:
+                logger.exception("participants_digest_failed, using placeholder")
         prompt = self._content.rag.planner_prompt.format(
             message=message,
             recent_messages=self._format_recent(recent_messages) or "(none)",
             nicknames=format_nicknames_for_planner(),
+            participants=participants,
             mentions_bot="yes" if mentions_bot else "no",
             reply_to_bot="yes" if reply_to_bot else "no",
             reply_to_other_user="yes" if reply_to_other_user else "no",

@@ -111,6 +111,10 @@ class MessageRepository:
         qdrant_point_id: str | None = None,
         created_at: datetime | None = None,
         telegram_message_id: int | None = None,
+        reply_to_message_id: int | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> StoredMessage:
         message = Message(
             sender_telegram_id=sender_telegram_id,
@@ -118,6 +122,10 @@ class MessageRepository:
             role=role,
             content=content,
             qdrant_point_id=qdrant_point_id,
+            reply_to_message_id=reply_to_message_id,
+            reply_to_text=reply_to_text,
+            reply_to_sender_telegram_id=reply_to_sender_telegram_id,
+            reply_to_sender_name=reply_to_sender_name,
         )
         if created_at is not None:
             message.created_at = created_at
@@ -174,6 +182,8 @@ class MessageRepository:
                 """
                 SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
                        m.role, m.content, m.qdrant_point_id, m.created_at,
+                       m.reply_to_message_id, m.reply_to_text,
+                       m.reply_to_sender_telegram_id, m.reply_to_sender_name,
                        COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                 FROM messages m
                 LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
@@ -305,6 +315,10 @@ class MessageRepository:
             qdrant_point_id=row["qdrant_point_id"],
             created_at=row["created_at"],
             sender_name=row.get("sender_name"),
+            reply_to_message_id=row.get("reply_to_message_id"),
+            reply_to_text=row.get("reply_to_text"),
+            reply_to_sender_telegram_id=row.get("reply_to_sender_telegram_id"),
+            reply_to_sender_name=row.get("reply_to_sender_name"),
         )
 
     async def _window_for_anchor(

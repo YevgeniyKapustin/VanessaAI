@@ -14,15 +14,19 @@
 #   python scripts/export_sticker_pack.py
 #
 # Current mapping (by emoji meaning):
-#   0 ❤️   → approval      (одобрение / тепло)
+#   0 ❤️   → love          (одобрение / тепло)
 #   1 👋   → greeting/farewell (приветствие и прощание)
 #   2 🤩   → delight       (дикий восторг)
-#   3 😮‍💨 → work          («горит» / выдох под нагрузкой)
+#   3 😮‍💨 → irritation    («горит» / выдох под нагрузкой)
 #   4 🤔   → thinking      (задумчивость)
 #   5 🥺   → embarrassment (смущение / «ладно, виновата»)
-# Tags that have no dedicated sticker are mapped onto the closest available one
-# (approval → love, facepalm → irritation, shrug → thinking), so the heuristic
-# fallback always resolves to a real sticker.
+#   6 😐   → bemused       (сказали что-то странное, но всё же отвечаешь)
+#   7 🫤   → weary         (утомляет ерундой / повторными просьбами)
+#
+# `description` on each sticker is shown to the LLM so it knows when to use the
+# emotion, not just the bare tag + emoji. Tags that have no dedicated sticker are
+# mapped onto the closest available one (approval → love, facepalm → irritation,
+# shrug → thinking), so the heuristic fallback always resolves to a real sticker.
 
 enabled: true
 sticker_set_name: "VanessaBot"
@@ -34,6 +38,11 @@ heuristic_probability: 0.45
 # Hard cap: at most one sticker per this many bot replies in a chat.
 min_messages_between: 3
 
+# Tags whose sticker fully replaces the text reply: the bot sends ONLY the
+# sticker (the image already carries the message — bemused 😐 has a caption on
+# it). The anti-spam gate is bypassed for these: the sticker IS the reply.
+sticker_only_tags: [bemused]
+
 stickers:
   - name: heart
     tags: [love]
@@ -41,33 +50,51 @@ stickers:
     index: 0
     emoji: "❤️"
     file_id: "CAACAgIAAxUAAWqOt_GAnIXjY0ZifpUnPDzG4pFGAAL7pQACWyBwSJSpNLR0IJwXPQQ"
+    description: "тепло и одобрение, «согласна / точно / спасибо»"
   - name: wave
     tags: [greeting, farewell]
     weight: 1.0
     index: 1
     emoji: "👋"
     file_id: "CAACAgIAAxUAAWqOt_FD3L3wosYC0Nmhzt1flKNQAALlpAACUOtwSH7S8g6ygEZbPQQ"
+    description: "приветствие или прощание"
   - name: hype
     tags: [delight]
     weight: 1.0
     index: 2
     emoji: "🤩"
     file_id: "CAACAgIAAxUAAWqOt_FG_pTszmS2xZQ2PTJCjElcAAKhnwACHul5SMmaGVoma0UjPQQ"
+    description: "восторг, дикая радость"
   - name: burning
     tags: [irritation]
     weight: 1.0
     index: 3
     emoji: "😮‍💨"
     file_id: "CAACAgIAAxUAAWqOt_ENKnfqbubNRTlVVCKt0LwlAALCnQACcVl4SEaT9rOILoKVPQQ"
+    description: "раздражение, «горит», выдох под нагрузкой"
   - name: thinking
     tags: [thinking]
     weight: 1.0
     index: 4
     emoji: "🤔"
     file_id: "CAACAgIAAxUAAWqOt_E3bgABh4iJao4LtM01jyT_NAAC36gAAkCDcUhRq_sPartgIj0E"
+    description: "задумчивость, раздумья"
   - name: plead
     tags: [embarrassment]
     weight: 1.0
     index: 5
     emoji: "🥺"
     file_id: "CAACAgIAAxUAAWqOt_G5UtBO1XczUI3g1Besyq1nAAKjrQACy4B4SFHv9tZrBxIaPQQ"
+    description: "смущение, «ладно, виновата»"
+  - name: bemused
+    tags: [bemused]
+    weight: 1.0
+    index: 6
+    emoji: "😐"
+    description: "сказали что-то странное, но ты всё равно отвечаешь — нейтрально-озадаченная реакция"
+  - name: weary
+    tags: [weary]
+    weight: 1.0
+    index: 7
+    emoji: "🫤"
+    description: "собеседник утомляет ерундой или повторными просьбами — устала, не впечатлена"

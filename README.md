@@ -77,10 +77,16 @@ them deterministically; git gives auditability + rollback.
   background worker chunks the accumulated chat into context-window-sized
   windows and extracts what it missed — including weekly digests.
 
-**Read** is intent-routed: the turn planner decides which archive to consult
-(`people` / `lore` / `culture` / `logs`); the humor module always consults the
-`lore` part, and matched notes are injected into the reply prompt under a
-knowledge header.
+**Read** is semantic-first: the vault notes are already semantic summaries (raw
+chat messages embed poorly), so they are embedded into a dedicated Qdrant
+`knowledge` collection and retrieved by embedding similarity to the composed
+query, merged with exact alias matches. The turn planner decides which archive to
+consult (`people` / `lore` / `culture` / `logs`); the humor module always
+consults the `lore` part. The matched notes become the **primary RAG context** —
+raw message history is only a fallback when the archive has nothing relevant.
+The vault is re-embedded on every write, so Vanessa's regularly-updated
+participant summaries stay fresh in the vectors (`scripts/reindex_knowledge_vectors.py`
+rebuilds the whole collection).
 
 ### Mood & relationship metrics
 
@@ -113,7 +119,7 @@ and quantitative signals:
 Telegram → Bot → API
   → Ingress (persist, session, nicknames)
   → Gate (prefilter → Turn Planner → Decision Engine)
-  → Retrieve (hybrid RAG, optional ReAct, humor RAG + reflexion)
+  → Retrieve (semantic vault RAG first, raw-message RAG fallback, optional ReAct, humor RAG + reflexion)
   → Compose (DeepSeek)
   → Critique (optional humor critic: approve or regenerate with feedback)
   → Post (formatting, profanity filter)
@@ -149,9 +155,14 @@ and a relevance threshold.
 
 - **Knowledge vault** — a machine-only structured memory (People/Lore/Culture/
   Logs) with index-based retrieval, post-reply extraction, and a periodic sweep
-  over messages the bot never replied to.
-- **Hybrid RAG** — vector search plus Postgres full-text, merging anchors with
-  context windows around matched messages.
+  over messages the bot never replied to; the semantic notes are embedded into a
+  Qdrant `knowledge` collection and re-embedded on every write.
+- **Semantic-first RAG** — the query is matched by meaning against the vault's
+  semantic notes (People/Lore/Culture/Logs); raw-message vector + Postgres
+  full-text search is only the fallback when the archive has nothing relevant.
+- **Participant-aware query planning** — the planner prompt receives compact
+  per-participant summaries (mood + recent facts from the People dossiers) so
+  the composed embedding query references the right aliases and topics.
 - **ReAct retrieval** — when `deep_search=true`, the planner runs iterative
   search (up to N steps) if the first pass is not enough.
 - **Two-track humor RAG** — separate meme search plus rule-based reflexion to
@@ -223,7 +234,7 @@ config/
                 memory, metrics, rag, profanity (SRP)
   nicknames.yaml
 knowledge/      Vanessa's memory vault (runtime data)
-scripts/        import_telegram_history.py, backfill_users.py
+scripts/        import_telegram_history.py, backfill_users.py, reindex_knowledge_vectors.py
 tests/          400 tests
 ```
 
@@ -263,6 +274,11 @@ does not apply them today.
 | `DECISION_TOXICITY_IGNORE_THRESHOLD` | Toxicity at/above which a low-trust sender may be ignored |
 | `DECISION_TRUST_IGNORE_THRESHOLD` | Trust at/below which a toxic sender may be ignored |
 | `KNOWLEDGE_METRICS_ENABLED` | Enable per-participant mood & relationship metrics |
+| `QDRANT_KNOWLEDGE_COLLECTION` | Qdrant collection for the semantic vault notes |
+| `KNOWLEDGE_VECTOR_TOP_K` | Top-K for the semantic vault vector search |
+| `KNOWLEDGE_VECTOR_MIN_SCORE` | Min cosine score for a vault note to be used |
+| `KNOWLEDGE_PARTICIPANT_MAX_PEOPLE` | Max people in the planner's participants digest |
+| `KNOWLEDGE_PARTICIPANT_MAX_FACTS` | Max recent facts per person in the digest |
 | `RAG_REACT_MAX_STEPS` | ReAct steps for deep search |
 | `CONTENT_CONFIG_PATH` | Path to content dir (one YAML per section) or a single file |
 

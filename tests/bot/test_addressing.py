@@ -72,6 +72,58 @@ def test_extract_addressing_reply_to_other_user():
     assert signals.reply_to_bot is False
 
 
+def test_extract_addressing_captures_replied_text_and_sender():
+    bot_user = FakeUser(id=1)
+    other = FakeUser(id=99, username="lich")
+    reply = type(
+        "Reply",
+        (),
+        {
+            "from_user": other,
+            "message_id": 555,
+            "text": "Личь не делает карты",
+        },
+    )()
+    message = type(
+        "Message",
+        (),
+        {
+            "bot": FakeBot(id=1),
+            "text": "а я про то и говорю",
+            "reply_to_message": reply,
+            "entities": None,
+        },
+    )()
+
+    signals = extract_addressing(message)  # type: ignore[arg-type]
+
+    assert signals.reply_to_message_id == 555
+    assert signals.reply_to_text == "Личь не делает карты"
+    assert signals.reply_to_sender_name == "lich"
+    assert signals.reply_to_sender_telegram_id == 99
+
+
+def test_extract_addressing_reply_without_text_is_none():
+    bot_user = FakeUser(id=1)
+    other = FakeUser(id=99, username="lich")
+    reply = type("Reply", (), {"from_user": other, "message_id": 556, "text": None})()
+    message = type(
+        "Message",
+        (),
+        {
+            "bot": FakeBot(id=1),
+            "text": "это к чему?",
+            "reply_to_message": reply,
+            "entities": None,
+        },
+    )()
+
+    signals = extract_addressing(message)  # type: ignore[arg-type]
+
+    assert signals.reply_to_text is None
+    assert signals.reply_to_sender_name == "lich"
+
+
 def test_extract_addressing_mention_in_text():
     message = type(
         "Message",

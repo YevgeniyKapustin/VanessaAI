@@ -29,13 +29,21 @@ def format_session_messages(
                 message.sender_telegram_id,
                 message.sender_name,
             )
-            lines.append(
-                llm.session_user_line.format(
-                    time=time_label,
-                    sender=sender,
-                    content=text,
-                )
+            line = llm.session_user_line.format(
+                time=time_label,
+                sender=sender,
+                content=text,
             )
+            if message.reply_to_text:
+                reply_sender = resolve_sender_display_name(
+                    message.reply_to_sender_telegram_id,
+                    message.reply_to_sender_name,
+                )
+                line += "\n" + llm.session_reply_line.format(
+                    sender=reply_sender,
+                    content=message.reply_to_text.replace("\n", " ").strip(),
+                )
+            lines.append(line)
     return "\n".join(lines)
 
 

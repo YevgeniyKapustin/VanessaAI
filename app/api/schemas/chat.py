@@ -14,7 +14,9 @@ class ChatRequest(BaseModel):
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
     reply_to_sender_telegram_id: int | None = None
-    reply_to_sender_telegram_id: int | None = None
+    reply_to_message_id: int | None = None
+    reply_to_text: str | None = Field(default=None, max_length=4096)
+    reply_to_sender_name: str | None = None
 
 
 class ChatResponse(BaseModel):

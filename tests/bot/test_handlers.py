@@ -163,6 +163,7 @@ async def test_handle_text_sends_sticker_when_tagged():
     message.reply = AsyncMock()
     sticker_service = AsyncMock()
     sticker_service.register_reply = MagicMock()
+    sticker_service.is_sticker_only = MagicMock(return_value=False)
     sticker_service.send_if_any = AsyncMock(return_value="sarcasm")
     services = _services(
         api_result=ChatProcessResult(
@@ -191,6 +192,7 @@ async def test_handle_text_forces_sticker_on_explicit_request():
     message.reply = AsyncMock()
     sticker_service = AsyncMock()
     sticker_service.register_reply = MagicMock()
+    sticker_service.is_sticker_only = MagicMock(return_value=False)
     sticker_service.send_if_any = AsyncMock(return_value="delight")
     services = _services(
         api_result=ChatProcessResult(
@@ -207,6 +209,60 @@ async def test_handle_text_forces_sticker_on_explicit_request():
     sticker_service.send_if_any.assert_awaited_once()
     kwargs = sticker_service.send_if_any.await_args.kwargs
     assert kwargs["force"] is True
+
+
+@pytest.mark.asyncio
+async def test_handle_text_sticker_only_suppresses_text():
+    message = make_telegram_message(text="что?")
+    message.reply = AsyncMock()
+    sticker_service = AsyncMock()
+    sticker_service.register_reply = MagicMock()
+    sticker_service.is_sticker_only = MagicMock(return_value=True)
+    sticker_service.send_if_any = AsyncMock(return_value="bemused")
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Серьёзно?",
+            relevance_score=0.9,
+            sticker_tag="bemused",
+        ),
+        stickers=sticker_service,
+    )
+    await _call_text_handler(services, message)
+    # the sticker itself is the whole reply — no text, no typing action
+    message.reply.assert_not_awaited()
+    message.bot.send_chat_action.assert_not_awaited()
+    sticker_service.register_reply.assert_called_once_with(-100123)
+    sticker_service.send_if_any.assert_awaited_once()
+    kwargs = sticker_service.send_if_any.await_args.kwargs
+    assert kwargs["sticker_tag"] == "bemused"
+    assert kwargs["reply_text"] is None
+    assert kwargs["force"] is True
+
+
+@pytest.mark.asyncio
+async def test_handle_text_sticker_only_falls_back_to_text():
+    message = make_telegram_message(text="что?")
+    message.reply = AsyncMock()
+    sticker_service = AsyncMock()
+    sticker_service.register_reply = MagicMock()
+    sticker_service.is_sticker_only = MagicMock(return_value=True)
+    sticker_service.send_if_any = AsyncMock(return_value=None)
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Серьёзно?",
+            relevance_score=0.9,
+            sticker_tag="bemused",
+        ),
+        stickers=sticker_service,
+    )
+    await _call_text_handler(services, message)
+    # sticker couldn't be sent — fall back to the text answer
+    message.reply.assert_awaited_once()
+    sticker_service.send_if_any.assert_awaited_once()
 
 
 @pytest.mark.asyncio

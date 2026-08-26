@@ -11,6 +11,10 @@ def message_to_stored(message: Message) -> StoredMessage:
         qdrant_point_id=message.qdrant_point_id,
         telegram_message_id=message.telegram_message_id,
         created_at=message.created_at,
+        reply_to_message_id=message.reply_to_message_id,
+        reply_to_text=message.reply_to_text,
+        reply_to_sender_telegram_id=message.reply_to_sender_telegram_id,
+        reply_to_sender_name=message.reply_to_sender_name,
     )
 
 

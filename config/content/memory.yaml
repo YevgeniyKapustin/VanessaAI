@@ -9,6 +9,10 @@ extraction_prompt: |
   may be called by several aliases in the chat, but there is ONE dossier per person):
   {nicknames}
 
+  In the transcript every user is labelled as [user:Canonical Nickname (id:123456)]
+  — reuse that exact nickname and id; never write Latin transliterations or your own
+  spellings of a name.
+
   Transcript:
   {transcript}
 
@@ -52,6 +56,11 @@ extraction_prompt: |
   Person identity rules:
   - one person = one "person" value: reuse the canonical nickname from the list,
     never invent new spellings or new ids for a known participant.
-  - prefer "person" over "telegram_id"; fill "telegram_id" when the transcript
-    shows the participant's id.
+  - Copy the exact canonical nickname from the transcript label into "person"
+    and the participant's id into "telegram_id" (for person_mood / person_fact /
+    quote). Never invent a generic name like «ну я» or «собеседник».
+  - Never write Latin transliterations («yevgeniy», «begemot», «kоtgast») or new
+    spellings — they split one person into several dossiers and are always wrong.
+  - If the speaker is not in the canonical list, keep the name exactly as shown
+    in their transcript label; if no id is visible, omit "telegram_id".
   Don't save greetings, «ок», small remarks, food/weather without context.

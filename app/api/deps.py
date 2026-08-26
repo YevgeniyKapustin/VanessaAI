@@ -35,8 +35,10 @@ from app.knowledge.metrics.pipeline import MetricsPipeline
 from app.knowledge.metrics.planner import MetricsPlanner
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.metrics.store import MetricsStore
+from app.knowledge.participants import ParticipantsDigest
 from app.knowledge.retriever import KnowledgeRetriever
 from app.knowledge.vault import KnowledgeVault
+from app.knowledge.vector_index import KnowledgeVectorIndexer
 from app.knowledge.writer import KnowledgeVaultWriter
 from app.llm.humor.critic import HumorCritic
 from app.llm.providers import create_llm_provider
@@ -139,8 +141,20 @@ def get_hybrid_search(
     return create_hybrid_search(messages, embeddings, vector_store)
 
 
+_participants_digest: ParticipantsDigest | None = None
+
+
+def get_participants_digest() -> ParticipantsDigest:
+    """Process-wide participants digest (mtime-cached across requests)."""
+    global _participants_digest
+    if _participants_digest is None:
+        vault = KnowledgeVault()
+        _participants_digest = ParticipantsDigest(vault, KnowledgeIndex(vault))
+    return _participants_digest
+
+
 def create_query_rewriter() -> QueryRewriter:
-    return QueryRewriter()
+    return QueryRewriter(participants_provider=get_participants_digest().build)
 
 
 def get_query_rewriter() -> QueryRewriter:
@@ -191,6 +205,13 @@ async def get_incoming_turn_handler(
     knowledge_vault = KnowledgeVault()
     knowledge_index = KnowledgeIndex(knowledge_vault)
     metrics_retriever = MetricsRetriever(knowledge_vault, knowledge_index)
+    knowledge_embeddings = container.embedding_provider
+    knowledge_vector_store = container.knowledge_vector_store
+    knowledge_vector_indexer = KnowledgeVectorIndexer(
+        knowledge_vault,
+        knowledge_embeddings,
+        knowledge_vector_store,
+    )
     gate = GateStage(
         query_rewriter,
         decision_engine,
@@ -207,9 +228,15 @@ async def get_incoming_turn_handler(
         knowledge_index,
         max_blocks=settings.knowledge_max_blocks,
         people_max_blocks=settings.knowledge_people_max_blocks,
+        embeddings=knowledge_embeddings,
+        vector_store=knowledge_vector_store,
     )
     memory = MemoryStage(
-        KnowledgeVaultWriter(knowledge_vault, knowledge_index),
+        KnowledgeVaultWriter(
+            knowledge_vault,
+            knowledge_index,
+            vector_indexer=knowledge_vector_indexer,
+        ),
         MemoryPlanner(),
         enabled=settings.knowledge_memory_enabled,
         cooldown_seconds=settings.knowledge_memory_cooldown_seconds,

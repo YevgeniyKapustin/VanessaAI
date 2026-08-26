@@ -8,7 +8,11 @@ from app.core.turn import ChatTurnInput, ConversationTurnResult
 
 
 class FakeHandler:
+    def __init__(self) -> None:
+        self.last_turn: ChatTurnInput | None = None
+
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
+        self.last_turn = turn
         return ConversationTurnResult(
             action="reply",
             reason="intent",
@@ -18,8 +22,11 @@ class FakeHandler:
         )
 
 
+_shared_handler = FakeHandler()
+
+
 async def _override_handler() -> FakeHandler:
-    return FakeHandler()
+    return _shared_handler
 
 
 @pytest.fixture
@@ -49,6 +56,34 @@ async def test_chat_endpoint_returns_reply(api_client_override):
     assert data["action"] == "reply"
     assert data["reply"] == "test reply"
     assert data["context_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_chat_endpoint_passes_reply_context(api_client_override):
+    _shared_handler.last_turn = None
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/v1/chat",
+            json={
+                "telegram_chat_id": -100123,
+                "message": "а я про то и говорю",
+                "sender_telegram_id": 42,
+                "reply_to_message_id": 555,
+                "reply_to_sender_telegram_id": 99,
+                "reply_to_text": "Личь не делает карты",
+                "reply_to_sender_name": "Личь",
+            },
+        )
+
+    assert response.status_code == 200
+    assert _shared_handler.last_turn is not None
+    assert _shared_handler.last_turn.reply_to_message_id == 555
+    assert _shared_handler.last_turn.reply_to_sender_telegram_id == 99
+    assert _shared_handler.last_turn.reply_to_text == "Личь не делает карты"
+    assert _shared_handler.last_turn.reply_to_sender_name == "Личь"
 
 
 @pytest.mark.asyncio

@@ -70,6 +70,9 @@ class ClaudeLLMProvider:
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        reply_to_text: str | None = None,
+        reply_to_sender_telegram_id: int | None = None,
+        reply_to_sender_name: str | None = None,
     ) -> str:
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
@@ -85,6 +88,9 @@ class ClaudeLLMProvider:
             sender_name=sender_name,
             critic_feedback=critic_feedback,
             tone=tone,
+            reply_to_text=reply_to_text,
+            reply_to_sender_telegram_id=reply_to_sender_telegram_id,
+            reply_to_sender_name=reply_to_sender_name,
         )
         message_count = sum(len(block.messages) for block in context_blocks)
         logger.info(

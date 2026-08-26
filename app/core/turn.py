@@ -15,6 +15,9 @@ class ChatTurnInput:
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
     reply_to_sender_telegram_id: int | None = None
+    reply_to_message_id: int | None = None
+    reply_to_text: str | None = None
+    reply_to_sender_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

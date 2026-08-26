@@ -20,11 +20,19 @@ def test_message_to_stored_maps_fields():
         telegram_message_id=99,
         qdrant_point_id="pt-1",
         created_at=created,
+        reply_to_message_id=555,
+        reply_to_text="Личь не делает карты",
+        reply_to_sender_telegram_id=99,
+        reply_to_sender_name="Личь",
     )
     stored = message_to_stored(message)
     assert stored.id == 1
     assert stored.sender_telegram_id == 42
     assert stored.created_at == created
+    assert stored.reply_to_message_id == 555
+    assert stored.reply_to_text == "Личь не делает карты"
+    assert stored.reply_to_sender_telegram_id == 99
+    assert stored.reply_to_sender_name == "Личь"
 
 
 def test_message_to_context():

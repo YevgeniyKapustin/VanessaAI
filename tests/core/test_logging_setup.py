@@ -1,10 +1,12 @@
 import logging
+from pathlib import Path
 
 from app.core.logging_setup import (
     LoguruStyleFormatter,
     RequestIdFilter,
     ServiceNameFilter,
     configure_logging,
+    create_file_handler,
 )
 from app.core.request_context import request_id_var
 
@@ -77,3 +79,50 @@ def test_loguru_formatter_shortens_app_prefix():
 
     assert "services.conversation_orchestrator:handle_incoming:42" in line
     assert "app.services" not in line
+
+
+def test_create_file_handler_writes_plain_lines(tmp_path: Path) -> None:
+    handler = create_file_handler(
+        "api",
+        "INFO",
+        tmp_path,
+        max_bytes=1024 * 1024,
+        backup_count=1,
+    )
+    logger = logging.getLogger("app.test_file_logging")
+    logger.handlers = [handler]
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    try:
+        logger.info("hello file %s", 42)
+
+        log_file = tmp_path / "api.log"
+        assert log_file.exists()
+        content = log_file.read_text(encoding="utf-8")
+        assert "hello file 42" in content
+        assert "\033[" not in content  # no ANSI colors in files
+    finally:
+        handler.close()
+
+
+def test_create_file_handler_rotates(tmp_path: Path) -> None:
+    handler = create_file_handler(
+        "bot",
+        "INFO",
+        tmp_path,
+        max_bytes=256,
+        backup_count=1,
+    )
+    logger = logging.getLogger("app.test_file_logging_rotate")
+    logger.handlers = [handler]
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    try:
+        for i in range(200):
+            logger.info("padding line %d %s", i, "x" * 40)
+
+        assert (tmp_path / "bot.log").exists()
+        backups = sorted(tmp_path.glob("bot.log.*"))
+        assert backups, "expected at least one rotated backup"
+    finally:
+        handler.close()

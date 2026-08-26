@@ -2,6 +2,7 @@ from app.config.content import AppContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.messages import ContextBlock, ContextMessage
+from app.knowledge.schema import KnowledgeBlock
 from app.llm.prompts.context_format import block_time_range, format_message_time
 from app.llm.prompts.session_format import format_session_messages
 
@@ -59,9 +60,11 @@ class PromptBuilder:
         context_blocks: list[ContextBlock],
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
+        knowledge_blocks: list[KnowledgeBlock] | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
+        critic_feedback: str | None = None,
     ) -> str:
         llm = self._content.llm
         if context_blocks:
@@ -75,6 +78,16 @@ class PromptBuilder:
             history_block = llm.context_header
 
         parts = [history_block]
+        if knowledge_blocks:
+            block_lines = [
+                llm.knowledge_block_line.format(
+                    kind=block.kind,
+                    title=block.title,
+                    content=block.content,
+                )
+                for block in knowledge_blocks
+            ]
+            parts.append(f"{llm.knowledge_header}\n" + "\n".join(block_lines))
         if humor_quotes:
             quote_lines = [
                 llm.humor_quote_line.format(quote=quote)
@@ -93,6 +106,12 @@ class PromptBuilder:
             sender_name=sender_name,
         )
         parts.append(f"{llm.current_message_header}\n{current_line}")
+        if critic_feedback and critic_feedback.strip():
+            fix_header = (
+                llm.critic.fix_instruction_header.strip()
+                or "Humor editor's note (you MUST address it in the new version of the reply):"
+            )
+            parts.append(f"{fix_header}\n{critic_feedback.strip()}")
         owner_id = settings.required_user_telegram_id
         owner_note = llm.owner_message_note.strip()
         if (
@@ -108,16 +127,17 @@ class PromptBuilder:
         persona = self._content.persona
         llm = self._content.llm
         sections = [
-            ("Личность", persona.identity_text()),
-            ("Голос", persona.voice_text()),
-            ("Правила контента", persona.rules_text()),
-            ("Работа с контекстом", llm.task_text()),
-            ("Формулировка ответа", llm.answer_text()),
+            ("Persona", persona.identity_text()),
+            ("Voice", persona.voice_text()),
+            ("Content rules", persona.rules_text()),
+            ("Context handling", llm.task_text()),
+            ("Answer formulation", llm.answer_text()),
+            ("Reply language", llm.language_text()),
         ]
         parts = [
             f"## {title}\n{body}" for title, body in sections if body
         ]
         profanity = self._content.profanity
         if profanity.enabled and profanity.instruction.strip():
-            parts.append(f"## Эмоциональная лексика\n{profanity.instruction.strip()}")
+            parts.append(f"## Emotional language\n{profanity.instruction.strip()}")
         return "\n\n".join(parts)

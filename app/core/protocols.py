@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Protocol, TypedDict
 
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
 from app.core.turn import ChatTurnInput, ConversationTurnResult
+from app.knowledge.schema import KnowledgeBlock
 
 if TYPE_CHECKING:
     from app.services.turn_metrics import TurnMetricsSnapshot
@@ -44,6 +45,12 @@ class MessageRepositoryProtocol(Protocol):
         after: int = 10,
         max_total: int = 80,
     ) -> list[tuple[int, list[StoredMessage]]]: ...
+
+    async def get_newer_than(
+        self,
+        after_message_id: int,
+        limit: int = 200,
+    ) -> list[StoredMessage]: ...
 
     async def get_recent(self, limit: int = 50) -> list[StoredMessage]: ...
 
@@ -131,10 +138,12 @@ class LLMProviderProtocol(Protocol):
         context_blocks: list[ContextBlock],
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
+        knowledge_blocks: list[KnowledgeBlock] | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
+        critic_feedback: str | None = None,
     ) -> str: ...
 
 

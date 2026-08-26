@@ -4,13 +4,16 @@ from unittest.mock import AsyncMock
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
 from app.core.turn import ChatTurnInput
 from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
+from app.knowledge.schema import KnowledgeBlock
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
+from app.llm.humor.critic import CriticStatus, CriticVerdict
 from app.llm.planner.turn_planner import TurnPlan
 from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from app.services.humor_pipeline import HumorPipeline
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
+from app.services.pipeline.critique_stage import CritiqueStage
 from app.services.pipeline.stages import (
     ComposeStage,
     FinalizeStage,
@@ -154,6 +157,8 @@ class FakeIndexing:
 class FakeLLM:
     def __init__(self) -> None:
         self.last_humor_quotes: list[str] | None = None
+        self.last_knowledge_blocks: list[KnowledgeBlock] | None = None
+        self.last_critic_feedback: str | None = None
 
     async def generate(
         self,
@@ -161,13 +166,37 @@ class FakeLLM:
         context_blocks: list[ContextBlock],
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
+        knowledge_blocks: list[KnowledgeBlock] | None = None,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
+        critic_feedback: str | None = None,
     ) -> str:
         self.last_humor_quotes = humor_quotes
+        self.last_knowledge_blocks = knowledge_blocks
         self.last_sender_name = sender_name
+        self.last_critic_feedback = critic_feedback
         return f"echo: {user_message}"
+
+
+class FakeCritic:
+    def __init__(self, verdict: CriticVerdict | None = None) -> None:
+        self._verdict = verdict or CriticVerdict(
+            status=CriticStatus.APPROVED,
+            score=5,
+            reason="ок",
+        )
+        self.reviews: list[str] = []
+
+    async def review(
+        self,
+        draft: str,
+        *,
+        user_message: str,
+        humor_quotes: list[str],
+    ) -> CriticVerdict:
+        self.reviews.append(draft)
+        return self._verdict
 
 
 class FakeDecisionEngine:
@@ -211,8 +240,10 @@ def _build_orchestrator(
     decision: FakeDecisionEngine,
     retriever: FakeContextRetriever | None = None,
     llm: FakeLLM | None = None,
+    critic: FakeCritic | None = None,
     query_rewriter: QueryRewriter | None = None,
     defer_index_on_ignore: bool = True,
+    critic_enabled: bool = False,
 ) -> ConversationOrchestrator:
     retriever = retriever or FakeContextRetriever()
     llm = llm or FakeLLM()
@@ -223,6 +254,7 @@ def _build_orchestrator(
         post_reply_listen_count=5,
         planner_prefilter_enabled=False,
         defer_index_on_ignore=defer_index_on_ignore,
+        critic_enabled=critic_enabled,
     )
     humor = HumorPipeline(retriever, FakeTurnQuery(), config)
     registry = ChatIgnoreRegistry()
@@ -243,6 +275,7 @@ def _build_orchestrator(
         gate=gate,
         retrieve=RetrieveStage(retriever, humor, None),
         compose=ComposeStage(llm),
+        critique=CritiqueStage(llm, critic or FakeCritic(), config),
         finalize=FinalizeStage(messages, indexing, decision, config, metrics),
     )
 
@@ -337,3 +370,45 @@ async def test_orchestrator_runs_humor_rag_when_planner_requests_it():
     assert len(retriever.calls) == 2
     assert retriever.calls[1]["query"] == "личь работа"
     assert llm.last_humor_quotes == ["найди работу"]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_runs_critique_on_humor_turn_when_enabled():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    retriever = FakeContextRetriever()
+    llm = FakeLLM()
+    critic = FakeCritic()
+    planner = QueryRewriter(use_llm=False)
+    planner.prepare = AsyncMock(
+        return_value=TurnPlan(
+            original="ну ладно поработаю",
+            text="работа",
+            skip_search=False,
+            humor_ok=True,
+            humor_query="личь работа",
+        ),
+    )
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=FakeDecisionEngine(DecisionAction.REPLY),
+        retriever=retriever,
+        llm=llm,
+        critic=critic,
+        query_rewriter=planner,
+        defer_index_on_ignore=False,
+        critic_enabled=True,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ну ладно поработаю",
+            sender_telegram_id=42,
+        )
+    )
+
+    assert result.reply == "echo: ну ладно поработаю"
+    assert critic.reviews == ["echo: ну ладно поработаю"]
+    assert llm.last_critic_feedback is None

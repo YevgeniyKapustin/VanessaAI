@@ -5,6 +5,8 @@ from app.core.session.chat_session_state import ChatSessionState
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionResult
+from app.knowledge.schema import KnowledgeBlock
+from app.llm.humor.critic import CriticVerdict
 from app.llm.planner.turn_planner import TurnPlan
 
 
@@ -21,8 +23,12 @@ class TurnPipelineContext:
     decision: DecisionResult | None = None
     context_blocks: list[ContextBlock] = field(default_factory=list)
     humor_quotes: list[str] = field(default_factory=list)
+    knowledge_blocks: list[KnowledgeBlock] = field(default_factory=list)
     reply: str | None = None
     result: ConversationTurnResult | None = None
+    critic_verdict: CriticVerdict | None = None
+    critic_iterations: int = 0
+    critic_ms: float = 0.0
     plan_ms: float = 0.0
     decision_ms: float = 0.0
     rag_ms: float = 0.0

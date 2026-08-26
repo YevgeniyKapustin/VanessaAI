@@ -27,6 +27,13 @@ from app.decision import (
     DecisionEngine,
     QdrantRelevanceChecker,
 )
+from app.knowledge.index import KnowledgeIndex
+from app.knowledge.memory_planner import MemoryPlanner
+from app.knowledge.memory_stage import MemoryStage
+from app.knowledge.retriever import KnowledgeRetriever
+from app.knowledge.vault import KnowledgeVault
+from app.knowledge.writer import KnowledgeVaultWriter
+from app.llm.humor.critic import HumorCritic
 from app.llm.providers import create_llm_provider
 from app.rag.search.hybrid_search import HybridSearchService
 from app.rag.query_rewriter import QueryRewriter
@@ -34,6 +41,7 @@ from app.services.orchestrator.conversation_orchestrator import ConversationOrch
 from app.services.humor_pipeline import HumorPipeline
 from app.services.indexing.message_indexing import MessageIndexingService
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
+from app.services.pipeline.critique_stage import CritiqueStage
 from app.services.pipeline.stages import (
     ComposeStage,
     FinalizeStage,
@@ -185,8 +193,23 @@ async def get_incoming_turn_handler(
         indexing,
         container.ignore_registry,
     )
-    retrieve = RetrieveStage(hybrid_search, humor, uow)
+    knowledge_vault = KnowledgeVault()
+    knowledge_index = KnowledgeIndex(knowledge_vault)
+    knowledge = KnowledgeRetriever(
+        knowledge_vault,
+        knowledge_index,
+        max_blocks=settings.knowledge_max_blocks,
+        people_max_blocks=settings.knowledge_people_max_blocks,
+    )
+    memory = MemoryStage(
+        KnowledgeVaultWriter(knowledge_vault, knowledge_index),
+        MemoryPlanner(),
+        enabled=settings.knowledge_memory_enabled,
+        cooldown_seconds=settings.knowledge_memory_cooldown_seconds,
+    )
+    retrieve = RetrieveStage(hybrid_search, humor, uow, knowledge=knowledge)
     compose = ComposeStage(llm)
+    critique = CritiqueStage(llm, HumorCritic(), config)
     finalize = FinalizeStage(messages, indexing, decision_engine, config, metrics)
     return ConversationOrchestrator(
         messages=messages,
@@ -195,5 +218,7 @@ async def get_incoming_turn_handler(
         gate=gate,
         retrieve=retrieve,
         compose=compose,
+        critique=critique,
         finalize=finalize,
+        memory=memory,
     )

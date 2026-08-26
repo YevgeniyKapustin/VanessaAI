@@ -70,6 +70,7 @@ services:
       - ./config:/app/config
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      - ./knowledge:/app/knowledge
       - huggingface_cache:/app/.cache/huggingface
 
   bot:
@@ -84,6 +85,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./config:/app/config
+      - ./knowledge:/app/knowledge
       - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
       - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
 

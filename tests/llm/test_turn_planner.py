@@ -66,3 +66,29 @@ async def test_turn_planner_strips_markdown_fence():
     assert result.text == "Крабер"
     assert result.humor_ok is True
     assert result.humor_query == "крабер подкол"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_parse_knowledge_fields():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "что там у Лича",
+        '{"search_query": "личь", "skip": false, "humor_ok": false, '
+        '"humor_query": "", "knowledge_indexes": ["people"], '
+        '"knowledge_query": "личь"}',
+    )
+
+    assert result.knowledge_indexes == ("people",)
+    assert result.knowledge_query == "личь"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_knowledge_defaults_empty():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "ок",
+        '{"search_query": "", "skip": true, "humor_ok": false, "humor_query": ""}',
+    )
+
+    assert result.knowledge_indexes == ()
+    assert result.knowledge_query == ""

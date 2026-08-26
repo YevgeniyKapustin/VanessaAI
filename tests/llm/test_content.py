@@ -16,12 +16,12 @@ def test_prompt_builder_assembles_system_prompt_from_persona():
     content = get_content()
 
     assert "Ванесса" in prompt
-    assert "## Личность" in prompt
-    assert "## Голос" in prompt
-    assert "## Правила контента" in prompt
+    assert "## Persona" in prompt
+    assert "## Voice" in prompt
+    assert "## Content rules" in prompt
     assert content.llm.task_text() in prompt
     if content.profanity.enabled:
-        assert "## Эмоциональная лексика" in prompt
+        assert "## Emotional language" in prompt
 
 
 def test_prompt_builder_builds_user_prompt():
@@ -50,14 +50,33 @@ def test_prompt_builder_includes_humor_quotes_block():
     assert "- найди работу" in prompt
 
 
+def test_prompt_builder_includes_critic_feedback_section():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "ну ладно поработаю",
+        [],
+        critic_feedback="добавь гиперболу",
+    )
+
+    content = get_content()
+    assert content.llm.critic.fix_instruction_header.strip() in prompt
+    assert "добавь гиперболу" in prompt
+
+
+def test_prompt_builder_omits_critic_feedback_when_empty():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("ну ладно поработаю", [])
+    assert "Humor editor's note" not in prompt
+
+
 def test_prompt_builder_system_includes_answer_checklist():
     builder = PromptBuilder()
     prompt = builder.system_prompt
 
-    assert "## Формулировка ответа" in prompt
-    assert "Перед ответом проверь" in prompt
-    assert "Плохо:" in prompt
-    assert "Хорошо:" in prompt
+    assert "## Answer formulation" in prompt
+    assert "Before replying, check" in prompt
+    assert "Bad:" in prompt
+    assert "Good:" in prompt
 
 
 def test_prompt_builder_includes_owner_note_for_host(monkeypatch):
@@ -73,3 +92,11 @@ def test_prompt_builder_includes_owner_note_for_host(monkeypatch):
         sender_name="Евгений",
     )
     assert get_content().llm.owner_message_note.strip() in prompt
+
+
+def test_prompt_builder_includes_reply_language_rule():
+    builder = PromptBuilder()
+    prompt = builder.system_prompt
+
+    assert "## Reply language" in prompt
+    assert "Default: Russian" in prompt

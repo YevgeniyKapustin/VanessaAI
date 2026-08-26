@@ -45,6 +45,15 @@ class LLMGenerationProfiles(BaseModel):
             frequency_penalty=0.0,
         )
     )
+    critic: LLMGenerationProfile = Field(
+        default_factory=lambda: LLMGenerationProfile(
+            temperature=0.1,
+            top_p=0.85,
+            max_tokens=256,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+        )
+    )
 
 
 class ConversationContent(BaseModel):
@@ -70,28 +79,40 @@ class PersonaContent(BaseModel):
         return self.rules.strip()
 
 
+class CriticContent(BaseModel):
+    system_prompt: str = ""
+    user_prompt: str = ""
+    fix_instruction_header: str = (
+        "Humor editor's note (you MUST address it in the new version of the reply):"
+    )
+
+
 class LLMContent(BaseModel):
     task: str = ""
     answer: str = ""
     answer_examples: str = ""
+    language: str = ""
     reply_instruction: str = ""
     compose_instruction: str = ""
     context_header: str
     context_block_header: str = (
-        "--- Фрагмент {index} ({started_at} — {ended_at}) ---"
+        "--- Block {index} ({started_at} — {ended_at}) ---"
     )
     context_block_separator: str = "\n\n"
     current_message_header: str
     current_message_line: str = "[user:{sender}] {content}"
-    session_header: str = "Недавняя переписка в чате:"
+    session_header: str = "Recent correspondence in the chat:"
     session_user_line: str = "{time} [user:{sender}] {content}"
     session_assistant_line: str = "{time} [assistant] {content}"
-    anchor_marker: str = " ← совпадение с запросом"
+    anchor_marker: str = " ← matches the query"
     assistant_line: str = "{time} [assistant]{anchor} {content}"
     user_line: str = "{time} [user:{sender}]{anchor} {content}"
-    humor_quotes_header: str = "Узнаваемые мемы и подколы из беседы (если уместно):"
+    humor_quotes_header: str = "Recognizable memes and jokes from the chat (if appropriate):"
     humor_quote_line: str = "- {quote}"
+    knowledge_header: str = "From my archive on the topic:"
+    knowledge_block_line: str = "- [{kind}] {title}:\n  {content}"
     owner_message_note: str = ""
+    critic: CriticContent = Field(default_factory=CriticContent)
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
 
     def task_text(self) -> str:
@@ -103,11 +124,15 @@ class LLMContent(BaseModel):
             parts.append(self.answer_examples.strip())
         return "\n\n".join(part for part in parts if part)
 
+    def language_text(self) -> str:
+        return self.language.strip()
+
 
 class BotAccessMessages(BaseModel):
     private_chat: str
     required_user_missing: str
     required_user_not_configured: str
+    wrong_chat: str = ""
 
 
 class BotNotesMessages(BaseModel):
@@ -143,6 +168,11 @@ class ProfanityContent(BaseModel):
     invariable: dict[str, str] = Field(default_factory=dict)
 
 
+class MemoryContent(BaseModel):
+    enabled: bool = True
+    extraction_prompt: str = ""
+
+
 class RagContent(BaseModel):
     turn_planner_prompt: str = ""
     query_rewrite_prompt: str = ""
@@ -163,6 +193,7 @@ class AppContent(BaseModel):
     decision: DecisionContent
     profanity: ProfanityContent = Field(default_factory=ProfanityContent)
     rag: RagContent = Field(default_factory=RagContent)
+    memory: MemoryContent = Field(default_factory=MemoryContent)
 
 
 def resolve_content_path() -> Path:

@@ -16,9 +16,16 @@ ACTIVE_MEMBER_STATUSES = {
 
 
 class ChatAccessGuard:
-    def __init__(self, required_user_telegram_id: int | None = None) -> None:
+    def __init__(
+        self,
+        required_user_telegram_id: int | None = None,
+        allowed_chat_telegram_id: int | None = None,
+    ) -> None:
         self._required_user_id = (
             required_user_telegram_id or settings.required_user_telegram_id
+        )
+        self._allowed_chat_id = (
+            allowed_chat_telegram_id or settings.allowed_chat_telegram_id
         )
         self._messages = get_content().bot.access
 
@@ -41,6 +48,8 @@ class ChatAccessGuard:
         }
 
     async def ensure_access(self, message: IncomingMessage) -> str | None:
+        if self._allowed_chat_id and message.telegram_chat_id != self._allowed_chat_id:
+            return self._messages.wrong_chat.strip()
         if not self.is_group_chat(message):
             return self._messages.private_chat.strip()
         if not self._required_user_id:

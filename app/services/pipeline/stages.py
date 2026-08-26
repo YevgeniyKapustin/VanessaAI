@@ -15,6 +15,7 @@ from app.decision.models import DecisionAction
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.decision.gate.protocols import PlannerPrefilterProtocol, TurnPlannerProtocol
 from app.decision.protocols import DecisionEngineProtocol
+from app.knowledge.retriever import KnowledgeRetriever
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.query_rewriter import QueryRewriter
 from app.rag.search.react_retriever import retrieve_with_react
@@ -146,10 +147,12 @@ class RetrieveStage:
         retriever: ContextRetrieverProtocol,
         humor_pipeline: HumorPipelineProtocol,
         uow: UnitOfWorkProtocol | None,
+        knowledge: KnowledgeRetriever | None = None,
     ) -> None:
         self._retriever = retriever
         self._humor = humor_pipeline
         self._uow = uow
+        self._knowledge = knowledge
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         if self._uow is not None:
@@ -188,11 +191,22 @@ class RetrieveStage:
                 ctx.humor_rag_ms,
             )
 
+        if self._knowledge is not None and ctx.turn_plan is not None:
+            ctx.knowledge_blocks = await self._knowledge.fetch(
+                knowledge_indexes=ctx.turn_plan.knowledge_indexes,
+                knowledge_query=ctx.turn_plan.knowledge_query,
+                humor_ok=ctx.turn_plan.humor_ok,
+                humor_query=ctx.turn_plan.humor_query,
+                user_message=ctx.turn.message,
+            )
+
         logger.info(
-            "turn_stage rag request_id=%s context=%s deep_search=%s rag_ms=%.1f",
+            "turn_stage rag request_id=%s context=%s deep_search=%s "
+            "knowledge=%s rag_ms=%.1f",
             get_request_id(),
             ctx.context_count,
             ctx.turn_plan.deep_search,
+            len(ctx.knowledge_blocks),
             ctx.rag_ms,
         )
         return True
@@ -210,6 +224,7 @@ class ComposeStage:
             context_blocks=ctx.context_blocks,
             session_messages=session_messages,
             humor_quotes=ctx.humor_quotes or None,
+            knowledge_blocks=ctx.knowledge_blocks or None,
             sender_telegram_id=ctx.turn.sender_telegram_id,
             sender_name=ctx.sender_name,
         )

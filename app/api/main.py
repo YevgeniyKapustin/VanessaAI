@@ -10,7 +10,12 @@ from app.api.routes import chat, health, metrics
 from app.config import settings
 from app.core.logging_setup import configure_logging
 from app.db.base import Base
-from app.db.session import engine
+from app.db.session import async_session_factory, engine
+from app.knowledge.index import KnowledgeIndex
+from app.knowledge.memory_planner import MemoryPlanner
+from app.knowledge.sweep import SweepAnalyzer, SweepWorker
+from app.knowledge.vault import KnowledgeVault
+from app.knowledge.writer import KnowledgeVaultWriter
 from app.rag.embeddings.local_embeddings import preload_embedding_model
 
 configure_logging("api")
@@ -24,9 +29,38 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
         logger.warning("API_AUTO_CREATE_SCHEMA enabled: used create_all")
     await create_vector_store().ensure_collection()
+    vault = KnowledgeVault()
+    await vault.ensure_structure()
+
+    sweep_task: asyncio.Task | None = None
+    if settings.knowledge_sweep_enabled:
+        vault_index = KnowledgeIndex(vault)
+        sweep = SweepAnalyzer(
+            vault,
+            MemoryPlanner(),
+            KnowledgeVaultWriter(vault, vault_index),
+            interval_messages=settings.knowledge_sweep_interval_messages,
+            batch_size=settings.knowledge_sweep_batch_size,
+            window_size=settings.knowledge_sweep_window_size,
+            window_overlap=settings.knowledge_sweep_window_overlap,
+        )
+        worker = SweepWorker(
+            sweep,
+            async_session_factory,
+            poll_seconds=settings.knowledge_sweep_poll_seconds,
+        )
+        sweep_task = asyncio.create_task(worker.run_forever())
+
     await asyncio.to_thread(preload_embedding_model)
     await create_embedding_provider().embed("warmup")
     yield
+
+    if sweep_task is not None:
+        sweep_task.cancel()
+        try:
+            await sweep_task
+        except asyncio.CancelledError:
+            pass
     await engine.dispose()
 
 

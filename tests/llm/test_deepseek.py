@@ -79,3 +79,12 @@ def test_should_retry_only_transient_errors(provider: DeepSeekLLMProvider):
     assert provider._should_retry(transient) is True
     assert provider._should_retry(fatal) is False
     assert provider._should_retry(RuntimeError("x")) is False
+
+
+@pytest.mark.asyncio
+async def test_deepseek_generate_includes_critic_feedback(provider: DeepSeekLLMProvider):
+    await provider.generate("hello", [], critic_feedback="добавь больше иронии")
+    call = provider._client.chat.completions.create.await_args
+    user_prompt = call.kwargs["messages"][1]["content"]
+    assert "Humor editor's note" in user_prompt
+    assert "добавь больше иронии" in user_prompt

@@ -23,8 +23,8 @@ def test_build_user_prompt_includes_session_context():
     ]
     prompt = builder.build_user_prompt("где там...", [], session_messages=session)
 
-    assert "Недавняя переписка" in prompt
+    assert "Recent correspondence" in prompt
     assert "про тик ток" in prompt
     assert "[assistant] поняла" in prompt
-    assert prompt.index("Недавняя переписка") < prompt.index("Текущее сообщение")
+    assert prompt.index("Recent correspondence") < prompt.index("Current message")
     assert "где там..." in prompt

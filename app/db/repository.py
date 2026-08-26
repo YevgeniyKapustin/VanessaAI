@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.messages import RAG_SOURCE_ROLE, StoredMessage
@@ -185,6 +185,38 @@ class MessageRepository:
         )
         rows = list(reversed(result.mappings().all()))
         return [self._row_to_stored(row) for row in rows]
+
+    async def get_newer_than(
+        self,
+        after_message_id: int,
+        limit: int = 200,
+    ) -> list[StoredMessage]:
+        """User messages with id > after_message_id, ascending (sweep cursor)."""
+        result = await self._session.execute(
+            text(
+                """
+                SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
+                       m.role, m.content, m.qdrant_point_id, m.created_at,
+                       COALESCE(u.nickname, u.first_name, u.username) AS sender_name
+                FROM messages m
+                LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
+                WHERE m.role = 'user' AND m.id > :after_message_id
+                ORDER BY m.id ASC
+                LIMIT :limit
+                """
+            ),
+            {"after_message_id": after_message_id, "limit": limit},
+        )
+        return [self._row_to_stored(row) for row in result.mappings().all()]
+
+    async def count_newer_than(self, after_message_id: int) -> int:
+        result = await self._session.execute(
+            select(func.count(Message.id)).where(
+                Message.role == RAG_SOURCE_ROLE,
+                Message.id > after_message_id,
+            )
+        )
+        return int(result.scalar_one())
 
     async def fulltext_search(
         self,

@@ -123,7 +123,7 @@ async def test_cmd_note_rejects_non_owner_dm():
     services = BotServices(
         chat_client=AsyncMock(),
         access_guard=access_guard,
-        notes=AsyncMock(),
+        knowledge=AsyncMock(),
         texts=get_content().bot,
     )
     router = create_notes_router(services)
@@ -136,22 +136,22 @@ async def test_cmd_note_rejects_non_owner_dm():
 
 
 @pytest.mark.asyncio
-async def test_cmd_note_saves_for_owner():
+async def test_cmd_note_saves_to_inbox_for_owner():
     message = make_telegram_message(text="/note buy milk", chat_type=ChatType.PRIVATE)
     message.from_user.id = 42
     message.answer = AsyncMock()
     message.photo = None
     access_guard = MagicMock()
     access_guard.ensure_owner_dm = MagicMock(return_value=None)
-    notes = AsyncMock()
-    notes.is_configured = True
-    notes.save_note = AsyncMock(
-        return_value=MagicMock(relative_path="telegram/x.md", filename="x.md")
-    )
+    knowledge = AsyncMock()
+    knowledge.is_configured = True
+    knowledge.ensure_structure = AsyncMock()
+    knowledge.write_attachment = AsyncMock(return_value="inbox/attachments/x.jpg")
+    knowledge.write_note = AsyncMock(return_value="inbox/2026-08-26_000000.md")
     services = BotServices(
         chat_client=AsyncMock(),
         access_guard=access_guard,
-        notes=notes,
+        knowledge=knowledge,
         texts=get_content().bot,
     )
     router = create_notes_router(services)
@@ -161,5 +161,9 @@ async def test_cmd_note_saves_for_owner():
         CommandObject(prefix="/", command="note", args="buy milk"),
     )
 
-    notes.save_note.assert_awaited_once()
-    assert "telegram/x.md" in message.answer.await_args.args[0]
+    knowledge.write_note.assert_awaited_once()
+    args = knowledge.write_note.await_args.args
+    assert args[0].startswith("inbox/")
+    assert args[1]["type"] == "note"
+    assert "buy milk" in args[2]
+    assert "inbox/" in message.answer.await_args.args[0]

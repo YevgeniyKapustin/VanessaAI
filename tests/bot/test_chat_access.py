@@ -87,3 +87,44 @@ def test_owner_dm_rejects_other_user():
     error = guard.ensure_owner_dm(incoming)
 
     assert error == texts.owner_only.strip()
+
+
+@pytest.mark.asyncio
+async def test_non_allowed_chat_rejected_when_single_chat_configured():
+    guard = ChatAccessGuard(
+        required_user_telegram_id=999,
+        allowed_chat_telegram_id=-100999,
+    )
+    incoming = make_incoming(chat_id=-100123)
+    texts = get_content().bot.access
+
+    error = await guard.ensure_access(incoming)
+
+    assert error == texts.wrong_chat.strip()
+
+
+@pytest.mark.asyncio
+async def test_allowed_chat_proceeds_to_normal_checks():
+    guard = ChatAccessGuard(
+        required_user_telegram_id=999,
+        allowed_chat_telegram_id=-100123,
+    )
+    incoming = make_incoming(chat_id=-100123, user_in_chat=True)
+
+    error = await guard.ensure_access(incoming)
+
+    assert error is None
+
+
+@pytest.mark.asyncio
+async def test_non_allowed_private_chat_rejected_as_wrong_chat():
+    guard = ChatAccessGuard(
+        required_user_telegram_id=999,
+        allowed_chat_telegram_id=-100999,
+    )
+    incoming = make_incoming(chat_type=ChatType.PRIVATE, chat_id=42)
+    texts = get_content().bot.access
+
+    error = await guard.ensure_access(incoming)
+
+    assert error == texts.wrong_chat.strip()

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     required_user_telegram_id: int = 0
+    # If set (> 0), the bot only works in this single Telegram chat.
+    allowed_chat_telegram_id: int = 0
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -35,6 +37,12 @@ class Settings(BaseSettings):
     deepseek_model: str = "deepseek-chat"
     deepseek_planner_model: str = ""
     deepseek_max_tokens: int = 4096
+
+    # Humor Critic (Generator–Critic pattern)
+    critic_enabled: bool = False
+    critic_max_iterations: int = 1
+    critic_model: str = ""
+    critic_apply_to_all: bool = False
 
     rag_context_min: int = 20
     rag_context_max: int = 50
@@ -98,6 +106,26 @@ class Settings(BaseSettings):
     obsidian_git_user_name: str = "VanessaAI Bot"
     obsidian_git_user_email: str = "bot@vanessa.local"
 
+    # Knowledge vault — the bot's own machine-only structured memory.
+    knowledge_path: str = "knowledge"
+    knowledge_git_enabled: bool = True
+    knowledge_git_remote: str = "origin"
+    knowledge_git_branch: str = ""
+    knowledge_git_user_name: str = "VanessaAI Bot"
+    knowledge_git_user_email: str = "bot@vanessa.local"
+    knowledge_max_blocks: int = 3
+    knowledge_people_max_blocks: int = 1
+    knowledge_model: str = ""
+    knowledge_memory_enabled: bool = True
+    knowledge_memory_cooldown_seconds: int = 300
+    knowledge_memory_max_tokens: int = 512
+    knowledge_sweep_enabled: bool = True
+    knowledge_sweep_interval_messages: int = 50
+    knowledge_sweep_batch_size: int = 200
+    knowledge_sweep_window_size: int = 40
+    knowledge_sweep_window_overlap: int = 10
+    knowledge_sweep_poll_seconds: int = 60
+
     @property
     def planner_model(self) -> str:
         if self.llm_provider == "claude":
@@ -106,6 +134,14 @@ class Settings(BaseSettings):
             return self.anthropic_model
         if self.deepseek_planner_model.strip():
             return self.deepseek_planner_model.strip()
+        return self.deepseek_model
+
+    @property
+    def resolved_critic_model(self) -> str:
+        if self.critic_model.strip():
+            return self.critic_model.strip()
+        if self.llm_provider == "claude":
+            return self.anthropic_model
         return self.deepseek_model
 
     @property

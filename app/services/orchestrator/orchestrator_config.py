@@ -17,6 +17,9 @@ class OrchestratorConfig:
     humor_window_after: int = 4
     humor_max_quotes: int = 3
     humor_min_quote_score: float = 2.5
+    critic_enabled: bool = False
+    critic_max_iterations: int = 1
+    critic_apply_to_all: bool = False
 
     @classmethod
     def from_settings(cls) -> "OrchestratorConfig":
@@ -32,4 +35,7 @@ class OrchestratorConfig:
             humor_window_after=settings.rag_humor_window_after,
             humor_max_quotes=settings.rag_humor_max_quotes,
             humor_min_quote_score=settings.rag_humor_min_quote_score,
+            critic_enabled=settings.critic_enabled,
+            critic_max_iterations=settings.critic_max_iterations,
+            critic_apply_to_all=settings.critic_apply_to_all,
         )

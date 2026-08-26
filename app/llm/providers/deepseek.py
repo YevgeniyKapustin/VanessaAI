@@ -6,6 +6,7 @@ from openai import APIStatusError, AsyncOpenAI
 from app.config.content import AppContent, get_content
 from app.config.settings import settings
 from app.core.messages import ContextBlock, ContextMessage
+from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.format.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompts.prompt_builder import PromptBuilder
@@ -68,10 +69,12 @@ class DeepSeekLLMProvider:
         context_blocks: list[ContextBlock],
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
+        knowledge_blocks: list[KnowledgeBlock] | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
+        critic_feedback: str | None = None,
     ) -> str:
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
@@ -79,8 +82,10 @@ class DeepSeekLLMProvider:
             context_blocks,
             session_messages=session_messages,
             humor_quotes=humor_quotes,
+            knowledge_blocks=knowledge_blocks,
             sender_telegram_id=sender_telegram_id,
             sender_name=sender_name,
+            critic_feedback=critic_feedback,
         )
         message_count = sum(len(block.messages) for block in context_blocks)
         logger.info(

@@ -1,5 +1,6 @@
 import io
 import logging
+from datetime import datetime, timezone
 
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
@@ -7,6 +8,7 @@ from aiogram.types import Message as TelegramMessage
 
 from app.bot.container import BotServices
 from app.bot.messages import IncomingMessage
+from app.knowledge.format import INBOX, TYPE_NOTE, today
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ def create_notes_router(services: BotServices) -> Router:
             await telegram_message.answer(error)
             return
 
-        if not services.notes.is_configured:
+        if not services.knowledge.is_configured:
             await telegram_message.answer(services.texts.notes.not_configured.strip())
             return
 
@@ -45,14 +47,31 @@ def create_notes_router(services: BotServices) -> Router:
             return
 
         try:
-            saved = await services.notes.save_note(
-                text,
-                attachment_bytes=attachment_bytes,
-                attachment_suffix=attachment_suffix,
+            await services.knowledge.ensure_structure()
+            stamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d_%H%M%S")
+            note_path = f"{INBOX}/{stamp}.md"
+
+            body_parts: list[str] = []
+            if text:
+                body_parts.append(text)
+            if attachment_bytes:
+                suffix = (
+                    attachment_suffix
+                    if attachment_suffix.startswith(".")
+                    else f".{attachment_suffix}"
+                )
+                attachment_rel = f"{INBOX}/attachments/{stamp}{suffix}"
+                await services.knowledge.write_attachment(attachment_rel, attachment_bytes)
+                body_parts.append(f"![[{attachment_rel}]]")
+
+            saved = await services.knowledge.write_note(
+                note_path,
+                {"type": TYPE_NOTE, "date": today(), "tags": [INBOX]},
+                "\n\n".join(body_parts),
             )
         except Exception as exc:
             logger.exception(
-                "obsidian_note_failed chat_id=%s sender_id=%s",
+                "knowledge_note_failed chat_id=%s sender_id=%s",
                 incoming.telegram_chat_id,
                 incoming.sender_telegram_id,
             )
@@ -62,12 +81,12 @@ def create_notes_router(services: BotServices) -> Router:
             return
 
         await telegram_message.answer(
-            services.texts.notes.success.format(filename=saved.relative_path).strip()
+            services.texts.notes.success.format(filename=saved).strip()
         )
         logger.info(
-            "obsidian_note_ok chat_id=%s path=%s",
+            "knowledge_note_ok chat_id=%s path=%s",
             incoming.telegram_chat_id,
-            saved.relative_path,
+            saved,
         )
 
     return router

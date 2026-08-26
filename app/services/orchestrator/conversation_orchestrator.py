@@ -8,6 +8,7 @@ from app.core.protocols import (
     MessageRepositoryProtocol,
     UserRepositoryProtocol,
 )
+from app.knowledge.memory_stage import MemoryStage
 from app.core.request_context import get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionAction
@@ -28,6 +29,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         retrieve: PipelineStage,
         compose: PipelineStage,
         finalize: PipelineStage,
+        critique: PipelineStage | None = None,
+        memory: MemoryStage | None = None,
     ) -> None:
         self._messages = messages
         self._users = users
@@ -36,6 +39,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         self._retrieve = retrieve
         self._compose = compose
         self._finalize = finalize
+        self._critique = critique
+        self._memory = memory
 
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
         ctx = TurnPipelineContext(turn=turn)
@@ -74,7 +79,17 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
 
         await self._retrieve.run(ctx)
         await self._compose.run(ctx)
+        if self._critique is not None:
+            await self._critique.run(ctx)
         await self._finalize.run(ctx)
+        if self._memory is not None:
+            try:
+                await self._memory.run(
+                    recent_messages=ctx.recent,
+                    source_message_ids=[ctx.user_msg.id] if ctx.user_msg else None,
+                )
+            except Exception:
+                logger.exception("memory_stage_run_failed request_id=%s", get_request_id())
         self._log_processed(turn, ctx)
         assert ctx.result is not None
         return ctx.result
@@ -101,11 +116,15 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             return
 
         turn_plan = ctx.turn_plan
+        critic_verdict = ctx.critic_verdict
+        critic_status = critic_verdict.status.value if critic_verdict else "-"
+        critic_score = critic_verdict.score if critic_verdict else 0
         logger.info(
             "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "
             "reason=%s relevance=%.3f search=%r skip=%s humor_quotes=%s "
-            "context=%s plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f "
-            "rag_ms=%.1f humor_rag_ms=%.1f llm_ms=%.1f total_ms=%.1f",
+            "context=%s critic_status=%s critic_score=%s critic_iterations=%s "
+            "plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f rag_ms=%.1f "
+            "humor_rag_ms=%.1f llm_ms=%.1f critic_ms=%.1f total_ms=%.1f",
             get_request_id(),
             turn.telegram_chat_id,
             turn.sender_telegram_id,
@@ -116,11 +135,15 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             turn_plan.skip_search if turn_plan else True,
             len(ctx.humor_quotes),
             ctx.result.context_count,
+            critic_status,
+            critic_score,
+            ctx.critic_iterations,
             ctx.plan_ms,
             ctx.embed_ms,
             ctx.decision_ms,
             ctx.rag_ms,
             ctx.humor_rag_ms,
             ctx.llm_ms,
+            ctx.critic_ms,
             total_ms,
         )

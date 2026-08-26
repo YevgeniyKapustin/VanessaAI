@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from anthropic import APIStatusError, AsyncAnthropic
+from openai import APIStatusError, AsyncOpenAI
 
 from app.config.content import AppContent, get_content
 from app.config.settings import settings
@@ -14,10 +14,10 @@ from app.llm.format.reply_format import capitalize_sentences
 logger = logging.getLogger(__name__)
 
 
-class ClaudeLLMProvider:
+class DeepSeekLLMProvider:
     def __init__(
         self,
-        client: AsyncAnthropic | None = None,
+        client: AsyncOpenAI | None = None,
         model: str | None = None,
         prompt_builder: PromptBuilder | None = None,
         profanity_substitutor: ProfanitySubstitutor | None = None,
@@ -26,8 +26,8 @@ class ClaudeLLMProvider:
         content: AppContent | None = None,
     ) -> None:
         self._content = content or get_content()
-        self._client = client or AsyncAnthropic(api_key=settings.anthropic_api_key)
-        self._model = model or settings.anthropic_model
+        self._client = client
+        self._model = model or settings.deepseek_model
         self._prompts = prompt_builder or PromptBuilder(self._content)
         self._profanity = profanity_substitutor
         self._max_retries = (
@@ -39,6 +39,15 @@ class ClaudeLLMProvider:
             generation
             or self._content.llm.generation.composer.to_params()
         )
+
+    @property
+    def _openai_client(self) -> AsyncOpenAI:
+        if self._client is None:
+            self._client = AsyncOpenAI(
+                api_key=settings.deepseek_api_key,
+                base_url=settings.deepseek_base_url,
+            )
+        return self._client
 
     def _should_retry(self, exc: Exception) -> bool:
         if isinstance(exc, APIStatusError):
@@ -94,19 +103,17 @@ class ClaudeLLMProvider:
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
-                response = await self._client.messages.create(
+                response = await self._openai_client.chat.completions.create(
                     model=self._model,
-                    system=system,
                     messages=[
-                        {
-                            "role": "user",
-                            "content": user_prompt,
-                        }
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user_prompt},
                     ],
                     **self._generation.to_llm_kwargs(),
                 )
+                text = response.choices[0].message.content or ""
                 return capitalize_sentences(
-                    self._substitute_profanity(response.content[0].text)
+                    self._substitute_profanity(text)
                 )
             except Exception as exc:
                 last_error = exc

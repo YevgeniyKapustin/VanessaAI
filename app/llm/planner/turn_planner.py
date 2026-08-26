@@ -5,7 +5,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from anthropic import AsyncAnthropic
+from app.llm.providers.protocols import LLMChatCompleter, create_chat_completer
 
 from app.config.content import AppContent, get_content
 from app.config.conversation_config import load_conversation_config
@@ -35,7 +35,7 @@ class TurnPlanner:
         content: AppContent | None = None,
         *,
         use_llm: bool | None = None,
-        llm_client: AsyncAnthropic | None = None,
+        llm_client: LLMChatCompleter | None = None,
         llm_model: str | None = None,
         generation: LLMGenerationParams | None = None,
     ) -> None:
@@ -113,7 +113,7 @@ class TurnPlanner:
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
     ) -> TurnPlan:
-        client = self._client or AsyncAnthropic(api_key=settings.anthropic_api_key)
+        client = self._client or create_chat_completer()
         prompt = self._content.rag.planner_prompt.format(
             message=message,
             recent_messages=self._format_recent(recent_messages) or "(нет)",
@@ -123,12 +123,13 @@ class TurnPlanner:
             reply_to_other_user="да" if reply_to_other_user else "нет",
             listen_window="да" if in_listen_window else "нет",
         )
-        response = await client.messages.create(
-            model=self._model,
-            messages=[{"role": "user", "content": prompt}],
-            **self._generation.to_anthropic_kwargs(),
-        )
-        raw = response.content[0].text.strip()
+        raw = (
+            await client.complete(
+                self._model,
+                [{"role": "user", "content": prompt}],
+                **self._generation.to_llm_kwargs(),
+            )
+        ).strip()
         return self._parse_llm_response(message, raw)
 
     @staticmethod

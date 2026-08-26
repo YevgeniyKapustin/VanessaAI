@@ -10,7 +10,8 @@ class LLMGenerationParams:
     presence_penalty: float = 0.0
     frequency_penalty: float = 0.0
 
-    def to_anthropic_kwargs(self) -> dict[str, Any]:
+    def to_llm_kwargs(self) -> dict[str, Any]:
+        """Sampling params shared by OpenAI-compatible (DeepSeek) and Claude APIs."""
         return {
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,

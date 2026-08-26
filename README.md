@@ -51,7 +51,7 @@ Telegram → Bot → API
   → Ingress (persist, session, nicknames)
   → Gate (prefilter → Turn Planner → Decision Engine)
   → Retrieve (hybrid RAG, optional ReAct, humor RAG + reflexion)
-  → Compose (Claude)
+  → Compose (DeepSeek)
   → Post (formatting, profanity filter)
 ```
 
@@ -74,7 +74,7 @@ and a relevance threshold.
 | Language | Python 3.12 |
 | Bot | aiogram 3 |
 | API | FastAPI, uvicorn |
-| LLM | Anthropic Claude (composer + turn planner) |
+| LLM | DeepSeek (default) or Claude, via provider adapter |
 | Embeddings | sentence-transformers (`all-MiniLM-L6-v2`), local |
 | Vector DB | Qdrant (HNSW, quantization, on-disk) |
 | SQL | PostgreSQL 16, SQLAlchemy 2 async, Alembic |
@@ -103,7 +103,8 @@ and a relevance threshold.
 ### Requirements
 
 - Docker and Docker Compose
-- Keys: `TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`
+- Keys: `TELEGRAM_BOT_TOKEN`, `DEEPSEEK_API_KEY` (or `ANTHROPIC_API_KEY` if
+  `LLM_PROVIDER=claude`)
 - `REQUIRED_USER_TELEGRAM_ID` — owner user ID (the bot only works in chats
   where that user is present)
 - `API_INTERNAL_TOKEN` — shared secret between bot and API
@@ -139,7 +140,7 @@ app/
   bot/          Telegram handlers, formatting, API client
   api/          FastAPI, DI, routes
   decision/     Gate: prefilter, rules, intent, rate limit
-  llm/          Claude, prompt builder, turn planner, humor
+  llm/          Providers (DeepSeek/Claude), prompts, planner, humor
   rag/          Hybrid search, Qdrant, ReAct, query rewriter
   services/     Orchestrator, pipeline stages, metrics
   ingest/       Telegram export import
@@ -164,13 +165,15 @@ LLM sampling). Environment variables cover secrets and infrastructure.
 | `llm.generation.planner` | Sampling params for turn planner |
 | `persona.*` | System prompt: identity, voice, rules |
 
-`presence_penalty` / `frequency_penalty` are stored for portability; Anthropic API
+`presence_penalty` / `frequency_penalty` are stored for portability; DeepSeek API
 does not apply them today.
 
 | Env variable | Purpose |
 |--------------|---------|
+| `LLM_PROVIDER` | LLM backend: `deepseek` (default) or `claude` |
+| `DEEPSEEK_PLANNER_MODEL` | Separate DeepSeek planner model (optional) |
+| `ANTHROPIC_PLANNER_MODEL` | Separate Claude planner model (optional) |
 | `DECISION_RELEVANCE_THRESHOLD` | Semantic relevance threshold |
-| `ANTHROPIC_PLANNER_MODEL` | Separate planner model (optional) |
 | `RAG_REACT_MAX_STEPS` | ReAct steps for deep search |
 | `CONTENT_CONFIG_PATH` | Path to persona and prompts |
 

@@ -24,10 +24,17 @@ class Settings(BaseSettings):
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dimensions: int = 384
 
+    llm_provider: str = "deepseek"  # "deepseek" (default) or "claude"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
     anthropic_planner_model: str = ""
     anthropic_max_tokens: int = 4096
+
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+    deepseek_planner_model: str = ""
+    deepseek_max_tokens: int = 4096
 
     rag_context_min: int = 20
     rag_context_max: int = 50
@@ -93,9 +100,13 @@ class Settings(BaseSettings):
 
     @property
     def planner_model(self) -> str:
-        if self.anthropic_planner_model.strip():
-            return self.anthropic_planner_model.strip()
-        return self.anthropic_model
+        if self.llm_provider == "claude":
+            if self.anthropic_planner_model.strip():
+                return self.anthropic_planner_model.strip()
+            return self.anthropic_model
+        if self.deepseek_planner_model.strip():
+            return self.deepseek_planner_model.strip()
+        return self.deepseek_model
 
     @property
     def database_url(self) -> str:

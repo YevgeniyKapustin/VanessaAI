@@ -20,13 +20,13 @@ def test_planner_generation_is_more_deterministic():
     assert params.max_tokens == 192
 
 
-def test_anthropic_kwargs_include_sampling_params():
+def test_llm_kwargs_include_sampling_params():
     params = LLMGenerationParams(
         temperature=0.7,
         top_p=0.9,
         max_tokens=512,
     )
-    assert params.to_anthropic_kwargs() == {
+    assert params.to_llm_kwargs() == {
         "max_tokens": 512,
         "temperature": 0.7,
     }

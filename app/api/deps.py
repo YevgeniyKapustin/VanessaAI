@@ -27,7 +27,7 @@ from app.decision import (
     DecisionEngine,
     QdrantRelevanceChecker,
 )
-from app.llm.providers.claude import ClaudeLLMProvider
+from app.llm.providers import create_llm_provider
 from app.rag.search.hybrid_search import HybridSearchService
 from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
@@ -135,7 +135,7 @@ def get_query_rewriter() -> QueryRewriter:
 
 
 def get_llm_provider() -> LLMProviderProtocol:
-    return ClaudeLLMProvider()
+    return create_llm_provider()
 
 
 def get_decision_engine(

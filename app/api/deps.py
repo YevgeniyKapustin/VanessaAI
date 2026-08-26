@@ -30,6 +30,11 @@ from app.decision import (
 from app.knowledge.index import KnowledgeIndex
 from app.knowledge.memory_planner import MemoryPlanner
 from app.knowledge.memory_stage import MemoryStage
+from app.knowledge.metrics.deterministic import DeterministicMetricsCalculator
+from app.knowledge.metrics.pipeline import MetricsPipeline
+from app.knowledge.metrics.planner import MetricsPlanner
+from app.knowledge.metrics.retriever import MetricsRetriever
+from app.knowledge.metrics.store import MetricsStore
 from app.knowledge.retriever import KnowledgeRetriever
 from app.knowledge.vault import KnowledgeVault
 from app.knowledge.writer import KnowledgeVaultWriter
@@ -183,6 +188,9 @@ async def get_incoming_turn_handler(
     config = OrchestratorConfig.from_settings()
     container = get_app_container()
     humor = HumorPipeline(hybrid_search, hybrid_search, config)
+    knowledge_vault = KnowledgeVault()
+    knowledge_index = KnowledgeIndex(knowledge_vault)
+    metrics_retriever = MetricsRetriever(knowledge_vault, knowledge_index)
     gate = GateStage(
         query_rewriter,
         decision_engine,
@@ -192,9 +200,8 @@ async def get_incoming_turn_handler(
         messages,
         indexing,
         container.ignore_registry,
+        metrics_retriever=metrics_retriever,
     )
-    knowledge_vault = KnowledgeVault()
-    knowledge_index = KnowledgeIndex(knowledge_vault)
     knowledge = KnowledgeRetriever(
         knowledge_vault,
         knowledge_index,
@@ -207,10 +214,33 @@ async def get_incoming_turn_handler(
         enabled=settings.knowledge_memory_enabled,
         cooldown_seconds=settings.knowledge_memory_cooldown_seconds,
     )
-    retrieve = RetrieveStage(hybrid_search, humor, uow, knowledge=knowledge)
+    metrics_pipeline = MetricsPipeline(
+        MetricsStore(knowledge_vault, knowledge_index),
+        MetricsPlanner(),
+        DeterministicMetricsCalculator(
+            history_days=settings.knowledge_metrics_history_days
+        ),
+        enabled=settings.knowledge_metrics_enabled,
+        cooldown_seconds=settings.knowledge_metrics_cooldown_seconds,
+    )
+    retrieve = RetrieveStage(
+        hybrid_search,
+        humor,
+        uow,
+        knowledge=knowledge,
+        meme_catalog=container.meme_catalog,
+        meme_decider=container.meme_decider,
+    )
     compose = ComposeStage(llm)
     critique = CritiqueStage(llm, HumorCritic(), config)
-    finalize = FinalizeStage(messages, indexing, decision_engine, config, metrics)
+    finalize = FinalizeStage(
+        messages,
+        indexing,
+        decision_engine,
+        config,
+        metrics,
+        meme_decider=container.meme_decider,
+    )
     return ConversationOrchestrator(
         messages=messages,
         users=users,
@@ -221,4 +251,5 @@ async def get_incoming_turn_handler(
         critique=critique,
         finalize=finalize,
         memory=memory,
+        metrics=metrics_pipeline,
     )

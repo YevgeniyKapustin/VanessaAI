@@ -1,9 +1,12 @@
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from app.core.messages import ContextMessage
 from app.decision.detectors.intent import IntentResult
 from app.decision.models import DecisionResult
 from app.decision.detectors.triggers import TriggerResult
+
+if TYPE_CHECKING:
+    from app.knowledge.metrics.schema import PersonMetrics
 
 
 class IntentDetectorProtocol(Protocol):
@@ -52,6 +55,7 @@ class DecisionEngineProtocol(Protocol):
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
+        sender_metrics: "PersonMetrics | None" = None,
         humor_ok: bool = False,
     ) -> DecisionResult: ...
 

@@ -5,6 +5,7 @@ from app.decision.gate.reply_expectation import (
     is_dismissal_request,
     is_third_party_about_bot,
     is_unsolicited_remark,
+    mention_warrants_reply,
 )
 
 
@@ -96,3 +97,31 @@ def test_contextual_vocative_address_detects_nickname_imperative():
 def test_contextual_vocative_address_rejects_status_remarks():
     assert is_contextual_vocative_address("гомункул работает") is False
     assert is_contextual_vocative_address("видите, гомункул работает") is False
+
+
+def test_bare_mention_warrants_reply():
+    assert mention_warrants_reply("ванесса") is True
+    assert mention_warrants_reply("hi") is True
+
+
+def test_mention_warrants_reply_with_reply_to_bot():
+    assert mention_warrants_reply(
+        "да именно",
+        reply_to_bot=True,
+    ) is True
+
+
+def test_mention_warrants_reply_with_planner_go_ahead():
+    assert mention_warrants_reply(
+        "ванесса",
+        should_reply=True,
+    ) is True
+
+
+def test_status_remark_mention_does_not_warrant_reply():
+    assert mention_warrants_reply("ванесса работает") is False
+    assert mention_warrants_reply("видите, ванесса работает") is False
+
+
+def test_closer_mention_does_not_warrant_reply():
+    assert mention_warrants_reply("ванесса, пока") is False

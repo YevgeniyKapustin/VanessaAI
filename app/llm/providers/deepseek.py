@@ -3,7 +3,7 @@ import logging
 
 from openai import APIStatusError, AsyncOpenAI
 
-from app.config.content import AppContent, get_content
+from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.messages import ContextBlock, ContextMessage
 from app.knowledge.schema import KnowledgeBlock
@@ -70,11 +70,15 @@ class DeepSeekLLMProvider:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        meme_blocks: list[MemeDefContent] | None = None,
+        meme_menu: list[MemeDefContent] | None = None,
+        metrics_block: str | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
+        tone: str | None = None,
     ) -> str:
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
@@ -83,19 +87,25 @@ class DeepSeekLLMProvider:
             session_messages=session_messages,
             humor_quotes=humor_quotes,
             knowledge_blocks=knowledge_blocks,
+            meme_blocks=meme_blocks,
+            meme_menu=meme_menu,
+            metrics_block=metrics_block,
             sender_telegram_id=sender_telegram_id,
             sender_name=sender_name,
             critic_feedback=critic_feedback,
+            tone=tone,
         )
         message_count = sum(len(block.messages) for block in context_blocks)
         logger.info(
             "llm_prompt_prepared model=%s context_blocks=%s context_messages=%s "
-            "humor_quotes=%s system_chars=%s user_chars=%s temperature=%s "
-            "top_p=%s max_tokens=%s",
+            "humor_quotes=%s meme_blocks=%s meme_menu=%s system_chars=%s "
+            "user_chars=%s temperature=%s top_p=%s max_tokens=%s",
             self._model,
             len(context_blocks),
             message_count,
             len(humor_quotes or []),
+            len(meme_blocks or []),
+            len(meme_menu or []),
             len(system),
             len(user_prompt),
             self._generation.temperature,

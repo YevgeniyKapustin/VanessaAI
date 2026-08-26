@@ -3,8 +3,10 @@ from typing import Protocol
 
 from app.core.messages import ContextMessage
 from app.decision.detectors.intent import IntentResult
-from app.decision.models import DecisionResult
 from app.decision.detectors.triggers import TriggerResult
+from app.decision.gate.reply_expectation import mention_warrants_reply
+from app.decision.models import DecisionResult
+from app.knowledge.metrics.schema import PersonMetrics
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,10 +25,41 @@ class DecisionContext:
     reply_to_other_user: bool = False
     in_listen_window: bool = False
     sender_telegram_id: int = 0
+    sender_metrics: PersonMetrics | None = None
 
     @property
     def directly_addressed(self) -> bool:
         return self.mentions_bot or self.reply_to_bot
+
+    @property
+    def addressed_with_expectation(self) -> bool:
+        """Direct address that implies the sender expects a reply.
+
+        A bare mention is not enough on its own: the message must also signal
+        an expected response (question, trigger keyword, imperative/vocative
+        request, direct reply to the bot, or planner go-ahead). Covers both
+        Telegram-level mentions (mentions_bot / reply_to_bot) and the bot name
+        appearing in the text (intent.mentions_bot).
+        """
+        if not (self.mentions_bot or self.reply_to_bot or self.intent.mentions_bot):
+            return False
+        return self._mention_warrants_reply()
+
+    @property
+    def telegram_addressed_with_expectation(self) -> bool:
+        """Like ``addressed_with_expectation`` but only for Telegram-level
+        mention entities / replies, not for the bot name merely appearing in
+        the text."""
+        if not (self.mentions_bot or self.reply_to_bot):
+            return False
+        return self._mention_warrants_reply()
+
+    def _mention_warrants_reply(self) -> bool:
+        return mention_warrants_reply(
+            self.text,
+            should_reply=self.should_reply,
+            reply_to_bot=self.reply_to_bot,
+        )
 
 
 class DecisionRule(Protocol):

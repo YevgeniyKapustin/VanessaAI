@@ -158,6 +158,8 @@ class FakeLLM:
     def __init__(self) -> None:
         self.last_humor_quotes: list[str] | None = None
         self.last_knowledge_blocks: list[KnowledgeBlock] | None = None
+        self.last_meme_blocks: list | None = None
+        self.last_meme_menu: list | None = None
         self.last_critic_feedback: str | None = None
 
     async def generate(
@@ -167,15 +169,23 @@ class FakeLLM:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        meme_blocks: list | None = None,
+        meme_menu: list | None = None,
+        metrics_block: str | None = None,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
+        tone: str | None = None,
     ) -> str:
+        self.last_metrics_block = metrics_block
         self.last_humor_quotes = humor_quotes
         self.last_knowledge_blocks = knowledge_blocks
+        self.last_meme_blocks = meme_blocks
+        self.last_meme_menu = meme_menu
         self.last_sender_name = sender_name
         self.last_critic_feedback = critic_feedback
+        self.last_tone = tone
         return f"echo: {user_message}"
 
 
@@ -218,6 +228,7 @@ class FakeDecisionEngine:
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
+        sender_metrics: object | None = None,
         humor_ok: bool = False,
     ) -> DecisionResult:
         return DecisionResult(
@@ -412,3 +423,91 @@ async def test_orchestrator_runs_critique_on_humor_turn_when_enabled():
     assert result.reply == "echo: ну ладно поработаю"
     assert critic.reviews == ["echo: ну ладно поработаю"]
     assert llm.last_critic_feedback is None
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_critic_no_reply_ignores_turn():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    retriever = FakeContextRetriever()
+    llm = FakeLLM()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    critic = FakeCritic(
+        CriticVerdict(
+            status=CriticStatus.NO_REPLY,
+            score=3,
+            reason="вопрос риторический",
+        )
+    )
+    planner = QueryRewriter(use_llm=False)
+    planner.prepare = AsyncMock(
+        return_value=TurnPlan(
+            original="ну ладно поработаю",
+            text="работа",
+            skip_search=False,
+            humor_ok=True,
+            humor_query="личь работа",
+        ),
+    )
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        retriever=retriever,
+        llm=llm,
+        critic=critic,
+        query_rewriter=planner,
+        defer_index_on_ignore=False,
+        critic_enabled=True,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ну ладно поработаю",
+            sender_telegram_id=42,
+        )
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.NO_REPLY_NEEDED
+    assert result.reply is None
+    # the user message is stored and indexed, but no assistant message is created
+    assert len(messages._messages) == 1
+    assert len(indexing.scheduled) == 1
+    # no reply was recorded, so consecutive/rate-limit state is untouched
+    assert decision.recorded_chats == []
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_extracts_sticker_tag_from_reply():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+
+    class StickerLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "Успех!\n[sticker:delight]"
+
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=StickerLLM(),
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="как дела",
+            sender_telegram_id=42,
+        )
+    )
+
+    assert result.sticker_tag == "delight"
+    # the marker must not leak into the reply or the stored assistant message
+    assert result.reply == "Успех!"
+    stored = [m for m in messages._messages.values() if m.role == "assistant"]
+    assert len(stored) == 1
+    assert stored[0].content == "Успех!"

@@ -2,6 +2,7 @@ from app.decision.detectors.intent import IntentDetector, IntentResult
 from app.decision.gate.reply_expectation import (
     is_contextual_vocative_address,
     listen_window_warrants_reply,
+    mention_warrants_reply,
 )
 
 
@@ -19,11 +20,18 @@ def is_addressed_to_bot(
     if reply_to_other_user and not mentions_bot and not reply_to_bot:
         return False
 
-    if mentions_bot or reply_to_bot:
-        return True
-
     detected = intent if intent is not None else IntentDetector().detect(text)
-    if detected.mentions_bot:
+
+    if mentions_bot or reply_to_bot or detected.mentions_bot:
+        if not mention_warrants_reply(
+            text,
+            should_reply=should_reply,
+            reply_to_bot=reply_to_bot,
+        ):
+            # The bot was mentioned, but the message is a status remark,
+            # unsolicited group observation, third-party talk, or a closer —
+            # none imply the sender expects a response.
+            return False
         return True
 
     if should_reply is True:

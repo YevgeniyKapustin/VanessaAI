@@ -18,11 +18,22 @@ from app.llm.prompts.session_format import format_session_messages, session_cont
 logger = logging.getLogger(__name__)
 
 
+_TONE_VALUES = frozenset({"neutral", "serious", "ironic", "humorous"})
+
+
+def _parse_tone(value: object) -> str:
+    if not isinstance(value, str):
+        return "neutral"
+    tone = value.strip().lower()
+    return tone if tone in _TONE_VALUES else "neutral"
+
+
 @dataclass(frozen=True, slots=True)
 class TurnPlan:
     original: str
     text: str
     skip_search: bool
+    tone: str = "neutral"
     humor_ok: bool = False
     humor_query: str = ""
     should_reply: bool | None = None
@@ -68,10 +79,11 @@ class TurnPlanner:
             result = self._fallback(message)
             logger.info(
                 "turn_plan source=fallback search=%r skip=%s should_reply=%s "
-                "humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r",
+                "tone=%s humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
+                result.tone,
                 result.humor_ok,
                 result.humor_query,
                 result.knowledge_indexes,
@@ -97,11 +109,12 @@ class TurnPlanner:
         else:
             logger.info(
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
-                "humor_ok=%s humor_query=%r deep_search=%s "
+                "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
+                result.tone,
                 result.humor_ok,
                 result.humor_query,
                 result.deep_search,
@@ -159,6 +172,7 @@ class TurnPlanner:
             )
 
         text = str(payload.get("search_query", "")).strip()
+        tone = _parse_tone(payload.get("tone"))
         humor_ok = payload.get("humor_ok") is True
         humor_query = str(payload.get("humor_query", "")).strip()
         if humor_ok and not humor_query:
@@ -175,6 +189,7 @@ class TurnPlanner:
             original=original,
             text=text,
             skip_search=not text,
+            tone=tone,
             humor_ok=humor_ok,
             humor_query=humor_query if humor_ok else "",
             should_reply=should_reply,

@@ -25,6 +25,7 @@ class FakeLLM:
         sender_name: str | None = None,
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
+        tone: str | None = None,
     ) -> str:
         self.calls.append(critic_feedback)
         return self.reply
@@ -105,6 +106,28 @@ async def test_critique_reject_then_approve_regenerates_once():
     assert ctx.critic_iterations == 2
     assert ctx.critic_verdict is not None
     assert ctx.critic_verdict.approved is True
+
+
+@pytest.mark.asyncio
+async def test_critique_no_reply_stops_without_reply():
+    llm = FakeLLM()
+    critic = ScriptedCritic(
+        CriticVerdict(
+            status=CriticStatus.NO_REPLY,
+            score=3,
+            reason="вопрос риторический",
+        ),
+    )
+    stage = CritiqueStage(llm, critic, _config())
+
+    ctx = _ctx(humor_quotes=["найди работу"])
+    assert await stage.run(ctx) is False
+
+    assert ctx.reply is None
+    assert llm.calls == []
+    assert ctx.critic_iterations == 1
+    assert ctx.critic_verdict is not None
+    assert ctx.critic_verdict.no_reply is True
 
 
 @pytest.mark.asyncio

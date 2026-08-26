@@ -100,3 +100,21 @@ def test_prompt_builder_includes_reply_language_rule():
 
     assert "## Reply language" in prompt
     assert "Default: Russian" in prompt
+
+
+def test_prompt_builder_includes_tone_note():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "нужно срочно починить сервер",
+        [],
+        tone="serious",
+    )
+
+    assert "Detected tone of the user's message: serious." in prompt
+    assert "answer the substance straight" in prompt
+
+
+def test_prompt_builder_omits_tone_note_when_not_provided():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [])
+    assert "Detected tone of the user's message" not in prompt

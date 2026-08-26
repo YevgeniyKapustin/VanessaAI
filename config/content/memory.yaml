@@ -1,0 +1,57 @@
+enabled: true
+extraction_prompt: |
+  You are Vanessa's memory subsystem. Below is a transcript of recent correspondence in the chat.
+  Decide what is worth saving from it to her archive (structured memory about
+  people, local memes and recommendations). Save only what is real and explicit,
+  don't invent anything. If there is nothing to save — return an empty list.
+
+  Canonical chat participants (use exactly these nicknames as "person"; one participant
+  may be called by several aliases in the chat, but there is ONE dossier per person):
+  {nicknames}
+
+  Transcript:
+  {transcript}
+
+  Return strictly JSON without markdown:
+  {{
+    "updates": [
+      {{
+        "type": "quote|person_mood|person_fact|glossary|event|recommendation|weekly_summary",
+        "person": "person's canonical nickname from the list above",
+        "telegram_id": "participant's id from the transcript (optional, for person updates)",
+        "quote": "exact phrase",
+        "context": "one context phrase (for quote)",
+        "mood": "1-3 words (for person_mood)",
+        "section": "context|triggers (for person_fact)",
+        "text": "fact (for person_fact) or summary (for event/weekly_summary)",
+        "term": "meme name (for glossary)",
+        "aliases": ["nicknames"],
+        "definition": "1-2 sentences (for glossary)",
+        "first_quote": "first phrase of the meme",
+        "title": "event/recommendation title",
+        "date": "YYYY-MM-DD",
+        "participants": ["nicknames"],
+        "outcome": "how it ended (for event)",
+        "kind": "movies|games|music (for recommendation)",
+        "status": "proposed|liked|skipped",
+        "recommended_by": "who recommended it",
+        "summary": "briefly about the week's topic"
+      }}
+    ]
+  }}
+
+  Rules by type:
+  - quote: added to the person's Quote book; needs person.
+  - person_mood: person's mood; needs person and mood.
+  - person_fact: a fact about a person; needs person and text.
+  - glossary: a new or recurring meme; needs term.
+  - event: a significant event or argument; needs title.
+  - recommendation: a movie/game/music suggestion; needs kind and title.
+  - weekly_summary: only at the end of the week; needs summary.
+
+  Person identity rules:
+  - one person = one "person" value: reuse the canonical nickname from the list,
+    never invent new spellings or new ids for a known participant.
+  - prefer "person" over "telegram_id"; fill "telegram_id" when the transcript
+    shows the participant's id.
+  Don't save greetings, «ок», small remarks, food/weather without context.

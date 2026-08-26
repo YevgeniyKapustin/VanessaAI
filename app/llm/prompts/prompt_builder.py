@@ -1,4 +1,4 @@
-from app.config.content import AppContent, get_content
+from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.messages import ContextBlock, ContextMessage
@@ -61,10 +61,14 @@ class PromptBuilder:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        meme_blocks: list[MemeDefContent] | None = None,
+        meme_menu: list[MemeDefContent] | None = None,
+        metrics_block: str | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         critic_feedback: str | None = None,
+        tone: str | None = None,
     ) -> str:
         llm = self._content.llm
         if context_blocks:
@@ -94,6 +98,31 @@ class PromptBuilder:
                 for quote in humor_quotes
             ]
             parts.append(f"{llm.humor_quotes_header}\n" + "\n".join(quote_lines))
+        if meme_blocks:
+            meme_lines = [
+                llm.meme_line.format(
+                    name=meme.name,
+                    meaning=meme.meaning,
+                    usage=meme.usage or "по ситуации",
+                )
+                for meme in meme_blocks
+            ]
+            parts.append(f"{llm.meme_header}\n" + "\n".join(meme_lines))
+        if meme_menu:
+            menu_lines = [
+                llm.meme_menu_line.format(
+                    name=meme.name,
+                    usage=meme.usage or "по ситуации",
+                )
+                for meme in meme_menu
+            ]
+            parts.append(f"{llm.meme_menu_header}\n" + "\n".join(menu_lines))
+        if metrics_block and metrics_block.strip():
+            header = (
+                self._content.metrics.feedback_header.strip()
+                or "My mood and relationship notes about the sender:"
+            )
+            parts.append(f"{header}\n{metrics_block.strip()}")
         session_text = format_session_messages(
             session_messages or [],
             self._content,
@@ -106,6 +135,8 @@ class PromptBuilder:
             sender_name=sender_name,
         )
         parts.append(f"{llm.current_message_header}\n{current_line}")
+        if tone and llm.tone_note.strip():
+            parts.append(llm.tone_note.strip().format(tone=tone))
         if critic_feedback and critic_feedback.strip():
             fix_header = (
                 llm.critic.fix_instruction_header.strip()
@@ -140,4 +171,14 @@ class PromptBuilder:
         profanity = self._content.profanity
         if profanity.enabled and profanity.instruction.strip():
             parts.append(f"## Emotional language\n{profanity.instruction.strip()}")
+        stickers = self._content.stickers
+        if stickers.enabled and llm.sticker_instruction.strip():
+            instruction = llm.sticker_instruction.strip()
+            tag_lines = stickers.tag_lines()
+            if tag_lines:
+                instruction += (
+                    "\n\nAvailable sticker tags (ONLY these exist in the pack — "
+                    "use exactly these tags, nothing else):\n" + "\n".join(tag_lines)
+                )
+            parts.append(f"## Stickers\n{instruction}")
         return "\n\n".join(parts)

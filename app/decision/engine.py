@@ -1,6 +1,8 @@
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext, DecisionRule
+from app.decision.metrics_rule import SenderMetricsRule
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
+from app.knowledge.metrics.schema import PersonMetrics
 from app.decision.protocols import (
     IntentDetectorProtocol,
     NoiseFilterProtocol,
@@ -13,6 +15,7 @@ from app.decision.gate.compose_gate import ComposeGatePolicy
 from app.decision.gate.protocols import ReplyEligibilityProtocol
 from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
+from app.decision.repeated_question import RepeatedQuestionRule
 from app.decision.rules import (
     ConsecutiveReplyRule,
     DirectAddressRule,
@@ -64,6 +67,7 @@ class DecisionEngine:
             RateLimitRule(rate_limiter),
             NoiseRule(noise_filter),
             HardIgnoreRule(eligibility),
+            RepeatedQuestionRule(),
             DirectAddressRule(),
             ConsecutiveReplyRule(
                 intent_detector,
@@ -75,6 +79,7 @@ class DecisionEngine:
             PlannerOverreachRule(),
             IntentRule(),
             TriggerRule(),
+            SenderMetricsRule(),
             RelevanceRule(relevance_threshold),
         ]
         self._pre_relevance_rules = [
@@ -99,6 +104,7 @@ class DecisionEngine:
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_telegram_id: int = 0,
+        sender_metrics: PersonMetrics | None = None,
         humor_ok: bool = False,
     ) -> DecisionResult:
         intent = self._intent.detect(text)
@@ -119,6 +125,7 @@ class DecisionEngine:
             reply_to_other_user=reply_to_other_user,
             in_listen_window=in_listen_window,
             sender_telegram_id=sender_telegram_id,
+            sender_metrics=sender_metrics,
         )
         for rule in self._pre_relevance_rules:
             result = rule.evaluate(base_context)
@@ -149,6 +156,7 @@ class DecisionEngine:
             reply_to_other_user=reply_to_other_user,
             in_listen_window=in_listen_window,
             sender_telegram_id=sender_telegram_id,
+            sender_metrics=sender_metrics,
         )
         for rule in self._relevance_rules:
             result = rule.evaluate(context)

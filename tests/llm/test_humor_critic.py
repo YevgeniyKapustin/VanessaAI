@@ -41,6 +41,17 @@ def test_parse_verdict_rejected_with_fix_instruction():
     assert verdict.fix_instruction == "используй гиперболу"
 
 
+def test_parse_verdict_no_reply():
+    verdict = parse_critic_verdict(
+        '{"status": "NO_REPLY", "score": 3, "reason": "вопрос риторический", '
+        '"fix_instruction": ""}'
+    )
+    assert verdict.status is CriticStatus.NO_REPLY
+    assert verdict.approved is False
+    assert verdict.no_reply is True
+    assert verdict.reason == "вопрос риторический"
+
+
 def test_parse_verdict_invalid_status_falls_back_approved():
     verdict = parse_critic_verdict(
         '{"status": "MAYBE", "score": 5, "reason": "?", "fix_instruction": ""}'
@@ -71,6 +82,8 @@ def test_parse_verdict_score_clamped():
 def test_verdict_approved_property():
     assert CriticVerdict(status=CriticStatus.APPROVED, score=5).approved is True
     assert CriticVerdict(status=CriticStatus.REJECTED, score=2).approved is False
+    assert CriticVerdict(status=CriticStatus.NO_REPLY, score=3).no_reply is True
+    assert CriticVerdict(status=CriticStatus.APPROVED, score=5).no_reply is False
 
 
 class FakeCompleter:
@@ -113,6 +126,22 @@ async def test_humor_critic_review_rejected():
     verdict = await critic.review("ответ", user_message="тема", humor_quotes=[])
     assert verdict.status is CriticStatus.REJECTED
     assert verdict.fix_instruction == "добавь мем"
+
+
+@pytest.mark.asyncio
+async def test_humor_critic_review_no_reply():
+    critic = HumorCritic(
+        llm_client=FakeCompleter(
+            '{"status": "NO_REPLY", "score": 3, "reason": "не требует ответа", '
+            '"fix_instruction": ""}'
+        ),
+        model="critic-model",
+    )
+    verdict = await critic.review("ответ", user_message="кто?", humor_quotes=[])
+    assert verdict.status is CriticStatus.NO_REPLY
+    assert verdict.no_reply is True
+    assert verdict.approved is False
+    assert verdict.reason == "не требует ответа"
 
 
 @pytest.mark.asyncio

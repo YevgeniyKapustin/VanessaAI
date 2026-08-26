@@ -13,6 +13,10 @@ from app.db.base import Base
 from app.db.session import async_session_factory, engine
 from app.knowledge.index import KnowledgeIndex
 from app.knowledge.memory_planner import MemoryPlanner
+from app.knowledge.metrics.deterministic import DeterministicMetricsCalculator
+from app.knowledge.metrics.pipeline import MetricsPipeline
+from app.knowledge.metrics.planner import MetricsPlanner
+from app.knowledge.metrics.store import MetricsStore
 from app.knowledge.sweep import SweepAnalyzer, SweepWorker
 from app.knowledge.vault import KnowledgeVault
 from app.knowledge.writer import KnowledgeVaultWriter
@@ -35,6 +39,14 @@ async def lifespan(app: FastAPI):
     sweep_task: asyncio.Task | None = None
     if settings.knowledge_sweep_enabled:
         vault_index = KnowledgeIndex(vault)
+        metrics_pipeline = MetricsPipeline(
+            MetricsStore(vault, vault_index),
+            MetricsPlanner(),
+            DeterministicMetricsCalculator(
+                history_days=settings.knowledge_metrics_history_days
+            ),
+            enabled=settings.knowledge_metrics_enabled,
+        )
         sweep = SweepAnalyzer(
             vault,
             MemoryPlanner(),
@@ -43,6 +55,7 @@ async def lifespan(app: FastAPI):
             batch_size=settings.knowledge_sweep_batch_size,
             window_size=settings.knowledge_sweep_window_size,
             window_overlap=settings.knowledge_sweep_window_overlap,
+            metrics=metrics_pipeline,
         )
         worker = SweepWorker(
             sweep,

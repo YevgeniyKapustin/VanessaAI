@@ -6,6 +6,22 @@ from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 
+# One file per responsibility (SRP). Each file holds the body of its top-level
+# section from the original monolithic config/content.yaml.
+CONTENT_SECTIONS: dict[str, str] = {
+    "bot": "bot.yaml",
+    "persona": "persona.yaml",
+    "conversation": "conversation.yaml",
+    "llm": "llm.yaml",
+    "decision": "decision.yaml",
+    "memory": "memory.yaml",
+    "metrics": "metrics.yaml",
+    "rag": "rag.yaml",
+    "profanity": "profanity.yaml",
+    "stickers": "stickers.yaml",
+    "memes": "memes.yaml",
+}
+
 
 class LLMGenerationProfile(BaseModel):
     temperature: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -94,6 +110,7 @@ class LLMContent(BaseModel):
     language: str = ""
     reply_instruction: str = ""
     compose_instruction: str = ""
+    sticker_instruction: str = ""
     context_header: str
     context_block_header: str = (
         "--- Block {index} ({started_at} — {ended_at}) ---"
@@ -109,8 +126,19 @@ class LLMContent(BaseModel):
     user_line: str = "{time} [user:{sender}]{anchor} {content}"
     humor_quotes_header: str = "Recognizable memes and jokes from the chat (if appropriate):"
     humor_quote_line: str = "- {quote}"
+    meme_header: str = (
+        "Curated memes I know (use ONLY if it fits perfectly, max one per reply, "
+        "paraphrase — never dump the definition, never force it):"
+    )
+    meme_line: str = "- {name}: {meaning} (appropriate: {usage})"
+    meme_menu_header: str = (
+        "Memes I can use if one fits (optional, max one per reply, "
+        "never force, never dump the definition):"
+    )
+    meme_menu_line: str = "- {name} — {usage}"
     knowledge_header: str = "From my archive on the topic:"
     knowledge_block_line: str = "- [{kind}] {title}:\n  {content}"
+    tone_note: str = ""
     owner_message_note: str = ""
     critic: CriticContent = Field(default_factory=CriticContent)
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
@@ -173,6 +201,15 @@ class MemoryContent(BaseModel):
     extraction_prompt: str = ""
 
 
+class MetricsContent(BaseModel):
+    enabled: bool = True
+    extraction_prompt: str = ""
+    feedback_header: str = "My mood and relationship notes about the sender:"
+    feedback_line: str = (
+        "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"
+    )
+
+
 class RagContent(BaseModel):
     turn_planner_prompt: str = ""
     query_rewrite_prompt: str = ""
@@ -185,6 +222,97 @@ class RagContent(BaseModel):
         return self.query_rewrite_prompt
 
 
+class StickerDefContent(BaseModel):
+    """One sticker of the bot's pack with the personality tags it can play."""
+
+    name: str
+    tags: list[str] = Field(default_factory=list)
+    weight: float = Field(default=1.0, ge=0.1, le=5.0)
+    file_id: str | None = None
+    index: int | None = None
+    emoji: str | None = None
+
+
+class StickersContent(BaseModel):
+    """Sticker engagement: catalog + anti-spam gates.
+
+    ``probability`` is the chance to actually send a sticker when the LLM tagged a
+    reply; ``heuristic_probability`` — when the tag came from text heuristics.
+    ``min_messages_between`` is the hard cap: no more than one sticker per that many
+    bot replies in a chat.
+
+    The sticker list here is the single source of truth for which tags exist: the
+    LLM prompt is built from ``available_tags`` and the pipeline only passes on tags
+    that are in this list, so the model can never suggest a sticker we don't have.
+    """
+
+    enabled: bool = True
+    sticker_set_name: str = "VanessaBot"
+    probability: float = Field(default=0.6, ge=0.0, le=1.0)
+    heuristic_probability: float = Field(default=0.45, ge=0.0, le=1.0)
+    min_messages_between: int = Field(default=3, ge=1, le=100)
+    stickers: list[StickerDefContent] = Field(default_factory=list)
+
+    @property
+    def available_tags(self) -> tuple[str, ...]:
+        """Personality tags that actually have a sticker in the pack.
+
+        The single source of truth: the LLM may only suggest these tags and the
+        pipeline only passes these on to the bot.
+        """
+        tags: set[str] = set()
+        for sticker in self.stickers:
+            tags.update(tag.lower() for tag in sticker.tags)
+        return tuple(sorted(tags))
+
+    def tag_lines(self) -> list[str]:
+        """Human-readable tag list for the LLM prompt (tag + emoji hint)."""
+        lines: list[str] = []
+        seen: set[str] = set()
+        for sticker in self.stickers:
+            for tag in sticker.tags:
+                key = tag.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                hint = sticker.emoji or sticker.name
+                lines.append(f"- {key} ({hint})" if hint else f"- {key}")
+        return lines
+
+
+class MemeDefContent(BaseModel):
+    """One curated internet meme the bot knows and may reference in dialogue.
+
+    ``keywords`` are trigger words/phrases matched against the user's message
+    (case-insensitive, word-boundary guarded). ``meaning`` and ``usage`` are shown
+    to the LLM so it applies the meme correctly instead of inventing its own.
+    """
+
+    name: str
+    keywords: list[str] = Field(default_factory=list)
+    meaning: str = ""
+    usage: str = ""
+    example: str | None = None
+
+
+class MemesContent(BaseModel):
+    """Curated meme catalog + anti-spam gates.
+
+    Memes are only offered to the composer when the turn planner says humor is
+    appropriate (``humor_ok``) AND one of a meme's keywords matches the message
+    AND the anti-spam gate allows it (``probability`` + a per-chat cooldown of
+    ``min_messages_between`` bot replies, mirroring the sticker gate).
+    """
+
+    enabled: bool = True
+    probability: float = Field(default=0.4, ge=0.0, le=1.0)
+    min_messages_between: int = Field(default=8, ge=1, le=100)
+    max_per_reply: int = Field(default=1, ge=1, le=5)
+    offer_on_humor: bool = True
+    offer_max: int = Field(default=6, ge=1, le=25)
+    memes: list[MemeDefContent] = Field(default_factory=list)
+
+
 class AppContent(BaseModel):
     persona: PersonaContent
     llm: LLMContent
@@ -194,26 +322,44 @@ class AppContent(BaseModel):
     profanity: ProfanityContent = Field(default_factory=ProfanityContent)
     rag: RagContent = Field(default_factory=RagContent)
     memory: MemoryContent = Field(default_factory=MemoryContent)
+    metrics: MetricsContent = Field(default_factory=MetricsContent)
+    stickers: StickersContent = Field(default_factory=StickersContent)
+    memes: MemesContent = Field(default_factory=MemesContent)
 
 
-def resolve_content_path() -> Path:
+def resolve_content_source() -> Path:
+    """Locate the content config: a directory of per-section files or a single YAML file."""
     configured = Path(settings.content_config_path)
-    if configured.is_file():
+    if configured.exists():
         return configured
     project_root = Path(__file__).resolve().parents[2]
-    fallback = project_root / "config" / "content.yaml"
-    if fallback.is_file():
+    fallback = project_root / "config" / "content"
+    if fallback.is_dir():
         return fallback
     raise FileNotFoundError(
         f"Content config not found: {configured} or {fallback}"
     )
 
 
+def _load_content_dict(source: Path) -> dict:
+    """Assemble the AppContent dict from either a directory of section files
+    or a single monolithic YAML file (backward compatible)."""
+    if source.is_dir():
+        data: dict = {}
+        for section, filename in CONTENT_SECTIONS.items():
+            section_file = source / filename
+            if section_file.is_file():
+                raw = yaml.safe_load(section_file.read_text(encoding="utf-8"))
+                data[section] = raw or {}
+        return data
+    raw = yaml.safe_load(source.read_text(encoding="utf-8"))
+    return raw or {}
+
+
 @lru_cache
 def get_content() -> AppContent:
-    path = resolve_content_path()
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return AppContent.model_validate(raw)
+    source = resolve_content_source()
+    return AppContent.model_validate(_load_content_dict(source))
 
 
 def get_bot_name_aliases() -> tuple[str, ...]:

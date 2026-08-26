@@ -1,0 +1,27 @@
+block_consecutive_replies: true
+noise_max_words: 1
+noise_max_chars: 12
+default_bot_names:
+  - vanessa
+  - ванесса
+trigger_keywords:
+  - помоги
+  - объясни
+  - найди
+  - расскажи
+question_words:
+  - кто
+  - что
+  - где
+  - когда
+  - почему
+  - как
+  - зачем
+  - какой
+  - какая
+  - какие
+  - сколько
+modal_verbs:
+  - можно
+  - нужно
+  - стоит

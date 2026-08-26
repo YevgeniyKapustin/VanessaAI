@@ -1,0 +1,170 @@
+vector_min_score: 0.35
+turn_planner_prompt: |
+  ## Task
+  Step 1 before the bot replies: plan the search over the group chat history.
+
+  ## Input
+  Message:
+  {message}
+
+  Recent context:
+  {recent_messages}
+
+  Participant nicknames:
+  {nicknames}
+
+  Telegram signals:
+  - reply to the bot: {reply_to_bot}
+  - reply to another participant: {reply_to_other_user}
+  - @mention of the bot: {mentions_bot}
+  - window after the bot's reply (≤2 messages): {listen_window}
+
+  ## Output format
+  JSON without markdown:
+  {{
+    "should_reply": false,
+    "search_query": "...",
+    "skip": false,
+    "tone": "neutral",
+    "humor_ok": false,
+    "humor_query": "",
+    "deep_search": false,
+    "knowledge_indexes": [],
+    "knowledge_query": ""
+  }}
+
+  ## should_reply
+  true — addressing the bot, a question to her, a continuation of her dialogue, an explicit expectation of a reaction.
+  false — side conversation, thinking out loud, goodbye, «ок», a question to another by nickname,
+  «что думаете про X» without addressing the bot, a request to be silent, discussing the bot in 3rd
+  person («почему она меня игнорирует») without «ты/ванесса/@mention».
+
+  Clarifications:
+  - reply_to_bot=yes or mentions_bot=yes → usually true;
+  - reply_to_other_user=yes without mention/bot name → should_reply=false, humor_ok=false;
+  - listen_window=yes — reply only on an explicit address or should_reply=true;
+    people chatting among themselves, gossip about «она» — false;
+  - «она/её» about the bot without a direct address → false;
+  - skip=true → should_reply=false.
+
+  Echo quotes (stay silent):
+  - the user repeats a recent bot reply verbatim or almost verbatim — not a dialogue;
+  - reply to the bot with the same phrase the bot just wrote → should_reply=false;
+  - a chain "bot said → user quoted → bot replied → user quoted again"
+    → should_reply=false, skip=true;
+  - if a new question or substance is added to the quote — should_reply=true.
+
+  Repeated question (stay silent):
+  - the same question was already asked and the bot already answered it in the recent
+    context → a repeat without new details → should_reply=false, skip=true;
+  - if the user adds new details, narrows the question or asks a follow-up
+    («а подробнее?», «и что с X?») → not a repeat, reply normally.
+
+  ## tone
+  Classify the user's message tone (one value, always fill it):
+  - "serious" — a real, important question or a request for help;
+  - "ironic" — a joke, banter, sarcasm, a light jab;
+  - "humorous" — clearly playful, mocking, meme-ish;
+  - "neutral" — ordinary chat, not clearly serious or joking.
+  This drives how the bot replies: serious → answer straight without jokes,
+  ironic/humorous → keep the banter, neutral → usual tone.
+
+  Unusual bot nicknames (not «Ванесса»):
+  - participants may call her nicknames from the chat (гомункул etc.);
+  - imperative + nickname («продолжай список гомункул») → should_reply=true;
+  - nickname with a comma («гомункул, дальше») → should_reply=true;
+  - «X работает» / «видите» — an observation between people, not an address → false;
+  - if the bot just answered on the topic — a dialogue continuation → often true.
+
+  ## search_query
+  1–8 words for searching facts:
+  - a short message — restore the topic from the recent correspondence;
+  - a participant's nickname — search as a person («Тик так», not TikTok);
+  - remove addresses to the bot, greetings, junk;
+  - skip=true for «ок», emoticons, goodbyes without a question.
+
+  ## humor_ok / humor_query
+  A separate search for chat memes:
+  - humor_ok=true only for a light jab (not sadness, not seriousness, not goodbye);
+  - humor_query: 2–6 words — who + running joke («Личь работа», «крабер пещера»);
+  - frequent chat jokes, not one-off remarks;
+  - humor_ok=false → humor_query="".
+
+  ## deep_search
+  true — a complex question needing a multi-step search over history (comparison, several
+  topics, «как было с X и Y», technical analysis). false — a regular short query.
+
+  ## knowledge_indexes / knowledge_query
+  When my own archive is needed (structured memory, NOT message history):
+  - people — about a participant: nickname, who they are, habits, mood («что там у Лича»);
+  - lore — internal memes, local jokes, old events («что было про Макса и утку»);
+  - culture — recommendations: movies/games/music;
+  - logs — how the week/day went.
+  knowledge_query: 1–6 words for the archive search.
+  Without an explicit need — knowledge_indexes=[] and knowledge_query="".
+
+  ## Examples (input → JSON)
+
+  «Ванесса, привет» | reply=yes, mention=yes
+  → {"should_reply": true, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «ок» | side chat
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «Личь не делает карты по героям» | reply to another, not the bot
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «видите, гомункул работает» | listen_window=yes, between people
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «почему она меня игнорирует» | about the bot, without ты/ванесса
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «хватит уже» | dismissal
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «да всё сгинь» / «уйди, закрой сессию» | dismissal
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «она плохо понимает когда ты монолог ведёшь» | about the bot, not to her
+  → {"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
+  "humor_query": "", "deep_search": false}
+
+  «что думаете про тик така» | question to the group, not the bot
+  → {"should_reply": false, "search_query": "тик так", "skip": false,
+  "humor_ok": false, "humor_query": "", "deep_search": false}
+
+  «Ванесса, кто такой Тик так» | reply=yes
+  → {"should_reply": true, "search_query": "тик так", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}
+
+  «где там» | context: discussing a file on the disk
+  → {"should_reply": true, "search_query": "файл диск", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}
+
+  «ну ладно поработаю» | light tone
+  → {"should_reply": true, "search_query": "работа", "skip": false,
+  "tone": "ironic", "humor_ok": true, "humor_query": "Личь работа", "deep_search": false}
+
+  «сравни как мы чинили меш и текстуры в unity»
+  → {"should_reply": true, "search_query": "меш текстуры unity", "skip": false,
+  "humor_ok": false, "humor_query": "", "deep_search": true}
+
+  «продолжай список гомункул» | listen_window=yes, nickname instead of the name
+  → {"should_reply": true, "search_query": "список", "skip": false,
+  "humor_ok": false, "humor_query": "", "deep_search": false}
+
+  «Котгаст, ты уже третий круг...» | reply=yes, verbatim quote of the bot's reply
+  → {"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false}
+
+  «ванесса, а что там с починкой unity» | already asked and answered above
+  → {"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false}

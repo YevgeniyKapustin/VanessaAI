@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, TypedDict
 
+from app.config.content import MemeDefContent
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.knowledge.schema import KnowledgeBlock
@@ -50,6 +51,12 @@ class MessageRepositoryProtocol(Protocol):
         self,
         after_message_id: int,
         limit: int = 200,
+    ) -> list[StoredMessage]: ...
+
+    async def get_messages_since(
+        self,
+        days: int,
+        limit: int = 5000,
     ) -> list[StoredMessage]: ...
 
     async def get_recent(self, limit: int = 50) -> list[StoredMessage]: ...
@@ -139,11 +146,15 @@ class LLMProviderProtocol(Protocol):
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        meme_blocks: list[MemeDefContent] | None = None,
+        meme_menu: list[MemeDefContent] | None = None,
+        metrics_block: str | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
+        tone: str | None = None,
     ) -> str: ...
 
 

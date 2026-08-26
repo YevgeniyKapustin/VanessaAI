@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -206,6 +206,34 @@ class MessageRepository:
                 """
             ),
             {"after_message_id": after_message_id, "limit": limit},
+        )
+        return [self._row_to_stored(row) for row in result.mappings().all()]
+
+    async def get_messages_since(
+        self,
+        days: int,
+        limit: int = 5000,
+    ) -> list[StoredMessage]:
+        """All messages (user + assistant) from the last ``days``, ascending.
+
+        Used by the deterministic metrics calculator (presence, activity,
+        reactivity, counters) which needs interleaved messages across senders.
+        """
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await self._session.execute(
+            text(
+                """
+                SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
+                       m.role, m.content, m.qdrant_point_id, m.created_at,
+                       COALESCE(u.nickname, u.first_name, u.username) AS sender_name
+                FROM messages m
+                LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
+                WHERE m.created_at >= :since
+                ORDER BY m.created_at ASC, m.id ASC
+                LIMIT :limit
+                """
+            ),
+            {"since": since, "limit": limit},
         )
         return [self._row_to_stored(row) for row in result.mappings().all()]
 

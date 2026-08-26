@@ -17,7 +17,10 @@ class CritiqueStage:
     Reviews the composed draft with the Critic agent. On REJECTED the draft is
     sent back to the generator together with the critic's fix instruction, up
     to ``critic_max_iterations`` fixes. On the last rejected iteration the
-    latest draft is shipped anyway (fail-open — never block a reply).
+    latest draft is shipped anyway (fail-open — never block a reply). If the
+    critic decides the user's message does not need a reply at all (NO_REPLY),
+    the turn is stopped without a reply (``ctx.reply`` is cleared and ``False``
+    is returned so the caller finishes the turn as ignored).
     """
 
     def __init__(
@@ -47,6 +50,18 @@ class CritiqueStage:
                 humor_quotes=ctx.humor_quotes,
             )
             ctx.critic_verdict = verdict
+
+            if verdict.no_reply:
+                logger.info(
+                    "humor_critic no_reply_needed request_id=%s score=%s "
+                    "reason=%s",
+                    get_request_id(),
+                    verdict.score,
+                    verdict.reason,
+                )
+                ctx.reply = None
+                ctx.critic_ms = (time.perf_counter() - started) * 1000
+                return False
 
             if verdict.approved:
                 break

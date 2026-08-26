@@ -7,3 +7,4 @@ class ChatProcessResult:
     reason: str
     reply: str | None = None
     relevance_score: float = 0.0
+    sticker_tag: str | None = None

@@ -17,6 +17,8 @@ async def main() -> None:
     services = create_bot_services()
     await services.knowledge.ensure_structure()
     bot = Bot(token=settings.telegram_bot_token)
+    if services.stickers is not None:
+        await services.stickers.resolve_file_ids(bot)
     me = await bot.get_me()
     logger.info("Bot started as @%s id=%s", me.username, me.id)
     dp = Dispatcher()

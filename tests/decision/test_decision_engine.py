@@ -594,3 +594,59 @@ async def test_decision_engine_ignores_quote_echo_reply_to_bot(
 
     assert result.action == DecisionAction.IGNORE
     assert result.reason == DecisionReason.QUOTE_ECHO
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_on_bare_mention(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.9)
+
+    result = await engine.decide(
+        text="ванесса",
+        telegram_chat_id=1,
+        recent_messages=[],
+        mentions_bot=True,
+        should_reply=None,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.ADDRESSING
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_ignores_status_remark_mention(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.9)
+
+    result = await engine.decide(
+        text="ванесса работает",
+        telegram_chat_id=1,
+        recent_messages=[],
+        mentions_bot=True,
+        should_reply=None,
+    )
+
+    assert result.action == DecisionAction.IGNORE
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_on_mention_with_question(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+
+    result = await engine.decide(
+        text="ванесса, ты тут?",
+        telegram_chat_id=1,
+        recent_messages=[],
+        mentions_bot=True,
+        should_reply=None,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.ADDRESSING

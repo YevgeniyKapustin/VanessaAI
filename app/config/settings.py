@@ -83,7 +83,9 @@ class Settings(BaseSettings):
     decision_post_reply_listen_count: int = 2
     decision_session_idle_seconds: int = 300
 
-    content_config_path: str = "config/content.yaml"
+    # Directory with one YAML file per section (bot, persona, llm, ...)
+    # or a single monolithic YAML file for backward compatibility.
+    content_config_path: str = "config/content"
     nicknames_config_path: str = "config/nicknames.yaml"
 
     api_host: str = "0.0.0.0"
@@ -108,11 +110,6 @@ class Settings(BaseSettings):
 
     # Knowledge vault — the bot's own machine-only structured memory.
     knowledge_path: str = "knowledge"
-    knowledge_git_enabled: bool = True
-    knowledge_git_remote: str = "origin"
-    knowledge_git_branch: str = ""
-    knowledge_git_user_name: str = "VanessaAI Bot"
-    knowledge_git_user_email: str = "bot@vanessa.local"
     knowledge_max_blocks: int = 3
     knowledge_people_max_blocks: int = 1
     knowledge_model: str = ""
@@ -125,6 +122,19 @@ class Settings(BaseSettings):
     knowledge_sweep_window_size: int = 40
     knowledge_sweep_window_overlap: int = 10
     knowledge_sweep_poll_seconds: int = 60
+
+    # Mood & relationship metrics (knowledge vault).
+    knowledge_metrics_enabled: bool = True
+    knowledge_metrics_model: str = ""
+    knowledge_metrics_max_tokens: int = 768
+    knowledge_metrics_cooldown_seconds: int = 900
+    knowledge_metrics_history_days: int = 14
+
+    # Behavioral feedback from metrics.
+    decision_metrics_rule_enabled: bool = True
+    decision_toxicity_ignore_threshold: float = 0.8
+    decision_trust_ignore_threshold: float = 30.0
+    feedback_tone_enabled: bool = True
 
     @property
     def planner_model(self) -> str:

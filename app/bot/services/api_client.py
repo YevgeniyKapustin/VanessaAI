@@ -80,6 +80,7 @@ class HttpChatApiClient:
             reason=data["reason"],
             reply=data.get("reply"),
             relevance_score=float(data.get("relevance_score", 0.0)),
+            sticker_tag=data.get("sticker_tag"),
         )
         logger.info(
             "api_request_done chat_id=%s action=%s reason=%s "

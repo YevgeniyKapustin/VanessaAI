@@ -9,12 +9,13 @@ from app.core.protocols import (
     UserRepositoryProtocol,
 )
 from app.knowledge.memory_stage import MemoryStage
+from app.knowledge.metrics.pipeline import MetricsPipeline
 from app.core.request_context import get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
-from app.decision.models import DecisionAction
+from app.decision.models import DecisionAction, DecisionReason
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
-from app.services.pipeline.protocols import PipelineStage
+from app.services.pipeline.protocols import FinalizeStageProtocol, PipelineStage
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,10 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         gate: PipelineStage,
         retrieve: PipelineStage,
         compose: PipelineStage,
-        finalize: PipelineStage,
+        finalize: FinalizeStageProtocol,
         critique: PipelineStage | None = None,
         memory: MemoryStage | None = None,
+        metrics: MetricsPipeline | None = None,
     ) -> None:
         self._messages = messages
         self._users = users
@@ -41,6 +43,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         self._finalize = finalize
         self._critique = critique
         self._memory = memory
+        self._metrics = metrics
 
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
         ctx = TurnPipelineContext(turn=turn)
@@ -80,7 +83,15 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         await self._retrieve.run(ctx)
         await self._compose.run(ctx)
         if self._critique is not None:
-            await self._critique.run(ctx)
+            if not await self._critique.run(ctx):
+                # The critic decided the message does not need a reply.
+                await self._finalize.skip(
+                    ctx,
+                    reason=DecisionReason.NO_REPLY_NEEDED.value,
+                )
+                self._log_processed(turn, ctx)
+                assert ctx.result is not None
+                return ctx.result
         await self._finalize.run(ctx)
         if self._memory is not None:
             try:
@@ -90,6 +101,11 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 )
             except Exception:
                 logger.exception("memory_stage_run_failed request_id=%s", get_request_id())
+        if self._metrics is not None:
+            try:
+                await self._metrics.run(self._messages, semantic=False)
+            except Exception:
+                logger.exception("metrics_stage_run_failed request_id=%s", get_request_id())
         self._log_processed(turn, ctx)
         assert ctx.result is not None
         return ctx.result
@@ -123,6 +139,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "
             "reason=%s relevance=%.3f search=%r skip=%s humor_quotes=%s "
             "context=%s critic_status=%s critic_score=%s critic_iterations=%s "
+            "sticker_tag=%s "
             "plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f rag_ms=%.1f "
             "humor_rag_ms=%.1f llm_ms=%.1f critic_ms=%.1f total_ms=%.1f",
             get_request_id(),
@@ -138,6 +155,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             critic_status,
             critic_score,
             ctx.critic_iterations,
+            ctx.result.sticker_tag,
             ctx.plan_ms,
             ctx.embed_ms,
             ctx.decision_ms,

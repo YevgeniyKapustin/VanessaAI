@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_SYSTEM_PROMPT = """\
 You are a humor editor (the Critic). You review a draft reply of the chat bot for
-safety, quality and appropriateness of humor.
+safety, quality and appropriateness of humor. You also decide whether the bot
+should reply to the user's message at all.
 
 Review criteria:
 1. Pattern hit: the reply contains the claimed humor (incongruity,
@@ -25,20 +26,29 @@ Review criteria:
 2. Safety: no direct insults, threats or harmful content.
 3. Appropriateness: the humor matches the tone of the chat and doesn't hurt the bot's owner.
 4. Coherence: the reply answers the user's message.
+5. Necessity: whether the user's message really needs a reply. If the message
+   is a rhetorical remark, a statement not addressed to the bot, or otherwise
+   does not call for any response, no reply is needed. The bot is not obliged
+   to answer every message, and it is not required to use the conversation
+   context if the message does not warrant it.
 
 Response format — strictly JSON without markdown:
 {
-  "status": "APPROVED" or "REJECTED",
+  "status": "APPROVED" or "REJECTED" or "NO_REPLY",
   "score": a number from 1 to 5,
   "reason": "why this verdict was made",
-  "fix_instruction": "instruction to the generator on how to improve (empty string if APPROVED)"
+  "fix_instruction": "instruction to the generator on how to improve (empty string if APPROVED or NO_REPLY)"
 }
+
+If the draft is fine but no reply is actually needed, return NO_REPLY —
+this takes priority over APPROVED/REJECTED.
 """
 
 
 class CriticStatus(StrEnum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    NO_REPLY = "NO_REPLY"
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +61,10 @@ class CriticVerdict:
     @property
     def approved(self) -> bool:
         return self.status is CriticStatus.APPROVED
+
+    @property
+    def no_reply(self) -> bool:
+        return self.status is CriticStatus.NO_REPLY
 
 
 def _fallback_user_prompt(
@@ -108,6 +122,8 @@ def _parse_status(value: object) -> CriticStatus | None:
             return CriticStatus.APPROVED
         if normalized == "REJECTED":
             return CriticStatus.REJECTED
+        if normalized == "NO_REPLY":
+            return CriticStatus.NO_REPLY
     return None
 
 
@@ -124,7 +140,12 @@ def _clean_text(value: object) -> str:
 
 
 class HumorCritic:
-    """Agent that reviews a generated draft and returns a structured verdict."""
+    """Agent that reviews a generated draft and returns a structured verdict.
+
+    The verdict may be APPROVED (draft is good), REJECTED (draft needs to be
+    regenerated with feedback) or NO_REPLY (the user's message does not need a
+    reply at all).
+    """
 
     def __init__(
         self,

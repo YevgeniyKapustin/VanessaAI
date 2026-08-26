@@ -14,6 +14,7 @@ from app.decision.gate.reply_expectation import (
     is_dismissal_request,
     is_third_party_about_bot,
     is_unsolicited_remark,
+    mention_warrants_reply,
 )
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionReason
@@ -149,11 +150,20 @@ class ReplyEligibility:
             max_idle_seconds=self._post_reply_listen_idle_seconds,
         )
 
-        if directly_addressed:
-            return PrefilterVerdict(True, "direct_address")
-
-        if intent.mentions_bot:
-            return PrefilterVerdict(True, "bot_name")
+        if directly_addressed or intent.mentions_bot:
+            if not mention_warrants_reply(
+                text,
+                should_reply=None,
+                reply_to_bot=reply_to_bot,
+            ):
+                # A mention that is a status remark, unsolicited observation,
+                # third-party talk, or closer should not even reach the
+                # planner — it is treated like side talk.
+                return PrefilterVerdict(False, "side_talk")
+            return PrefilterVerdict(
+                True,
+                "direct_address" if directly_addressed else "bot_name",
+            )
 
         if in_listen_window:
             if self._noise.is_noise(text) and not trigger.detected:

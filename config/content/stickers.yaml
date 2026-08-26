@@ -1,0 +1,73 @@
+# Sticker engagement config.
+#
+# The bot plays personality by sending stickers from the pack:
+#   https://t.me/addstickers/VanessaBot
+#
+# The LLM may suggest a tag by appending `[sticker:<tag>]` to the end of a reply;
+# the bot ALSO applies the anti-spam gates below before actually sending anything:
+#   - probability: send only with this chance even when a sticker fits;
+#   - min_messages_between: never more often than once per N bot replies (per chat).
+#
+# `file_id` is set directly from the live pack (getStickerSet), so the bot does not
+# need a network fetch at startup. `index` is the 0-based position in the pack and
+# is only used as a fallback if `file_id` is missing. Refresh the list with:
+#   python scripts/export_sticker_pack.py
+#
+# Current mapping (by emoji meaning):
+#   0 ❤️   → approval      (одобрение / тепло)
+#   1 👋   → greeting/farewell (приветствие и прощание)
+#   2 🤩   → delight       (дикий восторг)
+#   3 😮‍💨 → work          («горит» / выдох под нагрузкой)
+#   4 🤔   → thinking      (задумчивость)
+#   5 🥺   → embarrassment (смущение / «ладно, виновата»)
+# Tags that have no dedicated sticker are mapped onto the closest available one
+# (approval → love, facepalm → irritation, shrug → thinking), so the heuristic
+# fallback always resolves to a real sticker.
+
+enabled: true
+sticker_set_name: "VanessaBot"
+
+# Chance to send a sticker when the LLM tagged the reply as a good fit.
+probability: 0.6
+# Chance for heuristics-only matches (no LLM tag).
+heuristic_probability: 0.45
+# Hard cap: at most one sticker per this many bot replies in a chat.
+min_messages_between: 3
+
+stickers:
+  - name: heart
+    tags: [love]
+    weight: 1.0
+    index: 0
+    emoji: "❤️"
+    file_id: "CAACAgIAAxUAAWqOt_GAnIXjY0ZifpUnPDzG4pFGAAL7pQACWyBwSJSpNLR0IJwXPQQ"
+  - name: wave
+    tags: [greeting, farewell]
+    weight: 1.0
+    index: 1
+    emoji: "👋"
+    file_id: "CAACAgIAAxUAAWqOt_FD3L3wosYC0Nmhzt1flKNQAALlpAACUOtwSH7S8g6ygEZbPQQ"
+  - name: hype
+    tags: [delight]
+    weight: 1.0
+    index: 2
+    emoji: "🤩"
+    file_id: "CAACAgIAAxUAAWqOt_FG_pTszmS2xZQ2PTJCjElcAAKhnwACHul5SMmaGVoma0UjPQQ"
+  - name: burning
+    tags: [irritation]
+    weight: 1.0
+    index: 3
+    emoji: "😮‍💨"
+    file_id: "CAACAgIAAxUAAWqOt_ENKnfqbubNRTlVVCKt0LwlAALCnQACcVl4SEaT9rOILoKVPQQ"
+  - name: thinking
+    tags: [thinking]
+    weight: 1.0
+    index: 4
+    emoji: "🤔"
+    file_id: "CAACAgIAAxUAAWqOt_E3bgABh4iJao4LtM01jyT_NAAC36gAAkCDcUhRq_sPartgIj0E"
+  - name: plead
+    tags: [embarrassment]
+    weight: 1.0
+    index: 5
+    emoji: "🥺"
+    file_id: "CAACAgIAAxUAAWqOt_G5UtBO1XczUI3g1Besyq1nAAKjrQACy4B4SFHv9tZrBxIaPQQ"

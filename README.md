@@ -50,7 +50,7 @@ common problems:
 ## Knowledge vault
 
 Beyond raw message history, Vanessa keeps her own structured memory in a
-repo-local, git-tracked `knowledge/` folder. No human browses it — the format is
+repo-local `knowledge/` folder. No human browses it — the format is
 machine-only, a deterministic contract for the LLM.
 
 | Folder | Contents |
@@ -60,6 +60,7 @@ machine-only, a deterministic contract for the LLM.
 | `Lore/events/` | Chronicles of events and weird arguments |
 | `Culture/` | Movie / game / music recommendations |
 | `Logs/` | Daily and weekly chat logs |
+| `Metrics/` | Per-participant mood & relationship time series (machine YAML) |
 | `inbox/` | Manual `/note` entries |
 
 Every folder keeps a machine `_index.yaml` (alias → file maps), so retrieval
@@ -80,6 +81,31 @@ them deterministically; git gives auditability + rollback.
 (`people` / `lore` / `culture` / `logs`); the humor module always consults the
 `lore` part, and matched notes are injected into the reply prompt under a
 knowledge header.
+
+### Mood & relationship metrics
+
+Each participant gets a typed, machine-readable profile combining qualitative
+and quantitative signals:
+
+| Group | Metrics | Source |
+|-------|---------|--------|
+| Sentiment & valence | `valence`, `volatility`, `sarcasm_index` | LLM |
+| Engagement & dynamics | `constructiveness`, `toxicity`, `support_index` | LLM |
+| Relation to Vanessa | `trust_score`, `distance`, `sympathy` | LLM |
+| Behavioral meta | `presence_stability`, `reactivity_median_s`, `peak_hour`, `active_days`, `message_count`, `reply_rate_to_bot` | DB |
+
+- **Storage** — the current snapshot lives in the person card frontmatter
+  (`People/*.md` → `metrics:`), and a per-date time series is appended to
+  `Metrics/<person>.yaml` for volatility, trends and digests.
+- **Computation** — behavioral metrics are computed from the message DB
+  (`DeterministicMetricsCalculator`); semantic metrics come from an LLM
+  (`MetricsPlanner`). The full pass runs in the background sweep; a throttled
+  deterministic-only pass runs per replied turn.
+- **Behavioral feedback** — the `SenderMetricsRule` in the decision engine can
+  ignore chronically toxic, low-trust senders (with hard guards: never the
+  owner, never direct/triggered/expected replies), and the composer gets a
+  compact “mood and relationship” block to tune the tone — within the fixed
+  persona rules.
 
 ## How a message is processed
 
@@ -193,19 +219,21 @@ app/
   services/     Orchestrator, pipeline stages, metrics
   ingest/       Telegram export import
 config/
-  content.yaml  Persona, prompts, decision triggers
+  content/      Per-section YAML: bot, persona, conversation, llm, decision,
+                memory, metrics, rag, profanity (SRP)
   nicknames.yaml
-knowledge/      Vanessa's git-tracked memory vault (runtime data, own git repo)
+knowledge/      Vanessa's memory vault (runtime data)
 scripts/        import_telegram_history.py, backfill_users.py
 tests/          400 tests
 ```
 
 ## Configuration (essentials)
 
-Behavior tuning lives in **`config/content.yaml`** (persona, conversation window,
-LLM sampling). Environment variables cover secrets and infrastructure.
+Behavior tuning lives in **`config/content/`** — one YAML file per concern
+(persona, conversation window, LLM sampling). Environment variables cover
+secrets and infrastructure.
 
-| `content.yaml` key | Purpose |
+| `content/` key | Purpose |
 |--------------------|---------|
 | `conversation.session_window_size` | Recent messages in session context |
 | `conversation.session_idle_seconds` | Session idle timeout |
@@ -215,6 +243,8 @@ LLM sampling). Environment variables cover secrets and infrastructure.
 | `llm.generation.critic` | Sampling params for the humor critic |
 | `llm.critic` | Critic system/user prompts, fix-instruction header |
 | `persona.*` | System prompt: identity, voice, rules |
+| `metrics.extraction_prompt` | Semantic metric scoring prompt for the sweep |
+| `metrics.feedback_header` / `feedback_line` | Tone block injected into the compose prompt |
 
 `presence_penalty` / `frequency_penalty` are stored for portability; DeepSeek API
 does not apply them today.
@@ -229,8 +259,12 @@ does not apply them today.
 | `CRITIC_MODEL` | Optional separate model for the critic |
 | `CRITIC_APPLY_TO_ALL` | Critique all replies instead of humor-only |
 | `DECISION_RELEVANCE_THRESHOLD` | Semantic relevance threshold |
+| `DECISION_METRICS_RULE_ENABLED` | Enable the metrics-based toxicity/trust gate |
+| `DECISION_TOXICITY_IGNORE_THRESHOLD` | Toxicity at/above which a low-trust sender may be ignored |
+| `DECISION_TRUST_IGNORE_THRESHOLD` | Trust at/below which a toxic sender may be ignored |
+| `KNOWLEDGE_METRICS_ENABLED` | Enable per-participant mood & relationship metrics |
 | `RAG_REACT_MAX_STEPS` | ReAct steps for deep search |
-| `CONTENT_CONFIG_PATH` | Path to persona and prompts |
+| `CONTENT_CONFIG_PATH` | Path to content dir (one YAML per section) or a single file |
 
 See `.env.example` for the full list.
 

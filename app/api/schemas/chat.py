@@ -23,3 +23,4 @@ class ChatResponse(BaseModel):
     reply: str | None = None
     context_count: int = 0
     relevance_score: float = 0.0
+    sticker_tag: str | None = None

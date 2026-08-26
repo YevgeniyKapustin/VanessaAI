@@ -52,6 +52,7 @@ def _services(
     access_error: str | None = None,
     api_result: ChatProcessResult | None = None,
     api_error: Exception | None = None,
+    stickers=None,
 ) -> BotServices:
     chat_client = AsyncMock()
     if api_error is not None:
@@ -75,6 +76,7 @@ def _services(
         access_guard=access_guard,
         knowledge=knowledge,
         texts=get_content().bot,
+        stickers=stickers,
     )
 
 
@@ -153,6 +155,76 @@ async def test_cmd_start_sends_welcome():
     await _call_start_handler(services, message)
     message.answer.assert_awaited_once()
     assert services.texts.welcome.strip() in message.answer.await_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_handle_text_sends_sticker_when_tagged():
+    message = make_telegram_message(text="Vanessa?")
+    message.reply = AsyncMock()
+    sticker_service = AsyncMock()
+    sticker_service.register_reply = MagicMock()
+    sticker_service.send_if_any = AsyncMock(return_value="sarcasm")
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Да?",
+            relevance_score=0.9,
+            sticker_tag="sarcasm",
+        ),
+        stickers=sticker_service,
+    )
+    await _call_text_handler(services, message)
+    message.reply.assert_awaited_once()
+    sticker_service.register_reply.assert_called_once_with(-100123)
+    sticker_service.send_if_any.assert_awaited_once()
+    assert sticker_service.send_if_any.await_args.args[0] is message
+    kwargs = sticker_service.send_if_any.await_args.kwargs
+    assert kwargs["sticker_tag"] == "sarcasm"
+    assert kwargs["reply_text"] == "Да?"
+    assert kwargs["force"] is False
+
+
+@pytest.mark.asyncio
+async def test_handle_text_forces_sticker_on_explicit_request():
+    message = make_telegram_message(text="ванесса кинь стикер")
+    message.reply = AsyncMock()
+    sticker_service = AsyncMock()
+    sticker_service.register_reply = MagicMock()
+    sticker_service.send_if_any = AsyncMock(return_value="delight")
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Держи",
+            relevance_score=0.9,
+            sticker_tag="delight",
+        ),
+        stickers=sticker_service,
+    )
+    await _call_text_handler(services, message)
+    message.reply.assert_awaited_once()
+    sticker_service.send_if_any.assert_awaited_once()
+    kwargs = sticker_service.send_if_any.await_args.kwargs
+    assert kwargs["force"] is True
+
+
+@pytest.mark.asyncio
+async def test_handle_text_no_sticker_when_service_absent():
+    message = make_telegram_message(text="Vanessa?")
+    message.reply = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Да?",
+            relevance_score=0.9,
+            sticker_tag="sarcasm",
+        ),
+        stickers=None,
+    )
+    await _call_text_handler(services, message)
+    message.reply.assert_awaited_once()
 
 
 def test_create_router_includes_messages():

@@ -15,7 +15,10 @@ from app.decision.models import DecisionAction
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.decision.gate.protocols import PlannerPrefilterProtocol, TurnPlannerProtocol
 from app.decision.protocols import DecisionEngineProtocol
+from app.knowledge.metrics.feedback import render_feedback_block
+from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
+from app.llm.format.sticker_tag import extract_sticker_tag
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.query_rewriter import QueryRewriter
 from app.rag.search.react_retriever import retrieve_with_react
@@ -23,11 +26,13 @@ from app.rag.search.search_plan import build_main_rag_plan
 from app.services.humor_pipeline import HumorPipelineProtocol
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
+from app.llm.memes import MemeCatalog, MemeDecider
 from app.services.pipeline.gate_support import (
     apply_owner_ignore_if_needed,
     decision_reason_from_prefilter_tag,
     finish_decision_ignore,
     finish_ignore_turn,
+    index_user_on_ignore,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +49,7 @@ class GateStage:
         messages: MessageRepositoryProtocol,
         indexing: MessageIndexingSchedulerProtocol,
         ignore_registry: ChatIgnoreRegistryProtocol,
+        metrics_retriever: MetricsRetriever | None = None,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
@@ -53,6 +59,7 @@ class GateStage:
         self._messages = messages
         self._indexing = indexing
         self._ignore_registry = ignore_registry
+        self._metrics_retriever = metrics_retriever
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         await apply_owner_ignore_if_needed(self._ignore_registry, ctx)
@@ -95,6 +102,15 @@ class GateStage:
         )
         ctx.plan_ms = (time.perf_counter() - rewrite_started) * 1000
 
+        if self._metrics_retriever is not None:
+            try:
+                ctx.sender_profile = await self._metrics_retriever.get_by_telegram_id(
+                    ctx.turn.sender_telegram_id
+                )
+            except Exception:
+                logger.exception("metrics_retrieve_failed")
+                ctx.sender_profile = None
+
         decision_started = time.perf_counter()
         ctx.decision = await self._decision.decide(
             text=ctx.turn.message,
@@ -107,6 +123,7 @@ class GateStage:
             reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=ctx.session.in_listen_window,
             sender_telegram_id=ctx.turn.sender_telegram_id,
+            sender_metrics=ctx.sender_metrics,
             humor_ok=ctx.turn_plan.humor_ok,
         )
         ctx.decision_ms = (time.perf_counter() - decision_started) * 1000
@@ -148,11 +165,15 @@ class RetrieveStage:
         humor_pipeline: HumorPipelineProtocol,
         uow: UnitOfWorkProtocol | None,
         knowledge: KnowledgeRetriever | None = None,
+        meme_catalog: MemeCatalog | None = None,
+        meme_decider: MemeDecider | None = None,
     ) -> None:
         self._retriever = retriever
         self._humor = humor_pipeline
         self._uow = uow
         self._knowledge = knowledge
+        self._meme_catalog = meme_catalog
+        self._meme_decider = meme_decider
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         if self._uow is not None:
@@ -200,13 +221,36 @@ class RetrieveStage:
                 user_message=ctx.turn.message,
             )
 
+        # Curated memes (hybrid): when the planner allows humor, a keyword match
+        # offers that specific meme; otherwise (if enabled) a compact menu is
+        # offered so the bot can pick a meme itself. Both paths pass the same
+        # anti-spam gate (probability + per-chat cooldown).
+        if (
+            ctx.turn_plan is not None
+            and ctx.turn_plan.humor_ok
+            and self._meme_catalog is not None
+            and self._meme_decider is not None
+            and self._meme_catalog.enabled
+        ):
+            matched = self._meme_catalog.match(ctx.turn.message)
+            if matched:
+                if self._meme_decider.decide(ctx.turn.telegram_chat_id):
+                    ctx.meme_blocks = matched
+                    self._meme_decider.register_meme(ctx.turn.telegram_chat_id)
+            elif self._meme_catalog.offer_on_humor:
+                if self._meme_decider.decide(ctx.turn.telegram_chat_id):
+                    ctx.meme_menu = self._meme_catalog.offerable()
+                    self._meme_decider.register_meme(ctx.turn.telegram_chat_id)
+
         logger.info(
             "turn_stage rag request_id=%s context=%s deep_search=%s "
-            "knowledge=%s rag_ms=%.1f",
+            "knowledge=%s meme_blocks=%s meme_menu=%s rag_ms=%.1f",
             get_request_id(),
             ctx.context_count,
             ctx.turn_plan.deep_search,
             len(ctx.knowledge_blocks),
+            len(ctx.meme_blocks),
+            len(ctx.meme_menu),
             ctx.rag_ms,
         )
         return True
@@ -219,14 +263,25 @@ class ComposeStage:
     async def run(self, ctx: TurnPipelineContext) -> bool:
         llm_started = time.perf_counter()
         session_messages = session_context_messages(ctx.recent)
+        metrics_block = None
+        if ctx.sender_profile is not None and ctx.sender_metrics is not None:
+            metrics_block = render_feedback_block(
+                name=ctx.sender_profile.display_name,
+                metrics=ctx.sender_metrics,
+                mood=ctx.sender_profile.mood,
+            )
         ctx.reply = await self._llm.generate(
             user_message=ctx.turn.message,
             context_blocks=ctx.context_blocks,
             session_messages=session_messages,
             humor_quotes=ctx.humor_quotes or None,
             knowledge_blocks=ctx.knowledge_blocks or None,
+            meme_blocks=ctx.meme_blocks or None,
+            meme_menu=ctx.meme_menu or None,
+            metrics_block=metrics_block,
             sender_telegram_id=ctx.turn.sender_telegram_id,
             sender_name=ctx.sender_name,
+            tone=ctx.turn_plan.tone,
         )
         ctx.llm_ms = (time.perf_counter() - llm_started) * 1000
         logger.info(
@@ -246,12 +301,36 @@ class FinalizeStage:
         decision_engine: DecisionEngineProtocol,
         config: OrchestratorConfig,
         metrics: TurnMetricsProtocol,
+        meme_decider: MemeDecider | None = None,
     ) -> None:
         self._messages = messages
         self._indexing = indexing
         self._decision = decision_engine
         self._config = config
         self._metrics = metrics
+        self._meme_decider = meme_decider
+
+    async def skip(self, ctx: TurnPipelineContext, *, reason: str) -> None:
+        """Finish the turn without a reply.
+
+        Used when a later stage (e.g. the critic) decides the user's message
+        does not need a reply. The user message is still indexed and the turn
+        is recorded as ignored (no assistant message is created, no reply is
+        registered).
+        """
+        await index_user_on_ignore(ctx, self._indexing, self._config)
+        ctx.result = ConversationTurnResult(
+            action=DecisionAction.IGNORE.value,
+            reason=reason,
+            relevance_score=(
+                ctx.decision.relevance_score if ctx.decision is not None else 0.0
+            ),
+        )
+        self._metrics.record_turn(
+            action=ctx.result.action,
+            reason=ctx.result.reason,
+            planner_skipped=ctx.planner_skipped,
+        )
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         assert ctx.user_msg is not None
@@ -264,18 +343,24 @@ class FinalizeStage:
         else:
             await self._indexing.index_now(ctx.user_msg)
 
+        clean_reply, sticker_tag = extract_sticker_tag(ctx.reply)
+        ctx.reply = clean_reply
+
         await self._messages.create(
             role="assistant",
-            content=ctx.reply,
+            content=clean_reply,
         )
         self._decision.record_reply(ctx.turn.telegram_chat_id)
+        if self._meme_decider is not None:
+            self._meme_decider.register_reply(ctx.turn.telegram_chat_id)
 
         ctx.result = ConversationTurnResult(
             action=ctx.decision.action.value,
             reason=ctx.decision.reason.value,
-            reply=ctx.reply,
+            reply=clean_reply,
             context_count=ctx.context_count,
             relevance_score=ctx.decision.relevance_score,
+            sticker_tag=sticker_tag,
         )
         self._metrics.record_turn(
             action=ctx.result.action,

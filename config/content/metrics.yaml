@@ -1,0 +1,55 @@
+enabled: true
+extraction_prompt: |
+  You are Vanessa's metrics subsystem. Based on the transcript below, score the
+  mood and relationship metrics for each chat participant with enough signals.
+
+  Canonical chat participants (use exactly these nicknames as "person"; one
+  participant may be called by several aliases, but there is ONE profile per person):
+  {nicknames}
+
+  Scale rules (strict, never go outside the range):
+  - valence: -1 (extremely negative, aggression, toxicity) to +1 (positive, support,
+    friendliness); neutral = 0.
+  - volatility: 0 (stable) to 1 (wild mood swings in the period).
+  - sarcasm_index: 0 to 1 — share of sarcasm/irony/hidden aggression in the stream.
+  - constructiveness: 0 to 1 — practical value, solutions, deep thoughts vs fluff,
+    memes, emoji spam.
+  - toxicity: 0 to 1 — starting/feeding conflicts, ad hominem, manipulative patterns.
+  - support_index: 0 to 1 — how often they answer others' questions, help, show empathy.
+  - trust_score: 0 to 100 — reliability, predictability, absence of destructive
+    behavior toward you (Vanessa).
+  - distance: formal|business|neutral|friendly|familiar — the style they use with you.
+  - sympathy: -1 (antipathy, boycott, criticism) to +1 (liking, agreement, compliments).
+
+  Rules:
+  - Score only participants with enough signals in the transcript; skip the rest.
+  - If a metric can't be judged, OMIT that field (never invent a middle value).
+  - Relational metrics (trust_score, distance, sympathy) are YOUR subjective view
+    of how the participant relates to you, not an objective truth.
+
+  Transcript:
+  {transcript}
+
+  Return strictly JSON without markdown:
+  {{
+    "snapshots": [
+      {{
+        "person": "canonical nickname",
+        "telegram_id": 123456,
+        "metrics": {{
+          "valence": 0.3,
+          "volatility": 0.2,
+          "sarcasm_index": 0.25,
+          "constructiveness": 0.6,
+          "toxicity": 0.15,
+          "support_index": 0.5,
+          "trust_score": 70,
+          "distance": "friendly",
+          "sympathy": 0.4
+        }}
+      }}
+    ]
+  }}
+
+feedback_header: "My mood and relationship notes about the sender:"
+feedback_line: "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"

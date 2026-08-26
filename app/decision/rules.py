@@ -68,7 +68,7 @@ class HardIgnoreRule(_PreRelevanceRuleMixin):
 
 class DirectAddressRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if not context.directly_addressed:
+        if not context.telegram_addressed_with_expectation:
             return None
         return _reply(context, DecisionReason.ADDRESSING)
 
@@ -159,7 +159,7 @@ class IntentRule(_PreRelevanceRuleMixin):
             and is_third_party_about_bot(context.text)
         ):
             return None
-        if context.directly_addressed or context.intent.mentions_bot:
+        if context.addressed_with_expectation:
             return _reply(context, DecisionReason.INTENT, intent_detected=True)
         if planner_affirms_reply(context):
             return _reply(context, DecisionReason.INTENT, intent_detected=True)

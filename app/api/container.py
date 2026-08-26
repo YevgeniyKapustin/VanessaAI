@@ -15,6 +15,7 @@ from app.decision import (
 from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.gate.prefilter import PlannerPrefilter
+from app.llm.memes import MemeCatalog, MemeDecider
 
 
 from app.core.protocols import (
@@ -38,6 +39,8 @@ class AppContainer:
     block_consecutive_replies: bool
     embedding_provider: EmbeddingProviderProtocol
     vector_store: VectorStoreProtocol
+    meme_catalog: MemeCatalog
+    meme_decider: MemeDecider
 
 
 _container: AppContainer | None = None
@@ -46,6 +49,13 @@ _container: AppContainer | None = None
 def build_app_container() -> AppContainer:
     conversation = load_conversation_config()
     content = get_content()
+    memes_content = content.memes
+    meme_catalog = MemeCatalog(memes_content)
+    meme_decider = MemeDecider(
+        enabled=memes_content.enabled,
+        probability=memes_content.probability,
+        min_messages_between=memes_content.min_messages_between,
+    )
     intent_detector = IntentDetector(bot_names=get_bot_name_aliases())
     trigger_checker = TriggerKeywordChecker(keywords=get_trigger_keywords())
     noise_filter = NoiseFilter()
@@ -77,6 +87,8 @@ def build_app_container() -> AppContainer:
         block_consecutive_replies=content.decision.block_consecutive_replies,
         embedding_provider=LocalEmbeddingProvider(),
         vector_store=QdrantVectorStore(),
+        meme_catalog=meme_catalog,
+        meme_decider=meme_decider,
     )
 
 

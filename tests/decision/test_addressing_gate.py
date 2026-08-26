@@ -2,8 +2,19 @@ from app.decision.detectors.intent import IntentResult
 from app.decision.gate.addressing import is_addressed_to_bot
 
 
-def test_is_addressed_to_bot_by_mention():
+def test_bare_mention_warrants_reply():
     assert is_addressed_to_bot("hi", mentions_bot=True) is True
+    assert is_addressed_to_bot("ванесса", mentions_bot=True) is True
+
+
+def test_mention_with_question_warrants_reply():
+    assert is_addressed_to_bot("hi?", mentions_bot=True) is True
+    assert is_addressed_to_bot("ванесса, ты тут?", mentions_bot=True) is True
+
+
+def test_status_remark_mention_does_not_warrant_reply():
+    assert is_addressed_to_bot("ванесса работает", mentions_bot=True) is False
+    assert is_addressed_to_bot("видите, ванесса работает", mentions_bot=True) is False
 
 
 def test_is_addressed_to_bot_by_reply():

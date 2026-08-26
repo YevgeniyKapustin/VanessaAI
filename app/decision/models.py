@@ -23,6 +23,8 @@ class DecisionReason(StrEnum):
     DISMISSAL = "dismissal"
     QUOTE_ECHO = "quote_echo"
     USER_IGNORED = "user_ignored"
+    TOXIC = "toxic"
+    REPEATED = "repeated"
 
 
 @dataclass(frozen=True, slots=True)

@@ -92,3 +92,45 @@ async def test_turn_planner_knowledge_defaults_empty():
 
     assert result.knowledge_indexes == ()
     assert result.knowledge_query == ""
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_parse_tone():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "срочно помоги с задачей",
+        '{"should_reply": true, "search_query": "задача", "skip": false, '
+        '"tone": "serious", "humor_ok": false, "humor_query": ""}',
+    )
+
+    assert result.tone == "serious"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_tone_defaults_neutral():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "ок",
+        '{"search_query": "", "skip": true, "humor_ok": false, "humor_query": ""}',
+    )
+
+    assert result.tone == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_tone_invalid_falls_back_neutral():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "test",
+        '{"search_query": "x", "skip": false, "tone": "angry", '
+        '"humor_ok": false, "humor_query": ""}',
+    )
+
+    assert result.tone == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_fallback_tone_neutral():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._fallback("привет")
+    assert result.tone == "neutral"

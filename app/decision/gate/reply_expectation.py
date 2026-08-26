@@ -124,6 +124,33 @@ def is_contextual_vocative_address(text: str) -> bool:
     return False
 
 
+def mention_warrants_reply(
+    text: str,
+    *,
+    should_reply: bool | None = None,
+    reply_to_bot: bool = False,
+) -> bool:
+    """Whether a message that mentions the bot implies the sender expects a reply.
+
+    A direct mention (name/alias/mention entity) normally warrants a reply.
+    It does not when the message is clearly not directed at the bot: a status
+    remark, an unsolicited group observation, third-party talk about the bot,
+    or a conversation closer. A direct reply to the bot or an explicit planner
+    go-ahead always warrants a reply.
+    """
+    if reply_to_bot:
+        return True
+    if should_reply is True:
+        return True
+    if is_conversation_closure(text):
+        return False
+    if is_unsolicited_remark(text):
+        return False
+    if is_third_party_about_bot(text):
+        return False
+    return True
+
+
 _BOT_PRONOUN_REPLY = re.compile(
     r"^я\s+(её|ей)\b|"
     r"\b(она|её)\b[^.!]{0,30}\b("

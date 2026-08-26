@@ -9,6 +9,7 @@ from aiogram.types import Message as TelegramMessage
 
 from app.bot.container import BotServices
 from app.bot.messages import IncomingMessage
+from app.bot.stickers.heuristics import is_sticker_request
 from app.bot.telegram_format import markdown_to_telegram_html
 from app.decision.models import DecisionAction
 
@@ -62,6 +63,12 @@ def create_messages_router(services: BotServices) -> Router:
             incoming.sender_telegram_id,
         )
         await telegram_message.answer(services.texts.welcome.strip())
+        if services.stickers is not None:
+            services.stickers.register_reply(incoming.telegram_chat_id)
+            await services.stickers.send_if_any(
+                telegram_message,
+                sticker_tag="greeting",
+            )
 
     @router.message(F.text)
     async def handle_text(telegram_message: TelegramMessage) -> None:
@@ -101,5 +108,15 @@ def create_messages_router(services: BotServices) -> Router:
             incoming.telegram_chat_id,
             len(result.reply),
         )
+        if services.stickers is not None:
+            services.stickers.register_reply(incoming.telegram_chat_id)
+            # A direct request («кинь стикер») must always be honoured: bypass
+            # the anti-spam probability roll and the cooldown.
+            await services.stickers.send_if_any(
+                telegram_message,
+                sticker_tag=result.sticker_tag,
+                reply_text=result.reply,
+                force=is_sticker_request(incoming.text),
+            )
 
     return router

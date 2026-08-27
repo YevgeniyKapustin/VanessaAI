@@ -39,7 +39,8 @@ turn_planner_prompt: |
     "knowledge_query": "",
     "knowledge_detail": false,
     "needs_clarification": false,
-    "clarification_hint": ""
+    "clarification_hint": "",
+    "uses_pro_model": false
   }}
 
   ## should_reply
@@ -114,6 +115,9 @@ turn_planner_prompt: |
   - replace pronouns and vague wording with the concrete subject from the message
     or recent context («про то самое» → «меш текстуры unity»);
   - remove addresses to the bot, greetings, filler, «подскажи/расскажи»;
+  - drop stop words, conjunctions and prepositions («и», «про», «о», «что», «как»,
+    «по», «с», «для») — for embedding/keyword search the concrete entities matter,
+    service words only add noise;
   - skip=true for «ок», emoticons, goodbyes without a question.
 
   ## humor_ok / humor_query
@@ -127,6 +131,13 @@ turn_planner_prompt: |
   true — a complex question needing a multi-step search over history (comparison, several
   topics, «как было с X и Y», technical analysis). false — a regular short query.
 
+  ## uses_pro_model
+  true — the reply needs the upscaled, most capable compose model: coding (writing or
+  fixing code), super-complex synthesis, deep technical analysis, long multi-step
+  reasoning that a fast model would fumble. false (default) — regular dialogue, RAG
+  answers, everyday banter. Keep false unless truly necessary — the upscaled model
+  costs more.
+
   ## knowledge_indexes / knowledge_query
   The semantic archive (structured memory Vanessa maintains, NOT raw message
   history) is secondary to direct message history and should be queried
@@ -139,8 +150,9 @@ turn_planner_prompt: |
   - logs — how the week/day went.
   knowledge_query: 2–8 words for the archive search; compose it semantically too
   (entities + topic, words from the summaries), e.g. «личь сварщик игра»,
-  «конфликт зонов опоздания». If no archive data is needed, keep
-  knowledge_indexes=[] and knowledge_query="".
+  «конфликт зонов опоздания». Drop stop words and conjunctions («и», «про», «о»)
+  just like in search_query — entities carry the meaning, service words do not.
+  If no archive data is needed, keep knowledge_indexes=[] and knowledge_query="".
 
   ## knowledge_detail
   Only relevant when knowledge_indexes includes "people". Controls how much of
@@ -155,83 +167,34 @@ turn_planner_prompt: |
 
   ## Examples (input → JSON)
 
-  «Ванесса, привет» | reply=yes, mention=yes
-  → {{"should_reply": true, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «ок» | side chat
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «Личь не делает карты по героям» | reply to another, not the bot
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «видите, гомункул работает» | listen_window=yes, between people
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «почему она меня игнорирует» | about the bot, without ты/ванесса
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «хватит уже» | dismissal
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «да всё сгинь» / «уйди, закрой сессию» | dismissal
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «она плохо понимает когда ты монолог ведёшь» | about the bot, not to her
-  → {{"should_reply": false, "search_query": "", "skip": true, "humor_ok": false,
-  "humor_query": "", "deep_search": false}}
-
-  «что думаете про тик така» | question to the group, not the bot
-  → {{"should_reply": false, "search_query": "тик так", "skip": false,
-  "knowledge_indexes": ["people"], "knowledge_query": "тик так",
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
-
-  «Ванесса, кто такой Тик так» | reply=yes, general question → portrait only
-  → {{"should_reply": true, "search_query": "тик так", "skip": false,
-  "tone": "neutral", "knowledge_indexes": ["people"], "knowledge_query": "тик так",
-  "knowledge_detail": false, "humor_ok": false, "humor_query": "", "deep_search": false}}
-
-  «где там» | context: discussing a file on the disk
-  → {{"should_reply": true, "search_query": "файл диск", "skip": false,
-  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}}
-
-  «ванесса я думаю ты виновата» | no context, vague accusation, nothing to search
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral",
+  «ок» | side chat → stay silent
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
   "humor_ok": false, "humor_query": "", "deep_search": false,
-  "needs_clarification": true, "clarification_hint": "почему"}}
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
 
-  «ну ладно поработаю» | light tone
-  → {{"should_reply": true, "search_query": "работа", "skip": false,
-  "tone": "ironic", "humor_ok": true, "humor_query": "Личь работа", "deep_search": false}}
-
-  «сравни как мы чинили меш и текстуры в unity»
-  → {{"should_reply": true, "search_query": "меш текстуры unity", "skip": false,
-  "humor_ok": false, "humor_query": "", "deep_search": true}}
+  «Ванесса, кто такой Тик так» | direct address, general question → portrait only
+  → {{"should_reply": true, "search_query": "тик так", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": ["people"], "knowledge_query": "тик так",
+  "knowledge_detail": false, "needs_clarification": false, "clarification_hint": "",
+  "uses_pro_model": false}}
 
   «что там у Лича с работой» | participant + habit, concrete fact → raw dossier
   → {{"should_reply": true, "search_query": "личь работа сварщик", "skip": false,
-  "tone": "neutral", "knowledge_indexes": ["people"], "knowledge_query": "личь работа",
-  "knowledge_detail": true, "humor_ok": false, "humor_query": "", "deep_search": false}}
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": ["people"], "knowledge_query": "личь работа",
+  "knowledge_detail": true, "needs_clarification": false, "clarification_hint": "",
+  "uses_pro_model": false}}
 
-  «помнишь конфликт из-за опозданий» | local event, semantic archive
-  → {{"should_reply": true, "search_query": "опоздания игровая катка", "skip": false,
-  "tone": "neutral", "knowledge_indexes": ["lore"], "knowledge_query": "конфликт зонов опоздания",
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
+  «напиши скрипт на C#, чтобы объект плавно поворачивался к камере» | coding
+  → {{"should_reply": true, "search_query": "unity скрипт поворот к камере", "skip": false,
+  "tone": "serious", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": true}}
 
-  «продолжай список гомункул» | listen_window=yes, nickname instead of the name
-  → {{"should_reply": true, "search_query": "список", "skip": false,
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
-
-  «Котгаст, ты уже третий круг...» | reply=yes, verbatim quote of the bot's reply
-  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
-
-  «ванесса, а что там с починкой unity» | already asked and answered above
-  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
+  «ну ладно поработаю» | light tone → banter
+  → {{"should_reply": true, "search_query": "работа", "skip": false,
+  "tone": "ironic", "humor_ok": true, "humor_query": "личь работа", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}

@@ -48,9 +48,20 @@ the default registry.
 - `vanessa_llm_requests_total{provider, model, kind, status}` — `kind` = `generation`
   (composer) or `planner` / `critic` / `memory` / `metrics` (completer callers).
 - `vanessa_llm_tokens_total{provider, model, kind, token_type}` — `token_type` = `prompt` / `completion` / `total`.
+- `vanessa_llm_cost_total{provider, model, kind, token_type}` — estimated USD cost per
+  token type, priced from the built-in per-1M table (`_LLM_PRICING_PER_1M`) with
+  `LLM_DEFAULT_*_COST_PER_1M` fallback. Spend-monitoring estimate, not a billing ledger.
+- `vanessa_llm_empty_total{provider, model, kind}` — completions that returned empty/blank
+  text (quality signal; drives the empty-output alert).
 - `vanessa_llm_errors_total{provider, model, kind, error_type}` — e.g. `rate_limit`,
   `server_error`, `auth`, `network`.
 - `vanessa_llm_duration_seconds{provider, model, kind}`.
+
+### Activity / engagement
+- `vanessa_active_users{scope}` — unique senders over a rolling window (`1h`, `24h`); DAU proxy.
+- `vanessa_active_sessions{scope}` — unique chats over a rolling window (`5m`); concurrent dialogs.
+  Both are gauges refreshed on every turn and at each `/metrics` scrape (see `render_metrics`),
+  so they decay to 0 once a window empties.
 
 ### RAG
 - `vanessa_rag_search_total{source}` — `semantic` (knowledge vault), `raw` (hybrid history), `humor`.
@@ -60,7 +71,14 @@ the default registry.
 
 ### Telegram
 - `vanessa_telegram_requests_total{operation, status}` — `send_reply`, `typing`, `get_me`, ...
-- `vanessa_telegram_errors_total{operation, error_type}` — `flood`, `network`, `bad_request`, ...
+- `vanessa_telegram_errors_total{operation, error_type}` — `flood` (429/RetryAfter),
+  `blocked` (403 Forbidden — user blocked the bot), `bad_request`, `migrate`, `network`.
+- `vanessa_telegram_rate_limits_total{operation, error_type}` — dedicated counter for
+  `flood` / `blocked` so rate-limit incidents surface separately from generic errors.
+
+### Reply quality
+- `vanessa_reply_length_chars{action}` — final reply length in characters (hallucination /
+  over-generation signal), recorded by the orchestrator on every `reply` turn.
 
 ### Process / finance
 - `vanessa_process_start_time_seconds` — uptime.
@@ -123,7 +141,10 @@ periodic task in each process and evaluates local rolling windows:
 | High error rate | error share of all turns / LLM calls > `ALERTING_ERROR_RATE_THRESHOLD` (5%) | `ALERTING_WINDOW_SECONDS` (300s) |
 | Slow replies | turn p95 > `ALERTING_LATENCY_P95_THRESHOLD` (7s) | 300s |
 | LLM error spike | LLM error count / requests > threshold | 300s |
+| Empty LLM output | empty/blank completions share of successful calls > `ALERTING_LLM_EMPTY_THRESHOLD` (10%) | 300s |
 | Empty RAG | empty-retrieval share > threshold (context not found) | 300s |
+| Cost spike | estimated LLM spend over window > `ALERTING_COST_WINDOW_THRESHOLD_USD` ($5) | 300s |
+| Telegram flood / blocked | any 429/flood or blocked-by-user error in window | 300s |
 | Queue overload | background queue 100% full | window |
 
 Alerts are sent via the bot token to `ALERTING_DEV_CHAT_ID` with a cooldown per rule
@@ -138,8 +159,19 @@ Alerts are sent via the bot token to `ALERTING_DEV_CHAT_ID` with a cooldown per 
 - `prometheus` — scrapes `api:8000/metrics` and `bot:9101/metrics`.
 - `grafana` — provisioning with datasource + dashboard JSON on `:3001` (avoid clash with Langfuse).
 
-Grafana dashboard `vanessa.json` includes panels: RPS, turn latency p50/p95/p99, LLM tokens by
-provider/model, LLM error rate, RAG hits/empty, RAG eval scores, Telegram errors, queue depth.
+Grafana dashboard `vanessa.json` is laid out in four logical rows:
+
+1. **Health & Business KPI** — active users (1h/24h), concurrent dialogs (5m), turn RPS,
+   LLM cost today, turn success rate, uptime.
+2. **Latency & Performance** — turn latency p50/p95/p99 and stage latency p95 over time
+   (which stage — LLM or RAG — is the bottleneck).
+3. **LLM & Costs** — LLM requests by model/status, token rate by type, cost rate by model.
+4. **RAG & Integrations** — RAG hit rate by source, RAG hits/empty, Telegram API errors.
+
+Supplementary rows cover reliability (LLM error rate, empty LLM responses, Telegram
+rate-limits/blocked) and quality (reply length percentiles, API HTTP status, RAG Triad).
+The static "Turn latency p95 (5m)" stat is intentionally dropped in favor of the over-time
+percentile graph (no duplicated signal).
 
 ---
 

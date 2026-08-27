@@ -44,6 +44,58 @@ def _capitalize_prose(text: str) -> str:
 
 _TRAILING_PERIODS = re.compile(r"\.+$")
 
+_ADDRESS_SEPARATOR = r"(?:,|:|…|\.\.\.|—)"
+_ADDRESS_WRAP = r"[«„“\"'»”']?"
+_DIGITS_ONLY = re.compile(r"^\d+$")
+
+
+def _sender_name_tokens(sender_name: str) -> list[str]:
+    """Split a display name into the tokens a bot might address the person by.
+
+    Handles names like ``"Евгений (Капуста)"`` -> ``["Евгений", "Капуста"]``.
+    Numeric-only tokens (fallback telegram ids) are ignored.
+    """
+    tokens: list[str] = []
+    for token in re.split(r"[\s(),«»\"'„“\-]+", sender_name):
+        token = token.strip(".,;:!?")
+        if len(token) >= 3 and not _DIGITS_ONLY.match(token):
+            tokens.append(token)
+    return tokens
+
+
+def _leading_address_pattern(name: str) -> re.Pattern[str]:
+    """Regex matching an opening name-address like ``«Евгений, ...`` / ``Евгений: ...``."""
+    core = re.escape(name)
+    return re.compile(
+        rf"^\s*{_ADDRESS_WRAP}{core}{_ADDRESS_WRAP}\s*{_ADDRESS_SEPARATOR}\s*",
+        re.IGNORECASE,
+    )
+
+
+def strip_leading_address(text: str, sender_name: str | None = None) -> str:
+    """Remove a leading name-address from a reply (e.g. «Евгений, …»).
+
+    The persona must not call the addressee by name — who she's talking to is
+    obvious from the reply/quote context. Enforced here deterministically (in
+    addition to the prompt) so a reply never opens with the sender's name.
+    Only a genuine address prefix (name followed by a comma/colon/ellipsis) is
+    stripped; a name used as a sentence subject ("Евгений знает...") is kept.
+    """
+    if not sender_name or not text:
+        return text
+    stripped = text.strip()
+    if not stripped:
+        return stripped
+    for token in _sender_name_tokens(sender_name):
+        match = _leading_address_pattern(token).match(stripped)
+        if match is None:
+            continue
+        # Never return an empty reply: if the whole text was just the name,
+        # keep it as-is rather than sending an empty message.
+        result = stripped[match.end() :].strip()
+        return result or stripped
+    return stripped
+
 
 def strip_trailing_periods(text: str) -> str:
     """Remove the trailing period(s) of a reply.

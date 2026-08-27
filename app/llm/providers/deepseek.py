@@ -12,7 +12,11 @@ from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.format.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompts.prompt_builder import PromptBuilder
-from app.llm.format.reply_format import capitalize_sentences, strip_trailing_periods
+from app.llm.format.reply_format import (
+    capitalize_sentences,
+    strip_leading_address,
+    strip_trailing_periods,
+)
 from app.observability.metrics import classify_llm_error, record_llm_call
 from app.observability.tracing import get_tracer
 
@@ -29,10 +33,14 @@ class DeepSeekLLMProvider:
         max_retries: int | None = None,
         generation: LLMGenerationParams | None = None,
         content: AppContent | None = None,
+        pro_model: str | None = None,
     ) -> None:
         self._content = content or get_content()
         self._client = client
         self._model = model or settings.deepseek_model
+        # Upscaled model for super-complex synthesis / coding turns. Selected
+        # per-call when generate(uses_pro_model=True) is set by the gate.
+        self._pro_model = pro_model or settings.deepseek_pro_model
         self._prompts = prompt_builder or PromptBuilder(self._content)
         self._profanity = profanity_substitutor
         self._max_retries = (
@@ -85,10 +93,14 @@ class DeepSeekLLMProvider:
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
+        uses_pro_model: bool = False,
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
     ) -> str:
+        # Route complex turns (coding / deep synthesis, flagged by the gate)
+        # to the upscaled model; everything else stays on the fast default.
+        model = self._pro_model if uses_pro_model else self._model
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
             user_message,
@@ -117,11 +129,13 @@ class DeepSeekLLMProvider:
             len(message.content or "") for message in (session_messages or [])
         )
         logger.info(
-            "llm_prompt_prepared model=%s context_blocks=%s context_messages=%s "
-            "humor_quotes=%s meme_blocks=%s meme_menu=%s system_chars=%s "
-            "user_chars=%s knowledge_blocks=%s knowledge_chars=%s session_chars=%s "
-            "temperature=%s top_p=%s max_tokens=%s",
-            self._model,
+            "llm_prompt_prepared model=%s uses_pro_model=%s context_blocks=%s "
+            "context_messages=%s humor_quotes=%s meme_blocks=%s meme_menu=%s "
+            "system_chars=%s user_chars=%s knowledge_blocks=%s "
+            "knowledge_chars=%s session_chars=%s temperature=%s top_p=%s "
+            "max_tokens=%s",
+            model,
+            uses_pro_model,
             len(context_blocks),
             message_count,
             len(humor_quotes or []),
@@ -144,7 +158,7 @@ class DeepSeekLLMProvider:
         last_error: Exception | None = None
         async with tracer.generation(
             name="llm_generation",
-            model=self._model,
+            model=model,
             input={"system": system, "user": user_prompt},
             metadata={"provider": provider, "kind": "generation"},
         ) as gen:
@@ -152,7 +166,7 @@ class DeepSeekLLMProvider:
                 started = time.perf_counter()
                 try:
                     response = await self._openai_client.chat.completions.create(
-                        model=self._model,
+                        model=model,
                         messages=[
                             {"role": "system", "content": system},
                             {"role": "user", "content": user_prompt},
@@ -161,24 +175,28 @@ class DeepSeekLLMProvider:
                     )
                     text = response.choices[0].message.content or ""
                     usage = _usage_from_openai(response)
+                    _log_cache_usage(model, usage)
                     record_llm_call(
                         provider=provider,
-                        model=self._model,
+                        model=model,
                         kind="generation",
                         started=started,
                         status="success",
                         usage=usage,
+                        output=text,
                     )
-                    reply = capitalize_sentences(
-                        strip_trailing_periods(self._substitute_profanity(text))
+                    cleaned = strip_leading_address(
+                        self._substitute_profanity(text),
+                        sender_name,
                     )
+                    reply = capitalize_sentences(strip_trailing_periods(cleaned))
                     gen.update(output=reply, usage=usage or None)
                     return reply
                 except Exception as exc:
                     last_error = exc
                     record_llm_call(
                         provider=provider,
-                        model=self._model,
+                        model=model,
                         kind="generation",
                         started=started,
                         status="error",
@@ -200,7 +218,12 @@ class DeepSeekLLMProvider:
 
 
 def _usage_from_openai(response: Any) -> dict[str, int] | None:
-    """Normalize an OpenAI CompletionUsage into a dict, or None if absent."""
+    """Normalize an OpenAI CompletionUsage into a dict, or None if absent.
+
+    Includes the DeepSeek KV-cache split (``prompt_cache_hit_tokens`` /
+    ``prompt_cache_miss_tokens``) so cost estimates can apply the discounted
+    cache-hit input price and caching effectiveness can be monitored.
+    """
     usage = getattr(response, "usage", None)
     if usage is None:
         return None
@@ -208,4 +231,25 @@ def _usage_from_openai(response: Any) -> dict[str, int] | None:
         "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
         "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
         "total_tokens": int(getattr(usage, "total_tokens", 0) or 0),
+        "cache_hit_tokens": int(getattr(usage, "prompt_cache_hit_tokens", 0) or 0),
+        "cache_miss_tokens": int(getattr(usage, "prompt_cache_miss_tokens", 0) or 0),
     }
+
+
+def _log_cache_usage(model: str, usage: dict[str, int] | None) -> None:
+    """Log the KV-cache split (prompt_cache_hit_tokens) for one call."""
+    if not usage:
+        return
+    hit = int(usage.get("cache_hit_tokens") or 0)
+    miss = int(usage.get("cache_miss_tokens") or 0)
+    if hit + miss <= 0:
+        return
+    logger.info(
+        "llm_cache model=%s prompt_tokens=%s cache_hit=%s cache_miss=%s "
+        "cache_hit_ratio=%.3f",
+        model,
+        int(usage.get("prompt_tokens") or 0),
+        hit,
+        miss,
+        hit / (hit + miss),
+    )

@@ -6,7 +6,7 @@ from openai import APIStatusError
 from app.config.content import get_content
 from app.core.messages import ContextBlock, ContextMessage
 from app.llm.planner.generation_config import LLMGenerationParams
-from app.llm.providers.deepseek import DeepSeekLLMProvider
+from app.llm.providers.deepseek import DeepSeekLLMProvider, _usage_from_openai
 
 
 class FakeSubstitutor:
@@ -54,6 +54,67 @@ async def test_deepseek_generate_returns_capitalized_reply(provider: DeepSeekLLM
     reply = await provider.generate("hello", blocks, sender_name="Test")
     assert reply == "Привет мир"
     provider._client.chat.completions.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_deepseek_uses_default_model_by_default(provider: DeepSeekLLMProvider):
+    await provider.generate("hello", [])
+    call = provider._client.chat.completions.create.await_args
+    assert call.kwargs["model"] == "test-model"
+    # Gate/compose never send reasoning_effort (default normal mode).
+    assert "reasoning_effort" not in call.kwargs
+
+
+@pytest.mark.asyncio
+async def test_deepseek_routes_pro_model_when_flagged(provider: DeepSeekLLMProvider):
+    await provider.generate("напиши код на C#", [], uses_pro_model=True)
+    call = provider._client.chat.completions.create.await_args
+    assert call.kwargs["model"] == "deepseek-v4-pro"
+
+
+def test_usage_from_openai_includes_cache_tokens():
+    usage = MagicMock()
+    usage.prompt_tokens = 100
+    usage.completion_tokens = 20
+    usage.total_tokens = 120
+    usage.prompt_cache_hit_tokens = 90
+    usage.prompt_cache_miss_tokens = 10
+    response = MagicMock()
+    response.usage = usage
+    assert _usage_from_openai(response) == {
+        "prompt_tokens": 100,
+        "completion_tokens": 20,
+        "total_tokens": 120,
+        "cache_hit_tokens": 90,
+        "cache_miss_tokens": 10,
+    }
+
+
+def test_usage_from_openai_without_cache_fields_defaults_zero():
+    usage = MagicMock()
+    usage.prompt_tokens = 5
+    usage.completion_tokens = 1
+    usage.total_tokens = 6
+    # prompt_cache_hit_tokens / prompt_cache_miss_tokens are absent (e.g. non-V4).
+    del usage.prompt_cache_hit_tokens
+    del usage.prompt_cache_miss_tokens
+    response = MagicMock()
+    response.usage = usage
+    normalized = _usage_from_openai(response)
+    assert normalized["cache_hit_tokens"] == 0
+    assert normalized["cache_miss_tokens"] == 0
+
+
+@pytest.mark.asyncio
+async def test_deepseek_generate_strips_leading_sender_name(
+    provider: DeepSeekLLMProvider,
+):
+    provider._client.chat.completions.create = AsyncMock(
+        return_value=_make_response("Евгений, привет мир")
+    )
+    reply = await provider.generate("hello", [], sender_name="Евгений")
+    # The leading name-address is removed before capitalization.
+    assert reply == "Привет мир"
 
 
 @pytest.mark.asyncio

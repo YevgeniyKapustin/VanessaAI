@@ -173,3 +173,32 @@ def test_portrait_content_configured():
     # The prompt must ask for a compact portrait, not raw facts.
     assert "3-5" in content.portrait.portrait_prompt
     assert "compact" in content.portrait.portrait_prompt
+
+
+def test_prompt_builder_system_forbids_addressing_by_name():
+    builder = PromptBuilder()
+    prompt = builder.system_prompt
+
+    # The "Addressing" rule (persona) is a categorical ban, present in the
+    # final answer system prompt.
+    assert "NEVER call the addressee by name" in prompt
+    # The owner-naming constraint («Евгений»/«Капуста», never «Женя»…) lives in
+    # persona rules; the llm.yaml checklist no longer repeats it (dedup).
+    assert "«Женя», «Жень», «Женечка»" in prompt
+
+
+def test_prompt_builder_owner_note_forbids_calling_owner_by_name(monkeypatch):
+    monkeypatch.setattr(
+        "app.llm.prompts.prompt_builder.settings.required_user_telegram_id",
+        7714154251,
+    )
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "привет",
+        [],
+        sender_telegram_id=7714154251,
+        sender_name="Евгений",
+    )
+    # The per-turn owner note (injected into the user prompt) must NOT tell the
+    # model to address the owner by name — it must forbid it.
+    assert "Never call him by name" in prompt

@@ -32,6 +32,24 @@ def test_llm_kwargs_include_sampling_params():
     }
 
 
+def test_reasoning_effort_omitted_by_default():
+    # The gate planner must stay in the API's default normal mode — the
+    # parameter is never sent unless explicitly configured.
+    params = get_content().llm.generation.planner.to_params()
+    assert params.reasoning_effort is None
+    assert "reasoning_effort" not in params.to_llm_kwargs()
+
+
+def test_reasoning_effort_sent_when_configured():
+    params = LLMGenerationParams(
+        temperature=0.1,
+        top_p=0.85,
+        max_tokens=192,
+        reasoning_effort="high",
+    )
+    assert params.to_llm_kwargs()["reasoning_effort"] == "high"
+
+
 def test_conversation_config_from_content():
     from app.config.conversation_config import load_conversation_config
 

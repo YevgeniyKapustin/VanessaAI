@@ -63,10 +63,11 @@ class StickerService:
         if pick is None:
             return None
         try:
+            # Stickers are sent bare — no reply_to_message_id — so they don't
+            # clutter the chat with an extra quote block on top of the image.
             await telegram_message.bot.send_sticker(
                 telegram_message.chat.id,
                 pick.file_id,
-                reply_to_message_id=telegram_message.message_id,
             )
         except TelegramBadRequest:
             logger.warning(

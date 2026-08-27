@@ -47,6 +47,10 @@ class TurnPlan:
     knowledge_detail: bool = False
     needs_clarification: bool = False
     clarification_hint: str = ""
+    # True when the turn needs the upscaled compose model (deepseek-v4-pro):
+    # super-complex synthesis, coding, long multi-step reasoning. The gate
+    # planner decides; the composer routes the generation call accordingly.
+    uses_pro_model: bool = False
 
 
 class TurnPlanner:
@@ -127,7 +131,7 @@ class TurnPlanner:
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r knowledge_detail=%s "
-                "needs_clarification=%s",
+                "needs_clarification=%s uses_pro_model=%s",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -139,6 +143,7 @@ class TurnPlanner:
                 result.knowledge_query,
                 result.knowledge_detail,
                 result.needs_clarification,
+                result.uses_pro_model,
             )
         return result
 
@@ -232,6 +237,7 @@ class TurnPlanner:
         )
         knowledge_query = str(payload.get("knowledge_query", "")).strip()
         knowledge_detail = payload.get("knowledge_detail") is True
+        uses_pro_model = payload.get("uses_pro_model") is True
         return TurnPlan(
             original=original,
             text=text,
@@ -244,6 +250,7 @@ class TurnPlanner:
             knowledge_indexes=knowledge_indexes,
             knowledge_query=knowledge_query,
             knowledge_detail=knowledge_detail,
+            uses_pro_model=uses_pro_model,
         )
 
     @staticmethod

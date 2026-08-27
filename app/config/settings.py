@@ -43,8 +43,22 @@ class Settings(BaseSettings):
 
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
-    deepseek_planner_model: str = ""
+    # Compose (generation) model. V4-flash is the default for standard replies,
+    # dialogues and RAG answers; complex turns (coding / deep synthesis) are
+    # routed to ``deepseek_pro_model`` via the gate's ``uses_pro_model`` flag.
+    deepseek_model: str = "deepseek-v4-flash"
+    # Gate/planner model — fast routing, intent classification, strict JSON.
+    # Kept on the NON-reasoning model (deepseek-chat): the V4 models are
+    # reasoning (thinking) models that, on structured/JSON planner prompts with
+    # the small max_tokens budgets used below, spend the whole budget on
+    # reasoning_content and return EMPTY content (finish_reason=length). The
+    # gate planner and the knowledge planners (memory/metrics/portrait) all
+    # resolve through this setting, so keep it on a non-reasoning model unless
+    # V4 reasoning is explicitly wanted. reasoning_effort stays off (default
+    # normal mode): the planner never sends it.
+    deepseek_planner_model: str = "deepseek-chat"
+    # Upscaled compose model for super-complex synthesis / coding turns.
+    deepseek_pro_model: str = "deepseek-v4-pro"
     deepseek_max_tokens: int = 4096
 
     # Humor Critic (Generator–Critic pattern)
@@ -147,6 +161,20 @@ class Settings(BaseSettings):
     # Port for the bot process Prometheus HTTP endpoint (scraped by Prometheus).
     bot_metrics_port: int = 9101
 
+    # --- Observability: LLM cost estimation -----------------------------------
+    # USD per 1M tokens used as a fallback when a provider/model has no known
+    # price in the built-in table (app.observability.metrics._LLM_PRICING_PER_1M).
+    # Defaults match DeepSeek-chat (input / output). The cost metric is an
+    # estimate for spend monitoring, not a billing ledger.
+    llm_default_prompt_cost_per_1m: float = 0.27
+    llm_default_completion_cost_per_1m: float = 1.10
+    # USD per 1M cache-hit input tokens (DeepSeek KV-cache billing). Prompt
+    # tokens served from the KV-cache cost a fraction of a full re-encode, so
+    # the estimate splits input tokens into cache-hit (this price) and
+    # cache-miss (llm_default_prompt_cost_per_1m). Set to the prompt price to
+    # ignore the discount.
+    llm_default_cache_hit_prompt_cost_per_1m: float = 0.07
+
     # --- Observability: Langfuse LLM/RAG tracing -------------------------------
     # Off by default; the pipeline falls back to a NullTracer (no network).
     langfuse_enabled: bool = False
@@ -183,6 +211,12 @@ class Settings(BaseSettings):
     alerting_latency_p95_threshold: float = 7.0
     # Alert when the share of empty RAG retrievals over the window exceeds this.
     alerting_rag_empty_threshold: float = 0.5
+    # Alert when the share of empty/blank LLM completions over the window exceeds
+    # this (among successful calls).
+    alerting_llm_empty_threshold: float = 0.1
+    # Alert when estimated LLM spend over the window exceeds this (USD) — catches
+    # runaway loops and spam bursts.
+    alerting_cost_window_threshold_usd: float = 5.0
     # Private Telegram chat/channel that receives alerts (bot must be a member).
     alerting_dev_chat_id: int = 0
     # How often (hours) to probe the LLM provider balance; 0 disables the check.
@@ -223,8 +257,8 @@ class Settings(BaseSettings):
     # dumping ALL people into every planner call, only those mentioned in the
     # current message + the recent window are rendered (dynamic, bounded); when
     # nothing is mentioned, a small fallback floor keeps disambiguation anchors.
-    knowledge_participant_max_people: int = 20
-    knowledge_participant_max_facts: int = 5
+    knowledge_participant_max_people: int = 10
+    knowledge_participant_max_facts: int = 3
     # How many recent messages are scanned for participant mentions.
     knowledge_participant_recent_window: int = 5
     # Fallback floor of people in the digest when nothing is mentioned.

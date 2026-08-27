@@ -174,6 +174,7 @@ class FakeLLM:
         self.last_critic_feedback: str | None = None
         self.last_needs_clarification: bool = False
         self.last_clarification_hint: str = ""
+        self.last_uses_pro_model: bool = False
 
     async def generate(
         self,
@@ -192,6 +193,7 @@ class FakeLLM:
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
+        uses_pro_model: bool = False,
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
@@ -206,6 +208,7 @@ class FakeLLM:
         self.last_tone = tone
         self.last_needs_clarification = needs_clarification
         self.last_clarification_hint = clarification_hint
+        self.last_uses_pro_model = uses_pro_model
         self.last_reply_to_text = reply_to_text
         self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
         self.last_reply_to_sender_name = reply_to_sender_name

@@ -349,6 +349,7 @@ class ComposeStage:
             tone=ctx.turn_plan.tone,
             needs_clarification=ctx.turn_plan.needs_clarification,
             clarification_hint=ctx.turn_plan.clarification_hint,
+            uses_pro_model=ctx.turn_plan.uses_pro_model,
             reply_to_text=ctx.turn.reply_to_text,
             reply_to_sender_telegram_id=ctx.turn.reply_to_sender_telegram_id,
             reply_to_sender_name=ctx.turn.reply_to_sender_name,

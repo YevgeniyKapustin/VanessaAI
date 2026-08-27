@@ -58,4 +58,9 @@ def format_nicknames_for_planner() -> str:
     nicknames = get_chat_nicknames()
     if not nicknames:
         return "(не заданы)"
-    return ", ".join(sorted(nicknames, key=str.lower))
+    # Several Telegram accounts can share one display name (e.g. three different
+    # users are all «Котгаст»). The planner prompt only needs each name once;
+    # the full ID→name mapping still lives in get_chat_nicknames() for mention
+    # detection, so detection is unaffected by this dedup.
+    unique = dict.fromkeys(nicknames)
+    return ", ".join(sorted(unique, key=str.lower))

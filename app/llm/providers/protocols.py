@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Any, Protocol
 
@@ -7,6 +8,8 @@ from openai import AsyncOpenAI
 from app.config.settings import settings
 from app.observability.metrics import classify_llm_error, record_llm_call
 from app.observability.tracing import get_tracer
+
+logger = logging.getLogger(__name__)
 
 
 class LLMChatCompleter(Protocol):
@@ -67,6 +70,7 @@ class _InstrumentedCompleterMixin:
             started=started,
             status="success",
             usage=usage,
+            output=text,
         )
         gen.update(output=text, usage=usage or None)
         return text
@@ -141,13 +145,31 @@ class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
                 messages=messages,
                 **kwargs,
             )
+            msg = response.choices[0].message
+            text = getattr(msg, "content", None) or ""
+            if not text.strip():
+                reasoning = getattr(msg, "reasoning_content", None) or ""
+                logger.warning(
+                    "deepseek_empty_completion kind=%s model=%s finish_reason=%s "
+                    "reasoning_content_len=%s reasoning_head=%r usage=%s",
+                    kind,
+                    model,
+                    response.choices[0].finish_reason,
+                    len(reasoning),
+                    reasoning[:80],
+                    response.usage,
+                )
             usage = getattr(response, "usage", None)
             if usage is None:
-                return response.choices[0].message.content or "", None
-            return response.choices[0].message.content or "", {
+                return text, None
+            return text, {
                 "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
                 "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
                 "total_tokens": int(getattr(usage, "total_tokens", 0) or 0),
+                # DeepSeek KV-cache split — powers cache-effectiveness metrics and
+                # the discounted cache-hit input price in cost estimation.
+                "cache_hit_tokens": int(getattr(usage, "prompt_cache_hit_tokens", 0) or 0),
+                "cache_miss_tokens": int(getattr(usage, "prompt_cache_miss_tokens", 0) or 0),
             }
 
         return await self._run_completion(model, messages, kind, call)

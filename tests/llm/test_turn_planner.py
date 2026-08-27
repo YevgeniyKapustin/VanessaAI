@@ -242,6 +242,40 @@ def test_turn_planner_prompt_documents_knowledge_detail():
     assert "true — the user asks a concrete fact" in section
 
 
+@pytest.mark.asyncio
+async def test_turn_planner_parse_uses_pro_model():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "напиши скрипт на C#",
+        '{"should_reply": true, "search_query": "скрипт", "skip": false, '
+        '"humor_ok": false, "humor_query": "", "uses_pro_model": true}',
+    )
+    assert result.uses_pro_model is True
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_uses_pro_model_defaults_false():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "привет",
+        '{"should_reply": true, "search_query": "", "skip": false, '
+        '"humor_ok": false, "humor_query": ""}',
+    )
+    assert result.uses_pro_model is False
+
+
+def test_turn_planner_prompt_documents_uses_pro_model():
+    """The gate prompt must teach when to escalate to the upscaled model."""
+    prompt = get_content().rag.turn_planner_prompt
+    section = prompt.split("## uses_pro_model", 1)[1].split("## Examples", 1)[0]
+    assert "coding" in section
+    assert "super-complex synthesis" in section
+    assert "false (default)" in section
+    assert "costs more" in section
+    # The output template must include the field, defaulting to false.
+    assert '"uses_pro_model": false' in prompt
+
+
 class _FakeClient:
     """Minimal LLM chat completer that returns a valid planner JSON."""
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from threading import Lock
 from typing import Any, Callable, Mapping
@@ -14,6 +15,8 @@ from prometheus_client import (
 )
 
 from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 # Dedicated registry so the app and its tests never collide with the global
 # default registry (which other libraries may populate).
@@ -77,9 +80,19 @@ class EventWindow:
 # Sliding-window buffers feeding the AlertManager. Populated from the same
 # record_* functions that update the Prometheus counters.
 llm_outcomes = EventWindow()
+llm_empty_outcomes = EventWindow()
+llm_cost_outcomes = EventWindow()
 turn_durations = EventWindow()
 rag_outcomes = EventWindow()
 telegram_outcomes = EventWindow()
+telegram_limit_outcomes = EventWindow()
+
+# Activity windows: unique ids over a rolling period. Values are refreshed into
+# the active_users / active_sessions gauges on every record and at each scrape
+# (see render_metrics) so they decay to 0 once the window empties.
+active_users_1h = EventWindow(window_seconds=3600)
+active_users_24h = EventWindow(window_seconds=86400)
+active_sessions_5m = EventWindow(window_seconds=300)
 
 # --- buckets -----------------------------------------------------------------
 _STAGE_BUCKETS = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 30.0, 60.0)
@@ -235,6 +248,61 @@ telegram_errors_total = Counter(
     ["operation", "error_type"],
     registry=registry,
 )
+telegram_rate_limits_total = Counter(
+    "vanessa_telegram_rate_limits_total",
+    "Telegram 429/flood and blocked-by-user errors",
+    ["operation", "error_type"],
+    registry=registry,
+)
+
+# --- LLM cost & output quality ---------------------------------------------
+llm_cost_total = Counter(
+    "vanessa_llm_cost_total",
+    "Estimated LLM API cost in USD by token type",
+    ["provider", "model", "kind", "token_type"],
+    registry=registry,
+)
+llm_empty_total = Counter(
+    "vanessa_llm_empty_total",
+    "LLM completions that returned empty or whitespace text",
+    ["provider", "model", "kind"],
+    registry=registry,
+)
+llm_cache_hit_tokens_total = Counter(
+    "vanessa_llm_cache_hit_tokens_total",
+    "LLM prompt tokens served from the provider KV-cache (cache hit)",
+    ["provider", "model", "kind"],
+    registry=registry,
+)
+llm_cache_miss_tokens_total = Counter(
+    "vanessa_llm_cache_miss_tokens_total",
+    "LLM prompt tokens re-encoded because of a KV-cache miss",
+    ["provider", "model", "kind"],
+    registry=registry,
+)
+
+# --- User activity / engagement ---------------------------------------------
+active_users = Gauge(
+    "vanessa_active_users",
+    "Unique active senders over a rolling window",
+    ["scope"],  # 1h | 24h
+    registry=registry,
+)
+active_sessions = Gauge(
+    "vanessa_active_sessions",
+    "Unique active Telegram chats over a rolling window (concurrent dialogs)",
+    ["scope"],  # 5m
+    registry=registry,
+)
+
+# --- Reply quality ----------------------------------------------------------
+reply_length_chars = Histogram(
+    "vanessa_reply_length_chars",
+    "Final bot reply length in characters",
+    ["action"],
+    buckets=(50, 100, 200, 400, 700, 1000, 1500, 2500, 4000, 6000),
+    registry=registry,
+)
 
 # --- RAG Triad evaluation ------------------------------------------------------
 rag_eval_score = Gauge(
@@ -252,8 +320,102 @@ rag_eval_total = Counter(
 
 
 # --- helpers ------------------------------------------------------------------
+
+# USD per 1M tokens (input / output) for known models. Kept in sync with the
+# provider price sheets; ``settings.llm_default_*_cost_per_1m`` is the fallback
+# for any unlisted provider/model. Costs are estimates for monitoring spend —
+# not a billing ledger.
+_LLM_PRICING_PER_1M: dict[tuple[str, str], tuple[float, float]] = {
+    ("deepseek", "deepseek-chat"): (0.27, 1.10),
+    ("deepseek", "deepseek-reasoner"): (0.55, 2.19),
+    # DeepSeek V4 prices vary by hour (off-peak/peak); the midpoint of the
+    # published range is used as a single-point estimate for spend monitoring.
+    # Flash (0731): input $0.14–0.22, output $0.28–0.66 -> (0.18, 0.47).
+    ("deepseek", "deepseek-v4-flash"): (0.18, 0.47),
+    # Pro (0813): input $0.435–0.66, output $0.87–1.98 -> (0.5475, 1.425).
+    ("deepseek", "deepseek-v4-pro"): (0.5475, 1.425),
+    ("claude", "claude-sonnet-4-6"): (3.00, 15.00),
+    ("claude", "claude-sonnet-4-5"): (3.00, 15.00),
+    ("claude", "claude-haiku-4-5"): (1.00, 5.00),
+}
+
+# USD per 1M cache-hit input tokens (DeepSeek KV-cache billing). Tokens served
+# from the cache cost a fraction of a re-encode, so the cost estimate splits
+# input into cache-hit (this price) and cache-miss (the prompt price above).
+# V4 values are the midpoint of the published hourly ranges;
+# ``settings.llm_default_cache_hit_prompt_cost_per_1m`` is the fallback.
+_LLM_CACHE_HIT_PROMPT_PRICE_PER_1M: dict[tuple[str, str], float] = {
+    ("deepseek", "deepseek-chat"): 0.07,
+    # Flash (0731): cache-hit $0.0028–0.007 -> midpoint 0.0049.
+    ("deepseek", "deepseek-v4-flash"): 0.0049,
+    # Pro (0813): cache-hit $0.0036–0.022 -> midpoint 0.0128.
+    ("deepseek", "deepseek-v4-pro"): 0.0128,
+}
+
+
+def llm_price_per_1m(provider: str, model: str) -> tuple[float, float]:
+    """USD per 1M tokens ``(prompt, completion)`` for a provider+model."""
+    return _LLM_PRICING_PER_1M.get(
+        (provider, model),
+        (
+            settings.llm_default_prompt_cost_per_1m,
+            settings.llm_default_completion_cost_per_1m,
+        ),
+    )
+
+
+def llm_cache_hit_prompt_price_per_1m(provider: str, model: str) -> float:
+    """USD per 1M cache-hit input tokens for a provider+model."""
+    return _LLM_CACHE_HIT_PROMPT_PRICE_PER_1M.get(
+        (provider, model),
+        settings.llm_default_cache_hit_prompt_cost_per_1m,
+    )
+
+
+def _prompt_input_cost(
+    provider: str,
+    model: str,
+    prompt_tokens: int,
+    cache_hit_tokens: int,
+) -> float:
+    """USD cost of the input tokens, splitting cache-hit vs cache-miss pricing."""
+    prompt_usd, _ = llm_price_per_1m(provider, model)
+    cache_hit_usd = llm_cache_hit_prompt_price_per_1m(provider, model)
+    hit = min(max(cache_hit_tokens, 0), prompt_tokens)
+    miss = max(prompt_tokens - hit, 0)
+    return miss / 1_000_000 * prompt_usd + hit / 1_000_000 * cache_hit_usd
+
+
+def estimate_llm_cost(
+    provider: str,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    cache_hit_tokens: int = 0,
+) -> float:
+    """Estimate the USD cost of one LLM call from its token usage.
+
+    ``cache_hit_tokens`` (from ``prompt_cache_hit_tokens``) are billed at the
+    discounted KV-cache input price, so a well-cached RAG prompt is far cheaper
+    than its raw token count suggests.
+    """
+    _, completion_usd = llm_price_per_1m(provider, model)
+    return (
+        _prompt_input_cost(provider, model, prompt_tokens, cache_hit_tokens)
+        + completion_tokens / 1_000_000 * completion_usd
+    )
+
+
+def _refresh_activity_gauges() -> None:
+    """Push the current unique-count windows into the activity gauges."""
+    active_users.labels(scope="1h").set(len(set(active_users_1h.snapshot())))
+    active_users.labels(scope="24h").set(len(set(active_users_24h.snapshot())))
+    active_sessions.labels(scope="5m").set(len(set(active_sessions_5m.snapshot())))
+
+
 def render_metrics() -> bytes:
-    """Prometheus text exposition for GET /metrics."""
+    """Prometheus text exposition for GET /metrics (activity gauges refreshed)."""
+    _refresh_activity_gauges()
     return generate_latest(registry)
 
 
@@ -277,6 +439,19 @@ def record_turn_duration(action: str, seconds: float) -> None:
 
 def record_background_queue(length: int) -> None:
     background_queue_length.set(length)
+
+
+def record_user_activity(user_id: int, chat_id: int) -> None:
+    """Track an active sender and chat; refreshes the activity gauges."""
+    active_users_1h.add(user_id)
+    active_users_24h.add(user_id)
+    active_sessions_5m.add(chat_id)
+    _refresh_activity_gauges()
+
+
+def record_reply_length(action: str, chars: int) -> None:
+    """Record the final reply length in characters (quality signal)."""
+    reply_length_chars.labels(action=action).observe(chars)
 
 
 def record_http(method: str, path: str, status: int, seconds: float) -> None:
@@ -310,9 +485,24 @@ def record_llm_usage(
     prompt = int(usage.get("prompt_tokens") or usage.get("input") or 0)
     completion = int(usage.get("completion_tokens") or usage.get("output") or 0)
     total = int(usage.get("total_tokens") or (prompt + completion) or 0)
+    cache_hit = int(usage.get("cache_hit_tokens") or 0)
+    cache_miss = int(usage.get("cache_miss_tokens") or 0)
     llm_tokens_total.labels(provider=provider, model=model, kind=kind, token_type="prompt").inc(prompt)
     llm_tokens_total.labels(provider=provider, model=model, kind=kind, token_type="completion").inc(completion)
     llm_tokens_total.labels(provider=provider, model=model, kind=kind, token_type="total").inc(total)
+    if cache_hit or cache_miss:
+        llm_cache_hit_tokens_total.labels(provider=provider, model=model, kind=kind).inc(cache_hit)
+        llm_cache_miss_tokens_total.labels(provider=provider, model=model, kind=kind).inc(cache_miss)
+    prompt_cost = _prompt_input_cost(provider, model, prompt, cache_hit)
+    _, completion_usd = llm_price_per_1m(provider, model)
+    completion_cost = completion / 1_000_000 * completion_usd
+    cost = prompt_cost + completion_cost
+    if cost <= 0:
+        return
+    llm_cost_total.labels(provider=provider, model=model, kind=kind, token_type="prompt").inc(prompt_cost)
+    llm_cost_total.labels(provider=provider, model=model, kind=kind, token_type="completion").inc(completion_cost)
+    llm_cost_total.labels(provider=provider, model=model, kind=kind, token_type="total").inc(cost)
+    llm_cost_outcomes.add(cost)
 
 
 def record_llm_duration(provider: str, model: str, kind: str, seconds: float) -> None:
@@ -337,8 +527,9 @@ def record_llm_call(
     status: str,
     error_type: str | None = None,
     usage: Mapping[str, int] | None = None,
+    output: str | None = None,
 ) -> None:
-    """Record one LLM request: outcome, latency and tokens (if any)."""
+    """Record one LLM request: outcome, latency, tokens, cost and empty output."""
     elapsed = time.perf_counter() - started
     record_llm_request(provider, model, kind, status)
     record_llm_duration(provider, model, kind, elapsed)
@@ -347,6 +538,17 @@ def record_llm_call(
         record_llm_error(provider, model, kind, error_type or "unknown")
     else:
         record_llm_usage(provider, model, kind, usage)
+        if output is not None and not output.strip():
+            llm_empty_total.labels(provider=provider, model=model, kind=kind).inc()
+            llm_empty_outcomes.add(1)
+            logger.warning(
+                "llm_empty_output provider=%s model=%s kind=%s usage=%s output_repr=%r",
+                provider,
+                model,
+                kind,
+                dict(usage) if usage else None,
+                (output or "")[:80],
+            )
 
 
 def record_rag_search(
@@ -381,6 +583,9 @@ def record_telegram(operation: str, status: str) -> None:
 def record_telegram_error(operation: str, error_type: str) -> None:
     telegram_errors_total.labels(operation=operation, error_type=error_type).inc()
     telegram_outcomes.add((operation, "error"))
+    if error_type in {"flood", "blocked"}:
+        telegram_rate_limits_total.labels(operation=operation, error_type=error_type).inc()
+        telegram_limit_outcomes.add((operation, error_type))
 
 
 def record_rag_eval(dimension: str, score: float) -> None:
@@ -413,6 +618,8 @@ __all__ = [
     "record_stage",
     "record_turn_duration",
     "record_background_queue",
+    "record_user_activity",
+    "record_reply_length",
     "record_http",
     "record_http_client",
     "record_llm_call",
@@ -420,6 +627,9 @@ __all__ = [
     "record_llm_usage",
     "record_llm_duration",
     "record_llm_error",
+    "estimate_llm_cost",
+    "llm_price_per_1m",
+    "llm_cache_hit_prompt_price_per_1m",
     "record_rag_search",
     "record_prompt_budget",
     "record_prompt_truncation",

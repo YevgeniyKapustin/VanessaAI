@@ -23,11 +23,19 @@ _PREVIEW_LEN = 80
 
 
 def _telegram_error_type(exc: Exception) -> str:
-    """Coarse error class for the Telegram error metric."""
+    """Coarse error class for the Telegram error metric.
+
+    ``flood`` = 429 rate-limit / RetryAfter (Telegram flood control),
+    ``blocked`` = 403 Forbidden (the user blocked the bot). Both feed the
+    dedicated ``vanessa_telegram_rate_limits_total`` counter so they surface
+    separately from generic ``bad_request`` / ``network`` errors.
+    """
     name = type(exc).__name__.lower()
     if "retryafter" in name or "flood" in name:
         return "flood"
-    if "badrequest" in name or "forbidden" in name or "conflict" in name:
+    if "forbidden" in name:
+        return "blocked"
+    if "badrequest" in name or "conflict" in name:
         return "bad_request"
     if "migrate" in name:
         return "migrate"

@@ -49,6 +49,18 @@ async def test_claude_generate_returns_capitalized_reply(provider: ClaudeLLMProv
 
 
 @pytest.mark.asyncio
+async def test_claude_generate_strips_leading_sender_name(
+    provider: ClaudeLLMProvider,
+):
+    provider._client.messages.create = AsyncMock(
+        return_value=MagicMock(content=[MagicMock(text="Евгений, привет мир")])
+    )
+    reply = await provider.generate("hello", [], sender_name="Евгений")
+    # The leading name-address is removed before capitalization.
+    assert reply == "Привет мир"
+
+
+@pytest.mark.asyncio
 async def test_claude_retries_on_rate_limit(provider: ClaudeLLMProvider):
     ok = MagicMock()
     ok.content = [MagicMock(text="ok")]

@@ -64,7 +64,15 @@ def test_evaluate_telegram_error_rate(monkeypatch) -> None:
 
 def _patch_all_windows(monkeypatch) -> None:
     """Isolate every alerting window so prior tests can't skew the outcome."""
-    for name in ("llm_outcomes", "turn_durations", "rag_outcomes", "telegram_outcomes"):
+    for name in (
+        "llm_outcomes",
+        "llm_empty_outcomes",
+        "llm_cost_outcomes",
+        "turn_durations",
+        "rag_outcomes",
+        "telegram_outcomes",
+        "telegram_limit_outcomes",
+    ):
         monkeypatch.setattr(metrics, name, metrics.EventWindow(window_seconds=300))
 
 
@@ -81,6 +89,34 @@ def test_cooldown_suppresses_resend() -> None:
     manager._last_sent["x"] = time.time()
     assert manager._cooldown_ok("x") is False
     assert manager._cooldown_ok("y") is True
+
+
+def test_evaluate_empty_llm_rate(monkeypatch) -> None:
+    _patch_all_windows(monkeypatch)
+    llm_window = metrics.EventWindow(window_seconds=300)
+    for _ in range(8):
+        llm_window.add("success")
+    monkeypatch.setattr(metrics, "llm_outcomes", llm_window)
+    empty_window = metrics.EventWindow(window_seconds=300)
+    for _ in range(3):
+        empty_window.add(1)
+    monkeypatch.setattr(metrics, "llm_empty_outcomes", empty_window)
+    alerts = _manager(llm_empty_threshold=0.1).evaluate()
+    assert any(alert.rule == "llm_empty_rate" for alert in alerts)
+
+
+def test_evaluate_telegram_flood(monkeypatch) -> None:
+    _patch_all_windows(monkeypatch)
+    metrics.telegram_limit_outcomes.add(("send_reply", "flood"))
+    alerts = _manager().evaluate()
+    assert any(alert.rule == "telegram_flood" for alert in alerts)
+
+
+def test_evaluate_cost_spike(monkeypatch) -> None:
+    _patch_all_windows(monkeypatch)
+    metrics.llm_cost_outcomes.add(6.0)
+    alerts = _manager(cost_window_threshold_usd=5.0).evaluate()
+    assert any(alert.rule == "llm_cost_spike" for alert in alerts)
 
 
 def test_check_and_alert_sends_only_new_alerts(monkeypatch) -> None:

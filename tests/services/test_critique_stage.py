@@ -26,6 +26,7 @@ class FakeLLM:
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        uses_pro_model: bool = False,
     ) -> str:
         self.calls.append(critic_feedback)
         return self.reply

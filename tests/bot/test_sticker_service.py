@@ -87,7 +87,8 @@ async def test_send_if_any_sends_sticker():
     kwargs = message.bot.send_sticker.await_args.kwargs
     assert args[0] == -100123
     assert args[1] == "f:sarcasm"
-    assert kwargs["reply_to_message_id"] == 99
+    # Stickers are sent bare — no reply to the original message.
+    assert "reply_to_message_id" not in kwargs
     assert decider.messages_since_sticker(-100123) == 0
 
 

@@ -1,4 +1,8 @@
-from app.llm.format.reply_format import capitalize_sentences, strip_trailing_periods
+from app.llm.format.reply_format import (
+    capitalize_sentences,
+    strip_leading_address,
+    strip_trailing_periods,
+)
 
 
 def test_capitalize_sentences_starts_with_upper():
@@ -56,3 +60,54 @@ def test_strip_trailing_periods_ignores_code_block():
 def test_postprocess_strips_period_then_capitalizes():
     text = "ну ладно поработаю."
     assert capitalize_sentences(strip_trailing_periods(text)) == "Ну ладно поработаю"
+
+
+def test_strip_leading_address_removes_name_prefix():
+    assert strip_leading_address("Евгений, привет", "Евгений") == "привет"
+    assert strip_leading_address("Евгений: привет", "Евгений") == "привет"
+    assert strip_leading_address("евгений, привет", "Евгений") == "привет"
+
+
+def test_strip_leading_address_handles_guillemets():
+    assert strip_leading_address("«Евгений, привет", "Евгений") == "привет"
+    assert strip_leading_address("„Евгений, привет", "Евгений") == "привет"
+
+
+def test_strip_leading_address_uses_nickname_from_parenthesized_name():
+    assert (
+        strip_leading_address("Капуста, ты гений", "Евгений (Капуста)") == "ты гений"
+    )
+
+
+def test_strip_leading_address_tries_all_name_tokens():
+    # The second token ("Капуста") matches even though the first ("Евгений") doesn't.
+    assert strip_leading_address("Капуста, смотри", "Евгений Капуста") == "смотри"
+
+
+def test_strip_leading_address_keeps_name_as_sentence_subject():
+    # No address separator — the name is the subject, not an address.
+    assert (
+        strip_leading_address("Евгений знает ответ", "Евгений") == "Евгений знает ответ"
+    )
+
+
+def test_strip_leading_address_keeps_mid_sentence_mention():
+    assert (
+        strip_leading_address("Ну, Евгений сам сказал", "Евгений")
+        == "Ну, Евгений сам сказал"
+    )
+
+
+def test_strip_leading_address_keeps_reply_when_no_name_provided():
+    assert strip_leading_address("Евгений, привет", None) == "Евгений, привет"
+    assert strip_leading_address("привет", "Евгений") == "привет"
+
+
+def test_strip_leading_address_never_returns_empty():
+    assert strip_leading_address("Евгений,", "Евгений") == "Евгений,"
+
+
+def test_strip_leading_address_before_capitalize_keeps_casing():
+    # Integration-style: matches the provider pipeline order (strip then capitalize).
+    text = strip_leading_address("Евгений, привет мир", "Евгений")
+    assert capitalize_sentences(strip_trailing_periods(text)) == "Привет мир"

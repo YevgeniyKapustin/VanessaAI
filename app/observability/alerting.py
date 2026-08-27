@@ -41,6 +41,8 @@ class AlertManager:
         error_rate_threshold: float,
         latency_p95_threshold: float,
         rag_empty_threshold: float,
+        llm_empty_threshold: float = 0.1,
+        cost_window_threshold_usd: float = 5.0,
         min_samples: int = _MIN_SAMPLES,
         balance_check_hours: int = 0,
     ) -> None:
@@ -51,6 +53,8 @@ class AlertManager:
         self._error_rate_threshold = error_rate_threshold
         self._latency_p95_threshold = latency_p95_threshold
         self._rag_empty_threshold = rag_empty_threshold
+        self._llm_empty_threshold = llm_empty_threshold
+        self._cost_window_threshold_usd = cost_window_threshold_usd
         self._min_samples = min_samples
         self._balance_check_hours = balance_check_hours
         self._last_sent: dict[str, float] = {}
@@ -71,6 +75,24 @@ class AlertManager:
                         f"(threshold {self._error_rate_threshold:.0%})",
                     )
                 )
+
+        # Empty/blank completions are a quality signal: the model returned
+        # nothing usable. Compare against successful (non-error) calls in the
+        # same window.
+        llm_success = llm_total - sum(
+            1 for sample in metrics.llm_outcomes.snapshot() if sample == "error"
+        )
+        empty_count = metrics.llm_empty_outcomes.count()
+        if llm_success >= self._min_samples and empty_count and (
+            empty_count / llm_success
+        ) > self._llm_empty_threshold:
+            alerts.append(
+                Alert(
+                    "llm_empty_rate",
+                    f"⬜ Empty LLM output {empty_count / llm_success:.0%} of successful "
+                    f"calls over window (threshold {self._llm_empty_threshold:.0%})",
+                )
+            )
 
         turn_total = metrics.turn_durations.count()
         if turn_total >= self._min_samples:
@@ -111,6 +133,27 @@ class AlertManager:
                         f"(threshold {self._error_rate_threshold:.0%})",
                     )
                 )
+
+        # A single flood/429 or blocked-by-user error is already actionable —
+        # it usually means the bot is spamming or was blocked by a user.
+        if metrics.telegram_limit_outcomes.count() > 0:
+            alerts.append(
+                Alert(
+                    "telegram_flood",
+                    "🚫 Telegram rate-limit (429) or blocked-by-user errors in window",
+                )
+            )
+
+        # Estimated spend over the window catches runaway loops and spam bursts.
+        cost_total = sum(metrics.llm_cost_outcomes.snapshot())
+        if cost_total > self._cost_window_threshold_usd:
+            alerts.append(
+                Alert(
+                    "llm_cost_spike",
+                    f"💸 LLM spend ${cost_total:.2f} in window "
+                    f"(threshold ${self._cost_window_threshold_usd:.2f})",
+                )
+            )
 
         queue = metrics.queue_length()
         if queue:
@@ -201,5 +244,7 @@ def create_alert_manager() -> AlertManager | None:
         error_rate_threshold=settings.alerting_error_rate_threshold,
         latency_p95_threshold=settings.alerting_latency_p95_threshold,
         rag_empty_threshold=settings.alerting_rag_empty_threshold,
+        llm_empty_threshold=settings.alerting_llm_empty_threshold,
+        cost_window_threshold_usd=settings.alerting_cost_window_threshold_usd,
         balance_check_hours=settings.alerting_balance_check_hours,
     )

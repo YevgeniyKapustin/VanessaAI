@@ -15,7 +15,12 @@ from app.core.request_context import get_planning_started_signal, get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
 from app.observability.eval import RagTriadEvaluator
-from app.observability.metrics import record_stage, record_turn_duration
+from app.observability.metrics import (
+    record_reply_length,
+    record_stage,
+    record_turn_duration,
+    record_user_activity,
+)
 from app.observability.tracing import get_tracer, hash_identifier
 from app.services.background import BackgroundExecutor
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
@@ -82,6 +87,9 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
 
     async def _handle_incoming_inner(self, turn: ChatTurnInput) -> ConversationTurnResult:
         ctx = TurnPipelineContext(turn=turn)
+        # Track the sender and chat for the active-user / concurrent-dialog
+        # gauges (DAU, sessions) — every processed message counts as activity.
+        record_user_activity(turn.sender_telegram_id, turn.telegram_chat_id)
 
         user = await self._users.get_or_create(
             telegram_id=turn.sender_telegram_id,
@@ -280,6 +288,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         ):
             if ms > 0:
                 record_stage(stage, seconds=ms / 1000.0)
+        if ctx.result.action == DecisionAction.REPLY.value and ctx.reply:
+            record_reply_length(action=ctx.result.action, chars=len(ctx.reply))
         if ctx.result.action == DecisionAction.IGNORE.value:
             logger.info(
                 "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "

@@ -12,7 +12,11 @@ from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.format.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompts.prompt_builder import PromptBuilder
-from app.llm.format.reply_format import capitalize_sentences, strip_trailing_periods
+from app.llm.format.reply_format import (
+    capitalize_sentences,
+    strip_leading_address,
+    strip_trailing_periods,
+)
 from app.observability.metrics import classify_llm_error, record_llm_call
 from app.observability.tracing import get_tracer
 
@@ -76,10 +80,14 @@ class ClaudeLLMProvider:
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
+        uses_pro_model: bool = False,
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
     ) -> str:
+        # ``uses_pro_model`` is a DeepSeek routing signal; accepted (no-op) here
+        # for protocol compatibility so both providers share one signature.
+        del uses_pro_model
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
             user_message,
@@ -162,10 +170,13 @@ class ClaudeLLMProvider:
                         started=started,
                         status="success",
                         usage=usage,
+                        output=text,
                     )
-                    reply = capitalize_sentences(
-                        strip_trailing_periods(self._substitute_profanity(text))
+                    cleaned = strip_leading_address(
+                        self._substitute_profanity(text),
+                        sender_name,
                     )
+                    reply = capitalize_sentences(strip_trailing_periods(cleaned))
                     gen.update(output=reply, usage=usage or None)
                     return reply
                 except Exception as exc:

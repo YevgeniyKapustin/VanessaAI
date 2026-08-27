@@ -1,3 +1,5 @@
+    from pathlib import Path
+
 from app.core.users import nicknames
 
 
@@ -26,3 +28,119 @@ def test_format_nicknames_for_planner_sorted_case_insensitively(monkeypatch):
 def test_format_nicknames_for_planner_empty(monkeypatch):
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ())
     assert nicknames.format_nicknames_for_planner() == "(не заданы)"
+
+
+def test_canonical_name_for_resolves_alias_to_canonical(monkeypatch):
+    monkeypatch.setattr(
+        nicknames,
+        "get_chat_aliases",
+        lambda: {"Гриша": ("Ну я", "ну я", "гриша")},
+    )
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
+    # A Telegram nickname («ну я») resolves to the name the chat uses.
+    assert nicknames.canonical_name_for("Ну я") == "Гриша"
+    # The canonical name resolves to itself.
+    assert nicknames.canonical_name_for("Гриша") == "Гриша"
+    # Unknown names stay unresolved.
+    assert nicknames.canonical_name_for("Неизвестный") is None
+    assert nicknames.canonical_name_for("") is None
+    assert nicknames.canonical_name_for(None) is None
+
+
+def test_find_nicknames_in_text_matches_alias(monkeypatch):
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
+    monkeypatch.setattr(
+        nicknames,
+        "get_chat_aliases",
+        lambda: {"Гриша": ("Ну я",)},
+    )
+    found = nicknames.find_nicknames_in_text("что сказал ну я про игру")
+    assert "Гриша" in found
+
+
+def test_find_nicknames_in_text_does_not_duplicate_canonical(monkeypatch):
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
+    monkeypatch.setattr(
+        nicknames,
+        "get_chat_aliases",
+        lambda: {"Гриша": ("Ну я", "гриша")},
+    )
+    found = nicknames.find_nicknames_in_text("гриша, ну я и гриша")
+    assert found.count("Гриша") == 1
+
+
+def test_format_aliases_for_prompt_renders_distinct_aliases(monkeypatch):
+    monkeypatch.setattr(
+        nicknames,
+        "get_chat_aliases",
+        lambda: {"Гриша": ("Ну я", "гриша")},
+    )
+    assert "Гриша = Ну я" in nicknames.format_aliases_for_prompt()
+
+
+def test_format_aliases_for_prompt_empty(monkeypatch):
+    monkeypatch.setattr(nicknames, "get_chat_aliases", lambda: {})
+    assert nicknames.format_aliases_for_prompt() == ""
+
+
+# ---------------------------------------------------------------------------
+# Single source of truth: aliases come from the knowledge vault People cards,
+# not from a separate aliases config. Editing a card is enough.
+# ---------------------------------------------------------------------------
+
+
+def _write_people_card(tmp_path: Path, filename: str, telegram_id: str, aliases: list[str]) -> None:
+    people = tmp_path / "People"
+    people.mkdir(parents=True, exist_ok=True)
+    card = people / filename
+    aliases_block = "\n".join(f"- {alias}" for alias in aliases)
+    card.write_text(
+        f"---\ntype: person\nid: {Path(filename).stem}\naliases:\n{aliases_block}\n"
+        f"telegram_id: '{telegram_id}'\n---\n\n## Контекст жизни\n",
+        encoding="utf-8",
+    )
+
+
+def test_get_chat_aliases_reads_from_vault_people_cards(monkeypatch, tmp_path):
+    _write_people_card(tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"])
+    _write_people_card(tmp_path, "крабер.md", "7030546957", ["Крабер", "Владимир"])
+    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
+    monkeypatch.setattr(
+        nicknames,
+        "load_nicknames",
+        lambda _: {1071793838: "Гриша", 7030546957: "Крабер"},
+    )
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша", "Крабер"))
+
+    aliases = nicknames.get_chat_aliases()
+    assert aliases["Гриша"] == ("Ну я",)
+    assert aliases["Крабер"] == ("Владимир",)
+
+
+def test_canonical_name_for_uses_vault_aliases(monkeypatch, tmp_path):
+    _write_people_card(tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"])
+    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
+    monkeypatch.setattr(
+        nicknames,
+        "load_nicknames",
+        lambda _: {1071793838: "Гриша"},
+    )
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
+
+    # The vault card carries the alias, so the raw Telegram nickname resolves.
+    assert nicknames.canonical_name_for("Ну я") == "Гриша"
+    assert nicknames.canonical_name_for("ну я") == "Гриша"
+    assert nicknames.canonical_name_for("Гриша") == "Гриша"
+
+
+def test_format_aliases_for_prompt_uses_vault_aliases(monkeypatch, tmp_path):
+    _write_people_card(tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"])
+    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
+    monkeypatch.setattr(
+        nicknames,
+        "load_nicknames",
+        lambda _: {1071793838: "Гриша"},
+    )
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
+
+    assert "Гриша = Ну я" in nicknames.format_aliases_for_prompt()

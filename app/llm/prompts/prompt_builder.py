@@ -3,6 +3,7 @@ from datetime import datetime
 from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
+from app.core.users.nicknames import format_aliases_for_prompt
 from app.core.messages import ContextBlock, ContextMessage
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.prompts.budget import (
@@ -170,6 +171,11 @@ class PromptBuilder:
         if session_text:
             parts.append(
                 (PRIORITY_SESSION, "session_messages", f"{llm.session_header}\n{session_text}")
+            )
+        aliases_text = format_aliases_for_prompt()
+        if aliases_text:
+            parts.append(
+                (PRIORITY_DIRECTIVES, "aliases", f"{llm.aliases_header.strip()}\n{aliases_text}")
             )
         if reply_to_text:
             reply_sender = resolve_sender_display_name(

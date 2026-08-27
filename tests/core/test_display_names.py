@@ -14,6 +14,33 @@ def test_resolve_sender_falls_back_to_telegram_id():
     assert resolve_sender_display_name(6765300380, None) == "6765300380"
 
 
+def test_resolve_sender_canonicalizes_alias(monkeypatch):
+    # A Telegram nickname «ну я» must render as the canonical «Гриша», so the
+    # bot does not treat them as two different people.
+    monkeypatch.setattr(
+        "app.core.users.display_names.canonical_name_for",
+        lambda alias: "Гриша" if alias in ("Ну я", "ну я", "гриша") else None,
+    )
+    assert resolve_sender_display_name(1071793838, "Ну я") == "Гриша"
+    assert resolve_sender_display_name(1071793838, "Капустин") == "Капустин"
+
+
+def test_resolve_user_display_name_canonicalizes_alias(monkeypatch):
+    monkeypatch.setattr(
+        "app.core.users.display_names.canonical_name_for",
+        lambda alias: "Гриша" if alias in ("Ну я", "ну я", "гриша") else None,
+    )
+    assert (
+        resolve_user_display_name(
+            1071793838,
+            nickname=None,
+            first_name="Ну я",
+            username="nu_ya",
+        )
+        == "Гриша"
+    )
+
+
 def test_resolve_user_display_name_prefers_nickname():
     assert resolve_user_display_name(
         7714154251,

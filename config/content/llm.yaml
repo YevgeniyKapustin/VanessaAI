@@ -160,6 +160,9 @@ current_message_header: "Current message in the chat:"
 current_message_line: "{time} [user:{sender}] text: {content}"
 reply_message_header: "The user's message is a reply to this message:"
 reply_message_line: "[{sender}] text: {content}"
+aliases_header: |
+  Aliases — the same person is often called by different names in the chat
+  (a Telegram nickname, a nickname, a shortened form). Treat them as ONE person:
 anchor_marker: " ← matches the query"
 assistant_line: "{time} [assistant]{anchor} text: {content}"
 user_line: "{time} [user:{sender}]{anchor} text: {content}"

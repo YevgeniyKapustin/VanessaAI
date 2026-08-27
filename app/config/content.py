@@ -143,6 +143,11 @@ class LLMContent(BaseModel):
     current_message_line: str = "{time} [user:{sender}] text: {content}"
     reply_message_header: str = "The user's message is a reply to this message:"
     reply_message_line: str = "[{sender}] text: {content}"
+    aliases_header: str = (
+        "Aliases — the same person is often called by different names in the chat"
+        " (a Telegram nickname, a nickname, a shortened form). Treat them as ONE"
+        " person:"
+    )
     session_header: str = "Recent correspondence in the chat:"
     session_user_line: str = "{time} [user:{sender}] text: {content}"
     session_assistant_line: str = "{time} [assistant] text: {content}"

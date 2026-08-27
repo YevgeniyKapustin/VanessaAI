@@ -58,6 +58,32 @@ def test_prompt_builder_builds_user_prompt():
     assert "[user:Евгений] text: Привет" in prompt
 
 
+def test_prompt_builder_includes_aliases_block(monkeypatch):
+    import app.llm.prompts.prompt_builder as pb
+
+    monkeypatch.setattr(
+        pb,
+        "format_aliases_for_prompt",
+        lambda: "Гриша = Ну я",
+    )
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("кто такой гриша", [])
+
+    content = get_content()
+    assert content.llm.aliases_header.strip() in prompt
+    assert "Гриша = Ну я" in prompt
+
+
+def test_prompt_builder_omits_aliases_block_when_empty(monkeypatch):
+    import app.llm.prompts.prompt_builder as pb
+
+    monkeypatch.setattr(pb, "format_aliases_for_prompt", lambda: "")
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [])
+
+    assert get_content().llm.aliases_header.strip() not in prompt
+
+
 def test_prompt_builder_includes_reply_context():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt(

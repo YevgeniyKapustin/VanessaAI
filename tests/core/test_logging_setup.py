@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 
 from app.core.logging_setup import (
@@ -79,6 +80,33 @@ def test_loguru_formatter_shortens_app_prefix():
 
     assert "services.conversation_orchestrator:handle_incoming:42" in line
     assert "app.services" not in line
+
+
+def test_loguru_formatter_includes_exception_traceback():
+    formatter = LoguruStyleFormatter(colorize=False)
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        record = logging.LogRecord(
+            name="app.knowledge.writer",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=143,
+            msg="knowledge_vector_reindex_failed path=%s",
+            args=("People/x.md",),
+            exc_info=sys.exc_info(),
+            func="apply",
+        )
+    record.service = "api"
+    record.request_id = "-"
+    record.created = 1_700_000_000.0
+    record.msecs = 123.0
+
+    line = formatter.format(record)
+
+    assert "knowledge_vector_reindex_failed path=People/x.md" in line
+    assert "Traceback (most recent call last)" in line
+    assert "ValueError: boom" in line
 
 
 def test_create_file_handler_writes_plain_lines(tmp_path: Path) -> None:

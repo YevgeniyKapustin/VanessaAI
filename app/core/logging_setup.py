@@ -99,6 +99,14 @@ class LoguruStyleFormatter(logging.Formatter):
         )
         message = record.getMessage()
 
+        # Mirror the stdlib Formatter: append the exception traceback so
+        # ``logger.exception(...)`` lines actually surface the root cause
+        # (without this, exceptions were logged but the traceback was dropped).
+        if record.exc_info and not record.exc_text:
+            record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            message = f"{message}\n{record.exc_text}"
+
         if self._colorize:
             sep = self._paint(" | ", _Ansi.DIM)
             time_part = self._paint(time_text, _Ansi.GREEN)

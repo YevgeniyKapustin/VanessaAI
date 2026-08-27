@@ -177,6 +177,59 @@ def test_should_block_compose_still_blocks_status_remark_despite_name(
     ) is True
 
 
+def test_should_block_compose_honors_planner_veto_on_repeated_message(
+    eligibility: ReplyEligibility,
+):
+    # The direct-address override must NOT rescue a repeated message: the
+    # planner vetoed it (should_reply=False, «повтор»), and the same sender
+    # already sent the same content — the repeat stays silent.
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса не тормози я написал", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="ванесса не тормози я написал", sender_telegram_id=7),
+    ]
+    assert eligibility.should_block_compose(
+        "ванесса не тормози я написал",
+        recent_messages=recent,
+        sender_telegram_id=7,
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is True
+    assert eligibility.should_block_compose(
+        "ванесса отвечай",
+        recent_messages=[
+            ContextMessage(id=1, role="user", content="ванесса отвечай", sender_telegram_id=7),
+            ContextMessage(id=2, role="user", content="ванесса отвечай", sender_telegram_id=7),
+        ],
+        sender_telegram_id=7,
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is True
+
+
+def test_should_block_compose_does_not_block_non_repeat_direct_address_with_recent(
+    eligibility: ReplyEligibility,
+):
+    # With a single occurrence in recent, the message is not a repeat — the
+    # direct-address override still applies (regression guard for the previous
+    # fix).
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса не тормози я написал", sender_telegram_id=7),
+    ]
+    assert eligibility.should_block_compose(
+        "ванесса не тормози я написал",
+        recent_messages=recent,
+        sender_telegram_id=7,
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is False
+
+
 def _continuation_eligibility() -> ReplyEligibility:
     return ReplyEligibility(
         IntentDetector(),

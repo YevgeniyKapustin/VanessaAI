@@ -60,6 +60,15 @@ def test_turn_planner_prompt_teaches_imperative_address_is_not_self_talk():
     assert "«ванесса не тормози я написал»" in prompt
 
 
+def test_turn_planner_prompt_teaches_repeated_message_is_spam():
+    """The same sender sending the same message several times is junk —
+    should_reply=false, skip=true — even short spam like «ванесса»."""
+    prompt = get_content().rag.turn_planner_prompt
+    assert "same sender sends the SAME message" in prompt
+    assert "повтор сообщения" in prompt
+    assert "spam burst" in prompt
+
+
 @pytest.mark.asyncio
 async def test_turn_planner_parse_humor_fields():
     planner = TurnPlanner(use_llm=False)

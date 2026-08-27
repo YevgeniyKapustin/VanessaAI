@@ -4,7 +4,7 @@
 The memory LLM sometimes created several People cards for the same participant
 (Latin transliterations, mixed Latin/Cyrillic homoglyphs, extra aliases). This
 tool builds a merge plan from strong identity signals, prints it in dry-run
-mode, and merges (with Metrics/*.yaml reconciliation) in apply mode.
+mode, and merges (metrics live in the person cards) in apply mode.
 
 Usage:
     python scripts/merge_people.py --dry-run
@@ -28,8 +28,6 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
-
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
@@ -37,9 +35,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from app.config.settings import settings
 from app.ingest.user_backfill import load_nicknames
 from app.knowledge.format import (
-    METRICS,
     PEOPLE,
-    TYPE_METRICS,
     parse_frontmatter,
     render_note,
     slugify,
@@ -359,41 +355,12 @@ def merge_bodies(bodies: list[str]) -> str:
     return "\n".join(parts)
 
 
-def merge_timeseries(target_rows: list, source_rows: list) -> list[dict]:
-    by_date: dict[str, dict] = {}
-    for row in target_rows:
-        if isinstance(row, dict) and row.get("date") is not None:
-            by_date[str(row["date"])] = row
-    for row in source_rows:
-        if isinstance(row, dict) and row.get("date") is not None:
-            by_date.setdefault(str(row["date"]), row)
-    return [by_date[key] for key in sorted(by_date)]
-
-
 def _merge_metrics(*metrics: object) -> dict:
     merged: dict = {}
     for block in metrics:
         if isinstance(block, dict):
             merged = {**merged, **block}
     return merged
-
-
-def _read_yaml(path: Path) -> dict:
-    if not path.is_file():
-        return {}
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _write_yaml(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        yaml.safe_dump(data, allow_unicode=True, sort_keys=False).strip() + "\n",
-        encoding="utf-8",
-    )
 
 
 def merge_cards(
@@ -455,44 +422,6 @@ def delete_card(people: dict[str, Card], card_id: str, root: Path) -> None:
 def _delete_files(card_id: str, root: Path, *, people_path: Path) -> None:
     if people_path.exists():
         people_path.unlink()
-    metrics_file = root / METRICS / f"{card_id}.yaml"
-    if metrics_file.exists():
-        metrics_file.unlink()
-        print(f"  deleted Metrics/{card_id}.yaml")
-
-
-def reconcile_metrics(people: dict[str, Card], target: str, sources: list[str], root: Path) -> None:
-    target_file = root / METRICS / f"{target}.yaml"
-    merged_rows: list = []
-    target_data = _read_yaml(target_file)
-    if isinstance(target_data.get("rows"), list):
-        merged_rows = list(target_data["rows"])
-    telegram_id = people[target].telegram_id
-    for source in sources:
-        source_file = root / METRICS / f"{source}.yaml"
-        if not source_file.exists():
-            continue
-        source_data = _read_yaml(source_file)
-        if isinstance(source_data.get("rows"), list):
-            merged_rows = merge_timeseries(merged_rows, source_data["rows"])
-        if telegram_id is None:
-            try:
-                telegram_id = int(source_data["telegram_id"])
-            except (TypeError, ValueError, KeyError):
-                telegram_id = None
-    if not merged_rows:
-        return
-    merged_rows.sort(key=lambda row: str(row.get("date") or ""))
-    _write_yaml(
-        target_file,
-        {
-            "type": TYPE_METRICS,
-            "id": target,
-            "telegram_id": telegram_id,
-            "rows": merged_rows,
-        },
-    )
-    print(f"  reconciled Metrics/{target}.yaml ({len(merged_rows)} rows)")
 
 
 def print_plan(
@@ -557,8 +486,7 @@ async def _rebuild_indexes(root: Path) -> None:
     vault = KnowledgeVault(root_path=str(root))
     index = KnowledgeIndex(vault)
     await index.rebuild_folder(PEOPLE)
-    await index.rebuild_folder(METRICS)
-    print("rebuilt People/_index.yaml and Metrics/_index.yaml")
+    print("rebuilt People/_index.yaml")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -587,11 +515,9 @@ def main(argv: list[str] | None = None) -> int:
     print("=== Applying merge plan ===")
     for group in groups:
         merge_cards(people, group.target, group.sources, root)
-        reconcile_metrics(people, group.target, group.sources, root)
     for spec in args.merge:
         source, target = spec.split(":", 1)
         merge_cards(people, target, [source], root)
-        reconcile_metrics(people, target, [source], root)
     for card_id in args.delete:
         delete_card(people, card_id, root)
 

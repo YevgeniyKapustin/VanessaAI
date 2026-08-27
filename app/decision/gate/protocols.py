@@ -38,6 +38,8 @@ class ReplyEligibilityProtocol(Protocol):
         self,
         text: str,
         *,
+        recent_messages: list[ContextMessage] | None = None,
+        sender_telegram_id: int = 0,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,

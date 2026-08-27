@@ -20,6 +20,7 @@ from app.decision.gate.reply_expectation import (
     mention_warrants_reply,
 )
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
+from app.decision.repeated_question import is_repeated_message
 from app.decision.models import DecisionReason
 
 
@@ -285,6 +286,8 @@ class ReplyEligibility:
         self,
         text: str,
         *,
+        recent_messages: list[ContextMessage] | None = None,
+        sender_telegram_id: int = 0,
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
@@ -303,6 +306,16 @@ class ReplyEligibility:
         ):
             return True
         if should_reply is False:
+            # A repeated message is junk even when it mentions the bot — the
+            # deterministic repeat detector must win over the direct-address
+            # override (otherwise a spam burst that the planner vetoed as
+            # «повтор» still composes a reply).
+            if recent_messages and is_repeated_message(
+                text,
+                recent_messages,
+                sender_telegram_id=sender_telegram_id,
+            ):
+                return True
             # A planner veto normally closes the thread, but a deterministic
             # direct address overrides it: the LLM planner can misclassify a
             # clear "ванесса + императив" as self-talk («общение между

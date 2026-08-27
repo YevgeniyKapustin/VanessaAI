@@ -1,4 +1,3 @@
-import hashlib
 import uuid
 
 from qdrant_client import AsyncQdrantClient
@@ -149,12 +148,24 @@ class KnowledgeQdrantStore:
 
     @staticmethod
     def point_id(path: str) -> str:
-        return "k:" + hashlib.sha256(path.encode("utf-8")).hexdigest()
+        """Deterministic UUID point id derived from the note's vault-relative path.
+
+        Qdrant only accepts unsigned-integer or UUID point ids; a bare ``k:...``
+        hash string is rejected with HTTP 400 by modern Qdrant versions (this
+        silently kept the ``knowledge`` collection empty). Deriving a UUID keeps
+        the id deterministic so re-embedding a note overwrites its point in
+        place (idempotent reindex).
+        """
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"vault://{path}"))
 
     @staticmethod
     def chunk_point_id(path: str, chunk_index: int) -> str:
-        """Deterministic point id for a People-dossier chunk (per-chunk points)."""
-        return f"{KnowledgeQdrantStore.point_id(path)}:c{chunk_index}"
+        """Deterministic UUID point id for a People-dossier chunk (per-chunk points).
+
+        Each (path, chunk_index) pair maps to its own UUID so every block of a
+        People dossier is stored and re-indexed independently.
+        """
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"vault://{path}#{chunk_index}"))
 
     async def reset(self) -> None:
         """Drop the whole collection (used by a full reindex)."""

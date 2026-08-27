@@ -40,6 +40,8 @@ class ComposeGatePolicy:
             return False
         return self._eligibility.should_block_compose(
             context.text,
+            recent_messages=context.recent_messages,
+            sender_telegram_id=context.sender_telegram_id,
             mentions_bot=context.mentions_bot,
             reply_to_bot=context.reply_to_bot,
             reply_to_other_user=context.reply_to_other_user,

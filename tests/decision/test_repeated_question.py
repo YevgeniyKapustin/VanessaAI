@@ -10,7 +10,9 @@ from app.decision.models import DecisionAction, DecisionReason
 from app.decision.repeated_question import (
     RepeatedQuestionRule,
     is_pure_repeat,
+    is_repeated_message,
     message_tokens,
+    normalize_content,
 )
 
 
@@ -100,6 +102,78 @@ def test_rule_ignores_unanswered_repeat():
     assert rule.evaluate(context) is None
 
 
+def test_normalize_content_keeps_short_and_stopwords():
+    # Short spam «ванесса» must match itself — unlike message_tokens (which
+    # drops it for being <3 content words), normalize keeps stopwords.
+    assert normalize_content("ванесса") == "ванесса"
+    assert normalize_content("Ванесса!") == "ванесса"
+    assert normalize_content("ну чё там") == "ну че там"
+    assert normalize_content("ванесса,   ну чё?!") == "ванесса ну че"
+
+
+def test_is_repeated_message_same_sender_burst():
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="ванесса", sender_telegram_id=7),
+    ]
+    assert is_repeated_message("ванесса", recent, sender_telegram_id=7) is True
+
+
+def test_is_repeated_message_single_occurrence_false():
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),
+    ]
+    assert is_repeated_message("ванесса", recent, sender_telegram_id=7) is False
+
+
+def test_is_repeated_message_ignores_assistant_and_other_sender():
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),
+        ContextMessage(id=2, role="assistant", content="ванесса"),
+        ContextMessage(id=3, role="user", content="ванесса", sender_telegram_id=9),
+    ]
+    # Only same-sender user copies count; a different person's identical message
+    # does not suppress this sender.
+    assert is_repeated_message("ванесса", recent, sender_telegram_id=7) is False
+
+
+def test_is_repeated_message_normalizes_punctuation_case():
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса, НУ чё?!", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="ванесса ну чё", sender_telegram_id=7),
+    ]
+    assert is_repeated_message("ванесса ну чё", recent, sender_telegram_id=7) is True
+
+
+def test_rule_ignores_short_repeat_burst():
+    rule = RepeatedQuestionRule()
+    from app.decision.context import DecisionContext
+    from app.decision.detectors.intent import IntentDetector
+    from app.decision.detectors.triggers import TriggerKeywordChecker
+
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="ванесса", sender_telegram_id=7),
+    ]
+    intent = IntentDetector().detect("ванесса")
+    trigger = TriggerKeywordChecker(()).detect("ванесса")
+    context = DecisionContext(
+        text="ванесса",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        query_vector=None,
+        intent=intent,
+        trigger=trigger,
+        session_active=True,
+        relevance_score=0.0,
+        sender_telegram_id=7,
+    )
+    result = rule.evaluate(context)
+    assert result is not None
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.REPEATED
+
+
 # --- integration via the decision engine ---
 
 
@@ -172,6 +246,48 @@ async def test_engine_does_not_ignore_repeat_without_prior_answer(engine):
         recent_messages=recent,
         mentions_bot=True,
         should_reply=None,
+    )
+
+    assert result.action == DecisionAction.REPLY
+
+
+@pytest.mark.asyncio
+async def test_engine_ignores_same_sender_short_burst(engine):
+    # Same sender spams the same short message («ванесса») — a burst is spam,
+    # not a new question, even without any assistant reply in between.
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="ванесса", sender_telegram_id=7),
+    ]
+
+    result = await engine.decide(
+        text="ванесса",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        mentions_bot=True,
+        should_reply=None,
+        sender_telegram_id=7,
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.REPEATED
+
+
+@pytest.mark.asyncio
+async def test_engine_does_not_suppress_other_senders_similar_message(engine):
+    # Person B's identical message does not suppress person A's — burst
+    # detection is sender-aware.
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса ну чё", sender_telegram_id=7),
+    ]
+
+    result = await engine.decide(
+        text="ванесса ну чё",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        mentions_bot=True,
+        should_reply=None,
+        sender_telegram_id=9,
     )
 
     assert result.action == DecisionAction.REPLY

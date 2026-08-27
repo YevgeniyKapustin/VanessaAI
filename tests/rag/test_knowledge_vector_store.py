@@ -1,8 +1,17 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.rag.qdrant_client import KnowledgeQdrantStore
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except (ValueError, AttributeError):
+        return False
+    return True
 
 
 def _make_client() -> MagicMock:
@@ -29,7 +38,9 @@ def test_point_id_is_deterministic_and_path_scoped():
 
     assert a == b
     assert a != c
-    assert a.startswith("k:")
+    # Qdrant only accepts unsigned-integer or UUID point ids (modern Qdrant
+    # rejects the old ``k:``-prefixed hash strings with HTTP 400).
+    assert _is_uuid(a)
 
 
 @pytest.mark.asyncio
@@ -71,9 +82,10 @@ async def test_upsert_note_chunks_returns_distinct_point_ids():
 
     assert len(ids) == 2
     assert len(set(ids)) == 2
-    assert all(pid.startswith("k:") for pid in ids)
+    assert all(_is_uuid(pid) for pid in ids)
     assert ids[0] == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 0)
     assert ids[1] == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 1)
+    assert ids[0] != KnowledgeQdrantStore.point_id("People/личь.md")
 
 
 @pytest.mark.asyncio
@@ -92,9 +104,7 @@ async def test_chunk_point_id_is_deterministic():
     assert KnowledgeQdrantStore.chunk_point_id(
         "People/личь.md", 0
     ) != KnowledgeQdrantStore.chunk_point_id("People/личь.md", 1)
-    assert KnowledgeQdrantStore.chunk_point_id(
-        "People/личь.md", 0
-    ).startswith("k:")
+    assert _is_uuid(KnowledgeQdrantStore.chunk_point_id("People/личь.md", 0))
 
 
 @pytest.mark.asyncio

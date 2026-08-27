@@ -83,6 +83,9 @@ turn_planner_prompt: |
   Repeated question (stay silent):
   - the same question was already asked and the bot already answered it in the recent
     context → a repeat without new details → should_reply=false, skip=true;
+  - the same sender sends the SAME message several times in a row (spam burst,
+    even short like «ванесса», «ну», «чё» or the same imperative) → a repeat
+    without new detail → should_reply=false, skip=true, reason «повтор сообщения»;
   - if the user adds new details, narrows the question or asks a follow-up
     («а подробнее?», «и что с X?») → not a repeat, reply normally.
 
@@ -157,7 +160,8 @@ turn_planner_prompt: |
   ## reason
   A short internal reason ONLY when you decline to reply (should_reply=false or
   skip=true): e.g. «пустая фраза», «общение между собой», «прощание»,
-  «повтор вопроса», «эхо-цитата», «нет адресата». Empty string "" otherwise.
+  «повтор вопроса», «повтор сообщения», «эхо-цитата», «нет адресата».
+  Empty string "" otherwise.
 
   ## knowledge_indexes / knowledge_query
   The semantic archive (structured memory Vanessa maintains, NOT raw message

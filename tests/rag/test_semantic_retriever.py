@@ -157,3 +157,61 @@ async def test_fetch_semantic_falls_back_to_alias_fetch(tmp_path):
     )
 
     assert [block.path for block in blocks] == ["People/личь.md"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_people_injects_portrait_not_raw_dossier(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    note = await vault.read_note("People/личь.md")
+    meta = dict(note.meta)
+    meta["portrait"] = "Личь — философ и сварщик, держит ровное настроение."
+    await vault.write_note(note.relative_path, meta, note.body)
+
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=1)
+    blocks = await retriever.fetch_semantic(
+        "личь",
+        knowledge_indexes=("people",),
+        knowledge_query="личь",
+    )
+
+    assert len(blocks) == 1
+    assert blocks[0].content == "Личь — философ и сварщик, держит ровное настроение."
+    # The raw dossier is NOT dumped into the background context.
+    assert "## Контекст жизни" not in blocks[0].content
+
+
+@pytest.mark.asyncio
+async def test_fetch_people_detail_pulls_raw_dossier(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    note = await vault.read_note("People/личь.md")
+    meta = dict(note.meta)
+    meta["portrait"] = "Личь — философ и сварщик."
+    await vault.write_note(note.relative_path, meta, note.body)
+
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=1)
+    blocks = await retriever.fetch_semantic(
+        "личь",
+        knowledge_indexes=("people",),
+        knowledge_query="личь",
+        people_detail=True,
+    )
+
+    assert len(blocks) == 1
+    assert "Философ и сварщик" in blocks[0].content
+    # A concrete-fact question pulls the raw dossier section.
+    assert "## Контекст жизни" in blocks[0].content
+
+
+@pytest.mark.asyncio
+async def test_fetch_people_without_portrait_falls_back_to_raw(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=1)
+
+    blocks = await retriever.fetch_semantic(
+        "личь",
+        knowledge_indexes=("people",),
+        knowledge_query="личь",
+    )
+
+    assert len(blocks) == 1
+    assert "Философ и сварщик" in blocks[0].content

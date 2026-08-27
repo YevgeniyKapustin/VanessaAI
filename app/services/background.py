@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.observability.metrics import record_background_queue
+
 logger = logging.getLogger(__name__)
 
 Job = object  # a zero-arg async callable
@@ -46,6 +48,7 @@ class BackgroundExecutor:
                     logger.exception("background_job_failed worker=%s", name)
             finally:
                 self._queue.task_done()
+                record_background_queue(self._queue.qsize())
 
     def submit(self, job) -> None:
         """Schedule a zero-arg async callable; drop it when the queue is full."""
@@ -56,6 +59,7 @@ class BackgroundExecutor:
             self._queue.put_nowait(job)
         except asyncio.QueueFull:
             logger.warning("background_queue_full dropping job")
+        record_background_queue(self._queue.qsize())
 
     async def join(self) -> None:
         """Wait until every submitted job has finished (test/teardown aid)."""

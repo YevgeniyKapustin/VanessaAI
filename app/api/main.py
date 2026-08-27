@@ -7,9 +7,10 @@ from fastapi import FastAPI
 from app.api.container import get_app_container
 from app.api.deps import create_embedding_provider, create_vector_store
 from app.api.middleware import register_request_id_middleware
-from app.api.routes import chat, health, metrics
+from app.api.routes import chat, health, metrics, observability
 from app.config import settings
 from app.core.logging_setup import configure_logging
+from app.observability.alerting import create_alert_manager
 from app.db.base import Base
 from app.db.session import async_session_factory, engine
 from app.knowledge.index import KnowledgeIndex
@@ -18,6 +19,7 @@ from app.knowledge.metrics.deterministic import DeterministicMetricsCalculator
 from app.knowledge.metrics.pipeline import MetricsPipeline
 from app.knowledge.metrics.planner import MetricsPlanner
 from app.knowledge.metrics.store import MetricsStore
+from app.knowledge.portraits import PortraitBuilder, PortraitWorker
 from app.knowledge.sweep import SweepAnalyzer, SweepWorker
 from app.knowledge.vault import KnowledgeVault
 from app.knowledge.vector_index import KnowledgeVectorIndexer
@@ -48,6 +50,7 @@ async def lifespan(app: FastAPI):
     )
 
     sweep_task: asyncio.Task | None = None
+    portrait_task: asyncio.Task | None = None
     if settings.knowledge_sweep_enabled:
         metrics_pipeline = MetricsPipeline(
             MetricsStore(vault, vault_index),
@@ -78,6 +81,16 @@ async def lifespan(app: FastAPI):
         )
         sweep_task = asyncio.create_task(worker.run_forever())
 
+    # Hierarchical dossier summarization: periodically compress each People card
+    # into a compact portrait so the compose prompt never dumps a 100+ line
+    # dossier as background context.
+    if settings.knowledge_portrait_enabled:
+        portrait_worker = PortraitWorker(
+            PortraitBuilder(vault),
+            poll_seconds=settings.knowledge_portrait_poll_seconds,
+        )
+        portrait_task = asyncio.create_task(portrait_worker.run_forever())
+
     await asyncio.to_thread(preload_embedding_model)
     await create_embedding_provider().embed("warmup")
     # Seed/refresh the semantic vault vector index once at startup (fail-open —
@@ -86,12 +99,31 @@ async def lifespan(app: FastAPI):
         await knowledge_vector_indexer.index_all()
     except Exception:
         logger.exception("knowledge_vector_index_all_failed at startup")
+    # Observability: in-process alerting (error rate / latency p95 / balance).
+    alert_task: asyncio.Task | None = None
+    alert_manager = create_alert_manager()
+    if alert_manager is not None:
+        alert_task = asyncio.create_task(alert_manager.run_forever())
+        logger.info("AlertManager started (chat_id=%s)", settings.alerting_dev_chat_id)
+
     yield
 
+    if alert_task is not None:
+        alert_task.cancel()
+        try:
+            await alert_task
+        except asyncio.CancelledError:
+            pass
     if sweep_task is not None:
         sweep_task.cancel()
         try:
             await sweep_task
+        except asyncio.CancelledError:
+            pass
+    if portrait_task is not None:
+        portrait_task.cancel()
+        try:
+            await portrait_task
         except asyncio.CancelledError:
             pass
     await get_app_container().background.shutdown()
@@ -110,3 +142,5 @@ register_request_id_middleware(app)
 app.include_router(health.router, tags=["health"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(metrics.router, prefix="/api/v1", tags=["metrics"])
+# Prometheus scrape endpoint (root /metrics; /api/v1/metrics stays the JSON snapshot).
+app.include_router(observability.router)

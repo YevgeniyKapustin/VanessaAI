@@ -25,7 +25,8 @@ turn_planner_prompt: |
   - window after the bot's reply (≤2 messages): {listen_window}
 
   ## Output format
-  JSON without markdown:
+  Output ONLY valid raw JSON without any markdown formatting, backticks, or
+  explanatory text (no ```json code fences, no prose around the object):
   {{
     "should_reply": false,
     "search_query": "...",
@@ -36,6 +37,7 @@ turn_planner_prompt: |
     "deep_search": false,
     "knowledge_indexes": [],
     "knowledge_query": "",
+    "knowledge_detail": false,
     "needs_clarification": false,
     "clarification_hint": ""
   }}
@@ -127,18 +129,29 @@ turn_planner_prompt: |
 
   ## knowledge_indexes / knowledge_query
   The semantic archive (structured memory Vanessa maintains, NOT raw message
-  history) is the primary source when the question is about people, local lore,
-  recommendations or logs:
-  - people — about a participant: nickname, who they are, habits, mood («что там у Лича»);
+  history) is secondary to direct message history and should be queried
+  selectively — only when the question genuinely needs facts from dossiers or lore:
+  - people — about a participant's traits, habits, mood («что там у Лича»).
+    Use it ONLY when the question asks about the person; do NOT trigger it just
+    because a participant's name was mentioned in passing in casual chat;
   - lore — internal memes, local jokes, old events («что было про Макса и утку»);
   - culture — recommendations: movies/games/music;
   - logs — how the week/day went.
   knowledge_query: 2–8 words for the archive search; compose it semantically too
   (entities + topic, words from the summaries), e.g. «личь сварщик игра»,
-  «конфликт зонов опоздания». If no specific archive is needed, still consider
-  setting knowledge_indexes=["people","lore"] when the message names a participant
-  or a local meme — the semantic archive gives a much better match than raw history.
-  Without an explicit need — knowledge_indexes=[] and knowledge_query="".
+  «конфликт зонов опоздания». If no archive data is needed, keep
+  knowledge_indexes=[] and knowledge_query="".
+
+  ## knowledge_detail
+  Only relevant when knowledge_indexes includes "people". Controls how much of
+  the person's dossier goes into the compose prompt:
+  - false (default) — the user asks a general question about the person
+    («кто такой X», «расскажи про X») → inject only the compact portrait, keep
+    the context lean;
+  - true — the user asks a concrete fact from the dossier («во что играет X»,
+    «где работает X», «сколько X лет», «какое у X настроение») → inject the
+    raw dossier so the exact fact is available.
+  If knowledge_indexes is empty or has no "people", keep knowledge_detail=false.
 
   ## Examples (input → JSON)
 
@@ -179,10 +192,10 @@ turn_planner_prompt: |
   "knowledge_indexes": ["people"], "knowledge_query": "тик так",
   "humor_ok": false, "humor_query": "", "deep_search": false}}
 
-  «Ванесса, кто такой Тик так» | reply=yes
+  «Ванесса, кто такой Тик так» | reply=yes, general question → portrait only
   → {{"should_reply": true, "search_query": "тик так", "skip": false,
   "tone": "neutral", "knowledge_indexes": ["people"], "knowledge_query": "тик так",
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
+  "knowledge_detail": false, "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «где там» | context: discussing a file on the disk
   → {{"should_reply": true, "search_query": "файл диск", "skip": false,
@@ -201,10 +214,10 @@ turn_planner_prompt: |
   → {{"should_reply": true, "search_query": "меш текстуры unity", "skip": false,
   "humor_ok": false, "humor_query": "", "deep_search": true}}
 
-  «что там у Лича с работой» | participant + habit from his summary
+  «что там у Лича с работой» | participant + habit, concrete fact → raw dossier
   → {{"should_reply": true, "search_query": "личь работа сварщик", "skip": false,
   "tone": "neutral", "knowledge_indexes": ["people"], "knowledge_query": "личь работа",
-  "humor_ok": false, "humor_query": "", "deep_search": false}}
+  "knowledge_detail": true, "humor_ok": false, "humor_query": "", "deep_search": false}}
 
   «помнишь конфликт из-за опозданий» | local event, semantic archive
   → {{"should_reply": true, "search_query": "опоздания игровая катка", "skip": false,

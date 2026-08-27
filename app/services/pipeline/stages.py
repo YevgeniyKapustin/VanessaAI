@@ -202,6 +202,7 @@ class RetrieveStage:
                     humor_ok=ctx.turn_plan.humor_ok,
                     humor_query=ctx.turn_plan.humor_query,
                     user_message=ctx.turn.message,
+                    people_detail=ctx.turn_plan.knowledge_detail,
                 )
             except Exception:
                 # Fail-open: a semantic-search failure (e.g. Qdrant down) must

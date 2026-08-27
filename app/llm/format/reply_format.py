@@ -40,3 +40,19 @@ def _capitalize_prose(text: str) -> str:
         return match.group(1) + match.group(2).upper()
 
     return _SENTENCE_START.sub(repl, text)
+
+
+_TRAILING_PERIODS = re.compile(r"\.+$")
+
+
+def strip_trailing_periods(text: str) -> str:
+    """Remove the trailing period(s) of a reply.
+
+    The persona avoids a period at the very end of a message. The rule is
+    enforced here instead of in the prompt so the model doesn't spend its
+    attention budget on punctuation. An intentional ellipsis ('...') is kept.
+    """
+    stripped = text.rstrip()
+    if not stripped or stripped.endswith("..."):
+        return stripped
+    return _TRAILING_PERIODS.sub("", stripped)

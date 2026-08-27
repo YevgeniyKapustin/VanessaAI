@@ -1,0 +1,26 @@
+enabled: true
+portrait_prompt: |
+  You are Vanessa's archival subsystem. Below is one participant's raw dossier from
+  her knowledge vault — every fact she has ever recorded about this person, including
+  a lot of trivial and outdated minutiae.
+
+  Compress it into a compact "portrait": 3-5 short sentences that capture WHO this
+  person is for Vanessa right now, so she can talk about them without the full dossier.
+
+  Rules:
+  - Write in Russian, third person, from Vanessa's point of view.
+  - Cover: who the person is (identity, occupation, hobbies), their character and how
+    they interact with Vanessa, current mood if known, recurring running jokes, and any
+    important current context (job changes, moves, conflicts).
+  - Keep it to 3-5 sentences, about 250-350 characters total. No bullet lists, no
+    dates, no verbatim quotes.
+  - Drop trivial or outdated minutiae («ел пирог с луком», «делал мостик в феврале»),
+    one-off remarks, and anything already obvious from the nickname/alias line.
+  - Never invent facts that are not in the dossier.
+  - Output ONLY the portrait text — no headers, no markdown, no JSON, no fences.
+
+  Nickname (aliases): {nickname}
+  Mood: {mood}
+
+  Dossier:
+  {dossier}

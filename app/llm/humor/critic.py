@@ -196,6 +196,7 @@ class HumorCritic:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user_prompt},
                     ],
+                    kind="critic",
                     **self._generation.to_llm_kwargs(),
                 )
             ).strip()

@@ -41,11 +41,19 @@ common problems:
 
 - **REST API** (`POST /api/v1/chat`) — bot and API are separate, easy to test
   and scale.
-- **Metrics** (`GET /api/v1/metrics`) — reply/ignore counters by reason.
+- **Metrics** (`GET /api/v1/metrics`) — reply/ignore counters by reason, and
+  Prometheus metrics (`GET /metrics` + bot `:9101`) for Grafana dashboards.
+- **LLM/RAG tracing** — self-hosted Langfuse (`docker-compose`) with span-level
+  visibility of the RAG pipeline (gate → retrieve → compose → critique) and
+  per-call token usage.
+- **RAG Triad evaluation** — sampled LLM-as-judge scoring of context relevance,
+  groundedness and answer relevance.
+- **Alerting** — Telegram alerts on LLM error rate, p95 latency, empty RAG
+  retrieval and low provider balance.
 - **Configurability** — persona, triggers, RAG thresholds, and decision engine
   settings via YAML and env without rewriting core logic.
-- **400 automated tests** covering the decision engine, RAG, orchestrator,
-  prefilter, API, and the knowledge vault.
+- **500+ automated tests** covering the decision engine, RAG, orchestrator,
+  prefilter, API, observability, and the knowledge vault.
 
 ## Knowledge vault
 
@@ -284,8 +292,39 @@ does not apply them today.
 | `BACKGROUND_QUEUE_SIZE` | Bounded queue size for post-reply background work (memory/metrics/indexing) |
 | `BACKGROUND_WORKERS` | Worker tasks consuming the background queue |
 | `CONTENT_CONFIG_PATH` | Path to content dir (one YAML per section) or a single file |
+| `METRICS_ENABLED` | Expose Prometheus metrics (`/metrics` on API, `:9101` on bot) |
+| `LANGFUSE_ENABLED` | Enable Langfuse LLM/RAG tracing (off by default) |
+| `LANGFUSE_SAMPLE_RATE` | Fraction of turns traced (0..1) |
+| `RAG_EVAL_ENABLED` | Enable sampled LLM-as-judge RAG Triad evaluation |
+| `ALERTING_ENABLED` | Enable in-process alerting to a Telegram dev channel |
 
 See `.env.example` for the full list.
+
+## Observability
+
+Observability is layered across the two processes and correlated by
+`request_id` (propagated via `X-Request-ID`):
+
+- **Metrics (Prometheus)** — `app/observability/metrics.py` exports turns,
+  per-stage latency, LLM tokens/requests/errors, RAG hits/empty/scores, Telegram
+  errors and HTTP latency. The API serves `GET /metrics`; the bot runs a
+  threaded endpoint on `BOT_METRICS_PORT`. Prometheus + Grafana are defined in
+  `docker-compose.yml` with a preloaded dashboard (`grafana/dashboards/vanessa.json`).
+- **LLM/RAG tracing (Langfuse)** — `app/observability/tracing.py` wraps the
+  orchestrator, pipeline stages, LLM providers and completers in spans. User/chat
+  ids are hashed with `LANGFUSE_ID_SALT` before leaving the process; sampling is
+  controlled by `LANGFUSE_SAMPLE_RATE`. Off by default (NullTracer).
+- **RAG Triad evaluation** — deterministic signals are always collected; a
+  sampled LLM-as-judge (`app/observability/eval.py`) scores context relevance,
+  groundedness and answer relevance on replied turns in the background.
+- **Alerting** — `app/observability/alerting.py` evaluates local rolling windows
+  (LLM error rate, turn p95, empty RAG, Telegram errors) and sends Telegram
+  alerts to `ALERTING_DEV_CHAT_ID` with per-rule cooldown; a balance probe
+  alerts on provider HTTP 402.
+
+All observability features are **off by default** so the bot behaves exactly as
+before until explicitly enabled via `.env`. See [`plans/observability.md`](plans/observability.md)
+for the full design and metric catalog.
 
 ## Limitations
 

@@ -16,6 +16,7 @@ CONTENT_SECTIONS: dict[str, str] = {
     "decision": "decision.yaml",
     "memory": "memory.yaml",
     "metrics": "metrics.yaml",
+    "portrait": "portrait.yaml",
     "rag": "rag.yaml",
     "profanity": "profanity.yaml",
     "stickers": "stickers.yaml",
@@ -178,7 +179,6 @@ class BotNotesMessages(BaseModel):
 
 class BotMessagesContent(BaseModel):
     welcome: str
-    error_api: str
     access: BotAccessMessages
     notes: BotNotesMessages
 
@@ -212,6 +212,13 @@ class MetricsContent(BaseModel):
     feedback_line: str = (
         "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"
     )
+
+
+class PortraitContent(BaseModel):
+    """Prompt for the hierarchical dossier summarization (person portraits)."""
+
+    enabled: bool = True
+    portrait_prompt: str = ""
 
 
 class RagContent(BaseModel):
@@ -347,6 +354,7 @@ class AppContent(BaseModel):
     rag: RagContent = Field(default_factory=RagContent)
     memory: MemoryContent = Field(default_factory=MemoryContent)
     metrics: MetricsContent = Field(default_factory=MetricsContent)
+    portrait: PortraitContent = Field(default_factory=PortraitContent)
     stickers: StickersContent = Field(default_factory=StickersContent)
     memes: MemesContent = Field(default_factory=MemesContent)
 

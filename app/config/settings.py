@@ -135,6 +135,59 @@ class Settings(BaseSettings):
     # Optional; empty string falls back to LOG_LEVEL.
     log_file_level: str = ""
 
+    # --- Observability: Prometheus metrics -----------------------------------
+    # Expose vanessa_* metrics via GET /metrics (API) and a threaded HTTP
+    # endpoint on the bot (BOT_METRICS_PORT). Metrics are cheap and safe to keep
+    # on; they power the Grafana dashboards and the in-process AlertManager.
+    metrics_enabled: bool = True
+    # Require X-Internal-Token on GET /metrics. Prometheus itself can be given
+    # the header via scrape_configs.bearer_token; disabled by default so a
+    # fresh Prometheus scrape works out of the box.
+    metrics_require_token: bool = False
+    # Port for the bot process Prometheus HTTP endpoint (scraped by Prometheus).
+    bot_metrics_port: int = 9101
+
+    # --- Observability: Langfuse LLM/RAG tracing -------------------------------
+    # Off by default; the pipeline falls back to a NullTracer (no network).
+    langfuse_enabled: bool = False
+    langfuse_host: str = "http://localhost:3000"
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    # 0..1 — fraction of turns that are traced (1.0 = trace everything).
+    langfuse_sample_rate: float = 1.0
+    # Salt for hashing user/chat ids before they leave the process (privacy).
+    langfuse_id_salt: str = "vanessa"
+    # Flush interval (seconds) for the Langfuse client.
+    langfuse_flush_interval: int = 30
+
+    # --- Observability: RAG Triad evaluation ----------------------------------
+    # Deterministic RAG signals (score histograms, empty-retrieval counter) are
+    # always collected. This flag enables the sampled LLM-as-judge evaluations
+    # (context relevance / groundedness / answer relevance), which cost tokens.
+    rag_eval_enabled: bool = False
+    # 0..1 — fraction of replied turns that get an LLM-as-judge evaluation.
+    rag_eval_sample_rate: float = 0.05
+    # Judge model; empty = the active planner model.
+    rag_eval_model: str = ""
+
+    # --- Observability: Alerting (Telegram dev channel) -----------------------
+    # Periodic in-process evaluation of local metric windows with alerts sent
+    # to ALERTING_DEV_CHAT_ID via the bot token.
+    alerting_enabled: bool = False
+    alerting_check_interval_seconds: int = 60
+    alerting_cooldown_seconds: int = 600
+    alerting_window_seconds: int = 300
+    # Alert when the share of errored turns/LLM calls over the window exceeds this.
+    alerting_error_rate_threshold: float = 0.05
+    # Alert when turn latency p95 over the window exceeds this (seconds).
+    alerting_latency_p95_threshold: float = 7.0
+    # Alert when the share of empty RAG retrievals over the window exceeds this.
+    alerting_rag_empty_threshold: float = 0.5
+    # Private Telegram chat/channel that receives alerts (bot must be a member).
+    alerting_dev_chat_id: int = 0
+    # How often (hours) to probe the LLM provider balance; 0 disables the check.
+    alerting_balance_check_hours: int = 24
+
     obsidian_vault_path: str = ""
     obsidian_notes_subdir: str = "telegram"
     obsidian_attachments_subdir: str = "attachments"
@@ -173,6 +226,21 @@ class Settings(BaseSettings):
     knowledge_metrics_max_tokens: int = 768
     knowledge_metrics_cooldown_seconds: int = 900
     knowledge_metrics_history_days: int = 14
+
+    # Hierarchical dossiers: compact LLM portraits per participant. A background
+    # worker compresses each People card into a 3-5 sentence portrait stored in
+    # the card's frontmatter; the compose prompt injects only the relevant
+    # person's portrait (not the full 100+ line dossier) unless a concrete fact
+    # is asked (then the raw dossier is pulled, bounded by
+    # knowledge_people_raw_max_chars).
+    knowledge_portrait_enabled: bool = True
+    knowledge_portrait_model: str = ""
+    knowledge_portrait_max_tokens: int = 384
+    knowledge_portrait_poll_seconds: int = 300
+    knowledge_portrait_max_chars: int = 4000
+    # Raw dossier facts injected into the compose prompt on a concrete-fact
+    # question about a person ("во что играет Крабер?").
+    knowledge_people_raw_max_chars: int = 1400
 
     # Behavioral feedback from metrics.
     decision_metrics_rule_enabled: bool = True

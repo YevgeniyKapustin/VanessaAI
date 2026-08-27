@@ -15,10 +15,23 @@ from app.bot.messages import IncomingMessage
 from app.bot.stickers.heuristics import is_sticker_request
 from app.bot.telegram_format import markdown_to_telegram_html
 from app.decision.models import DecisionAction
+from app.observability.metrics import record_telegram, record_telegram_error
 
 logger = logging.getLogger(__name__)
 
 _PREVIEW_LEN = 80
+
+
+def _telegram_error_type(exc: Exception) -> str:
+    """Coarse error class for the Telegram error metric."""
+    name = type(exc).__name__.lower()
+    if "retryafter" in name or "flood" in name:
+        return "flood"
+    if "badrequest" in name or "forbidden" in name or "conflict" in name:
+        return "bad_request"
+    if "migrate" in name:
+        return "migrate"
+    return "network"
 
 
 def _preview(text: str) -> str:
@@ -34,6 +47,7 @@ async def _send_reply(telegram_message: TelegramMessage, reply: str) -> None:
         await telegram_message.reply(formatted, parse_mode=ParseMode.HTML)
     except TelegramBadRequest:
         await telegram_message.reply(reply)
+    record_telegram("send_reply", "success")
 
 
 _TYPING_INTERVAL_SECONDS = 4.0
@@ -49,8 +63,11 @@ async def _ping_typing(bot: Bot, chat_id: int, where: str) -> None:
     """
     try:
         await bot.send_chat_action(chat_id, "typing")
+        record_telegram("typing", "success")
         logger.debug("typing_ping chat_id=%s where=%s", chat_id, where)
     except Exception as exc:
+        record_telegram("typing", "error")
+        record_telegram_error("typing", _telegram_error_type(exc))
         logger.warning(
             "typing_ping_failed chat_id=%s where=%s error=%s",
             chat_id,
@@ -81,10 +98,13 @@ async def _typing_loop(
         try:
             await bot.send_chat_action(chat_id, "typing")
             consecutive_failures = 0
+            record_telegram("typing", "success")
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             consecutive_failures += 1
+            record_telegram("typing", "error")
+            record_telegram_error("typing", _telegram_error_type(exc))
             logger.warning(
                 "typing_ping_failed chat_id=%s consecutive_failures=%s error=%s",
                 chat_id,
@@ -190,8 +210,14 @@ def create_messages_router(services: BotServices) -> Router:
 
         try:
             result = await services.chat_client.process(incoming)
-        except httpx.HTTPError:
-            await telegram_message.reply(services.texts.error_api)
+        except httpx.HTTPError as exc:
+            # Never leak errors into the chat: log the failure and drop the
+            # turn silently instead of spamming the conversation.
+            logger.warning(
+                "api_request_error chat_id=%s error=%s",
+                incoming.telegram_chat_id,
+                exc,
+            )
             return
 
         if result.action != DecisionAction.REPLY or not result.reply:

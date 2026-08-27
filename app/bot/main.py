@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 
 from aiogram import Bot, Dispatcher
@@ -8,12 +9,25 @@ from app.bot.handlers import create_router
 from app.bot.middleware import BotLoggingMiddleware
 from app.config import settings
 from app.core.logging_setup import configure_logging
+from app.observability.alerting import create_alert_manager
 
 configure_logging("bot")
 logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
+    if settings.metrics_enabled:
+        from prometheus_client import start_http_server
+
+        start_http_server(settings.bot_metrics_port)
+        logger.info("Prometheus metrics endpoint started on :%s", settings.bot_metrics_port)
+
+    alert_task: asyncio.Task | None = None
+    alert_manager = create_alert_manager()
+    if alert_manager is not None:
+        alert_task = asyncio.create_task(alert_manager.run_forever())
+        logger.info("AlertManager started (chat_id=%s)", settings.alerting_dev_chat_id)
+
     services = create_bot_services()
     await services.knowledge.ensure_structure()
     bot = Bot(token=settings.telegram_bot_token)
@@ -26,7 +40,13 @@ async def main() -> None:
     router.message.middleware(BotLoggingMiddleware())
     dp.include_router(router)
     logger.info("Bot polling started")
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        if alert_task is not None:
+            alert_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await alert_task
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import pytest
 
+from app.config.content import get_content
 from app.llm.planner.turn_planner import TurnPlanner
 
 
@@ -92,6 +93,34 @@ async def test_turn_planner_knowledge_defaults_empty():
 
     assert result.knowledge_indexes == ()
     assert result.knowledge_query == ""
+    assert result.knowledge_detail is False
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_parse_knowledge_detail():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "что там у Лича с работой",
+        '{"search_query": "личь работа", "skip": false, "humor_ok": false, '
+        '"humor_query": "", "knowledge_indexes": ["people"], '
+        '"knowledge_query": "личь работа", "knowledge_detail": true}',
+    )
+
+    assert result.knowledge_indexes == ("people",)
+    assert result.knowledge_detail is True
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_knowledge_detail_defaults_false():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "кто такой Тик так",
+        '{"search_query": "тик так", "skip": false, "humor_ok": false, '
+        '"humor_query": "", "knowledge_indexes": ["people"], '
+        '"knowledge_query": "тик так"}',
+    )
+
+    assert result.knowledge_detail is False
 
 
 @pytest.mark.asyncio
@@ -172,3 +201,41 @@ async def test_turn_planner_fallback_needs_clarification_false():
     planner = TurnPlanner(use_llm=False)
     result = planner._fallback("привет")
     assert result.needs_clarification is False
+
+
+def test_turn_planner_prompt_forbids_markdown_json_wrapping():
+    """The Output format section must demand raw JSON, not ```json fences."""
+    prompt = get_content().rag.turn_planner_prompt
+    assert "Output format" in prompt
+    assert "Output ONLY valid raw JSON" in prompt
+    assert "no ```json code fences" in prompt
+    # the weak instruction is gone
+    assert "JSON without markdown" not in prompt
+
+
+def test_turn_planner_prompt_knowledge_indexes_selective():
+    """knowledge_indexes must not fire on a passing name mention."""
+    prompt = get_content().rag.turn_planner_prompt
+    section = prompt.split("## knowledge_indexes", 1)[1].split("## Examples", 1)[0]
+    # archives are secondary to direct history and queried selectively
+    assert "secondary to direct message history" in section
+    assert "should be queried" in section
+    assert "selectively" in section
+    # the old over-triggering rule is gone
+    assert "still consider" not in section
+    assert 'knowledge_indexes=["people","lore"]' not in section
+    # the strict rule is present
+    assert "do NOT trigger it just" in section
+    assert "mentioned in passing" in section
+
+
+def test_turn_planner_prompt_documents_knowledge_detail():
+    """The prompt must teach the model when to request raw dossier facts."""
+    prompt = get_content().rag.turn_planner_prompt
+    section = prompt.split("## knowledge_detail", 1)[1].split("## Examples", 1)[0]
+    assert "compact portrait" in section
+    assert "raw dossier" in section
+    assert "concrete fact" in section
+    # Portrait-only is the default; raw facts only on an explicit fact question.
+    assert "false (default)" in section
+    assert "true — the user asks a concrete fact" in section

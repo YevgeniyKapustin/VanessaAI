@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import time
+from typing import Any
 
 from openai import APIStatusError, AsyncOpenAI
 
@@ -10,7 +12,9 @@ from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.format.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompts.prompt_builder import PromptBuilder
-from app.llm.format.reply_format import capitalize_sentences
+from app.llm.format.reply_format import capitalize_sentences, strip_trailing_periods
+from app.observability.metrics import classify_llm_error, record_llm_call
+from app.observability.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -125,33 +129,73 @@ class DeepSeekLLMProvider:
         logger.info("llm_system_prompt:\n%s", system)
         logger.info("llm_user_prompt:\n%s", user_prompt)
 
+        provider = "deepseek"
+        tracer = get_tracer()
         last_error: Exception | None = None
-        for attempt in range(self._max_retries + 1):
-            try:
-                response = await self._openai_client.chat.completions.create(
-                    model=self._model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    **self._generation.to_llm_kwargs(),
-                )
-                text = response.choices[0].message.content or ""
-                return capitalize_sentences(
-                    self._substitute_profanity(text)
-                )
-            except Exception as exc:
-                last_error = exc
-                if attempt >= self._max_retries or not self._should_retry(exc):
-                    raise
-                delay = 1.0 * (attempt + 1)
-                logger.warning(
-                    "LLM request failed (attempt %s/%s), retry in %.1fs: %s",
-                    attempt + 1,
-                    self._max_retries + 1,
-                    delay,
-                    exc,
-                )
-                await asyncio.sleep(delay)
-        assert last_error is not None
-        raise last_error
+        async with tracer.generation(
+            name="llm_generation",
+            model=self._model,
+            input={"system": system, "user": user_prompt},
+            metadata={"provider": provider, "kind": "generation"},
+        ) as gen:
+            for attempt in range(self._max_retries + 1):
+                started = time.perf_counter()
+                try:
+                    response = await self._openai_client.chat.completions.create(
+                        model=self._model,
+                        messages=[
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        **self._generation.to_llm_kwargs(),
+                    )
+                    text = response.choices[0].message.content or ""
+                    usage = _usage_from_openai(response)
+                    record_llm_call(
+                        provider=provider,
+                        model=self._model,
+                        kind="generation",
+                        started=started,
+                        status="success",
+                        usage=usage,
+                    )
+                    reply = capitalize_sentences(
+                        strip_trailing_periods(self._substitute_profanity(text))
+                    )
+                    gen.update(output=reply, usage=usage or None)
+                    return reply
+                except Exception as exc:
+                    last_error = exc
+                    record_llm_call(
+                        provider=provider,
+                        model=self._model,
+                        kind="generation",
+                        started=started,
+                        status="error",
+                        error_type=classify_llm_error(exc),
+                    )
+                    if attempt >= self._max_retries or not self._should_retry(exc):
+                        raise
+                    delay = 1.0 * (attempt + 1)
+                    logger.warning(
+                        "LLM request failed (attempt %s/%s), retry in %.1fs: %s",
+                        attempt + 1,
+                        self._max_retries + 1,
+                        delay,
+                        exc,
+                    )
+                    await asyncio.sleep(delay)
+            assert last_error is not None
+            raise last_error
+
+
+def _usage_from_openai(response: Any) -> dict[str, int] | None:
+    """Normalize an OpenAI CompletionUsage into a dict, or None if absent."""
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    return {
+        "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
+        "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
+        "total_tokens": int(getattr(usage, "total_tokens", 0) or 0),
+    }

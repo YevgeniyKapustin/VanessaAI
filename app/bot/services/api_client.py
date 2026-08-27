@@ -5,6 +5,7 @@ import time
 from app.bot.messages import IncomingMessage
 from app.bot.messages.response import ChatProcessResult
 from app.config import settings
+from app.observability.metrics import record_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,11 @@ class HttpChatApiClient:
                 and exc.response is not None
                 else None
             )
+            record_http_client(
+                service="api",
+                status=status,
+                seconds=time.perf_counter() - started,
+            )
             logger.warning(
                 "api_request_failed chat_id=%s status=%s duration_ms=%.1f error=%s",
                 message.telegram_chat_id,
@@ -98,6 +104,11 @@ class HttpChatApiClient:
             reply=data.get("reply"),
             relevance_score=float(data.get("relevance_score", 0.0)),
             sticker_tag=data.get("sticker_tag"),
+        )
+        record_http_client(
+            service="api",
+            status=response.status_code,
+            seconds=time.perf_counter() - started,
         )
         logger.info(
             "api_request_done chat_id=%s action=%s reason=%s "

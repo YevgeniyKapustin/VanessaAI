@@ -42,6 +42,7 @@ from app.knowledge.vector_index import KnowledgeVectorIndexer
 from app.knowledge.writer import KnowledgeVaultWriter
 from app.llm.humor.critic import HumorCritic
 from app.llm.providers import create_llm_provider
+from app.observability.eval import RagTriadEvaluator
 from app.rag.search.hybrid_search import HybridSearchService
 from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
@@ -282,4 +283,6 @@ async def get_incoming_turn_handler(
         metrics=metrics_pipeline,
         background=container.background,
         session_factory=async_session_factory,
+        # RAG Triad LLM-as-judge evaluation (sampled, off by default).
+        eval=RagTriadEvaluator(),
     )

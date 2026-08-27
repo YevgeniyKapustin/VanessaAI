@@ -13,6 +13,7 @@ from app.core.protocols import (
     VectorStoreProtocol,
 )
 from app.rag.search.merger import merge_hybrid_results, merge_vector_search_hits
+from app.observability.metrics import record_rag_search
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,7 @@ class HybridSearchService(
                 vector_ms,
                 fts_ms,
             )
+            record_rag_search("raw", hits=0, top_score=top_score)
             return []
 
         before = window_before if window_before is not None else settings.rag_context_window_before
@@ -178,6 +180,7 @@ class HybridSearchService(
                 fts_ms,
                 window_ms,
             )
+            record_rag_search("raw", hits=len(blocks), top_score=top_score)
             return blocks
 
         messages = await self._messages.get_by_ids(selected_ids)
@@ -192,6 +195,7 @@ class HybridSearchService(
             fts_ms,
             window_ms,
         )
+        record_rag_search("raw", hits=len(user_messages), top_score=top_score)
         return [
             block
             for message in user_messages

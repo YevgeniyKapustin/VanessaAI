@@ -1,0 +1,15 @@
+# Prometheus scrape config for VanessaAI.
+# Targets: api (FastAPI /metrics) and bot (threaded /metrics on 9101).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: vanessa-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+
+  - job_name: vanessa-bot
+    static_configs:
+      - targets: ["bot:9101"]

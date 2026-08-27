@@ -14,12 +14,24 @@ from app.knowledge.metrics.pipeline import MetricsPipeline
 from app.core.request_context import get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
+from app.observability.eval import RagTriadEvaluator
+from app.observability.metrics import record_stage, record_turn_duration
+from app.observability.tracing import get_tracer, hash_identifier
 from app.services.background import BackgroundExecutor
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
 from app.services.pipeline.protocols import FinalizeStageProtocol, PipelineStage
 
 logger = logging.getLogger(__name__)
+
+_PREVIEW_LEN = 80
+
+
+def _preview(text: str) -> str:
+    normalized = text.replace("\n", " ").strip()
+    if len(normalized) <= _PREVIEW_LEN:
+        return normalized
+    return f"{normalized[:_PREVIEW_LEN]}..."
 
 
 class ConversationOrchestrator(IncomingTurnHandlerProtocol):
@@ -37,6 +49,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         metrics: MetricsPipeline | None = None,
         background: BackgroundExecutor | None = None,
         session_factory=None,
+        eval: RagTriadEvaluator | None = None,
     ) -> None:
         self._messages = messages
         self._users = users
@@ -50,8 +63,24 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         self._metrics = metrics
         self._background = background
         self._session_factory = session_factory
+        self._eval = eval
 
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
+        tracer = get_tracer()
+        async with tracer.trace(
+            name="telegram_rag_pipeline",
+            user_id=hash_identifier(turn.sender_telegram_id),
+            session_id=str(turn.telegram_chat_id),
+            metadata={
+                "request_id": get_request_id(),
+                "chat_id": hash_identifier(turn.telegram_chat_id),
+                "message_preview": _preview(turn.message),
+            },
+            input=turn.message,
+        ):
+            return await self._handle_incoming_inner(turn)
+
+    async def _handle_incoming_inner(self, turn: ChatTurnInput) -> ConversationTurnResult:
         ctx = TurnPipelineContext(turn=turn)
 
         user = await self._users.get_or_create(
@@ -85,15 +114,15 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         )
         ctx.recent = ctx.session.recent_messages
 
-        if not await self._gate.run(ctx):
+        if not await self._run_stage("gate", self._gate.run(ctx)):
             self._log_processed(turn, ctx)
             assert ctx.result is not None
             return ctx.result
 
-        await self._retrieve.run(ctx)
-        await self._compose.run(ctx)
+        await self._run_stage("retrieve", self._retrieve.run(ctx))
+        await self._run_stage("compose", self._compose.run(ctx))
         if self._critique is not None:
-            if not await self._critique.run(ctx):
+            if not await self._run_stage("critique", self._critique.run(ctx)):
                 # The critic decided the message does not need a reply.
                 await self._finalize.skip(
                     ctx,
@@ -102,11 +131,17 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 self._log_processed(turn, ctx)
                 assert ctx.result is not None
                 return ctx.result
-        await self._finalize.run(ctx)
+        await self._run_stage("finalize", self._finalize.run(ctx))
         await self._run_post_reply(ctx)
         self._log_processed(turn, ctx)
         assert ctx.result is not None
         return ctx.result
+
+    async def _run_stage(self, name: str, coro) -> bool:
+        """Run a pipeline stage inside a tracing span (no-op when disabled)."""
+        tracer = get_tracer()
+        async with tracer.span(name=name):
+            return await coro
 
     async def _run_post_reply(self, ctx: TurnPipelineContext) -> None:
         """Run memory extraction + metrics.
@@ -120,6 +155,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 self._background.submit(self._build_memory_job(ctx))
             if self._metrics is not None:
                 self._background.submit(self._build_metrics_job())
+            if self._eval is not None and self._eval.should_run():
+                self._background.submit(self._build_eval_job(ctx))
             return
         if self._memory is not None:
             try:
@@ -178,9 +215,57 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
 
         return job
 
+    def _build_eval_job(self, ctx: TurnPipelineContext):
+        question = ctx.turn.message
+        answer = ctx.reply or ""
+        context = self._eval_context_text(ctx)
+
+        async def job() -> None:
+            try:
+                assert self._eval is not None
+                await self._eval.evaluate(
+                    question=question,
+                    answer=answer,
+                    context=context,
+                )
+            except Exception:
+                logger.exception(
+                    "rag_eval_failed request_id=%s", get_request_id()
+                )
+
+        return job
+
+    @staticmethod
+    def _eval_context_text(ctx: TurnPipelineContext) -> str:
+        """Flatten the retrieved context into plain text for the judge."""
+        parts: list[str] = []
+        for block in ctx.knowledge_blocks:
+            if block.content.strip():
+                parts.append(block.content.strip())
+        for block in ctx.context_blocks:
+            for message in block.messages:
+                if message.content.strip():
+                    parts.append(message.content.strip())
+        parts.extend(quote.strip() for quote in ctx.humor_quotes if quote.strip())
+        return "\n\n".join(parts)
+
     def _log_processed(self, turn: ChatTurnInput, ctx: TurnPipelineContext) -> None:
         assert ctx.result is not None
         total_ms = (time.perf_counter() - ctx.started) * 1000
+        # Export latency histograms to Prometheus (dashboards + AlertManager).
+        record_turn_duration(action=ctx.result.action, seconds=total_ms / 1000.0)
+        record_stage("total", seconds=total_ms / 1000.0)
+        for stage, ms in (
+            ("plan", ctx.plan_ms),
+            ("decision", ctx.decision_ms),
+            ("embed", ctx.embed_ms),
+            ("rag", ctx.rag_ms),
+            ("humor_rag", ctx.humor_rag_ms),
+            ("llm", ctx.llm_ms),
+            ("critic", ctx.critic_ms),
+        ):
+            if ms > 0:
+                record_stage(stage, seconds=ms / 1000.0)
         if ctx.result.action == DecisionAction.IGNORE.value:
             logger.info(
                 "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "

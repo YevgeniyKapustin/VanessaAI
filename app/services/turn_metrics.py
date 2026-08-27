@@ -2,6 +2,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from threading import Lock
 
+from app.observability.metrics import record_turn as record_turn_metric
+
 
 @dataclass
 class TurnMetricsSnapshot:
@@ -45,6 +47,9 @@ class TurnMetrics:
                 self._deep_search_used += 1
             self._by_reason[reason] += 1
             self._by_action_reason[f"{action}:{reason}"] += 1
+        # Mirror into Prometheus so dashboards and the AlertManager can use the
+        # same counts as the /api/v1/metrics snapshot.
+        record_turn_metric(action=action, reason=reason)
 
     def snapshot(self) -> TurnMetricsSnapshot:
         with self._lock:

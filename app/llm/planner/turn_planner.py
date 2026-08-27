@@ -41,6 +41,10 @@ class TurnPlan:
     deep_search: bool = False
     knowledge_indexes: tuple[str, ...] = ()
     knowledge_query: str = ""
+    # True when the user asks a concrete fact about a person ("во что играет
+    # Крабер?") -> the compose prompt injects the raw dossier; False (default)
+    # injects only the compact LLM portrait as background context.
+    knowledge_detail: bool = False
     needs_clarification: bool = False
     clarification_hint: str = ""
 
@@ -87,7 +91,7 @@ class TurnPlanner:
             logger.info(
                 "turn_plan source=fallback search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r "
-                "needs_clarification=%s",
+                "knowledge_detail=%s needs_clarification=%s",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -96,6 +100,7 @@ class TurnPlanner:
                 result.humor_query,
                 result.knowledge_indexes,
                 result.knowledge_query,
+                result.knowledge_detail,
                 result.needs_clarification,
             )
             return result
@@ -119,7 +124,8 @@ class TurnPlanner:
             logger.info(
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
-                "knowledge=%s knowledge_query=%r needs_clarification=%s",
+                "knowledge=%s knowledge_query=%r knowledge_detail=%s "
+                "needs_clarification=%s",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -129,6 +135,7 @@ class TurnPlanner:
                 result.deep_search,
                 result.knowledge_indexes,
                 result.knowledge_query,
+                result.knowledge_detail,
                 result.needs_clarification,
             )
         return result
@@ -164,6 +171,7 @@ class TurnPlanner:
             await client.complete(
                 self._model,
                 [{"role": "user", "content": prompt}],
+                kind="planner",
                 **self._generation.to_llm_kwargs(),
             )
         ).strip()
@@ -217,6 +225,7 @@ class TurnPlanner:
             if str(item).strip()
         )
         knowledge_query = str(payload.get("knowledge_query", "")).strip()
+        knowledge_detail = payload.get("knowledge_detail") is True
         return TurnPlan(
             original=original,
             text=text,
@@ -228,6 +237,7 @@ class TurnPlanner:
             deep_search=deep_search,
             knowledge_indexes=knowledge_indexes,
             knowledge_query=knowledge_query,
+            knowledge_detail=knowledge_detail,
         )
 
     @staticmethod

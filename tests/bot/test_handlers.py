@@ -110,12 +110,12 @@ async def test_handle_text_ignores_when_access_denied():
 
 
 @pytest.mark.asyncio
-async def test_handle_text_reports_api_error():
+async def test_handle_text_swallows_api_error():
     message = make_telegram_message()
     message.reply = AsyncMock()
     services = _services(api_error=httpx.ConnectError("down"))
     await _call_text_handler(services, message)
-    message.reply.assert_awaited_once_with(services.texts.error_api)
+    message.reply.assert_not_awaited()
 
 
 @pytest.mark.asyncio

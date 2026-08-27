@@ -163,3 +163,13 @@ def test_prompt_builder_omits_clarification_instruction_when_not_needed():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt("привет", [])
     assert get_content().llm.clarification_instruction.strip() not in prompt
+
+
+def test_portrait_content_configured():
+    content = get_content()
+    assert content.portrait.enabled
+    assert "{dossier}" in content.portrait.portrait_prompt
+    assert "{nickname}" in content.portrait.portrait_prompt
+    # The prompt must ask for a compact portrait, not raw facts.
+    assert "3-5" in content.portrait.portrait_prompt
+    assert "compact" in content.portrait.portrait_prompt

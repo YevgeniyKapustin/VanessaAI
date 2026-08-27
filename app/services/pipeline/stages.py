@@ -11,9 +11,13 @@ from app.core.protocols import (
 )
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
-from app.decision.models import DecisionAction
+from app.decision.models import DecisionAction, DecisionReason
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
-from app.decision.gate.protocols import PlannerPrefilterProtocol, TurnPlannerProtocol
+from app.decision.gate.protocols import (
+    PlannerPrefilterProtocol,
+    ReactionGateProtocol,
+    TurnPlannerProtocol,
+)
 from app.decision.protocols import DecisionEngineProtocol
 from app.knowledge.entities import is_person_focused
 from app.knowledge.metrics.feedback import render_feedback_block
@@ -50,10 +54,15 @@ class GateStage:
         indexing: MessageIndexingSchedulerProtocol,
         ignore_registry: ChatIgnoreRegistryProtocol,
         metrics_retriever: MetricsRetriever | None = None,
+        reaction_gate: ReactionGateProtocol | None = None,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
         self._prefilter = planner_prefilter
+        # Lightweight pre-planner classifier: when it says the message does not
+        # need a reaction, the turn is finalized immediately and the expensive
+        # LLM planner is never invoked.
+        self._reaction_gate = reaction_gate
         self._config = config
         self._metrics = metrics
         self._messages = messages
@@ -87,6 +96,45 @@ class GateStage:
                     config=self._config,
                     planner_skipped=True,
                     log_event="turn_stage prefilter",
+                )
+                return False
+
+        # Lightweight Decision Gate (reaction classifier): one fast, cheap
+        # YES/NO call right before the expensive LLM turn planner. When the
+        # answer is NO (people chatting among themselves, the bot's name
+        # mentioned in passing, small talk), the turn is finalized instantly
+        # and the planner/RAG/compose chain is never invoked.
+        if self._reaction_gate is not None:
+            assert ctx.session is not None
+            gate_started = time.perf_counter()
+            reaction = await self._reaction_gate.evaluate(
+                ctx.turn.message,
+                ctx.recent,
+                mentions_bot=ctx.turn.mentions_bot,
+                reply_to_bot=ctx.turn.reply_to_bot,
+                reply_to_other_user=ctx.turn.reply_to_other_user,
+                in_listen_window=ctx.session.in_listen_window,
+                sender_telegram_id=ctx.turn.sender_telegram_id,
+            )
+            ctx.reaction_gate_ms = (time.perf_counter() - gate_started) * 1000
+            logger.info(
+                "turn_stage reaction_gate request_id=%s respond=%s reason=%s "
+                "reaction_gate_ms=%.1f",
+                get_request_id(),
+                reaction.respond,
+                reaction.reason,
+                ctx.reaction_gate_ms,
+            )
+            if not reaction.respond:
+                ctx.planner_skipped = True
+                await finish_ignore_turn(
+                    ctx,
+                    reason=DecisionReason.REACTION_GATE.value,
+                    metrics=self._metrics,
+                    indexing=self._indexing,
+                    config=self._config,
+                    planner_skipped=True,
+                    log_event="turn_stage reaction_gate",
                 )
                 return False
 
@@ -131,7 +179,8 @@ class GateStage:
         logger.info(
             "turn_stage plan request_id=%s search=%r skip=%s should_reply=%s "
             "humor_ok=%s humor_query=%r deep_search=%s listen_window=%s "
-            "needs_clarification=%s plan_ms=%.1f decision_ms=%.1f action=%s reason=%s",
+            "needs_clarification=%s reaction_gate_ms=%.1f plan_ms=%.1f "
+            "decision_ms=%.1f action=%s reason=%s",
             get_request_id(),
             ctx.turn_plan.text,
             ctx.turn_plan.skip_search,
@@ -141,6 +190,7 @@ class GateStage:
             ctx.turn_plan.deep_search,
             ctx.session.in_listen_window,
             ctx.turn_plan.needs_clarification,
+            ctx.reaction_gate_ms,
             ctx.plan_ms,
             ctx.decision_ms,
             ctx.decision.action.value,

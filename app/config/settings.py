@@ -106,6 +106,35 @@ class Settings(BaseSettings):
     decision_post_reply_listen_count: int = 2
     decision_session_idle_seconds: int = 300
 
+    # Lightweight Decision Gate (reaction classifier) — runs BEFORE the heavy
+    # LLM turn planner. One fast, cheap YES/NO call decides whether the message
+    # needs a bot reaction at all; NO finalizes the turn instantly (the bot
+    # stays silent), saving the planner/RAG/compose chain on empty or
+    # non-reply-worthy group-chat messages. Fail-open: errors/ambiguous replies
+    # always let the turn proceed.
+    decision_reaction_gate_enabled: bool = True
+    # Empty = the active planner model (deepseek-chat, a fast non-reasoning
+    # model) — perfect for a tiny binary classification with max_tokens=5.
+    decision_reaction_gate_model: str = ""
+    decision_reaction_gate_max_tokens: int = 5
+    # How many recent messages (at most) are rendered as context for the gate.
+    decision_reaction_gate_recent_window: int = 4
+    # Tier-1 zero-cost deterministic short-circuit (question/trigger/modal/
+    # imperative verb, direct address, noise). When on, clear requests are
+    # resolved WITHOUT any LLM call, so the gate adds zero latency on the happy
+    # path; only genuinely ambiguous messages hit the cheap LLM tier.
+    decision_reaction_gate_heuristics_enabled: bool = True
+    # High-confidence bypasses: a direct reply to the bot's message and a
+    # post-reply listen window are never classified — the bot is expected to
+    # answer there, so we never risk dropping the turn.
+    decision_reaction_gate_bypass_reply_to_bot: bool = True
+    decision_reaction_gate_bypass_listen_window: bool = True
+    # Sender-aware continuation follow-ups: a short demand right after the
+    # bot's own reply from the same user ("а ещё" = "tell me another one") is
+    # an explicit request even when the post-reply listen window has expired.
+    # Applies to both the planner prefilter and the reaction-gate Tier-1.
+    decision_continuation_follow_up_enabled: bool = True
+
     # Directory with one YAML file per section (bot, persona, llm, ...)
     # or a single monolithic YAML file for backward compatibility.
     content_config_path: str = "config/content"

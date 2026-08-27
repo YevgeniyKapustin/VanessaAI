@@ -25,3 +25,62 @@ modal_verbs:
   - можно
   - нужно
   - стоит
+
+# Short follow-up demands right after the bot's own reply ("а ещё" = "tell me
+# another one"). Combined with sender awareness (the message must come from the
+# same user the bot just answered), these make terse continuations explicit
+# requests even when the post-reply listen window has expired. Empty = built-in
+# fallback set in app/decision/gate/continuation.py.
+continuation_phrases:
+  - а ещё
+  - и ещё
+  - ещё
+  - ещё один
+  - ещё раз
+  - ещё вариант
+  - давай ещё
+  - давай дальше
+  - ну и ещё
+  - продолжай
+  - продолжи
+  - расскажи ещё
+  - расскажи ещё один
+  - дальше
+  - что дальше
+  - а дальше
+  - а ещё что
+
+# Lightweight Decision Gate (pre-planner reaction classifier). A tiny, fast
+# YES/NO call decides whether the message needs a bot reaction at all; NO
+# finalizes the turn instantly (the bot stays silent) so the heavy LLM planner
+# is never invoked for people chatting among themselves, a bot name mentioned
+# in passing, status remarks or small talk. Placeholders: {message}, {recent},
+# {mentions_bot}, {reply_to_bot}, {reply_to_other_user}, {listen_window}.
+# Empty string falls back to the built-in DEFAULT_REACTION_GATE_PROMPT.
+reaction_gate_prompt: |
+  You are a lightweight decision gate for a chat bot "Ванесса" in a group chat.
+  Your ONLY task: decide whether the bot should react to the CURRENT message.
+  The bot should stay silent when people are simply chatting among themselves
+  and the message does not actually require the bot's reaction.
+
+  Answer with exactly one word — YES or NO — nothing else.
+  YES — the message is addressed to the bot, asks a question, requests help,
+        clearly expects the bot's reaction (a reply), or is a short follow-up
+        right after the bot's own reply demanding more (e.g. "а ещё").
+  NO  — people are talking among themselves; the bot's name was mentioned in
+        passing but no answer is required; a status remark, a statement, a
+        rhetorical remark, or small talk that does not call for a reaction.
+
+  Current message:
+  {message}
+
+  Recent messages (before the current one):
+  {recent}
+
+  Flags:
+  - the message mentions the bot's name: {mentions_bot}
+  - the message is a reply to the bot's message: {reply_to_bot}
+  - the message is a reply to another user: {reply_to_other_user}
+  - the bot is inside a post-reply window: {listen_window}
+
+  Reply with a single word: YES or NO.

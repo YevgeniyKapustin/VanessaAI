@@ -224,6 +224,7 @@ async def get_incoming_turn_handler(
         indexing,
         container.ignore_registry,
         metrics_retriever=metrics_retriever,
+        reaction_gate=container.reaction_gate,
     )
     knowledge = KnowledgeRetriever(
         knowledge_vault,

@@ -15,6 +15,7 @@ from app.decision import (
 from app.decision.gate.reply_eligibility import ReplyEligibility
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.gate.prefilter import PlannerPrefilter
+from app.decision.gate.reaction_gate import ReactionGate
 from app.llm.memes import MemeCatalog, MemeDecider
 
 
@@ -38,6 +39,7 @@ class AppContainer:
     session_analyzer: SessionWindowAnalyzer
     reply_eligibility: ReplyEligibility
     planner_prefilter: PlannerPrefilter
+    reaction_gate: ReactionGate
     block_consecutive_replies: bool
     embedding_provider: EmbeddingProviderProtocol
     vector_store: VectorStoreProtocol
@@ -88,6 +90,7 @@ def build_app_container() -> AppContainer:
         ),
         reply_eligibility=eligibility,
         planner_prefilter=PlannerPrefilter(eligibility),
+        reaction_gate=ReactionGate(content),
         block_consecutive_replies=content.decision.block_consecutive_replies,
         embedding_provider=LocalEmbeddingProvider(),
         vector_store=QdrantVectorStore(),

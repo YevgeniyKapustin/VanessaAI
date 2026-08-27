@@ -8,62 +8,8 @@
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
-      "id": 1,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "vanessa_active_users{scope=\"1h\"}", "legendFormat": "users", "refId": "A" } ],
-      "title": "Active users (1h)",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 4, "w": 3, "x": 3, "y": 0 },
-      "id": 2,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "vanessa_active_users{scope=\"24h\"}", "legendFormat": "users", "refId": "A" } ],
-      "title": "Active users (24h)",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 4, "w": 3, "x": 6, "y": 0 },
-      "id": 3,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "vanessa_active_sessions{scope=\"5m\"}", "legendFormat": "dialogs", "refId": "A" } ],
-      "title": "Concurrent dialogs (5m)",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "spanNulls": false }, "mappings": [], "unit": "reqps" }, "overrides": [] },
-      "gridPos": { "h": 4, "w": 6, "x": 9, "y": 0 },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 0 },
       "id": 4,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum(rate(vanessa_turns_total[5m]))", "legendFormat": "RPS", "refId": "A" } ],
@@ -81,11 +27,11 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "id": 5,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum(increase(vanessa_llm_cost_total{token_type=\"total\"}[24h]))", "legendFormat": "cost", "refId": "A" } ],
-      "title": "LLM cost (today)",
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum(increase(vanessa_llm_cost_total{token_type=\"total\"}[$__range]))", "legendFormat": "cost", "refId": "A" } ],
+      "title": "LLM cost",
       "type": "stat"
     },
     {
@@ -99,10 +45,10 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
       "id": 6,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum(rate(vanessa_turns_total{action=\"reply\"}[5m])) / clamp_min(sum(rate(vanessa_turns_total[5m])), 1e-6)", "legendFormat": "reply share", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum(increase(vanessa_turns_total{action=\"reply\"}[$__range])) / clamp_min(sum(increase(vanessa_turns_total[$__range])), 1e-6)", "legendFormat": "reply share", "refId": "A" } ],
       "title": "Turn success rate",
       "type": "stat"
     },
@@ -117,7 +63,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
       "id": 7,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "time() - max(vanessa_process_start_time_seconds)", "legendFormat": "uptime", "refId": "A" } ],

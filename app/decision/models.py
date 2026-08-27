@@ -19,6 +19,9 @@ class DecisionReason(StrEnum):
     NO_REPLY_NEEDED = "no_reply_needed"
     NOT_EXPECTED = "not_expected"
     PREFILTER = "prefilter"
+    # The lightweight pre-planner Decision Gate (reaction classifier) said the
+    # message does not require a bot reaction (people chatting among themselves).
+    REACTION_GATE = "reaction_gate"
     LISTEN_WINDOW = "listen_window"
     DISMISSAL = "dismissal"
     QUOTE_ECHO = "quote_echo"

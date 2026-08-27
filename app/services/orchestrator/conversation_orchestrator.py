@@ -278,6 +278,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         record_turn_duration(action=ctx.result.action, seconds=total_ms / 1000.0)
         record_stage("total", seconds=total_ms / 1000.0)
         for stage, ms in (
+            ("reaction_gate", ctx.reaction_gate_ms),
             ("plan", ctx.plan_ms),
             ("decision", ctx.decision_ms),
             ("embed", ctx.embed_ms),
@@ -293,8 +294,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         if ctx.result.action == DecisionAction.IGNORE.value:
             logger.info(
                 "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "
-                "reason=%s relevance=%.3f planner_skipped=%s plan_ms=%.1f "
-                "decision_ms=%.1f total_ms=%.1f",
+                "reason=%s relevance=%.3f planner_skipped=%s reaction_gate_ms=%.1f "
+                "plan_ms=%.1f decision_ms=%.1f total_ms=%.1f",
                 get_request_id(),
                 turn.telegram_chat_id,
                 turn.sender_telegram_id,
@@ -302,6 +303,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 ctx.result.reason,
                 ctx.result.relevance_score,
                 ctx.planner_skipped,
+                ctx.reaction_gate_ms,
                 ctx.plan_ms,
                 ctx.decision_ms,
                 total_ms,
@@ -317,8 +319,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             "reason=%s relevance=%.3f search=%r skip=%s humor_quotes=%s "
             "context=%s critic_status=%s critic_score=%s critic_iterations=%s "
             "sticker_tag=%s "
-            "plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f rag_ms=%.1f "
-            "humor_rag_ms=%.1f llm_ms=%.1f critic_ms=%.1f total_ms=%.1f",
+            "reaction_gate_ms=%.1f plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f "
+            "rag_ms=%.1f humor_rag_ms=%.1f llm_ms=%.1f critic_ms=%.1f total_ms=%.1f",
             get_request_id(),
             turn.telegram_chat_id,
             turn.sender_telegram_id,
@@ -333,6 +335,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             critic_score,
             ctx.critic_iterations,
             ctx.result.sticker_tag,
+            ctx.reaction_gate_ms,
             ctx.plan_ms,
             ctx.embed_ms,
             ctx.decision_ms,

@@ -37,6 +37,8 @@ class TurnPipelineContext:
     critic_ms: float = 0.0
     plan_ms: float = 0.0
     decision_ms: float = 0.0
+    # Latency of the lightweight pre-planner Decision Gate (reaction classifier).
+    reaction_gate_ms: float = 0.0
     rag_ms: float = 0.0
     semantic_ms: float = 0.0
     humor_rag_ms: float = 0.0

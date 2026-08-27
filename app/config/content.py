@@ -214,6 +214,16 @@ class DecisionContent(BaseModel):
     trigger_keywords: list[str] = Field(default_factory=list)
     question_words: list[str] = Field(default_factory=list)
     modal_verbs: list[str] = Field(default_factory=list)
+    # Short follow-up demands right after the bot's own reply ("а ещё" = "tell
+    # me another one"). Used by the sender-aware continuation detector in both
+    # the planner prefilter and the reaction-gate Tier-1. Empty = built-in
+    # fallback set in app/decision/gate/continuation.py.
+    continuation_phrases: list[str] = Field(default_factory=list)
+    # Lightweight pre-planner Decision Gate prompt (see app/decision/gate/
+    # reaction_gate.py). Placeholders: {message}, {recent}, {mentions_bot},
+    # {reply_to_bot}, {reply_to_other_user}, {listen_window}. Empty string falls
+    # back to the built-in DEFAULT_REACTION_GATE_PROMPT.
+    reaction_gate_prompt: str = ""
 
 
 class ProfanityContent(BaseModel):
@@ -435,3 +445,11 @@ def get_question_words() -> tuple[str, ...]:
 
 def get_modal_verbs() -> tuple[str, ...]:
     return tuple(get_content().decision.modal_verbs)
+
+
+def get_continuation_phrases() -> tuple[str, ...]:
+    return tuple(
+        phrase.strip().lower()
+        for phrase in get_content().decision.continuation_phrases
+        if phrase.strip()
+    )

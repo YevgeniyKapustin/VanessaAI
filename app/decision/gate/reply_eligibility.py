@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.config.content import get_continuation_phrases
+from app.config.settings import settings
 from app.core.messages import ContextMessage
 from app.core.session.chat_session_state import in_post_reply_listen_window
 from app.decision.detectors.intent import IntentDetector, IntentResult
 from app.decision.detectors.noise import NoiseFilter
 from app.decision.detectors.triggers import TriggerKeywordChecker
 from app.decision.gate.addressing import is_addressed_to_bot
+from app.decision.gate.continuation import is_sender_continuation_demand
 from app.decision.gate.quote_echo import is_recursive_quote_loop
 from app.decision.gate.reply_expectation import (
     is_conversation_closure,
@@ -60,6 +63,8 @@ class ReplyEligibility:
         *,
         post_reply_listen_count: int = 2,
         post_reply_listen_idle_seconds: float = 0,
+        continuation_follow_up_enabled: bool | None = None,
+        continuation_phrases: tuple[str, ...] | None = None,
     ) -> None:
         self._intent = intent_detector
         self._triggers = trigger_checker
@@ -67,6 +72,16 @@ class ReplyEligibility:
         self._ignore_registry = ignore_registry
         self._post_reply_listen_count = post_reply_listen_count
         self._post_reply_listen_idle_seconds = post_reply_listen_idle_seconds
+        self._continuation_enabled = (
+            settings.decision_continuation_follow_up_enabled
+            if continuation_follow_up_enabled is None
+            else continuation_follow_up_enabled
+        )
+        self._continuation_phrases = (
+            continuation_phrases
+            if continuation_phrases is not None
+            else get_continuation_phrases()
+        )
 
     def hard_ignore(
         self,
@@ -164,6 +179,21 @@ class ReplyEligibility:
                 True,
                 "direct_address" if directly_addressed else "bot_name",
             )
+
+        # Sender-aware continuation follow-up: a short demand right after the
+        # bot's own reply from the same user ("а ещё" = "tell me another one")
+        # is an explicit request even when the post-reply listen window has
+        # expired because other people wrote in between.
+        if (
+            self._continuation_enabled
+            and is_sender_continuation_demand(
+                text,
+                recent_messages,
+                sender_telegram_id,
+                phrases=self._continuation_phrases,
+            )
+        ):
+            return PrefilterVerdict(True, "continuation")
 
         if in_listen_window:
             if self._noise.is_noise(text) and not trigger.detected:

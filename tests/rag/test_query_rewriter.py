@@ -103,7 +103,7 @@ class _FakeCompleter:
 
 @pytest.mark.asyncio
 async def test_llm_prompt_includes_participants():
-    async def provider() -> str:
+    async def provider(message, recent_messages) -> str:
         return "Личь — сварщик, играет в ХСР. Крабер — любит пещеры."
 
     client = _FakeCompleter()
@@ -121,7 +121,7 @@ async def test_llm_prompt_includes_participants():
 
 @pytest.mark.asyncio
 async def test_llm_prompt_participants_failure_uses_placeholder():
-    async def provider() -> str:
+    async def provider(message, recent_messages) -> str:
         raise RuntimeError("vault down")
 
     client = _FakeCompleter()

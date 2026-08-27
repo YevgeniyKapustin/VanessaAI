@@ -15,12 +15,12 @@ from app.decision.models import DecisionAction
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.decision.gate.protocols import PlannerPrefilterProtocol, TurnPlannerProtocol
 from app.decision.protocols import DecisionEngineProtocol
+from app.knowledge.entities import is_person_focused
 from app.knowledge.metrics.feedback import render_feedback_block
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
 from app.llm.format.sticker_tag import extract_sticker_tag
 from app.llm.prompts.session_format import session_context_messages
-from app.rag.query_rewriter import QueryRewriter
 from app.rag.search.react_retriever import retrieve_with_react
 from app.rag.search.search_plan import build_main_rag_plan
 from app.services.humor_pipeline import HumorPipelineProtocol
@@ -191,18 +191,50 @@ class RetrieveStage:
         # Semantic archive (People/Lore/Culture/Logs) is the primary RAG source —
         # those notes are already semantic summaries, unlike raw message history.
         semantic_query = self._semantic_query(ctx.turn_plan, ctx.turn.message)
+
+        # Deterministic participant resolution: which People dossiers are
+        # relevant to this turn (mentioned in the message + recent window).
+        # This powers multi-person retrieval — all mentioned people get pulled,
+        # not a single arbitrary match.
+        people_files: list[str] = []
+        if self._knowledge is not None:
+            try:
+                people_files = await self._knowledge.resolve_people(
+                    ctx.turn.message,
+                    ctx.recent,
+                )
+            except Exception:
+                logger.exception("people_resolve_failed, ignoring")
+                people_files = []
+
+        # Deterministic fallback: if the message is clearly about people and the
+        # planner (LLM) omitted the "people" index, force it — the resolver is
+        # cheap and exact, the planner is not.
+        knowledge_indexes = list(ctx.turn_plan.knowledge_indexes)
+        if (
+            people_files
+            and "people" not in knowledge_indexes
+            and is_person_focused(ctx.turn.message)
+        ):
+            knowledge_indexes.append("people")
+            logger.info(
+                "people_index_forced_by_resolver files=%s",
+                sorted(people_files),
+            )
+
         semantic_started = time.perf_counter()
         semantic_found = False
         if self._knowledge is not None:
             try:
                 ctx.knowledge_blocks = await self._knowledge.fetch_semantic(
                     semantic_query,
-                    knowledge_indexes=ctx.turn_plan.knowledge_indexes,
+                    knowledge_indexes=tuple(knowledge_indexes),
                     knowledge_query=ctx.turn_plan.knowledge_query,
                     humor_ok=ctx.turn_plan.humor_ok,
                     humor_query=ctx.turn_plan.humor_query,
                     user_message=ctx.turn.message,
                     people_detail=ctx.turn_plan.knowledge_detail,
+                    people_files=people_files or None,
                 )
             except Exception:
                 # Fail-open: a semantic-search failure (e.g. Qdrant down) must

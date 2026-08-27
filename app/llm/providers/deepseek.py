@@ -110,10 +110,17 @@ class DeepSeekLLMProvider:
             reply_to_sender_name=reply_to_sender_name,
         )
         message_count = sum(len(block.messages) for block in context_blocks)
+        knowledge_chars = sum(
+            len(block.content or "") for block in (knowledge_blocks or [])
+        )
+        session_chars = sum(
+            len(message.content or "") for message in (session_messages or [])
+        )
         logger.info(
             "llm_prompt_prepared model=%s context_blocks=%s context_messages=%s "
             "humor_quotes=%s meme_blocks=%s meme_menu=%s system_chars=%s "
-            "user_chars=%s temperature=%s top_p=%s max_tokens=%s",
+            "user_chars=%s knowledge_blocks=%s knowledge_chars=%s session_chars=%s "
+            "temperature=%s top_p=%s max_tokens=%s",
             self._model,
             len(context_blocks),
             message_count,
@@ -122,6 +129,9 @@ class DeepSeekLLMProvider:
             len(meme_menu or []),
             len(system),
             len(user_prompt),
+            len(knowledge_blocks or []),
+            knowledge_chars,
+            session_chars,
             self._generation.temperature,
             self._generation.top_p,
             self._generation.max_tokens,

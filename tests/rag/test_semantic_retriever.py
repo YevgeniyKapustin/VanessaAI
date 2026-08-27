@@ -215,3 +215,79 @@ async def test_fetch_people_without_portrait_falls_back_to_raw(tmp_path):
 
     assert len(blocks) == 1
     assert "Философ и сварщик" in blocks[0].content
+
+
+async def _add_kraber(tmp_path, vault, index) -> None:
+    await vault.write_note(
+        "People/крабер.md",
+        {"type": "person", "id": "крабер", "aliases": ["Крабер"]},
+        "## Контекст жизни\n\n- 2026-08-26: Любит пещеры.\n",
+    )
+    await index.rebuild_folder(PEOPLE)
+
+
+@pytest.mark.asyncio
+async def test_fetch_people_files_pulls_all_mentioned(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    await _add_kraber(tmp_path, vault, index)
+
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=3)
+    blocks = await retriever.fetch_semantic(
+        "крабер и личь",
+        knowledge_indexes=("people",),
+        knowledge_query="крабер личь",
+        people_files=["People/крабер.md", "People/личь.md"],
+    )
+
+    paths = {block.path for block in blocks}
+    assert "People/крабер.md" in paths
+    assert "People/личь.md" in paths
+
+
+@pytest.mark.asyncio
+async def test_fetch_people_files_bounded_by_people_max_blocks(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    await _add_kraber(tmp_path, vault, index)
+
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=1)
+    blocks = await retriever.fetch(
+        knowledge_indexes=("people",),
+        people_files=["People/крабер.md", "People/личь.md"],
+    )
+
+    assert len(blocks) == 1
+    assert blocks[0].path == "People/крабер.md"
+
+
+@pytest.mark.asyncio
+async def test_fetch_people_files_portrait_by_default(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    await _add_kraber(tmp_path, vault, index)
+    for path, portrait in (
+        ("People/личь.md", "Личь — философ и сварщик."),
+        ("People/крабер.md", "Крабер — отшельник из пещеры."),
+    ):
+        note = await vault.read_note(path)
+        meta = dict(note.meta)
+        meta["portrait"] = portrait
+        await vault.write_note(note.relative_path, meta, note.body)
+
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=3)
+    blocks = await retriever.fetch(
+        knowledge_indexes=("people",),
+        people_files=["People/крабер.md", "People/личь.md"],
+    )
+
+    contents = {block.content for block in blocks}
+    assert "Крабер — отшельник из пещеры." in contents
+    assert "Личь — философ и сварщик." in contents
+
+
+@pytest.mark.asyncio
+async def test_resolve_people_returns_mentioned_files(tmp_path):
+    vault, index = await _seed_vault(tmp_path)
+    await _add_kraber(tmp_path, vault, index)
+    retriever = KnowledgeRetriever(vault, index)
+
+    files = await retriever.resolve_people("что там у лича и крабера", [])
+    assert set(files) == {"People/личь.md", "People/крабер.md"}

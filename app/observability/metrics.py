@@ -207,6 +207,21 @@ rag_empty_total = Counter(
     registry=registry,
 )
 
+# --- Compose-prompt budget ---------------------------------------------------
+prompt_budget_chars = Histogram(
+    "vanessa_prompt_budget_chars",
+    "Compose prompt section length in characters after the budget",
+    ["section"],
+    buckets=(500, 1000, 2000, 4000, 6000, 10000, 16000, 24000, 36000),
+    registry=registry,
+)
+prompt_truncations_total = Counter(
+    "vanessa_prompt_truncations_total",
+    "Compose prompt sections truncated by the budget guard",
+    ["section"],
+    registry=registry,
+)
+
 # --- Telegram ----------------------------------------------------------------
 telegram_requests_total = Counter(
     "vanessa_telegram_requests_total",
@@ -348,6 +363,16 @@ def record_rag_search(
         rag_empty_total.labels(source=source).inc()
 
 
+def record_prompt_budget(section: str, chars: int) -> None:
+    """Record the final length of one compose-prompt section (after budget)."""
+    prompt_budget_chars.labels(section=section).observe(chars)
+
+
+def record_prompt_truncation(section: str) -> None:
+    """Record that the budget guard trimmed/dropped a compose-prompt section."""
+    prompt_truncations_total.labels(section=section).inc()
+
+
 def record_telegram(operation: str, status: str) -> None:
     telegram_requests_total.labels(operation=operation, status=status).inc()
     telegram_outcomes.add((operation, status))
@@ -396,6 +421,8 @@ __all__ = [
     "record_llm_duration",
     "record_llm_error",
     "record_rag_search",
+    "record_prompt_budget",
+    "record_prompt_truncation",
     "record_telegram",
     "record_telegram_error",
     "record_rag_eval",

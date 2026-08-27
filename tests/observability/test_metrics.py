@@ -127,3 +127,13 @@ def test_record_telegram_and_error() -> None:
 
 def test_queue_length_helper() -> None:
     assert metrics.queue_length() >= 0
+
+
+def test_prompt_budget_metrics_exposed() -> None:
+    metrics.record_prompt_budget("knowledge_blocks", 1234)
+    metrics.record_prompt_truncation("context_blocks")
+    text = metrics.render_metrics().decode()
+    assert "vanessa_prompt_budget_chars" in text
+    assert "vanessa_prompt_truncations_total" in text
+    assert 'section="knowledge_blocks"' in text
+    assert 'section="context_blocks"' in text

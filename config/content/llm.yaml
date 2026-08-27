@@ -237,3 +237,18 @@ generation:
     max_tokens: 256
     presence_penalty: 0.0
     frequency_penalty: 0.0
+
+# Compose-prompt budget: per-section and global char caps applied by
+# PromptBuilder. A 0 cap disables that section's limit. On overflow the lowest
+# priority sections (metrics/memes/humor, then old context) are trimmed first;
+# the current message and short directives are never cut.
+budget:
+  enabled: true
+  max_chars: 24000
+  context_blocks: 12000
+  knowledge_blocks: 6000
+  session_messages: 6000
+  humor_quotes: 1200
+  meme_blocks: 1500
+  meme_menu: 2000
+  metrics_block: 1500

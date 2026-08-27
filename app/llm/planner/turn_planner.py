@@ -58,7 +58,9 @@ class TurnPlanner:
         llm_client: LLMChatCompleter | None = None,
         llm_model: str | None = None,
         generation: LLMGenerationParams | None = None,
-        participants_provider: Callable[[], Awaitable[str]] | None = None,
+        participants_provider: Callable[
+            [str, list[ContextMessage]], Awaitable[str]
+        ] | None = None,
     ) -> None:
         self._content = content or get_content()
         self._use_llm = (
@@ -154,7 +156,11 @@ class TurnPlanner:
         participants = "(нет данных)"
         if self._participants_provider is not None:
             try:
-                participants = (await self._participants_provider()).strip() or participants
+                # The digest is turn-scoped: it must know the current message
+                # and the recent window to render only relevant people.
+                participants = (
+                    await self._participants_provider(message, recent_messages)
+                ).strip() or participants
             except Exception:
                 logger.exception("participants_digest_failed, using placeholder")
         prompt = self._content.rag.planner_prompt.format(

@@ -1,6 +1,7 @@
 import pytest
 
 from app.config.content import get_content
+from app.core.messages import ContextMessage
 from app.llm.planner.turn_planner import TurnPlanner
 
 
@@ -239,3 +240,41 @@ def test_turn_planner_prompt_documents_knowledge_detail():
     # Portrait-only is the default; raw facts only on an explicit fact question.
     assert "false (default)" in section
     assert "true — the user asks a concrete fact" in section
+
+
+class _FakeClient:
+    """Minimal LLM chat completer that returns a valid planner JSON."""
+
+    async def complete(self, model, messages, kind, **kwargs):
+        return (
+            '{"search_query": "x", "skip": false, "humor_ok": false, '
+            '"humor_query": "", "should_reply": true}'
+        )
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_participants_provider_receives_message_and_recent():
+    """The dynamic participants digest must get the turn's message + window."""
+    received = []
+
+    async def provider(message, recent_messages):
+        received.append((message, recent_messages))
+        return "крабер: отшельник"
+
+    recent = [
+        ContextMessage(id=1, role="user", content="крабер опять в пещере"),
+        ContextMessage(id=2, role="assistant", content="ну и пусть"),
+    ]
+    planner = TurnPlanner(
+        use_llm=True,
+        llm_client=_FakeClient(),
+        participants_provider=provider,
+    )
+
+    result = await planner.prepare(
+        "расскажи про крабера",
+        recent_messages=recent,
+    )
+
+    assert result.should_reply is True
+    assert received == [("расскажи про крабера", recent)]

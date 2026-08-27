@@ -200,7 +200,10 @@ class Settings(BaseSettings):
     # Knowledge vault — the bot's own machine-only structured memory.
     knowledge_path: str = "knowledge"
     knowledge_max_blocks: int = 3
-    knowledge_people_max_blocks: int = 1
+    # Multi-person retrieval: when several people are mentioned ("крабер и
+    # личь"), fetch up to this many dossiers (each still bounded by
+    # knowledge_people_raw_max_chars / portraits).
+    knowledge_people_max_blocks: int = 3
     knowledge_model: str = ""
     knowledge_memory_enabled: bool = True
     knowledge_memory_cooldown_seconds: int = 300
@@ -216,9 +219,16 @@ class Settings(BaseSettings):
     knowledge_vector_top_k: int = 10
     knowledge_vector_min_score: float = 0.3
 
-    # Participants digest injected into the query-composition prompt.
+    # Participants digest injected into the query-composition prompt. Instead of
+    # dumping ALL people into every planner call, only those mentioned in the
+    # current message + the recent window are rendered (dynamic, bounded); when
+    # nothing is mentioned, a small fallback floor keeps disambiguation anchors.
     knowledge_participant_max_people: int = 20
     knowledge_participant_max_facts: int = 5
+    # How many recent messages are scanned for participant mentions.
+    knowledge_participant_recent_window: int = 5
+    # Fallback floor of people in the digest when nothing is mentioned.
+    knowledge_participant_min_people: int = 3
 
     # Mood & relationship metrics (knowledge vault).
     knowledge_metrics_enabled: bool = True
@@ -241,6 +251,11 @@ class Settings(BaseSettings):
     # Raw dossier facts injected into the compose prompt on a concrete-fact
     # question about a person ("во что играет Крабер?").
     knowledge_people_raw_max_chars: int = 1400
+
+    # Compose-prompt budget: per-section and global char caps applied in
+    # PromptBuilder so a bloated context never blows the LLM window. Caps live
+    # in config/content/llm.yaml (budget: section); this flag gates the guard.
+    compose_budget_enabled: bool = True
 
     # Behavioral feedback from metrics.
     decision_metrics_rule_enabled: bool = True

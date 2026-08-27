@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import httpx
 from aiogram import Bot, F, Router
@@ -88,7 +88,7 @@ async def _typing_loop(
     Critique request (2-6s+). Each ping is guarded individually: a single
     failed ping (e.g. Telegram 429 flood control or a transient network error)
     must NOT stop the indicator for the rest of the turn, so this loop only
-    exits via cancellation from _typing_indicator. After consecutive failures
+    exits via cancellation from _typing_on_signal. After consecutive failures
     we back off (up to 3x the interval) so a dead chat isn't hammered.
     asyncio.CancelledError is a BaseException (not an Exception), so cancelling
     this task stops it cleanly.
@@ -116,30 +116,40 @@ async def _typing_loop(
 
 
 @contextlib.asynccontextmanager
-async def _typing_indicator(
+async def _typing_on_signal(
     bot: Bot,
     chat_id: int,
     interval: float = _TYPING_INTERVAL_SECONDS,
-) -> AsyncIterator[None]:
-    """Show a live "typing..." indicator while the wrapped block runs.
+) -> AsyncIterator[Callable[[], Awaitable[None]]]:
+    """Show a live "typing..." indicator only after the API signals a reply.
 
-    A first "typing" action is sent right away so the indicator shows even for
-    fast paths, then a background task keeps refreshing it (Telegram's typing
-    state expires after ~5s) for as long as the block takes — including the
-    access guard's getChatMember call and the slow Gate -> Retrieve -> Compose
-    -> Critique pipeline. The task is cancelled on exit, covering success,
-    error and early-return paths. Telegram-side failures only drop the
-    indicator, never the reply.
+    Vanessa starts "typing" the moment the decision gate has passed and she
+    commits to an actual answer: the yielded trigger is fired by the API SSE
+    stream (``on_started``) at exactly that point. Until then no "typing" is
+    shown, so messages she will ignore never pretend she is writing. Once
+    fired, a first ping goes out right away and a background task keeps
+    refreshing it (Telegram's typing state expires after ~5s) for the rest of
+    the turn. The task is cancelled on exit, covering success, error and
+    early-return paths. Telegram-side failures only drop the indicator, never
+    the reply.
     """
-    await _ping_typing(bot, chat_id, "start")
+    trigger = asyncio.Event()
+    typing_task: asyncio.Task | None = None
 
-    typing_task = asyncio.create_task(_typing_loop(bot, chat_id, interval))
+    async def _start() -> None:
+        nonlocal typing_task
+        if typing_task is not None:
+            return
+        await _ping_typing(bot, chat_id, "start")
+        typing_task = asyncio.create_task(_typing_loop(bot, chat_id, interval))
+
     try:
-        yield
+        yield _start
     finally:
-        typing_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await typing_task
+        if typing_task is not None:
+            typing_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await typing_task
 
 
 def create_messages_router(services: BotServices) -> Router:
@@ -182,21 +192,23 @@ def create_messages_router(services: BotServices) -> Router:
     @router.message(F.text)
     async def handle_text(telegram_message: TelegramMessage) -> None:
         incoming = IncomingMessage.from_telegram(telegram_message)
-        # Show "typing..." immediately — the access guard (getChatMember) and
-        # the Gate -> Retrieve -> Compose -> Critique pipeline below can take
-        # seconds, and Telegram's typing state expires in ~5s, so the indicator
-        # must run for the whole turn.
-        async with _typing_indicator(
+        # "typing..." starts only once the API signals that the decision gate
+        # has passed and Vanessa is composing an actual answer (SSE "started"
+        # event). Messages she will ignore never trigger it.
+        async with _typing_on_signal(
             telegram_message.bot,
             incoming.telegram_chat_id,
             interval=services.typing_interval_seconds,
-        ):
-            await _handle_text_core(telegram_message, incoming, services)
+        ) as start_typing:
+            await _handle_text_core(
+                telegram_message, incoming, services, start_typing
+            )
 
     async def _handle_text_core(
         telegram_message: TelegramMessage,
         incoming: IncomingMessage,
         services: BotServices,
+        start_typing: Callable[[], Awaitable[None]],
     ) -> None:
         if await _reject_if_no_access(telegram_message, incoming):
             return
@@ -209,7 +221,10 @@ def create_messages_router(services: BotServices) -> Router:
         )
 
         try:
-            result = await services.chat_client.process(incoming)
+            result = await services.chat_client.process(
+                incoming,
+                on_started=start_typing,
+            )
         except httpx.HTTPError as exc:
             # Never leak errors into the chat: log the failure and drop the
             # turn silently instead of spamming the conversation.

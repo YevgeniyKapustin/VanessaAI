@@ -11,7 +11,7 @@ from app.core.protocols import (
 from app.db.repository import MessageRepository
 from app.knowledge.memory_stage import MemoryStage
 from app.knowledge.metrics.pipeline import MetricsPipeline
-from app.core.request_context import get_request_id
+from app.core.request_context import get_planning_started_signal, get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
 from app.observability.eval import RagTriadEvaluator
@@ -118,6 +118,20 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             self._log_processed(turn, ctx)
             assert ctx.result is not None
             return ctx.result
+
+        # The decision gate has passed and Vanessa is committing to an actual
+        # reply: notify the caller (the API chat route streams this to the bot)
+        # so the "typing..." indicator starts only now — never for messages
+        # that got filtered out. Fail-open: a broken signal must not block the
+        # turn.
+        signal = get_planning_started_signal()
+        if signal is not None:
+            try:
+                await signal()
+            except Exception:
+                logger.exception(
+                    "planning_started_signal_failed request_id=%s", get_request_id()
+                )
 
         await self._run_stage("retrieve", self._retrieve.run(ctx))
         await self._run_stage("compose", self._compose.run(ctx))

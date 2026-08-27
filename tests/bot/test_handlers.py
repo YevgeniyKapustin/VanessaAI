@@ -10,8 +10,8 @@ from app.bot.container import BotServices, create_bot_services
 from app.bot.handlers.messages import (
     _preview,
     _send_reply,
-    _typing_indicator,
     _typing_loop,
+    _typing_on_signal,
     create_messages_router,
 )
 from app.bot.messages.response import ChatProcessResult
@@ -65,15 +65,22 @@ def _services(
     if api_error is not None:
         chat_client.process = AsyncMock(side_effect=api_error)
     else:
-        chat_client.process = AsyncMock(
-            return_value=api_result
-            or ChatProcessResult(
-                action="ignore",
-                reason="ignore",
-                reply=None,
-                relevance_score=0.0,
-            )
+        result = api_result or ChatProcessResult(
+            action="ignore",
+            reason="ignore",
+            reply=None,
+            relevance_score=0.0,
         )
+
+        async def _process(message, on_started=None):
+            # Simulate the API SSE stream: the "started" event is emitted only
+            # when the decision gate passes and Vanessa commits to an actual
+            # reply — never for ignored messages.
+            if result.action == "reply" and on_started is not None:
+                await on_started()
+            return result
+
+        chat_client.process = AsyncMock(side_effect=_process)
     access_guard = AsyncMock()
     access_guard.ensure_access = AsyncMock(return_value=access_error)
     knowledge = AsyncMock()
@@ -152,8 +159,9 @@ async def test_handle_text_ignores_non_reply():
     await _call_text_handler(services, message)
     message.answer.assert_not_awaited()
     message.reply.assert_not_awaited()
-    # typing still starts while the decision runs, even when the gate ignores
-    assert message.bot.send_chat_action.await_count >= 1
+    # No "typing..." at all: the gate ignored the message, so Vanessa never
+    # pretended she started writing.
+    assert message.bot.send_chat_action.await_count == 0
 
 
 @pytest.mark.asyncio
@@ -340,14 +348,26 @@ async def test_typing_loop_recovers_after_transient_error():
 
 
 @pytest.mark.asyncio
-async def test_typing_indicator_cancels_on_error():
+async def test_typing_on_signal_cancels_on_error():
     bot = MagicMock()
     bot.send_chat_action = AsyncMock()
     with pytest.raises(RuntimeError):
-        async with _typing_indicator(bot, -100123):
+        async with _typing_on_signal(bot, -100123) as start_typing:
+            await start_typing()
             raise RuntimeError("boom")
-    # The initial ping was still sent and the block error propagated.
+    # The trigger was fired so the first ping was sent, then the block error
+    # propagated and the refresh loop was cancelled on exit.
     assert bot.send_chat_action.await_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_typing_on_signal_stays_silent_until_triggered():
+    bot = MagicMock()
+    bot.send_chat_action = AsyncMock()
+    async with _typing_on_signal(bot, -100123):
+        # The trigger was never fired — no "typing..." should be sent at all.
+        await asyncio.sleep(0)
+    assert bot.send_chat_action.await_count == 0
 
 
 @pytest.mark.asyncio
@@ -357,8 +377,12 @@ async def test_handle_text_typing_shown_while_request_pending():
     started = asyncio.Event()
     release = asyncio.Event()
 
-    async def slow_process(incoming):
+    async def slow_process(incoming, on_started=None):
         started.set()
+        # The API emits "started" once the gate passes, while the pipeline is
+        # still composing the answer.
+        if on_started is not None:
+            await on_started()
         await release.wait()
         return ChatProcessResult(
             action="reply", reason="intent", reply="Да?", relevance_score=0.9
@@ -379,7 +403,7 @@ async def test_handle_text_typing_shown_while_request_pending():
 
 
 @pytest.mark.asyncio
-async def test_handle_text_typing_before_access_check():
+async def test_handle_text_no_typing_before_access_check():
     message = make_telegram_message(text="Vanessa?")
     message.answer = AsyncMock()
     message.reply = AsyncMock()
@@ -396,11 +420,12 @@ async def test_handle_text_typing_before_access_check():
 
     handler_task = asyncio.create_task(_call_text_handler(services, message))
     await started.wait()
-    # Give the typing loop a chance to run while the access guard is blocked.
+    # Give the access guard a chance to run while it is still blocked.
     await asyncio.sleep(0)
     await asyncio.sleep(0)
-    # typing must already be visible even though getChatMember is still running
-    assert message.bot.send_chat_action.await_count >= 1
+    # typing must NOT appear while the access guard is running — the indicator
+    # only starts once the API signals that the gate passed.
+    assert message.bot.send_chat_action.await_count == 0
     release.set()
     await handler_task
 

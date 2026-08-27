@@ -1,5 +1,6 @@
 import pytest
 
+from app.core.messages import ContextMessage
 from app.knowledge.format import PEOPLE
 from app.knowledge.index import KnowledgeIndex
 from app.knowledge.participants import ParticipantsDigest
@@ -79,3 +80,52 @@ async def test_cache_invalidates_on_note_edit(tmp_path):
 
     second = await digest.build()
     assert "Новый факт про работу" in second
+
+
+def _msg(content: str, message_id: int = 1) -> ContextMessage:
+    return ContextMessage(id=message_id, role="user", content=content)
+
+
+@pytest.mark.asyncio
+async def test_build_selects_mentioned_people_only(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    digest = ParticipantsDigest(vault, max_people=20, max_facts=5, min_people=1)
+
+    text = await digest.build("расскажи про крабера")
+
+    assert "крабер" in text
+    assert "личь" not in text
+
+
+@pytest.mark.asyncio
+async def test_build_includes_recent_window_mentions(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    digest = ParticipantsDigest(vault, max_people=20, max_facts=5, min_people=1)
+
+    recent = [_msg("крабер опять в пещере")]
+    text = await digest.build("а как он?", recent_messages=recent)
+
+    assert "крабер" in text
+    assert "личь" not in text
+
+
+@pytest.mark.asyncio
+async def test_build_fallback_floor_when_nothing_mentioned(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    digest = ParticipantsDigest(vault, max_people=20, max_facts=5, min_people=2)
+
+    text = await digest.build("привет всем")
+
+    assert "крабер" in text
+    assert "личь" in text
+
+
+@pytest.mark.asyncio
+async def test_build_caps_selected_people(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    digest = ParticipantsDigest(vault, max_people=1, max_facts=5, min_people=3)
+
+    text = await digest.build("привет")
+
+    lines = [line for line in text.splitlines() if line.strip()]
+    assert len(lines) == 1

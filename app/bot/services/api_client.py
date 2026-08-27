@@ -1,6 +1,9 @@
-import httpx
+import json
 import logging
 import time
+from collections.abc import Awaitable, Callable
+
+import httpx
 
 from app.bot.messages import IncomingMessage
 from app.bot.messages.response import ChatProcessResult
@@ -49,7 +52,11 @@ class HttpChatApiClient:
             headers["X-Internal-Token"] = token
         return headers
 
-    async def process(self, message: IncomingMessage) -> ChatProcessResult:
+    async def process(
+        self,
+        message: IncomingMessage,
+        on_started: Callable[[], Awaitable[None]] | None = None,
+    ) -> ChatProcessResult:
         url = f"{self._base_url}/api/v1/chat"
         payload = message.to_api_payload()
         headers = self._request_headers(message)
@@ -60,23 +67,7 @@ class HttpChatApiClient:
             message.telegram_message_id,
         )
         try:
-            if self._client is not None:
-                response = await self._client.post(
-                    url,
-                    json=payload,
-                    headers=headers,
-                )
-                response.raise_for_status()
-                data = response.json()
-            else:
-                async with httpx.AsyncClient(timeout=self._timeout_config) as client:
-                    response = await client.post(
-                        url,
-                        json=payload,
-                        headers=headers,
-                    )
-                    response.raise_for_status()
-                    data = response.json()
+            data, status_code = await self._post(url, payload, headers, on_started)
         except httpx.HTTPError as exc:
             status = (
                 exc.response.status_code
@@ -107,7 +98,7 @@ class HttpChatApiClient:
         )
         record_http_client(
             service="api",
-            status=response.status_code,
+            status=status_code,
             seconds=time.perf_counter() - started,
         )
         logger.info(
@@ -120,3 +111,72 @@ class HttpChatApiClient:
             (time.perf_counter() - started) * 1000,
         )
         return result
+
+    async def _post(
+        self,
+        url: str,
+        payload: dict,
+        headers: dict[str, str],
+        on_started: Callable[[], Awaitable[None]] | None,
+    ) -> tuple[dict, int]:
+        if self._client is not None:
+            async with self._client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as response:
+                response.raise_for_status()
+                data = await self._read_body(response, on_started)
+                return data, response.status_code
+        async with httpx.AsyncClient(timeout=self._timeout_config) as client:
+            async with client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as response:
+                response.raise_for_status()
+                data = await self._read_body(response, on_started)
+                return data, response.status_code
+
+    async def _read_body(
+        self,
+        response: httpx.Response,
+        on_started: Callable[[], Awaitable[None]] | None,
+    ) -> dict:
+        content_type = response.headers.get("content-type", "")
+        if "text/event-stream" in content_type:
+            return await self._parse_sse(response, on_started)
+        # Plain-JSON fallback (older API / non-streaming path).
+        return response.json()
+
+    async def _parse_sse(
+        self,
+        response: httpx.Response,
+        on_started: Callable[[], Awaitable[None]] | None,
+    ) -> dict:
+        """Consume an SSE stream and return the final `result` payload.
+
+        A `started` event means the decision gate passed and the pipeline is
+        composing an actual answer — at that point `on_started` is fired so the
+        bot can show the "typing..." indicator for the rest of the turn.
+        """
+        event_name: str | None = None
+        data_lines: list[str] = []
+        async for line in response.aiter_lines():
+            if line == "":
+                if event_name == "started":
+                    if on_started is not None:
+                        try:
+                            await on_started()
+                        except Exception:
+                            logger.warning(
+                                "on_started_callback_failed",
+                                exc_info=True,
+                            )
+                elif event_name == "result":
+                    return json.loads("\n".join(data_lines))
+                event_name = None
+                data_lines = []
+            elif line.startswith("event:"):
+                event_name = line[len("event:"):].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[len("data:"):].strip())
+        if event_name == "result":
+            return json.loads("\n".join(data_lines))
+        raise httpx.ProtocolError("SSE stream ended without a result event")

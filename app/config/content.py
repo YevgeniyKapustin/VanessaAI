@@ -104,6 +104,28 @@ class CriticContent(BaseModel):
     )
 
 
+class PromptBudgetContent(BaseModel):
+    """Per-section and global char caps for the compose prompt.
+
+    Applied by ``PromptBuilder`` so a bloated context (old history, too many
+    knowledge blocks, a long session) never blows the LLM context window.
+    ``0`` disables the cap for that section. When the global cap is hit,
+    sections are trimmed from the lowest priority up; priority order (highest
+    first) is: current message > knowledge > session > context > humor/memes/
+    metrics. The caps are pure character limits on the rendered bodies.
+    """
+
+    enabled: bool = True
+    max_chars: int = 0  # global cap over the whole user prompt; 0 = unlimited
+    context_blocks: int = 0
+    knowledge_blocks: int = 0
+    session_messages: int = 0
+    humor_quotes: int = 0
+    meme_blocks: int = 0
+    meme_menu: int = 0
+    metrics_block: int = 0
+
+
 class LLMContent(BaseModel):
     task: str = ""
     answer: str = ""
@@ -147,6 +169,7 @@ class LLMContent(BaseModel):
     clarification_instruction: str = ""
     critic: CriticContent = Field(default_factory=CriticContent)
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
+    budget: PromptBudgetContent = Field(default_factory=PromptBudgetContent)
 
     def task_text(self) -> str:
         return (self.task or self.reply_instruction).strip()

@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -6,6 +7,36 @@ from aiogram.enums import ChatType
 from app.bot.messages import IncomingMessage
 from app.bot.services.api_client import HttpChatApiClient
 from app.decision.models import DecisionAction
+
+
+def _stream_ctx(
+    payload: dict,
+    *,
+    with_started: bool = True,
+    content_type: str = "text/event-stream",
+):
+    """Mock async context returned by ``client.stream`` for an SSE response."""
+    mock_response = MagicMock()
+    mock_response.headers = {"content-type": content_type}
+    lines = []
+    if with_started:
+        lines += ["event: started", "data: {}", ""]
+    lines += [
+        "event: result",
+        "data: " + json.dumps(payload, ensure_ascii=False),
+        "",
+    ]
+
+    async def _iter_lines():
+        for line in lines:
+            yield line
+
+    mock_response.aiter_lines = MagicMock(side_effect=_iter_lines)
+    if content_type != "text/event-stream":
+        mock_response.json.return_value = payload
+    ctx = AsyncMock()
+    ctx.__aenter__.return_value = mock_response
+    return ctx
 
 
 def make_telegram_message(
@@ -88,19 +119,17 @@ def test_is_text_false_for_empty_message():
 async def test_api_client_sends_request_id_header():
     incoming = IncomingMessage.from_telegram(make_telegram_message())
     mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "action": "ignore",
-        "reason": "ignore",
-        "reply": None,
-        "relevance_score": 0.2,
-    }
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {"action": "ignore", "reason": "ignore", "reply": None},
+            with_started=False,
+        )
+    )
 
     api = HttpChatApiClient(client=mock_client)
     await api.process(incoming)
 
-    headers = mock_client.post.await_args.kwargs["headers"]
+    headers = mock_client.stream.call_args.kwargs["headers"]
     assert headers["X-Request-ID"] == "-100123:99"
 
 
@@ -108,14 +137,17 @@ async def test_api_client_sends_request_id_header():
 async def test_api_client_parses_ignore_response():
     incoming = IncomingMessage.from_telegram(make_telegram_message())
     mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "action": "ignore",
-        "reason": "ignore",
-        "reply": None,
-        "relevance_score": 0.2,
-    }
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "ignore",
+                "reason": "ignore",
+                "reply": None,
+                "relevance_score": 0.2,
+            },
+            with_started=False,
+        )
+    )
 
     api = HttpChatApiClient(client=mock_client)
     result = await api.process(incoming)
@@ -129,20 +161,94 @@ async def test_api_client_parses_ignore_response():
 async def test_api_client_parses_reply_response():
     incoming = IncomingMessage.from_telegram(make_telegram_message())
     mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "action": "reply",
-        "reason": "intent",
-        "reply": "Привет!",
-        "relevance_score": 0.1,
-    }
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "reply",
+                "reason": "intent",
+                "reply": "Привет!",
+                "relevance_score": 0.1,
+            },
+            with_started=True,
+        )
+    )
 
     api = HttpChatApiClient(client=mock_client)
     result = await api.process(incoming)
 
     assert result.action == DecisionAction.REPLY
     assert result.reply == "Привет!"
+
+
+@pytest.mark.asyncio
+async def test_api_client_fires_on_started_when_gate_passes():
+    incoming = IncomingMessage.from_telegram(make_telegram_message())
+    mock_client = MagicMock()
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "reply",
+                "reason": "intent",
+                "reply": "Да?",
+                "relevance_score": 0.9,
+            },
+            with_started=True,
+        )
+    )
+    on_started = AsyncMock()
+
+    api = HttpChatApiClient(client=mock_client)
+    result = await api.process(incoming, on_started=on_started)
+
+    on_started.assert_awaited_once()
+    assert result.action == DecisionAction.REPLY
+
+
+@pytest.mark.asyncio
+async def test_api_client_skips_on_started_when_gate_ignores():
+    incoming = IncomingMessage.from_telegram(make_telegram_message())
+    mock_client = MagicMock()
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "ignore",
+                "reason": "noise",
+                "reply": None,
+                "relevance_score": 0.1,
+            },
+            with_started=False,
+        )
+    )
+    on_started = AsyncMock()
+
+    api = HttpChatApiClient(client=mock_client)
+    result = await api.process(incoming, on_started=on_started)
+
+    on_started.assert_not_awaited()
+    assert result.action == DecisionAction.IGNORE
+
+
+@pytest.mark.asyncio
+async def test_api_client_falls_back_to_plain_json():
+    incoming = IncomingMessage.from_telegram(make_telegram_message())
+    mock_client = MagicMock()
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "reply",
+                "reason": "intent",
+                "reply": "legacy",
+                "relevance_score": 0.5,
+            },
+            content_type="application/json",
+        )
+    )
+
+    api = HttpChatApiClient(client=mock_client)
+    result = await api.process(incoming)
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reply == "legacy"
 
 
 def test_api_client_timeout_config_from_settings(monkeypatch):

@@ -133,6 +133,50 @@ def test_should_block_compose_blocks_planner_veto_in_listen_window(
     ) is True
 
 
+def test_should_block_compose_allows_direct_address_despite_planner_veto(
+    eligibility: ReplyEligibility,
+):
+    # "ванесса + императив" is a direct address: the planner may misclassify
+    # it as "общение между собой" (should_reply=False), but the deterministic
+    # intent layer knows the bot was addressed — the veto must not silence it.
+    assert eligibility.should_block_compose(
+        "ванесса не тормози я написал",
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is False
+    assert eligibility.should_block_compose(
+        "ванесса отвечай",
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is False
+    assert eligibility.should_block_compose(
+        "ванесса, не молчи",
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is False
+
+
+def test_should_block_compose_still_blocks_status_remark_despite_name(
+    eligibility: ReplyEligibility,
+):
+    # The override is narrow: a status remark about the bot ("ванесса
+    # работает") is NOT a direct address and stays silent even though the name
+    # is present — the veto and the unsolicited-remark filter still hold.
+    assert eligibility.should_block_compose(
+        "ванесса работает",
+        mentions_bot=False,
+        reply_to_bot=False,
+        should_reply=False,
+        in_listen_window=False,
+    ) is True
+
+
 def _continuation_eligibility() -> ReplyEligibility:
     return ReplyEligibility(
         IntentDetector(),

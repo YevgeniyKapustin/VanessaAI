@@ -399,6 +399,35 @@ async def test_prompt_includes_message_recent_and_flags():
 
 
 @pytest.mark.asyncio
+async def test_tier1_direct_address_with_imperative_is_yes_without_llm():
+    completer = FakeCompleter("NO")
+    gate = _gate(completer)
+
+    result = await gate.evaluate("ванесса не тормози я написал", [])
+
+    # "ванесса + императив" starts with the bot name — a direct address, no LLM.
+    assert result.respond is True
+    assert result.reason == "heuristic_address"
+    assert completer.calls == []
+
+
+def test_configured_prompt_teaches_imperative_is_direct_address():
+    from app.config.content import get_content
+
+    prompt = get_content().decision.reaction_gate_prompt
+    assert "ванесса, не тормози, я написал" in prompt
+    assert "imperative" in prompt.lower()
+    assert "naming the bot is not that" in prompt
+
+
+def test_default_prompt_teaches_imperative_is_direct_address():
+    from app.decision.gate.reaction_gate import DEFAULT_REACTION_GATE_PROMPT
+
+    assert "ванесса, не тормози, я написал" in DEFAULT_REACTION_GATE_PROMPT
+    assert "Общение между собой" in DEFAULT_REACTION_GATE_PROMPT
+
+
+@pytest.mark.asyncio
 async def test_recent_context_is_bounded():
     completer = FakeCompleter("NO")
     gate = _gate(completer, recent_window=1)

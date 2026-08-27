@@ -10,13 +10,14 @@ class FakePlanner:
         self.calls = 0
         self.last: dict = {}
 
-    async def portrait(self, *, nickname, aliases, mood, dossier):
+    async def portrait(self, *, nickname, aliases, mood, dossier, previous_portrait=""):
         self.calls += 1
         self.last = {
             "nickname": nickname,
             "aliases": aliases,
             "mood": mood,
             "dossier": dossier,
+            "previous_portrait": previous_portrait,
         }
         return self.result
 
@@ -78,6 +79,27 @@ async def test_builder_regenerates_when_dossier_changes(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_builder_passes_previous_portrait_on_regeneration(tmp_path):
+    """Regeneration hands the old portrait back so the LLM REWORKS it (fresh
+    wording, current state) instead of repeating the same stale summary."""
+    vault = await _seed_vault(tmp_path)
+    planner = FakePlanner(result="Личь — философ, сварщик.")
+    builder = PortraitBuilder(vault, planner, enabled=True)
+
+    assert await builder.run() == 1
+    assert planner.last["previous_portrait"] == ""
+
+    note = await vault.read_note("People/личь.md")
+    await vault.write_note(
+        "People/личь.md",
+        note.meta,
+        note.body + "- 2026-08-26: Переехал в Грузию.\n",
+    )
+    assert await builder.run() == 1
+    assert planner.last["previous_portrait"] == "Личь — философ, сварщик."
+
+
+@pytest.mark.asyncio
 async def test_builder_force_rebuilds_everything(tmp_path):
     vault = await _seed_vault(tmp_path)
     planner = FakePlanner()
@@ -120,9 +142,36 @@ async def test_planner_formats_prompt_and_returns_clean_portrait():
 
     assert "крабер" in completer.prompt
     assert "тело досье" in completer.prompt
+    # The prompt demands a rework and shows the (empty) previous portrait.
+    assert "REWRITE" in completer.prompt
+    assert "(нет)" in completer.prompt
     # Newlines are collapsed and no stray whitespace survives.
     assert "\n" not in result
     assert "отшельник из Екатеринбурга" in result
+
+
+@pytest.mark.asyncio
+async def test_planner_includes_previous_portrait_in_prompt():
+    class FakeCompleter:
+        def __init__(self) -> None:
+            self.prompt = ""
+
+        async def complete(self, model, messages, *, kind, **kwargs):
+            self.prompt = messages[0]["content"]
+            return "портрет"
+
+    completer = FakeCompleter()
+    planner = PortraitPlanner(llm_client=completer, llm_model="test-model")
+
+    await planner.portrait(
+        nickname="личь",
+        aliases=[],
+        mood="",
+        dossier="тело",
+        previous_portrait="старый портрет про философа",
+    )
+
+    assert "старый портрет про философа" in completer.prompt
 
 
 @pytest.mark.asyncio

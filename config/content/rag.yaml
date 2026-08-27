@@ -40,14 +40,21 @@ turn_planner_prompt: |
     "knowledge_detail": false,
     "needs_clarification": false,
     "clarification_hint": "",
-    "uses_pro_model": false
+    "uses_pro_model": false,
+    "reason": ""
   }}
 
   ## should_reply
   true — addressing the bot, a question to her, a continuation of her dialogue, an explicit expectation of a reaction.
+  IMPORTANT: any imperative addressed to the bot by name or «ты» is an address to her,
+  not people talking among themselves: «ванесса, не тормози, я написал»,
+  «ванесса, отвечай», «ну ванесса давай», «ванесса, не молчи» → should_reply=true.
+  The bot name at the start is a direct address even without a question mark.
   false — side conversation, thinking out loud, goodbye, «ок», a question to another by nickname,
   «что думаете про X» without addressing the bot, a request to be silent, discussing the bot in 3rd
   person («почему она меня игнорирует») without «ты/ванесса/@mention».
+  «общение между собой» means people talking to each other WITHOUT addressing the bot — a message
+  that names or addresses the bot is not it.
   Also false — an empty/meaningless phrase that asks nothing and expects no reply: a dry remark,
   a rhetorical acknowledgment, filler («чего и следовало ожидать», «ну вот», «так и знал», «ага»,
   «ну да»), or a bare agreement/acknowledgment («это правда», «верно», «именно», «точно»,
@@ -147,6 +154,11 @@ turn_planner_prompt: |
   answers, everyday banter. Keep false unless truly necessary — the upscaled model
   costs more.
 
+  ## reason
+  A short internal reason ONLY when you decline to reply (should_reply=false or
+  skip=true): e.g. «пустая фраза», «общение между собой», «прощание»,
+  «повтор вопроса», «эхо-цитата», «нет адресата». Empty string "" otherwise.
+
   ## knowledge_indexes / knowledge_query
   The semantic archive (structured memory Vanessa maintains, NOT raw message
   history) is secondary to direct message history and should be queried
@@ -234,5 +246,18 @@ turn_planner_prompt: |
   «ну ладно поработаю» | light tone → banter
   → {{"should_reply": true, "search_query": "работа", "skip": false,
   "tone": "ironic", "humor_ok": true, "humor_query": "личь работа", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «ванесса не тормози я написал» | imperative directly addressed to the bot —
+  NOT self-talk, reply
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «ванесса, отвечай» | short imperative addressed to the bot → reply
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
   "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}

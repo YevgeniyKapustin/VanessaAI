@@ -52,6 +52,9 @@ class TurnPlan:
     # super-complex synthesis, coding, long multi-step reasoning. The gate
     # planner decides; the composer routes the generation call accordingly.
     uses_pro_model: bool = False
+    # Short reason for declining a reply — filled only when should_reply=false
+    # or skip=true (e.g. «пустая фраза», «общение между собой», «прощание»).
+    reason: str = ""
 
     def to_trace_dict(self) -> dict[str, Any]:
         """Serialize the plan for the Langfuse trace (gate span output).
@@ -75,6 +78,7 @@ class TurnPlan:
             "needs_clarification": self.needs_clarification,
             "clarification_hint": self.clarification_hint,
             "uses_pro_model": self.uses_pro_model,
+            "reason": self.reason,
         }
 
 
@@ -122,7 +126,7 @@ class TurnPlanner:
             logger.info(
                 "turn_plan source=fallback search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r "
-                "knowledge_detail=%s needs_clarification=%s",
+                "knowledge_detail=%s needs_clarification=%s reason=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -133,6 +137,7 @@ class TurnPlanner:
                 result.knowledge_query,
                 result.knowledge_detail,
                 result.needs_clarification,
+                result.reason,
             )
             return result
 
@@ -156,7 +161,7 @@ class TurnPlanner:
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r knowledge_detail=%s "
-                "needs_clarification=%s uses_pro_model=%s",
+                "needs_clarification=%s uses_pro_model=%s reason=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -169,6 +174,7 @@ class TurnPlanner:
                 result.knowledge_detail,
                 result.needs_clarification,
                 result.uses_pro_model,
+                result.reason,
             )
         return result
 
@@ -224,12 +230,15 @@ class TurnPlanner:
         except json.JSONDecodeError:
             payload = {"search_query": normalized, "skip": False}
 
+        reason = str(payload.get("reason", "")).strip()
+
         if payload.get("skip") is True:
             return TurnPlan(
                 original=original,
                 text="",
                 skip_search=True,
                 should_reply=False,
+                reason=reason,
             )
 
         if payload.get("needs_clarification") is True:
@@ -276,6 +285,7 @@ class TurnPlanner:
             knowledge_query=knowledge_query,
             knowledge_detail=knowledge_detail,
             uses_pro_model=uses_pro_model,
+            reason=reason,
         )
 
     @staticmethod

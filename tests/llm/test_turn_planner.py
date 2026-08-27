@@ -18,6 +18,49 @@ async def test_turn_planner_parse_should_reply():
 
 
 @pytest.mark.asyncio
+async def test_turn_planner_parse_decline_reason():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "чего и следовало ожидать",
+        '{"should_reply": false, "search_query": "", "skip": true, '
+        '"reason": "пустая фраза"}',
+    )
+
+    assert result.should_reply is False
+    assert result.reason == "пустая фраза"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_reason_defaults_empty():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "привет",
+        '{"should_reply": true, "search_query": "", "skip": false}',
+    )
+
+    assert result.reason == ""
+
+
+def test_turn_planner_prompt_has_decline_reason_field():
+    prompt = get_content().rag.turn_planner_prompt
+    assert '"reason": ""' in prompt
+    assert "## reason" in prompt
+
+
+def test_turn_planner_prompt_teaches_imperative_address_is_not_self_talk():
+    """A "ванесса + императив" message must be a direct address, not
+    "общение между собой" — the exact misclassification being fixed."""
+    prompt = get_content().rag.turn_planner_prompt
+    assert "ванесса, не тормози, я написал" in prompt
+    assert "общение между собой" in prompt
+    # The prompt must state that a message naming/addressing the bot is NOT
+    # "общение между собой".
+    assert "naming the bot is not it" in prompt or "that names or addresses the bot is not it" in prompt
+    # And the example section must show a direct imperative → should_reply=true.
+    assert "«ванесса не тормози я написал»" in prompt
+
+
+@pytest.mark.asyncio
 async def test_turn_planner_parse_humor_fields():
     planner = TurnPlanner(use_llm=False)
     result = planner._parse_llm_response(

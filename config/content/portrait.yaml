@@ -7,6 +7,9 @@ portrait_prompt: |
   Compress it into a compact "portrait": 3-5 short sentences that capture WHO this
   person is for Vanessa right now, so she can talk about them without the full dossier.
 
+  This is a REWRITE, not a copy: produce fresh wording every time. Never repeat the
+  previous portrait's phrasing, structure or stale facts verbatim — rework it.
+
   Rules:
   - Write in Russian, third person, from Vanessa's point of view.
   - Cover: who the person is (identity, occupation, hobbies), their character and how
@@ -14,13 +17,18 @@ portrait_prompt: |
     important current context (job changes, moves, conflicts).
   - Keep it to 3-5 sentences, about 250-350 characters total. No bullet lists, no
     dates, no verbatim quotes.
-  - Drop trivial or outdated minutiae («ел пирог с луком», «делал мостик в феврале»),
-    one-off remarks, and anything already obvious from the nickname/alias line.
+  - Focus on the CURRENT state: drop outdated facts (old job, past move, resolved
+    conflicts, one-off trivia) — the raw chat history still holds the past, the portrait
+    only needs who the person is right now.
+  - If something changed since the previous portrait, reflect the change instead of
+    restating the old summary.
   - Never invent facts that are not in the dossier.
   - Output ONLY the portrait text — no headers, no markdown, no JSON, no fences.
 
   Nickname (aliases): {nickname}
   Mood: {mood}
+  Previous portrait (a draft to rework — do NOT copy it, rephrase entirely, drop stale
+  details): {previous_portrait}
 
   Dossier:
   {dossier}

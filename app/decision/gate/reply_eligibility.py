@@ -303,7 +303,15 @@ class ReplyEligibility:
         ):
             return True
         if should_reply is False:
-            return True
+            # A planner veto normally closes the thread, but a deterministic
+            # direct address overrides it: the LLM planner can misclassify a
+            # clear "ванесса + императив" as self-talk («общение между
+            # собой»), while the deterministic intent layer knows the bot was
+            # addressed. Only honor the veto for non-addressed messages — for
+            # an addressed one fall through to the addressing check below.
+            detected = intent if intent is not None else self._intent.detect(text)
+            if not (mentions_bot or reply_to_bot or detected.mentions_bot):
+                return True
         if in_listen_window:
             return False
         return not self.allows_compose(

@@ -51,6 +51,17 @@ async def test_parse_llm_search_query():
 
 
 @pytest.mark.asyncio
+async def test_parse_llm_decline_reason(rewriter):
+    result = rewriter._parse_llm_response(
+        "чего и следовало ожидать",
+        '{"search_query": "", "skip": true, "reason": "пустая фраза"}',
+    )
+
+    assert result.skip_search is True
+    assert result.reason == "пустая фраза"
+
+
+@pytest.mark.asyncio
 async def test_parse_llm_plain_text_fallback():
     rewriter = QueryRewriter(use_llm=False)
     result = rewriter._parse_llm_response("original", "крабер")

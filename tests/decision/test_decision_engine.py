@@ -465,6 +465,27 @@ async def test_decision_engine_ignores_side_talk_when_planner_says_no():
 
 
 @pytest.mark.asyncio
+async def test_decision_engine_replies_direct_address_despite_planner_veto(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    # "ванесса + императив" is a direct address: even when the LLM planner
+    # misclassifies it as "общение между собой" (should_reply=False), the
+    # deterministic intent layer sees the bot was addressed and replies.
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+
+    result = await engine.decide(
+        text="ванесса не тормози я написал",
+        telegram_chat_id=1,
+        recent_messages=[],
+        should_reply=False,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.INTENT
+
+
+@pytest.mark.asyncio
 async def test_decision_engine_replies_on_reply_to_bot(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,

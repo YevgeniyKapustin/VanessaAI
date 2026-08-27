@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
@@ -62,10 +64,16 @@ class PromptBuilder:
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
+        created_at: datetime | None = None,
     ) -> str:
         llm = self._content.llm
         sender = resolve_sender_display_name(sender_telegram_id, sender_name)
-        return llm.current_message_line.format(sender=sender, content=content)
+        time_label = format_message_time(created_at or datetime.now())
+        return llm.current_message_line.format(
+            time=time_label,
+            sender=sender,
+            content=content,
+        )
 
     def build_user_prompt(
         self,
@@ -78,6 +86,7 @@ class PromptBuilder:
         meme_menu: list[MemeDefContent] | None = None,
         metrics_block: str | None = None,
         *,
+        attitude_note: str | None = None,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         critic_feedback: str | None = None,
@@ -191,6 +200,10 @@ class PromptBuilder:
             parts.append(
                 (PRIORITY_DIRECTIVES, "directives", llm.tone_note.strip().format(tone=tone))
             )
+        if attitude_note and attitude_note.strip():
+            # Cold-reply directive: the sender is stuck in a same-topic loop and
+            # Vanessa is annoyed — reply dry, sharp and brief.
+            parts.append((PRIORITY_DIRECTIVES, "directives", attitude_note.strip()))
         if critic_feedback and critic_feedback.strip():
             fix_header = (
                 llm.critic.fix_instruction_header.strip()

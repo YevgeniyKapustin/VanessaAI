@@ -57,6 +57,8 @@ class DecisionEngineProtocol(Protocol):
         sender_telegram_id: int = 0,
         sender_metrics: "PersonMetrics | None" = None,
         humor_ok: bool = False,
+        loop_strength: int = 0,
+        annoyance: float = 0.0,
     ) -> DecisionResult: ...
 
     def record_reply(self, telegram_chat_id: int) -> None: ...

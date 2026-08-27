@@ -86,6 +86,9 @@ def test_knowledge_kind_for_path():
     assert knowledge_kind_for_path("Lore/events/x.md") == "lore"
     assert knowledge_kind_for_path("Culture/games/y.md") == "culture"
     assert knowledge_kind_for_path("Logs/daily/z.md") == "logs"
+    # The compaction archive is embedded for RAG (as people chunks) but stays
+    # out of the People alias index.
+    assert knowledge_kind_for_path("_archive/People/личь.md") == "people"
     assert knowledge_kind_for_path("inbox/note.md") is None
 
 

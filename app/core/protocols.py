@@ -202,6 +202,7 @@ class LLMProviderProtocol(Protocol):
         meme_blocks: list[MemeDefContent] | None = None,
         meme_menu: list[MemeDefContent] | None = None,
         metrics_block: str | None = None,
+        attitude_note: str | None = None,
         *,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,

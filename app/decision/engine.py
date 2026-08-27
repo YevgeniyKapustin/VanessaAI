@@ -1,6 +1,6 @@
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext, DecisionRule
-from app.decision.metrics_rule import SenderMetricsRule
+from app.decision.metrics_rule import LowAttitudeRule, SenderMetricsRule
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.knowledge.metrics.schema import PersonMetrics
 from app.decision.protocols import (
@@ -68,6 +68,7 @@ class DecisionEngine:
             NoiseRule(noise_filter),
             HardIgnoreRule(eligibility),
             RepeatedQuestionRule(),
+            LowAttitudeRule(),
             DirectAddressRule(),
             ConsecutiveReplyRule(
                 intent_detector,
@@ -106,6 +107,8 @@ class DecisionEngine:
         sender_telegram_id: int = 0,
         sender_metrics: PersonMetrics | None = None,
         humor_ok: bool = False,
+        loop_strength: int = 0,
+        annoyance: float = 0.0,
     ) -> DecisionResult:
         intent = self._intent.detect(text)
         trigger = self._triggers.detect(text)
@@ -126,6 +129,8 @@ class DecisionEngine:
             in_listen_window=in_listen_window,
             sender_telegram_id=sender_telegram_id,
             sender_metrics=sender_metrics,
+            loop_strength=loop_strength,
+            annoyance=annoyance,
         )
         for rule in self._pre_relevance_rules:
             result = rule.evaluate(base_context)
@@ -157,6 +162,8 @@ class DecisionEngine:
             in_listen_window=in_listen_window,
             sender_telegram_id=sender_telegram_id,
             sender_metrics=sender_metrics,
+            loop_strength=loop_strength,
+            annoyance=annoyance,
         )
         for rule in self._relevance_rules:
             result = rule.evaluate(context)

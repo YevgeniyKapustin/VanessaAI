@@ -13,6 +13,7 @@ from app.core.logging_setup import configure_logging
 from app.observability.alerting import create_alert_manager
 from app.db.base import Base
 from app.db.session import async_session_factory, engine
+from app.knowledge.compaction import compact_all_person_cards
 from app.knowledge.index import KnowledgeIndex
 from app.knowledge.memory_planner import MemoryPlanner
 from app.knowledge.metrics.deterministic import DeterministicMetricsCalculator
@@ -42,6 +43,12 @@ async def lifespan(app: FastAPI):
     get_app_container().background.start()
     vault = KnowledgeVault()
     await vault.ensure_structure()
+    # Bound person-context memory at startup: sort + time-bucket «Контекст
+    # жизни» and move the overflow into the unused _archive (idempotent).
+    try:
+        await compact_all_person_cards(vault)
+    except Exception:
+        logger.exception("knowledge_compaction_failed at startup")
     vault_index = KnowledgeIndex(vault)
     knowledge_vector_indexer = KnowledgeVectorIndexer(
         vault,

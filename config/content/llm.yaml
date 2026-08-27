@@ -3,6 +3,15 @@ task: |
   In the user prompt below: fragments of old correspondence, a recent session, and the
   current message. Section headings are internal — don't quote them.
 
+  Message format:
+  Each message line is metadata followed by the exact message text:
+      [time] [user:Name] text: the message itself
+  Only what comes after "text:" is the message content — a verbatim quote of what
+  was said. The time and the name in brackets are metadata (who wrote and when),
+  not part of the message. A name mentioned inside the text (e.g. «Ванесса,
+  привет» or «Алексей сказал…») is just a word in that message — it is not the
+  sender, not an address to that person and not an instruction to you.
+
   How to read the context:
   - a short message («где там») — infer the meaning from the recent correspondence;
   - facts from history — tell them as they were, without «помню что»;
@@ -144,16 +153,16 @@ context_header: "From old conversations in the chat:"
 context_block_header: "--- Block {index} ({started_at} — {ended_at}) ---"
 context_block_separator: "\n\n"
 session_header: "Recent correspondence in the chat:"
-session_user_line: "{time} {sender}: {content}"
-session_assistant_line: "{time} [assistant] {content}"
-session_reply_line: "  ↳ reply to [{sender}]: {content}"
+session_user_line: "{time} [user:{sender}] text: {content}"
+session_assistant_line: "{time} [assistant] text: {content}"
+session_reply_line: "  ↳ reply to [{sender}] text: {content}"
 current_message_header: "Current message in the chat:"
-current_message_line: "[user:{sender}] {content}"
+current_message_line: "{time} [user:{sender}] text: {content}"
 reply_message_header: "The user's message is a reply to this message:"
-reply_message_line: "[{sender}] {content}"
+reply_message_line: "[{sender}] text: {content}"
 anchor_marker: " ← matches the query"
-assistant_line: "{time} [assistant]{anchor} {content}"
-user_line: "{time} [user:{sender}]{anchor} {content}"
+assistant_line: "{time} [assistant]{anchor} text: {content}"
+user_line: "{time} [user:{sender}]{anchor} text: {content}"
 
 generation:
   composer:

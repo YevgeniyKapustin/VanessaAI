@@ -55,7 +55,7 @@ def test_prompt_builder_builds_user_prompt():
     )
 
     assert get_content().llm.current_message_header in prompt
-    assert "[user:Евгений] Привет" in prompt
+    assert "[user:Евгений] text: Привет" in prompt
 
 
 def test_prompt_builder_includes_reply_context():
@@ -70,7 +70,7 @@ def test_prompt_builder_includes_reply_context():
 
     content = get_content()
     assert content.llm.reply_message_header.strip() in prompt
-    assert "[Личь] Личь не делает карты" in prompt
+    assert "[Личь] text: Личь не делает карты" in prompt
     # the reply block appears before the current message line
     assert prompt.index(content.llm.reply_message_header) < prompt.index(
         content.llm.current_message_header

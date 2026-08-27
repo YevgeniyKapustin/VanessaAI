@@ -55,6 +55,14 @@ class TurnPlan:
     # Short reason for declining a reply — filled only when should_reply=false
     # or skip=true (e.g. «пустая фраза», «общение между собой», «прощание»).
     reason: str = ""
+    # Loop-repetition signal: the SAME sender keeps asking about the SAME TOPIC
+    # in the recent context (different phrasings, same meaning — a loop «по
+    # кругу»). ``repeated_topic`` is the boolean verdict; ``loop_level`` 0..3 is
+    # how deep the loop is (1 = re-asked once, 2 = several times, 3 = stuck in a
+    # constant loop). Feeds Vanessa's annoyance mechanic: a high loop level drops
+    # her attitude, raises her ignore tendency and turns her replies cold.
+    repeated_topic: bool = False
+    loop_level: int = 0
 
     def to_trace_dict(self) -> dict[str, Any]:
         """Serialize the plan for the Langfuse trace (gate span output).
@@ -78,6 +86,8 @@ class TurnPlan:
             "needs_clarification": self.needs_clarification,
             "clarification_hint": self.clarification_hint,
             "uses_pro_model": self.uses_pro_model,
+            "repeated_topic": self.repeated_topic,
+            "loop_level": self.loop_level,
             "reason": self.reason,
         }
 
@@ -231,6 +241,8 @@ class TurnPlanner:
             payload = {"search_query": normalized, "skip": False}
 
         reason = str(payload.get("reason", "")).strip()
+        repeated_topic = payload.get("repeated_topic") is True
+        loop_level = _parse_loop_level(payload.get("loop_level"))
 
         if payload.get("skip") is True:
             return TurnPlan(
@@ -238,6 +250,8 @@ class TurnPlanner:
                 text="",
                 skip_search=True,
                 should_reply=False,
+                repeated_topic=repeated_topic,
+                loop_level=loop_level,
                 reason=reason,
             )
 
@@ -254,6 +268,8 @@ class TurnPlanner:
                 should_reply=True,
                 needs_clarification=True,
                 clarification_hint=clarification_hint,
+                repeated_topic=repeated_topic,
+                loop_level=loop_level,
             )
 
         text = str(payload.get("search_query", "")).strip()
@@ -285,6 +301,8 @@ class TurnPlanner:
             knowledge_query=knowledge_query,
             knowledge_detail=knowledge_detail,
             uses_pro_model=uses_pro_model,
+            repeated_topic=repeated_topic,
+            loop_level=loop_level,
             reason=reason,
         )
 
@@ -324,3 +342,14 @@ def _parse_should_reply(value: object) -> bool | None:
         if normalized in {"false", "no", "нет", "0"}:
             return False
     return None
+
+
+def _parse_loop_level(value: object) -> int:
+    """Clamp the planner's loop_level to 0..3 (a bare ``true`` counts as 1)."""
+    if isinstance(value, bool):
+        return 1 if value else 0
+    try:
+        level = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(3, level))

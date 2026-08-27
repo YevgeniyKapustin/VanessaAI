@@ -1,6 +1,7 @@
 import logging
 import time
 
+from app.config.settings import settings
 from app.core.protocols import (
     ContextRetrieverProtocol,
     LLMProviderProtocol,
@@ -13,6 +14,7 @@ from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
+from app.decision.repeated_loop import LoopRegistry, loop_registry as default_loop_registry
 from app.decision.gate.protocols import (
     PlannerPrefilterProtocol,
     ReactionGateProtocol,
@@ -20,7 +22,10 @@ from app.decision.gate.protocols import (
 )
 from app.decision.protocols import DecisionEngineProtocol
 from app.knowledge.entities import is_person_focused
-from app.knowledge.metrics.feedback import render_feedback_block
+from app.knowledge.metrics.feedback import (
+    render_annoyance_note,
+    render_feedback_block,
+)
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
 from app.llm.format.sticker_tag import extract_sticker_tag
@@ -55,10 +60,12 @@ class GateStage:
         ignore_registry: ChatIgnoreRegistryProtocol,
         metrics_retriever: MetricsRetriever | None = None,
         reaction_gate: ReactionGateProtocol | None = None,
+        loop_registry: LoopRegistry | None = None,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
         self._prefilter = planner_prefilter
+        self._loop_registry = loop_registry or default_loop_registry
         # Lightweight pre-planner classifier: when it says the message does not
         # need a reaction, the turn is finalized immediately and the expensive
         # LLM planner is never invoked.
@@ -159,6 +166,23 @@ class GateStage:
                 logger.exception("metrics_retrieve_failed")
                 ctx.sender_profile = None
 
+        # Loop-repetition signal: the same sender re-asking the SAME topic with
+        # different words raises Vanessa's annoyance (drives LowAttitudeRule —
+        # maximal ignore tendency — and the cold compose note).
+        if ctx.turn_plan is not None:
+            signal = self._loop_registry.update(
+                ctx.turn.sender_telegram_id,
+                ctx.turn.message,
+                ctx.recent,
+                planner_repeated=ctx.turn_plan.repeated_topic,
+                planner_loop_level=ctx.turn_plan.loop_level,
+                window=settings.decision_loop_window,
+                similarity_threshold=settings.decision_loop_similarity_threshold,
+                decay_half_life_seconds=settings.decision_loop_decay_half_life_seconds,
+            )
+            ctx.loop_strength = signal.loop_strength
+            ctx.annoyance = signal.annoyance
+
         decision_started = time.perf_counter()
         ctx.decision = await self._decision.decide(
             text=ctx.turn.message,
@@ -173,6 +197,8 @@ class GateStage:
             sender_telegram_id=ctx.turn.sender_telegram_id,
             sender_metrics=ctx.sender_metrics,
             humor_ok=ctx.turn_plan.humor_ok,
+            loop_strength=ctx.loop_strength,
+            annoyance=ctx.annoyance,
         )
         ctx.decision_ms = (time.perf_counter() - decision_started) * 1000
 
@@ -385,6 +411,17 @@ class ComposeStage:
                 metrics=ctx.sender_metrics,
                 mood=ctx.sender_profile.mood,
             )
+        # Cold-reply note: a sender stuck in a same-topic loop gets a dry, sharp,
+        # brief answer — no warmth, no fluff (the loop dropped Vanessa's attitude).
+        attitude_note = None
+        if (
+            ctx.sender_profile is not None
+            and ctx.annoyance >= settings.feedback_annoyance_threshold
+        ):
+            attitude_note = render_annoyance_note(
+                name=ctx.sender_profile.display_name,
+                annoyance=ctx.annoyance,
+            )
         ctx.reply = await self._llm.generate(
             user_message=ctx.turn.message,
             context_blocks=ctx.context_blocks,
@@ -394,6 +431,7 @@ class ComposeStage:
             meme_blocks=ctx.meme_blocks or None,
             meme_menu=ctx.meme_menu or None,
             metrics_block=metrics_block,
+            attitude_note=attitude_note,
             sender_telegram_id=ctx.turn.sender_telegram_id,
             sender_name=ctx.sender_name,
             tone=ctx.turn_plan.tone,

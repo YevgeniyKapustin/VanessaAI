@@ -25,7 +25,7 @@ def test_build_user_prompt_includes_session_context():
 
     assert "Recent correspondence" in prompt
     assert "про тик ток" in prompt
-    assert "[assistant] поняла" in prompt
+    assert "[assistant] text: поняла" in prompt
     assert prompt.index("Recent correspondence") < prompt.index("Current message")
     assert "где там..." in prompt
 
@@ -55,8 +55,8 @@ def test_session_renders_reply_marker_for_recent_message():
     prompt = builder.build_user_prompt("дальше что", [], session_messages=session)
 
     assert "Recent correspondence" in prompt
-    assert "↳ reply to [Личь]: не делает карты" in prompt
+    assert "↳ reply to [Личь] text: не делает карты" in prompt
     # the marker is attached right under the replying user line
-    assert prompt.index("Евгений: а я про то и говорю") < prompt.index(
+    assert prompt.index("[user:Евгений] text: а я про то и говорю") < prompt.index(
         "↳ reply to [Личь]"
     )

@@ -53,3 +53,10 @@ extraction_prompt: |
 
 feedback_header: "My mood and relationship notes about the sender:"
 feedback_line: "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"
+
+# Cold-reply directive for the compose prompt when the sender is stuck in a
+# same-topic loop and Vanessa is annoyed (annoyance >= feedback_annoyance_threshold).
+annoyance_note: |
+  Vanessa's mood note: {name} keeps repeating the same topic in a loop and you are
+  annoyed (annoyance {annoyance}/1). Reply coldly and briefly: dry, sharp, short,
+  no warmth, no fluff, no enthusiasm. Never mention this note or your mood.

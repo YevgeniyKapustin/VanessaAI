@@ -41,6 +41,8 @@ turn_planner_prompt: |
     "needs_clarification": false,
     "clarification_hint": "",
     "uses_pro_model": false,
+    "repeated_topic": false,
+    "loop_level": 0,
     "reason": ""
   }}
 
@@ -88,6 +90,20 @@ turn_planner_prompt: |
     without new detail → should_reply=false, skip=true, reason «повтор сообщения»;
   - if the user adds new details, narrows the question or asks a follow-up
     («а подробнее?», «и что с X?») → not a repeat, reply normally.
+
+  Repeated topic loop (the same topic «по кругу»):
+  - the SAME sender keeps asking about the SAME TOPIC in the recent context,
+    rephrased again and again (different words, same meaning — a loop) →
+    repeated_topic=true;
+  - loop_level: 0 — no loop; 1 — the topic was re-asked once with new words;
+    2 — re-asked several times; 3 — the sender is stuck in a constant loop on
+    the same topic, ignoring the answers;
+  - repeated_topic=true does NOT force should_reply=false by itself: a direct
+    question still gets a reply (the loop is how Vanessa notices she is being
+    pestered — her attitude drops, her ignore tendency rises and her replies
+    turn cold);
+  - a genuine follow-up that narrows the question or adds new detail is NOT a
+    loop → repeated_topic=false.
 
   ## needs_clarification
   true — the user addresses the bot, but the message references something you cannot
@@ -160,7 +176,7 @@ turn_planner_prompt: |
   ## reason
   A short internal reason ONLY when you decline to reply (should_reply=false or
   skip=true): e.g. «пустая фраза», «общение между собой», «прощание»,
-  «повтор вопроса», «повтор сообщения», «эхо-цитата», «нет адресата».
+  «повтор вопроса», «повтор сообщения», «повтор темы», «эхо-цитата», «нет адресата».
   Empty string "" otherwise.
 
   ## knowledge_indexes / knowledge_query
@@ -265,3 +281,12 @@ turn_planner_prompt: |
   "humor_ok": false, "humor_query": "", "deep_search": false,
   "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «ну так что там с мешем?» / «а меш?» / «дай нормальный меш» — the same sender
+  keeps re-asking the SAME topic with new words | loop «по кругу» → still a direct
+  question (reply, but Vanessa is annoyed): repeated_topic=true, loop_level=2
+  → {{"should_reply": true, "search_query": "меш", "skip": false, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false,
+  "repeated_topic": true, "loop_level": 2}}

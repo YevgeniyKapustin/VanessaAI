@@ -186,6 +186,7 @@ class FakeLLM:
         meme_blocks: list | None = None,
         meme_menu: list | None = None,
         metrics_block: str | None = None,
+        attitude_note: str | None = None,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
@@ -256,6 +257,8 @@ class FakeDecisionEngine:
         sender_telegram_id: int = 0,
         sender_metrics: object | None = None,
         humor_ok: bool = False,
+        loop_strength: int = 0,
+        annoyance: float = 0.0,
     ) -> DecisionResult:
         return DecisionResult(
             action=self._action,

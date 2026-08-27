@@ -26,6 +26,11 @@ class DecisionContext:
     in_listen_window: bool = False
     sender_telegram_id: int = 0
     sender_metrics: PersonMetrics | None = None
+    # Loop-repetition signal (see app/decision/repeated_loop.py): how deep the
+    # same-topic loop is (0..3) and how annoyed Vanessa is (0..1). High annoyance
+    # feeds LowAttitudeRule (maximal ignore tendency) and the cold compose note.
+    loop_strength: int = 0
+    annoyance: float = 0.0
 
     @property
     def directly_addressed(self) -> bool:

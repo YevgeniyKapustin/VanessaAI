@@ -69,6 +69,42 @@ def test_turn_planner_prompt_teaches_repeated_message_is_spam():
     assert "spam burst" in prompt
 
 
+def test_turn_planner_prompt_teaches_repeated_topic_loop():
+    """The planner must emit the loop-repetition signal: same sender, same topic,
+    different words — repeated_topic / loop_level (feeds the annoyance mechanic)."""
+    prompt = get_content().rag.turn_planner_prompt
+    assert '"repeated_topic": false' in prompt
+    assert '"loop_level": 0' in prompt
+    assert "Repeated topic loop" in prompt
+    assert "«по кругу»" in prompt
+    assert "повтор темы" in prompt
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_parse_loop_signal():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "ну так что там с мешем?",
+        '{"should_reply": true, "search_query": "меш", "skip": false, '
+        '"repeated_topic": true, "loop_level": 2, "reason": "повтор темы"}',
+    )
+
+    assert result.repeated_topic is True
+    assert result.loop_level == 2
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_loop_level_defaults_zero():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "привет",
+        '{"should_reply": true, "search_query": "", "skip": false}',
+    )
+
+    assert result.repeated_topic is False
+    assert result.loop_level == 0
+
+
 @pytest.mark.asyncio
 async def test_turn_planner_parse_humor_fields():
     planner = TurnPlanner(use_llm=False)

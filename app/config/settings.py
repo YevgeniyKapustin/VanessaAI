@@ -346,6 +346,19 @@ class Settings(BaseSettings):
     decision_toxicity_ignore_threshold: float = 0.8
     decision_trust_ignore_threshold: float = 30.0
     feedback_tone_enabled: bool = True
+    # Loop-repetition attitude mechanic: a sender re-asking the SAME topic in a
+    # loop (different phrasings, same meaning) raises Vanessa's runtime
+    # annoyance (see app/decision/repeated_loop.py). At high annoyance her
+    # ignore tendency becomes maximal — weak/non-essential messages are skipped
+    # (LowAttitudeRule) — and replies turn cold (compose annoyance note).
+    decision_low_attitude_rule_enabled: bool = True
+    decision_annoyance_ignore_threshold: float = 0.6
+    decision_low_attitude_trust_threshold: float = 25.0
+    decision_low_attitude_sympathy_threshold: float = -0.3
+    decision_loop_window: int = 10
+    decision_loop_similarity_threshold: float = 0.4
+    decision_loop_decay_half_life_seconds: int = 3600
+    feedback_annoyance_threshold: float = 0.5
 
     @property
     def planner_model(self) -> str:

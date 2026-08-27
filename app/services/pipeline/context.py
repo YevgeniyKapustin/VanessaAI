@@ -30,6 +30,10 @@ class TurnPipelineContext:
     meme_blocks: list[MemeDefContent] = field(default_factory=list)
     meme_menu: list[MemeDefContent] = field(default_factory=list)
     sender_profile: SenderProfile | None = None
+    # Loop-repetition signal from the gate: how deep the same-topic loop is and
+    # how annoyed Vanessa is (drives LowAttitudeRule + the cold compose note).
+    loop_strength: int = 0
+    annoyance: float = 0.0
     reply: str | None = None
     result: ConversationTurnResult | None = None
     critic_verdict: CriticVerdict | None = None

@@ -21,6 +21,7 @@ class FakeLLM:
         session_messages: list | None = None,
         humor_quotes: list[str] | None = None,
         *,
+        attitude_note: str | None = None,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,

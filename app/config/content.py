@@ -140,16 +140,16 @@ class LLMContent(BaseModel):
     )
     context_block_separator: str = "\n\n"
     current_message_header: str
-    current_message_line: str = "[user:{sender}] {content}"
+    current_message_line: str = "{time} [user:{sender}] text: {content}"
     reply_message_header: str = "The user's message is a reply to this message:"
-    reply_message_line: str = "[{sender}] {content}"
+    reply_message_line: str = "[{sender}] text: {content}"
     session_header: str = "Recent correspondence in the chat:"
-    session_user_line: str = "{time} [user:{sender}] {content}"
-    session_assistant_line: str = "{time} [assistant] {content}"
-    session_reply_line: str = "  ↳ reply to [{sender}]: {content}"
+    session_user_line: str = "{time} [user:{sender}] text: {content}"
+    session_assistant_line: str = "{time} [assistant] text: {content}"
+    session_reply_line: str = "  ↳ reply to [{sender}] text: {content}"
     anchor_marker: str = " ← matches the query"
-    assistant_line: str = "{time} [assistant]{anchor} {content}"
-    user_line: str = "{time} [user:{sender}]{anchor} {content}"
+    assistant_line: str = "{time} [assistant]{anchor} text: {content}"
+    user_line: str = "{time} [user:{sender}]{anchor} text: {content}"
     humor_quotes_header: str = "Recognizable memes and jokes from the chat (if appropriate):"
     humor_quote_line: str = "- {quote}"
     meme_header: str = (
@@ -245,6 +245,10 @@ class MetricsContent(BaseModel):
     feedback_line: str = (
         "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"
     )
+    # Cold-reply directive injected into the compose prompt when the sender is
+    # stuck in a same-topic loop (annoyance >= feedback_annoyance_threshold).
+    # Placeholders: {name}, {annoyance}. Empty = feature disabled.
+    annoyance_note: str = ""
 
 
 class PortraitContent(BaseModel):

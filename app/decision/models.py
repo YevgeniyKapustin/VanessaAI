@@ -28,6 +28,10 @@ class DecisionReason(StrEnum):
     USER_IGNORED = "user_ignored"
     TOXIC = "toxic"
     REPEATED = "repeated"
+    # Vanessa's attitude to the sender is critically low (loop-repetition
+    # annoyance and/or a persistently low relationship) → even a weak / slightly
+    # disliked message is ignored (maximal ignore tendency).
+    LOW_ATTITUDE = "low_attitude"
 
 
 @dataclass(frozen=True, slots=True)

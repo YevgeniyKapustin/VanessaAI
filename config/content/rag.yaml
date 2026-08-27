@@ -22,7 +22,7 @@ turn_planner_prompt: |
   - reply to the bot: {reply_to_bot}
   - reply to another participant: {reply_to_other_user}
   - @mention of the bot: {mentions_bot}
-  - window after the bot's reply (≤2 messages): {listen_window}
+  - window after the bot's reply (≤4 messages): {listen_window}
 
   ## Output format
   Output ONLY valid raw JSON without any markdown formatting, backticks, or
@@ -48,12 +48,21 @@ turn_planner_prompt: |
   false — side conversation, thinking out loud, goodbye, «ок», a question to another by nickname,
   «что думаете про X» without addressing the bot, a request to be silent, discussing the bot in 3rd
   person («почему она меня игнорирует») without «ты/ванесса/@mention».
+  Also false — an empty/meaningless phrase that asks nothing and expects no reply: a dry remark,
+  a rhetorical acknowledgment, filler («чего и следовало ожидать», «ну вот», «так и знал», «ага»,
+  «ну да»), or a bare agreement/acknowledgment («это правда», «верно», «именно», «точно»,
+  «согласен») → should_reply=false, skip=true.
 
   Clarifications:
   - reply_to_bot=yes or mentions_bot=yes → usually true;
   - reply_to_other_user=yes without mention/bot name → should_reply=false, humor_ok=false;
-  - listen_window=yes — reply only on an explicit address or should_reply=true;
-    people chatting among themselves, gossip about «она» — false;
+  - listen_window=yes — the bot just replied and is inside the post-reply window:
+    reply to a question, a follow-up, or a comment continuing the dialogue
+    («ну чет мало», «хочешь закурить?», «а про текстуры?»); stay silent for
+    clear side talk, third-person gossip («она...»), a goodbye, and also for an
+    empty/no-meaning phrase or a bare agreement that adds no substance and
+    expects no answer («чего и следовало ожидать», «ну вот», «так и знал»,
+    «это правда», «верно») — it does not continue the dialogue;
   - «она/её» about the bot without a direct address → false;
   - skip=true → should_reply=false.
 
@@ -161,8 +170,11 @@ turn_planner_prompt: |
     («кто такой X», «расскажи про X») → inject only the compact portrait, keep
     the context lean;
   - true — the user asks a concrete fact from the dossier («во что играет X»,
-    «где работает X», «сколько X лет», «какое у X настроение») → inject the
-    raw dossier so the exact fact is available.
+    «где работает X», «сколько X лет», «какое у X настроение») or wants the
+    person revealed in depth («расскажи подробно про X») → inject the
+    raw dossier so the exact fact is available. With per-chunk embeddings enabled,
+    this injects the top matching text blocks of the dossier (multiple fragments
+    of the same file) instead of a single short portrait.
   If knowledge_indexes is empty or has no "people", keep knowledge_detail=false.
 
   ## Examples (input → JSON)
@@ -170,6 +182,32 @@ turn_planner_prompt: |
   «ок» | side chat → stay silent
   → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
   "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «чего и следовало ожидать» | dry empty comment, no answer expected
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «это правда» | bare agreement, no answer expected
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «ну чет ваще мало» (right after the bot answered the same user) | in-window
+  continuation → should_reply=true, no extra search needed
+  → {{"should_reply": true, "search_query": "", "skip": true, "tone": "ironic",
+  "humor_ok": true, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «хочешь закурить?» (to the bot after she answered the same user) | in-window
+  question to her → reply
+  → {{"should_reply": true, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": true, "humor_query": "", "deep_search": false,
   "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
 

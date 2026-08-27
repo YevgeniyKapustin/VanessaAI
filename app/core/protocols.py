@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol, TypedDict
+from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict
 
 from app.config.content import MemeDefContent
 from app.core.messages import ContextBlock, ContextMessage, StoredMessage
@@ -19,6 +19,10 @@ class KnowledgeVectorHit(TypedDict):
     kind: str
     title: str
     score: float
+    # Present when the hit is a chunk of a People dossier (chunked retrieval).
+    # Absent for whole-note hits. The chunk text itself is re-read from the
+    # vault by path + chunk_index at retrieval time.
+    chunk_index: NotRequired[int]
 
 
 class UnitOfWorkProtocol(Protocol):
@@ -134,6 +138,15 @@ class KnowledgeVectorStoreProtocol(Protocol):
     async def upsert_notes(
         self,
         items: list[tuple[str, str, str, list[float]]],
+    ) -> list[str]: ...
+
+    async def upsert_note_chunks(
+        self,
+        path: str,
+        kind: str,
+        title: str,
+        chunks: list[tuple[int, str]],
+        vectors: list[list[float]],
     ) -> list[str]: ...
 
     async def search(

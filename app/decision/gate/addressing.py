@@ -1,6 +1,9 @@
 from app.decision.detectors.intent import IntentDetector, IntentResult
 from app.decision.gate.reply_expectation import (
     is_contextual_vocative_address,
+    is_conversation_closure,
+    is_third_party_about_bot,
+    is_unsolicited_remark,
     listen_window_warrants_reply,
     mention_warrants_reply,
 )
@@ -38,6 +41,17 @@ def is_addressed_to_bot(
         return True
 
     if is_contextual_vocative_address(text):
+        return True
+
+    if detected.has_question and not (
+        is_conversation_closure(text)
+        or is_unsolicited_remark(text)
+        or is_third_party_about_bot(text)
+    ):
+        # A question in an active conversation is a candidate for a reply even
+        # without a mention — lets the bot actually answer contextually
+        # addressed questions ("хочешь закурить?") that the decision engine
+        # approved via an active session instead of downgrading them here.
         return True
 
     if in_listen_window and listen_window_warrants_reply(

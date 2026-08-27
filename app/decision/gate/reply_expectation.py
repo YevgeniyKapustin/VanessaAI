@@ -183,13 +183,19 @@ def listen_window_warrants_reply(
 ) -> bool:
     if is_unsolicited_remark(text) or is_third_party_about_bot(text):
         return False
-    if should_reply is True or trigger_detected:
+    if should_reply is False:
+        # The LLM planner explicitly vetoed a reply — honor it.
+        return False
+    if should_reply is True or trigger_detected or has_question:
         return True
     if is_bot_pronoun_reply(text):
         return True
     if is_contextual_vocative_address(text):
         return True
-    return False
+    # Inside the post-reply window a substantive message that continues the
+    # thread (not noise/closure/unsolicited/third-party) is a candidate: the
+    # bot participates in the dialogue unless the planner vetoed a reply.
+    return True
 
 
 def expects_follow_up_after_bot(text: str, *, last_prior_role: str | None) -> bool:

@@ -2,7 +2,7 @@ import pytest
 
 from app.config.content import get_content
 from app.core.messages import ContextMessage
-from app.llm.planner.turn_planner import TurnPlanner
+from app.llm.planner.turn_planner import TurnPlan, TurnPlanner
 
 
 async def test_turn_planner_parse_should_reply():
@@ -312,3 +312,37 @@ async def test_turn_planner_participants_provider_receives_message_and_recent():
 
     assert result.should_reply is True
     assert received == [("расскажи про крабера", recent)]
+
+
+def test_turn_plan_to_trace_dict():
+    """The Langfuse gate-span output must expose every planner decision."""
+    plan = TurnPlan(
+        original="во что играет Крабер?",
+        text="крабер игры",
+        skip_search=False,
+        tone="neutral",
+        humor_ok=True,
+        humor_query="игры крабер",
+        should_reply=True,
+        deep_search=True,
+        knowledge_indexes=("people",),
+        knowledge_query="крабер",
+        knowledge_detail=True,
+        needs_clarification=False,
+        uses_pro_model=False,
+    )
+    data = plan.to_trace_dict()
+    assert data["search_query"] == "крабер игры"
+    assert data["skip_search"] is False
+    assert data["should_reply"] is True
+    assert data["tone"] == "neutral"
+    assert data["humor_ok"] is True
+    assert data["humor_query"] == "игры крабер"
+    assert data["deep_search"] is True
+    assert data["knowledge_indexes"] == ["people"]
+    assert data["knowledge_query"] == "крабер"
+    assert data["knowledge_detail"] is True
+    assert data["needs_clarification"] is False
+    assert data["uses_pro_model"] is False
+    # The raw user message is already on the trace root — not duplicated here.
+    assert "original" not in data

@@ -122,7 +122,13 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         )
         ctx.recent = ctx.session.recent_messages
 
-        if not await self._run_stage("gate", self._gate.run(ctx)):
+        if not await self._run_stage(
+            "gate",
+            self._gate.run(ctx),
+            output=lambda: ctx.turn_plan.to_trace_dict()
+            if ctx.turn_plan is not None
+            else None,
+        ):
             self._log_processed(turn, ctx)
             assert ctx.result is not None
             return ctx.result
@@ -159,11 +165,20 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         assert ctx.result is not None
         return ctx.result
 
-    async def _run_stage(self, name: str, coro) -> bool:
-        """Run a pipeline stage inside a tracing span (no-op when disabled)."""
+    async def _run_stage(self, name: str, coro, *, output=None) -> bool:
+        """Run a pipeline stage inside a tracing span (no-op when disabled).
+
+        ``output`` is an optional zero-arg callable evaluated after the stage
+        completes, while the span is still open, so a stage can attach its
+        result to the trace — the gate attaches the parsed ``TurnPlan`` so the
+        planner's output is visible in Langfuse for debugging.
+        """
         tracer = get_tracer()
-        async with tracer.span(name=name):
-            return await coro
+        async with tracer.span(name=name) as span:
+            ok = await coro
+            if output is not None:
+                span.update(output=output())
+            return ok
 
     async def _run_post_reply(self, ctx: TurnPipelineContext) -> None:
         """Run memory extraction + metrics.

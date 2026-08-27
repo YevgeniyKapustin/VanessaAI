@@ -53,7 +53,7 @@ DEFAULT_CONTINUATION_PHRASES = (
 # программистов"), but not a full paragraph — that would be a real message.
 _MAX_PHRASE_WORDS = 5
 # How many messages back the bot's last reply may be and still count as "right
-# after" (the listen window is 2, so this gives headroom for interleaved talk).
+# after" (the listen window is 4, so this gives headroom for interleaved talk).
 DEFAULT_MAX_MESSAGES_BACK = 6
 
 

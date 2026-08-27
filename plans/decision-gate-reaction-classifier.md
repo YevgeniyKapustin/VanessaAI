@@ -172,3 +172,69 @@ The detector only fires for a **short continuation phrase** from the **same
 user the bot just answered**, with the bot's reply still in the recent window.
 It does not relax general group-chat noise suppression (the listen window
 itself stays message-count based, as before).
+
+---
+
+## Addendum: the post-reply window became "the next 4" and the bot participates
+
+Reported bug: the bot was practically impossible to get a reply from unless it
+was tagged or replied to. Two messages that were clearly directed at the bot
+from context got no answer:
+
+- "ну чет ваще мало" — a continuation right after the bot answered the same
+  user's dossier request;
+- "хочешь закурить?" — a question to the bot right after she answered the same
+  user's riddle.
+
+### Root cause
+
+A stack of "stay silent" gates compounded:
+
+1. The post-reply listen window was only **2** messages wide
+   (`post_reply_listen_count: 2`), so "the next 4" was never a concept.
+2. [`listen_window_warrants_reply`](../app/decision/gate/reply_expectation.py)
+   accepted a `has_question` flag but never used it, and only warranted a reply
+   for pronoun-replies / vocative / planner-affirmed — a substantive
+   continuation ("ну чет ваще мало") was dropped.
+3. The LLM planner prompt told the model `listen_window=yes — reply only on an
+   explicit address`, actively discouraging in-window replies.
+4. Outside the window, the deterministic prefilter hard-dropped any
+   non-addressed question as `side_talk` before the semantic reaction gate even
+   ran ("хочешь закурить?" never got "considered").
+
+### Fix
+
+- **Window widened to 4** (`config/content/conversation.yaml`
+  `post_reply_listen_count: 4`; mirrored in settings, the Pydantic default and
+  `ReplyEligibility` default) — the bot now "considers" the next 4 messages
+  after its own reply.
+- **In-window thread participation**
+  ([`listen_window_warrants_reply`](../app/decision/gate/reply_expectation.py)):
+  honor the planner veto (`should_reply is False`), treat `has_question` as a
+  warrant, and default to reply for substantive in-window messages that are not
+  noise/closure/unsolicited/third-party. Plus a sender-aware fallback in
+  [`ListenWindowRule`](../app/decision/rules.py): if the message comes from the
+  user the bot just answered, it is an explicit continuation and wins even when
+  the planner is neutral or vetoed.
+- **Planner prompt** ([`rag.yaml`](../config/content/rag.yaml)): the listen
+  window is now described as a participation window (reply to questions /
+  follow-ups / comments continuing the dialogue; stay silent only for clear
+  side talk, gossip, goodbye), with examples mirroring the reported cases.
+- **Question deferral** ([`evaluate_prefilter`](../app/decision/gate/reply_eligibility.py),
+  toggle `decision_prefilter_defer_questions`, default true): a non-addressed
+  question is no longer hard-dropped as `side_talk` — it is deferred to the
+  reaction gate (Tier-1 catches clear questions instantly; the LLM tier decides
+  the ambiguous tail). A recent dismissal ("хватит") still closes the thread.
+- **Compose allowance** ([`is_addressed_to_bot`](../app/decision/gate/addressing.py)):
+  a question in an active conversation is a compose candidate, so a
+  session-approved out-of-window question survives the compose gate instead of
+  being downgraded to `NOT_EXPECTED`.
+
+### Cost trade-off
+
+Widening the window and deferring questions means more turns reach the LLM
+planner/reaction gate than before (they get "considered" and then often
+ignored). The reaction-gate Tier-1 heuristics still short-circuit clear
+requests and obvious noise with zero LLM cost; the deterministic prefilter
+still resolves noise/closure/dismissal/third-party cheaply. `DECISION_PREFILTER_DEFER_QUESTIONS=false`
+restores the previous cheap-but-silent behavior.

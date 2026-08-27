@@ -53,6 +53,20 @@ def _follows_bot(recent_messages: list[ContextMessage]) -> bool:
     return recent_messages[-2].role == "assistant"
 
 
+def _thread_dismissed(recent_messages: list[ContextMessage]) -> bool:
+    """Whether the user dismissed the bot after the last assistant message.
+
+    A dismissal ("хватит", "заткнись", ...) closes the thread: even a later
+    question should not be deferred to the reaction gate.
+    """
+    for message in reversed(recent_messages):
+        if message.role == "assistant":
+            return False
+        if message.role == "user" and is_dismissal_request(message.content):
+            return True
+    return False
+
+
 class ReplyEligibility:
     def __init__(
         self,
@@ -61,10 +75,11 @@ class ReplyEligibility:
         noise_filter: NoiseFilter,
         ignore_registry: ChatIgnoreRegistry,
         *,
-        post_reply_listen_count: int = 2,
+        post_reply_listen_count: int = 4,
         post_reply_listen_idle_seconds: float = 0,
         continuation_follow_up_enabled: bool | None = None,
         continuation_phrases: tuple[str, ...] | None = None,
+        defer_questions: bool | None = None,
     ) -> None:
         self._intent = intent_detector
         self._triggers = trigger_checker
@@ -72,6 +87,11 @@ class ReplyEligibility:
         self._ignore_registry = ignore_registry
         self._post_reply_listen_count = post_reply_listen_count
         self._post_reply_listen_idle_seconds = post_reply_listen_idle_seconds
+        self._defer_questions = (
+            settings.decision_prefilter_defer_questions
+            if defer_questions is None
+            else defer_questions
+        )
         self._continuation_enabled = (
             settings.decision_continuation_follow_up_enabled
             if continuation_follow_up_enabled is None
@@ -220,6 +240,18 @@ class ReplyEligibility:
             directly_addressed or intent.mentions_bot or follows_bot
         ):
             return PrefilterVerdict(True, "trigger")
+
+        if (
+            self._defer_questions
+            and intent.has_question
+            and not _thread_dismissed(recent_messages)
+        ):
+            # A question that is not deterministically addressed still gets
+            # "considered": defer to the reaction gate (Tier-1 catches clear
+            # questions instantly; the LLM tier decides the ambiguous tail)
+            # instead of hard-dropping it as side_talk before any semantics.
+            # A recent dismissal closes the thread — stay silent.
+            return PrefilterVerdict(True, "question")
 
         return PrefilterVerdict(False, "side_talk")
 

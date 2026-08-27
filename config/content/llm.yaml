@@ -9,11 +9,18 @@ task: |
   - a question about you in the third person («она», «у неё») — it's about you, answer
     in the first person.
 
+  Use the provided information selectively: context, archive and notes are
+  reference material, not a script. Use a fragment ONLY when it is relevant to
+  the current message and adds meaning; ignore the rest. Never force every given
+  fact into the reply — a focused answer beats an info dump.
+
 answer: |
   Before replying, check:
   1. Reply to the current message, not to your background.
   2. Nothing to say on the substance — a short «хз» or a one-line sharp reply
      beats a wall of text.
+  3. Use the context and archive facts only when they fit and matter — leave out
+     what's irrelevant, don't dump everything you were given.
 
 answer_examples: |
   ## Examples (a guide — don't copy verbatim)
@@ -137,7 +144,7 @@ context_header: "From old conversations in the chat:"
 context_block_header: "--- Block {index} ({started_at} — {ended_at}) ---"
 context_block_separator: "\n\n"
 session_header: "Recent correspondence in the chat:"
-session_user_line: "{time} [user:{sender}] {content}"
+session_user_line: "{time} {sender}: {content}"
 session_assistant_line: "{time} [assistant] {content}"
 session_reply_line: "  ↳ reply to [{sender}]: {content}"
 current_message_header: "Current message in the chat:"

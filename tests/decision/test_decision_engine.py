@@ -218,6 +218,101 @@ async def test_decision_engine_replies_bot_pronoun_in_listen_window(
 
 
 @pytest.mark.asyncio
+async def test_decision_engine_replies_partner_continuation_in_listen_window(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    # The user the bot just answered follows up inside the window ("ну чет
+    # ваще мало" right after the dossier) — an explicit continuation even when
+    # the LLM planner vetoed a reply.
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(
+            id=1,
+            role="user",
+            content="ванесса досье на меня",
+            sender_telegram_id=7,
+        ),
+        ContextMessage(id=2, role="assistant", content="Бегемот, рефлексирующий..."),
+        ContextMessage(
+            id=3,
+            role="user",
+            content="ну чет ваще мало",
+            sender_telegram_id=7,
+        ),
+    ]
+
+    result = await engine.decide(
+        text="ну чет ваще мало",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=False,
+        in_listen_window=True,
+        sender_telegram_id=7,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.LISTEN_WINDOW
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_question_in_listen_window_neutral_planner(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    # A question inside the post-reply window warrants a reply even with a
+    # neutral planner — has_question is now honored by the listen window.
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(id=1, role="user", content="ванесса расскажи про меш"),
+        ContextMessage(id=2, role="assistant", content="Кратко про меш"),
+        ContextMessage(id=3, role="user", content="а про текстуры?"),
+    ]
+
+    result = await engine.decide(
+        text="а про текстуры?",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=None,
+        in_listen_window=True,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.LISTEN_WINDOW
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_replies_out_of_window_question_in_active_session(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    # A question to the bot outside the window but inside an active session
+    # ("хочешь закурить?" after the bot answered the same user's riddle) is
+    # approved by the intent rule and survives the compose gate.
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(
+            id=1,
+            role="user",
+            content="@vanessakap_bot вы идете по пустыне... черепаха",
+        ),
+        ContextMessage(id=2, role="assistant", content="Это классический тест на эмпатию"),
+        ContextMessage(id=3, role="user", content="хочешь закурить?"),
+    ]
+
+    result = await engine.decide(
+        text="хочешь закурить?",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=None,
+        in_listen_window=False,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.INTENT
+
+
+@pytest.mark.asyncio
 async def test_decision_engine_ignores_side_talk_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,

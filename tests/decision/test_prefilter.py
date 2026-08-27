@@ -25,12 +25,24 @@ def prefilter() -> PlannerPrefilter:
 
 def test_prefilter_skips_side_talk(prefilter: PlannerPrefilter):
     result = prefilter.evaluate(
-        "что думаешь про тик така",
+        "Гриша меш гексы поле боя генерация",
         [],
     )
 
     assert result.run_planner is False
     assert result.reason == "side_talk"
+
+
+def test_prefilter_defers_question_to_reaction_gate(prefilter: PlannerPrefilter):
+    # A non-addressed question is no longer hard-dropped as side talk: it is
+    # deferred to the reaction gate so the bot actually "considers" it.
+    result = prefilter.evaluate(
+        "что думаешь про тик така",
+        [],
+    )
+
+    assert result.run_planner is True
+    assert result.reason == "question"
 
 
 def test_prefilter_runs_on_bot_name(prefilter: PlannerPrefilter):
@@ -100,17 +112,39 @@ def test_prefilter_listen_window_covers_side_talk_after_bot_reply(
     assert result.reason == "listen_window"
 
 
-def test_prefilter_listen_window_expires_after_two_user_messages(
+def test_prefilter_listen_window_covers_up_to_four_user_messages(
     prefilter: PlannerPrefilter,
 ):
+    # With the widened 4-message window, three interleaved user messages after
+    # the bot's reply are still "considered" (listen window).
     recent = [
         ContextMessage(id=1, role="assistant", content="Ответ бота"),
         ContextMessage(id=2, role="user", content="один"),
         ContextMessage(id=3, role="user", content="два"),
-        ContextMessage(id=4, role="user", content="что думаешь про тик така"),
+        ContextMessage(id=4, role="user", content="три"),
+        ContextMessage(id=5, role="user", content="Гриша меш гексы поле боя генерация"),
     ]
 
-    result = prefilter.evaluate("что думаешь про тик така", recent)
+    result = prefilter.evaluate("Гриша меш гексы поле боя генерация", recent)
+
+    assert result.run_planner is True
+    assert result.reason == "listen_window"
+
+
+def test_prefilter_listen_window_expires_after_four_user_messages(
+    prefilter: PlannerPrefilter,
+):
+    # Five user messages after the bot's reply exceed the 4-message window.
+    recent = [
+        ContextMessage(id=1, role="assistant", content="Ответ бота"),
+        ContextMessage(id=2, role="user", content="один"),
+        ContextMessage(id=3, role="user", content="два"),
+        ContextMessage(id=4, role="user", content="три"),
+        ContextMessage(id=5, role="user", content="четыре"),
+        ContextMessage(id=6, role="user", content="Гриша меш гексы поле боя генерация"),
+    ]
+
+    result = prefilter.evaluate("Гриша меш гексы поле боя генерация", recent)
 
     assert result.run_planner is False
     assert result.reason == "side_talk"

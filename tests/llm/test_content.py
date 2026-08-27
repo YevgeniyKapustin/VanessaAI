@@ -10,6 +10,27 @@ def test_content_loads_persona_and_templates():
     assert content.decision.noise_max_words >= 1
 
 
+def test_planner_prompt_rejects_empty_meaningless_phrases():
+    prompt = get_content().rag.planner_prompt
+    assert "чего и следовало ожидать" in prompt
+    assert "это правда" in prompt
+    assert "empty/meaningless" in prompt
+    assert "skip=true" in prompt
+
+
+def test_reaction_gate_prompt_rejects_empty_meaningless_phrases():
+    prompt = get_content().decision.reaction_gate_prompt
+    assert "чего и следовало ожидать" in prompt
+    assert "это правда" in prompt
+    assert "empty/meaningless" in prompt
+
+
+def test_compose_prompt_uses_context_selectively():
+    llm = get_content().llm
+    assert "Use the provided information selectively" in llm.task_text()
+    assert "don't dump everything" in llm.answer_text()
+
+
 def test_prompt_builder_assembles_system_prompt_from_persona():
     builder = PromptBuilder()
     prompt = builder.system_prompt

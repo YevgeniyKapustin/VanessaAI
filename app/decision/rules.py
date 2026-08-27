@@ -2,6 +2,7 @@ from app.decision.context import DecisionContext
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.gate.planner_gate import planner_affirms_reply
 from app.decision.gate.protocols import ReplyEligibilityProtocol
+from app.decision.gate.continuation import last_bot_reply_partner_sender_id
 from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
@@ -117,14 +118,23 @@ class ListenWindowRule(_PreRelevanceRuleMixin):
             return None
         if is_conversation_closure(context.text):
             return None
-        if not listen_window_warrants_reply(
+        if listen_window_warrants_reply(
             context.text,
             should_reply=context.should_reply,
             has_question=context.intent.has_question,
             trigger_detected=context.trigger.detected,
         ):
-            return None
-        return _reply(context, DecisionReason.LISTEN_WINDOW)
+            return _reply(context, DecisionReason.LISTEN_WINDOW)
+        if (
+            context.sender_telegram_id
+            and last_bot_reply_partner_sender_id(context.recent_messages)
+            == context.sender_telegram_id
+        ):
+            # The user the bot just answered keeps talking inside the window —
+            # an explicit continuation even when the planner was neutral or
+            # vetoed a reply ("ну чет ваще мало" right after the dossier).
+            return _reply(context, DecisionReason.LISTEN_WINDOW)
+        return None
 
 
 class PlannerReplyRule(_PreRelevanceRuleMixin):

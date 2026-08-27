@@ -93,7 +93,11 @@ One trace per processed message, named `telegram_rag_pipeline`.
 ```
 telegram_rag_pipeline                    (trace; metadata: request_id, chat_id_hash, message preview)
 ├── gate                                  (span: plan_ms, decision_ms, action, reason)
-│   ├── llm_planner                       (generation via completer, kind=planner)
+│   └── output: TurnPlan.to_trace_dict()  (the parsed planner output: should_reply, tone,
+│                                          deep_search, humor_ok, knowledge, ...)
+│   ├── llm_planner                       (generation via completer, kind=planner; output =
+│                                          the raw model response, recorded before the
+│                                          observation closes)
 │   └── decision                          (span: relevance score)
 ├── retrieve                              (span)
 │   ├── rag_semantic                      (span: query, indexes, hits, top_score)
@@ -105,6 +109,14 @@ telegram_rag_pipeline                    (trace; metadata: request_id, chat_id_h
 │   └── llm_critic                        (generation via completer, kind=critic)
 └── finalize                              (span: reply_len, sticker_tag)
 ```
+
+The planner's output is now visible in the trace two ways: the `llm_planner` generation
+carries the raw model response, and the `gate` span carries the parsed `TurnPlan`
+(via `TurnPlan.to_trace_dict()`). The completer (`_run_completion` in
+`app/llm/providers/protocols.py`) records the generation output *inside* the open
+observation — previously it called `update()` after the Langfuse v4 observation was
+finalized, so the planner showed no output while the composer (which updates inside its
+block) did.
 
 Background LLM work (post-reply) is traced under its own traces so it never bloats the reply
 trace: `memory_extraction` (kind=memory), `metrics_extraction` (kind=metrics),

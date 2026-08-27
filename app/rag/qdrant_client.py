@@ -151,6 +151,11 @@ class KnowledgeQdrantStore:
     def point_id(path: str) -> str:
         return "k:" + hashlib.sha256(path.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def chunk_point_id(path: str, chunk_index: int) -> str:
+        """Deterministic point id for a People-dossier chunk (per-chunk points)."""
+        return f"{KnowledgeQdrantStore.point_id(path)}:c{chunk_index}"
+
     async def reset(self) -> None:
         """Drop the whole collection (used by a full reindex)."""
         await self._client.delete_collection(self._collection)
@@ -233,6 +238,46 @@ class KnowledgeQdrantStore:
         )
         return point_ids
 
+    async def upsert_note_chunks(
+        self,
+        path: str,
+        kind: str,
+        title: str,
+        chunks: list[tuple[int, str]],
+        vectors: list[list[float]],
+    ) -> list[str]:
+        """Upsert one point per dossier chunk, keyed by (path, chunk_index).
+
+        Each chunk keeps the note path in its payload plus a ``chunk_index`` so
+        ``search`` can return the strongest individual blocks of a People
+        dossier. Re-embedding a note overwrites its chunk points in place
+        (deterministic ids), never accumulating stale vectors.
+        """
+        points: list[PointStruct] = []
+        point_ids: list[str] = []
+        for (chunk_index, _chunk_text), vector in zip(chunks, vectors):
+            pid = self.chunk_point_id(path, chunk_index)
+            point_ids.append(pid)
+            points.append(
+                PointStruct(
+                    id=pid,
+                    vector=vector,
+                    payload={
+                        "path": path,
+                        "kind": kind,
+                        "title": title,
+                        "chunk_index": chunk_index,
+                    },
+                )
+            )
+        if not points:
+            return []
+        await self._client.upsert(
+            collection_name=self._collection,
+            points=points,
+        )
+        return point_ids
+
     async def search(
         self,
         vector: list[float],
@@ -250,12 +295,14 @@ class KnowledgeQdrantStore:
             path = payload.get("path")
             if not path:
                 continue
-            hits.append(
-                KnowledgeVectorHit(
-                    path=str(path),
-                    kind=str(payload.get("kind") or ""),
-                    title=str(payload.get("title") or ""),
-                    score=hit.score,
-                )
-            )
+            chunk_index = payload.get("chunk_index")
+            knowledge_hit: KnowledgeVectorHit = {
+                "path": str(path),
+                "kind": str(payload.get("kind") or ""),
+                "title": str(payload.get("title") or ""),
+                "score": hit.score,
+            }
+            if chunk_index is not None:
+                knowledge_hit["chunk_index"] = int(chunk_index)
+            hits.append(knowledge_hit)
         return hits

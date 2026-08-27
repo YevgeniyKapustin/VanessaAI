@@ -57,6 +57,47 @@ async def test_upsert_notes_empty_returns_empty():
 
 
 @pytest.mark.asyncio
+async def test_upsert_note_chunks_returns_distinct_point_ids():
+    client = _make_client()
+    store = KnowledgeQdrantStore(client=client, collection="knowledge", vector_size=3)
+
+    ids = await store.upsert_note_chunks(
+        "People/личь.md",
+        "people",
+        "личь",
+        [(0, "фрагмент один"), (1, "фрагмент два")],
+        [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+    )
+
+    assert len(ids) == 2
+    assert len(set(ids)) == 2
+    assert all(pid.startswith("k:") for pid in ids)
+    assert ids[0] == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 0)
+    assert ids[1] == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 1)
+
+
+@pytest.mark.asyncio
+async def test_upsert_note_chunks_empty_returns_empty():
+    client = _make_client()
+    store = KnowledgeQdrantStore(client=client, collection="knowledge", vector_size=3)
+
+    assert await store.upsert_note_chunks("x", "people", "x", [], []) == []
+
+
+@pytest.mark.asyncio
+async def test_chunk_point_id_is_deterministic():
+    assert KnowledgeQdrantStore.chunk_point_id(
+        "People/личь.md", 0
+    ) == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 0)
+    assert KnowledgeQdrantStore.chunk_point_id(
+        "People/личь.md", 0
+    ) != KnowledgeQdrantStore.chunk_point_id("People/личь.md", 1)
+    assert KnowledgeQdrantStore.chunk_point_id(
+        "People/личь.md", 0
+    ).startswith("k:")
+
+
+@pytest.mark.asyncio
 async def test_search_maps_hits():
     client = _make_client()
     store = KnowledgeQdrantStore(client=client, collection="knowledge", vector_size=3)
@@ -65,6 +106,35 @@ async def test_search_maps_hits():
 
     assert hits == [
         {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.88}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_search_maps_chunk_hits_with_index():
+    client = _make_client()
+    chunk_point = MagicMock()
+    chunk_point.payload = {
+        "path": "People/личь.md",
+        "kind": "people",
+        "title": "личь",
+        "chunk_index": 2,
+    }
+    chunk_point.score = 0.77
+    response = MagicMock()
+    response.points = [chunk_point]
+    client.query_points = AsyncMock(return_value=response)
+    store = KnowledgeQdrantStore(client=client, collection="knowledge", vector_size=3)
+
+    hits = await store.search([0.1, 0.2, 0.3], limit=5)
+
+    assert hits == [
+        {
+            "path": "People/личь.md",
+            "kind": "people",
+            "title": "личь",
+            "chunk_index": 2,
+            "score": 0.77,
+        }
     ]
 
 

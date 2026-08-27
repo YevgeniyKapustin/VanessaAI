@@ -52,10 +52,20 @@ def test_hard_ignore_ignored_user(eligibility: ReplyEligibility):
 
 
 def test_prefilter_maps_side_talk_to_tag(eligibility: ReplyEligibility):
-    verdict = eligibility.evaluate_prefilter("что думаешь про тик така", [])
+    verdict = eligibility.evaluate_prefilter(
+        "Гриша меш гексы поле боя генерация",
+        [],
+    )
 
     assert verdict.run_planner is False
     assert verdict.reason == "side_talk"
+
+
+def test_prefilter_defers_question_to_reaction_gate(eligibility: ReplyEligibility):
+    verdict = eligibility.evaluate_prefilter("что думаешь про тик така", [])
+
+    assert verdict.run_planner is True
+    assert verdict.reason == "question"
 
 
 def test_allows_compose_humor_ok(eligibility: ReplyEligibility):
@@ -87,10 +97,22 @@ def test_should_block_compose_blocks_outside_listen_window(
     eligibility: ReplyEligibility,
 ):
     assert eligibility.should_block_compose(
-        "что думаешь про тик така",
+        "Гриша меш гексы поле боя генерация",
         in_listen_window=False,
         should_reply=None,
     ) is True
+
+
+def test_should_block_compose_allows_question_outside_window(
+    eligibility: ReplyEligibility,
+):
+    # A question in an active conversation is a compose candidate even outside
+    # the listen window, so a session-approved question is not downgraded.
+    assert eligibility.should_block_compose(
+        "что думаешь про тик така",
+        in_listen_window=False,
+        should_reply=None,
+    ) is False
 
 
 def test_should_block_compose_blocks_reply_to_other(eligibility: ReplyEligibility):
@@ -161,11 +183,11 @@ def _joke_follow_up_recent(interleaved: int = 2) -> list[ContextMessage]:
 
 
 def test_prefilter_continuation_follow_up_passes_after_listen_window_expired():
-    # Two other users wrote after the joke, so the 2-message listen window is
+    # Four other users wrote after the joke, so the 4-message listen window is
     # already expired — but the sender-aware continuation demand from the same
     # user the bot just answered still reaches the planner.
     eligibility = _continuation_eligibility()
-    recent = _joke_follow_up_recent(interleaved=2)
+    recent = _joke_follow_up_recent(interleaved=4)
 
     verdict = eligibility.evaluate_prefilter("а ещё", recent, sender_telegram_id=1)
 
@@ -175,7 +197,7 @@ def test_prefilter_continuation_follow_up_passes_after_listen_window_expired():
 
 def test_prefilter_continuation_requires_matching_sender():
     eligibility = _continuation_eligibility()
-    recent = _joke_follow_up_recent(interleaved=2)
+    recent = _joke_follow_up_recent(interleaved=4)
 
     # Someone else's "а ещё" is not an addressed continuation → side talk.
     verdict = eligibility.evaluate_prefilter("а ещё", recent, sender_telegram_id=5)
@@ -193,7 +215,7 @@ def test_prefilter_continuation_disabled_falls_to_side_talk():
         continuation_follow_up_enabled=False,
         continuation_phrases=("а ещё",),
     )
-    recent = _joke_follow_up_recent(interleaved=2)
+    recent = _joke_follow_up_recent(interleaved=4)
 
     verdict = eligibility.evaluate_prefilter("а ещё", recent, sender_telegram_id=1)
 

@@ -63,6 +63,12 @@ class _InstrumentedCompleterMixin:
                     error_type=classify_llm_error(exc),
                 )
                 raise
+            # Update the generation while the observation is still open. Once the
+            # ``async with`` exits, the Langfuse v4 observation is finalized and a
+            # late update() is silently dropped — which is exactly why the planner
+            # (this completer path) showed no output in the trace while the
+            # composer (which updates inside its block) did.
+            gen.update(output=text, usage=usage or None)
         record_llm_call(
             provider=self.provider,
             model=model,
@@ -72,7 +78,6 @@ class _InstrumentedCompleterMixin:
             usage=usage,
             output=text,
         )
-        gen.update(output=text, usage=usage or None)
         return text
 
 

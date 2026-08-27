@@ -4,6 +4,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Any
 
 from app.llm.format.llm_json import normalize_llm_json
 from app.llm.providers.protocols import LLMChatCompleter, create_chat_completer
@@ -51,6 +52,30 @@ class TurnPlan:
     # super-complex synthesis, coding, long multi-step reasoning. The gate
     # planner decides; the composer routes the generation call accordingly.
     uses_pro_model: bool = False
+
+    def to_trace_dict(self) -> dict[str, Any]:
+        """Serialize the plan for the Langfuse trace (gate span output).
+
+        Bounded, debugging-friendly projection of the planner's output. Omits
+        ``original`` (the raw user message is already on the trace root) so the
+        Langfuse observation panel stays readable while still showing every
+        decision the planner made.
+        """
+        return {
+            "search_query": self.text,
+            "skip_search": self.skip_search,
+            "should_reply": self.should_reply,
+            "tone": self.tone,
+            "humor_ok": self.humor_ok,
+            "humor_query": self.humor_query,
+            "deep_search": self.deep_search,
+            "knowledge_indexes": list(self.knowledge_indexes),
+            "knowledge_query": self.knowledge_query,
+            "knowledge_detail": self.knowledge_detail,
+            "needs_clarification": self.needs_clarification,
+            "clarification_hint": self.clarification_hint,
+            "uses_pro_model": self.uses_pro_model,
+        }
 
 
 class TurnPlanner:

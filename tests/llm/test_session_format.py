@@ -57,6 +57,6 @@ def test_session_renders_reply_marker_for_recent_message():
     assert "Recent correspondence" in prompt
     assert "↳ reply to [Личь]: не делает карты" in prompt
     # the marker is attached right under the replying user line
-    assert prompt.index("[user:Евгений] а я про то и говорю") < prompt.index(
+    assert prompt.index("Евгений: а я про то и говорю") < prompt.index(
         "↳ reply to [Личь]"
     )

@@ -103,7 +103,13 @@ class Settings(BaseSettings):
     decision_bot_names: str = ""
     decision_trigger_keywords: str = ""
     decision_planner_prefilter: bool = True
-    decision_post_reply_listen_count: int = 2
+    # Defer undecided questions (no deterministic address/trigger/window) to the
+    # reaction gate instead of hard-dropping them as side_talk: the bot then
+    # actually "considers" contextually-addressed questions in an active
+    # conversation. Trade-off: those questions reach the planner even when they
+    # end up ignored, so a busy group pays more planner/LLM calls.
+    decision_prefilter_defer_questions: bool = True
+    decision_post_reply_listen_count: int = 4
     decision_session_idle_seconds: int = 300
 
     # Lightweight Decision Gate (reaction classifier) — runs BEFORE the heavy
@@ -314,6 +320,21 @@ class Settings(BaseSettings):
     # Raw dossier facts injected into the compose prompt on a concrete-fact
     # question about a person ("во что играет Крабер?").
     knowledge_people_raw_max_chars: int = 1400
+    # Detailed person retrieval: when a question asks to reveal a person in
+    # depth (knowledge_detail=true), instead of injecting a single portrait or a
+    # bounded raw dump, the dossier is split into text blocks (chunks), each
+    # embedded separately, and the top matching blocks are injected. A short
+    # portrait is only enough for passing mentions — this option powers the
+    # "tell me in detail about X" case.
+    knowledge_people_chunks_enabled: bool = True
+    # Target size of a dossier block (chars) when chunking People notes.
+    knowledge_people_chunk_chars: int = 600
+    # Overlap between neighbouring chunks (chars) so a fact spanning a boundary
+    # stays readable.
+    knowledge_people_chunk_overlap: int = 120
+    # How many of the strongest matching blocks from a person's dossier are
+    # injected on a detail query (semantic rank order).
+    knowledge_people_detail_blocks: int = 5
 
     # Compose-prompt budget: per-section and global char caps applied in
     # PromptBuilder so a bloated context never blows the LLM window. Caps live

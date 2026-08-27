@@ -20,6 +20,7 @@ class FakeEmbeddings:
 class FakeKnowledgeStore:
     def __init__(self) -> None:
         self.notes: dict[str, tuple[str, str, list[float]]] = {}
+        self.chunk_points: dict[tuple[str, int], tuple[str, str, list[float]]] = {}
         self.ensured = False
 
     async def ensure_collection(self) -> None:
@@ -43,6 +44,18 @@ class FakeKnowledgeStore:
             self.notes[path] = (kind, title, vector)
         return [path for path, _, _, _ in items]
 
+    async def upsert_note_chunks(
+        self,
+        path: str,
+        kind: str,
+        title: str,
+        chunks: list[tuple[int, str]],
+        vectors: list[list[float]],
+    ) -> list[str]:
+        for (index, _), vector in zip(chunks, vectors):
+            self.chunk_points[(path, index)] = (kind, title, vector)
+        return [f"{path}#{index}" for index, _ in chunks]
+
     async def search(self, vector: list[float], limit: int = 30) -> list[dict]:
         del vector
         hits = []
@@ -53,6 +66,16 @@ class FakeKnowledgeStore:
                     "kind": kind,
                     "title": title,
                     "score": max(0.0, 0.95 - i * 0.1),
+                }
+            )
+        for (path, index), (kind, title, _) in self.chunk_points.items():
+            hits.append(
+                {
+                    "path": path,
+                    "kind": kind,
+                    "title": title,
+                    "chunk_index": index,
+                    "score": max(0.0, 0.95 - len(hits) * 0.1),
                 }
             )
         return hits[:limit]
@@ -139,3 +162,51 @@ async def test_embed_text_is_capped(tmp_path):
     text = indexer._embed_text("people", "личь", "x" * 200)
 
     assert len(text) == 30
+
+
+@ pytest.mark.asyncio
+async def test_index_all_chunks_long_people_dossier(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    # A long dossier that exceeds the per-chunk budget -> split into blocks.
+    long_body = "\n".join(
+        f"- 2026-08-{day:02d}: Факт номер {day} про лича." for day in range(1, 40)
+    )
+    await vault.write_note(
+        "People/личь.md",
+        {"type": "person", "id": "личь", "aliases": ["Личь"]},
+        long_body,
+    )
+    store = FakeKnowledgeStore()
+    indexer = KnowledgeVectorIndexer(
+        vault,
+        FakeEmbeddings(),
+        store,
+        people_chunk_chars=120,
+        people_chunk_overlap=20,
+    )
+
+    await indexer.index_note("People/личь.md")
+
+    assert store.chunk_points, "expected chunk points for a long people dossier"
+    indexes = sorted(index for (_, index) in store.chunk_points)
+    assert indexes == list(range(len(indexes)))
+    # Every chunk was embedded (not just the single whole-note).
+    assert len(store.chunk_points) > 1
+
+
+@ pytest.mark.asyncio
+async def test_index_all_short_people_dossier_uses_whole_note(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    store = FakeKnowledgeStore()
+    indexer = KnowledgeVectorIndexer(
+        vault,
+        FakeEmbeddings(),
+        store,
+        people_chunk_chars=2000,
+    )
+
+    ok = await indexer.index_note("People/личь.md")
+
+    assert ok is True
+    assert "People/личь.md" in store.notes
+    assert store.chunk_points == {}

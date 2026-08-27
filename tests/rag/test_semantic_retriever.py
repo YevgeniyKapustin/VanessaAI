@@ -291,3 +291,341 @@ async def test_resolve_people_returns_mentioned_files(tmp_path):
 
     files = await retriever.resolve_people("что там у лича и крабера", [])
     assert set(files) == {"People/личь.md", "People/крабер.md"}
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_people_detail_returns_top_chunks(tmp_path):
+    """A detail query about a person returns several dossier blocks, ranked by
+    embedding score — not a single short portrait."""
+    vault, index = await _seed_vault(tmp_path)
+    long_body = (
+        "## Контекст жизни\n\n"
+        "- 2026-08-26: Устроился сварщиком в Тик Так.\n"
+        "- 2026-08-27: Любит пещеры и философию.\n"
+        "- 2026-08-28: Переехал в Грузию.\n"
+        "- 2026-08-29: Занимается закупкой долларов.\n"
+        "- 2026-08-30: Ходит в походы по выходным.\n"
+        "- 2026-08-31: Изучает итальянский язык.\n"
+        "- 2026-09-01: Завёл кота по имени Бублик.\n"
+        "- 2026-09-02: Пошёл на курсы бармена.\n"
+        "- 2026-09-03: Планирует отпуск в Тбилиси.\n"
+        "- 2026-09-04: Начал бегать по утрам.\n"
+    )
+    await vault.write_note(
+        "People/личь.md",
+        {"type": "person", "id": "личь", "aliases": ["Личь"]},
+        long_body,
+    )
+    store = FakeStore(
+        [
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.9,
+             "chunk_index": 0},
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.85,
+             "chunk_index": 1},
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.8,
+             "chunk_index": 2},
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.7,
+             "chunk_index": 3},
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.6,
+             "chunk_index": 4},
+        ]
+    )
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=3,
+        people_detail_blocks=5,
+        people_chunk_chars=120,
+        embeddings=FakeEmbeddings(),
+        vector_store=store,
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "личь доллары",
+        knowledge_indexes=("people",),
+        knowledge_query="личь доллары",
+        people_detail=True,
+    )
+
+    assert len(blocks) == 5
+    contents = [block.content for block in blocks]
+    assert any("долларов" in content for content in contents)
+    # Chunk blocks keep a fragment label and a chunk index for dedup.
+    assert all(block.chunk_index is not None for block in blocks)
+    assert blocks[0].title.startswith("личь")
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_people_detail_dedupes_chunks(tmp_path):
+    """Vector chunk hits for the same dossier don't duplicate after dedup."""
+    vault, index = await _seed_vault(tmp_path)
+    long_body = "\n".join(
+        f"- 2026-08-{day:02d}: Факт номер {day} про лича." for day in range(1, 20)
+    )
+    await vault.write_note(
+        "People/личь.md",
+        {"type": "person", "id": "личь", "aliases": ["Личь"]},
+        long_body,
+    )
+    store = FakeStore(
+        [
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.9,
+             "chunk_index": 0},
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.9,
+             "chunk_index": 0},
+            {"path": "People/личь.md", "kind": "people", "title": "личь", "score": 0.8,
+             "chunk_index": 1},
+        ]
+    )
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=3,
+        people_detail_blocks=5,
+        people_chunk_chars=120,
+        embeddings=FakeEmbeddings(),
+        vector_store=store,
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "личь",
+        knowledge_indexes=("people",),
+        knowledge_query="личь",
+        people_detail=True,
+    )
+
+    chunk_keys = [block.chunk_index for block in blocks]
+    assert 0 in chunk_keys
+    assert 1 in chunk_keys
+    # The duplicate chunk_index 0 hit is collapsed to a single block.
+    assert len([key for key in chunk_keys if key == 0]) == 1
+
+
+async def _add_veronica(tmp_path, vault, index) -> None:
+    await vault.write_note(
+        "People/вероника.md",
+        {
+            "type": "person",
+            "id": "вероника",
+            "aliases": ["Вероника"],
+            "portrait": "Вероника — 19-летняя студентка и скрипачка.",
+        },
+        "## Контекст жизни\n\n- 2026-08-26: Учится на скрипке.\n",
+    )
+    await index.rebuild_folder(PEOPLE)
+
+
+async def _add_vanessa_self(tmp_path, vault, index) -> None:
+    await vault.write_note(
+        "People/ванесса.md",
+        {
+            "type": "person",
+            "id": "ванесса",
+            "aliases": ["Ванесса"],
+            "portrait": "Ванесса — ассистент Лича.",
+        },
+        "## Контекст жизни\n\n- 2026-08-26: Ассистент.\n",
+    )
+    await index.rebuild_folder(PEOPLE)
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_keeps_target_when_self_card_ranks_higher(tmp_path):
+    """A named person survives the cap even when the bot's own card (ванесса)
+    ranks higher in the vector search — the self-card is dropped first."""
+    vault, index = await _seed_vault(tmp_path)
+    await _add_veronica(tmp_path, vault, index)
+    await _add_vanessa_self(tmp_path, vault, index)
+    store = FakeStore(
+        [
+            {
+                "path": "People/ванесса.md",
+                "kind": "people",
+                "title": "ванесса",
+                "score": 0.95,
+            },
+            {
+                "path": "People/вероника.md",
+                "kind": "people",
+                "title": "вероника",
+                "score": 0.5,
+            },
+        ]
+    )
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=1,
+        people_max_blocks=1,
+        embeddings=FakeEmbeddings(),
+        vector_store=store,
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "вероника",
+        knowledge_indexes=("people",),
+        knowledge_query="вероника",
+        people_files=["People/ванесса.md", "People/вероника.md"],
+    )
+
+    assert [block.path for block in blocks] == ["People/вероника.md"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_suppresses_self_card_for_other_person(tmp_path):
+    """When the user asks about another person, the bot's own dossier is not
+    injected into the compose context."""
+    vault, index = await _seed_vault(tmp_path)
+    await _add_veronica(tmp_path, vault, index)
+    await _add_vanessa_self(tmp_path, vault, index)
+    store = FakeStore(
+        [
+            {
+                "path": "People/ванесса.md",
+                "kind": "people",
+                "title": "ванесса",
+                "score": 0.9,
+            },
+            {
+                "path": "People/вероника.md",
+                "kind": "people",
+                "title": "вероника",
+                "score": 0.6,
+            },
+        ]
+    )
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=3,
+        embeddings=FakeEmbeddings(),
+        vector_store=store,
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "что там у вероники",
+        knowledge_indexes=("people",),
+        knowledge_query="вероника",
+        people_files=["People/ванесса.md", "People/вероника.md"],
+    )
+
+    paths = [block.path for block in blocks]
+    assert "People/вероника.md" in paths
+    assert "People/ванесса.md" not in paths
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_keeps_self_card_when_about_bot(tmp_path):
+    """A query genuinely about the bot still retrieves its own dossier."""
+    vault, index = await _seed_vault(tmp_path)
+    await _add_vanessa_self(tmp_path, vault, index)
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=3,
+        embeddings=FakeEmbeddings(),
+        vector_store=FakeStore([]),
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "расскажи про себя",
+        knowledge_indexes=("people",),
+        knowledge_query="ванесса",
+        people_files=["People/ванесса.md"],
+    )
+
+    assert [block.path for block in blocks] == ["People/ванесса.md"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_returns_target_missing_from_vectors(tmp_path):
+    """A stale vector index (target absent) cannot drop the named person — the
+    deterministic alias path still supplies her dossier."""
+    vault, index = await _seed_vault(tmp_path)
+    await _add_veronica(tmp_path, vault, index)
+    await _add_vanessa_self(tmp_path, vault, index)
+    store = FakeStore(
+        [
+            {
+                "path": "People/ванесса.md",
+                "kind": "people",
+                "title": "ванесса",
+                "score": 0.9,
+            },
+            {
+                "path": "People/личь.md",
+                "kind": "people",
+                "title": "личь",
+                "score": 0.7,
+            },
+        ]
+    )
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=3,
+        embeddings=FakeEmbeddings(),
+        vector_store=store,
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "вероника",
+        knowledge_indexes=("people",),
+        knowledge_query="вероника",
+        people_files=["People/вероника.md"],
+    )
+
+    paths = [block.path for block in blocks]
+    assert "People/вероника.md" in paths
+
+
+@pytest.mark.asyncio
+async def test_fetch_semantic_union_planner_query_when_resolver_misses(tmp_path):
+    """If the deterministic resolver only saw the bot's address, the planner's
+    knowledge_query still pulls the person it named."""
+    vault, index = await _seed_vault(tmp_path)
+    await _add_veronica(tmp_path, vault, index)
+    await _add_vanessa_self(tmp_path, vault, index)
+    retriever = KnowledgeRetriever(
+        vault,
+        index,
+        max_blocks=3,
+        embeddings=FakeEmbeddings(),
+        vector_store=FakeStore([]),
+        vector_min_score=0.3,
+    )
+
+    blocks = await retriever.fetch_semantic(
+        "вероника",
+        knowledge_indexes=("people",),
+        knowledge_query="вероника",
+        people_files=["People/ванесса.md"],
+    )
+
+    paths = [block.path for block in blocks]
+    assert "People/вероника.md" in paths
+
+
+@pytest.mark.asyncio
+async def test_fetch_drops_self_card_when_other_person_targeted(tmp_path):
+    """Non-embedding fetch path: the bot's own card is dropped when a real
+    person is the target."""
+    vault, index = await _seed_vault(tmp_path)
+    await _add_veronica(tmp_path, vault, index)
+    await _add_vanessa_self(tmp_path, vault, index)
+    retriever = KnowledgeRetriever(vault, index, max_blocks=3, people_max_blocks=3)
+
+    blocks = await retriever.fetch(
+        knowledge_indexes=("people",),
+        people_files=["People/ванесса.md", "People/вероника.md"],
+    )
+
+    paths = {block.path for block in blocks}
+    assert "People/вероника.md" in paths
+    assert "People/ванесса.md" not in paths

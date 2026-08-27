@@ -30,6 +30,20 @@ def test_is_not_addressed_to_bot():
     assert is_addressed_to_bot("Личь не делает карты") is False
 
 
+def test_is_addressed_by_question_in_active_conversation():
+    # A question in an active conversation is a compose candidate even without
+    # a mention, so a session-approved question ("хочешь закурить?") is not
+    # downgraded by the compose gate.
+    assert is_addressed_to_bot("хочешь закурить?") is True
+    assert is_addressed_to_bot("что думаешь про тик така") is True
+
+
+def test_is_not_addressed_by_third_party_gossip_question():
+    # Third-party gossip about the bot is still not a candidate, even as a
+    # question.
+    assert is_addressed_to_bot("почему она меня игнорирует") is False
+
+
 def test_is_addressed_by_contextual_nickname():
     assert is_addressed_to_bot("продолжай список гомункул") is True
     assert is_addressed_to_bot("гомункул, продолжай список") is True

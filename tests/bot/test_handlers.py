@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -6,7 +7,13 @@ from aiogram.enums import ChatType, ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
 from app.bot.container import BotServices, create_bot_services
-from app.bot.handlers.messages import _preview, _send_reply, create_messages_router
+from app.bot.handlers.messages import (
+    _preview,
+    _send_reply,
+    _typing_indicator,
+    _typing_loop,
+    create_messages_router,
+)
 from app.bot.messages.response import ChatProcessResult
 from app.config.content import get_content
 from tests.bot.test_bot_message import make_telegram_message
@@ -124,7 +131,8 @@ async def test_handle_text_sends_reply():
         )
     )
     await _call_text_handler(services, message)
-    message.bot.send_chat_action.assert_awaited_once()
+    # typing is shown while the pipeline runs (initial ping, plus refreshes)
+    assert message.bot.send_chat_action.await_count >= 1
     message.reply.assert_awaited_once()
 
 
@@ -144,7 +152,8 @@ async def test_handle_text_ignores_non_reply():
     await _call_text_handler(services, message)
     message.answer.assert_not_awaited()
     message.reply.assert_not_awaited()
-    message.bot.send_chat_action.assert_not_awaited()
+    # typing still starts while the decision runs, even when the gate ignores
+    assert message.bot.send_chat_action.await_count >= 1
 
 
 @pytest.mark.asyncio
@@ -230,9 +239,10 @@ async def test_handle_text_sticker_only_suppresses_text():
         stickers=sticker_service,
     )
     await _call_text_handler(services, message)
-    # the sticker itself is the whole reply — no text, no typing action
+    # the sticker itself is the whole reply — no text (typing still shows while
+    # the pipeline runs)
     message.reply.assert_not_awaited()
-    message.bot.send_chat_action.assert_not_awaited()
+    assert message.bot.send_chat_action.await_count >= 1
     sticker_service.register_reply.assert_called_once_with(-100123)
     sticker_service.send_if_any.assert_awaited_once()
     kwargs = sticker_service.send_if_any.await_args.kwargs
@@ -288,3 +298,128 @@ def test_create_router_includes_messages():
 
     router = create_router(create_bot_services())
     assert router.sub_routers
+
+
+@pytest.mark.asyncio
+async def test_typing_loop_refreshes_until_cancelled():
+    bot = MagicMock()
+    bot.send_chat_action = AsyncMock()
+    task = asyncio.create_task(_typing_loop(bot, -100123, interval=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert bot.send_chat_action.await_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_typing_loop_survives_telegram_errors():
+    bot = MagicMock()
+    bot.send_chat_action = AsyncMock(side_effect=RuntimeError("chat not found"))
+    # Telegram-side failures must not kill the indicator for the whole turn:
+    # the loop keeps trying until cancelled and never propagates the error.
+    task = asyncio.create_task(_typing_loop(bot, -100123, interval=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert bot.send_chat_action.await_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_typing_loop_recovers_after_transient_error():
+    bot = MagicMock()
+    bot.send_chat_action = AsyncMock(side_effect=[RuntimeError("boom"), None])
+    # The first ping fails but the loop must keep going and send the next one.
+    task = asyncio.create_task(_typing_loop(bot, -100123, interval=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert bot.send_chat_action.await_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_typing_indicator_cancels_on_error():
+    bot = MagicMock()
+    bot.send_chat_action = AsyncMock()
+    with pytest.raises(RuntimeError):
+        async with _typing_indicator(bot, -100123):
+            raise RuntimeError("boom")
+    # The initial ping was still sent and the block error propagated.
+    assert bot.send_chat_action.await_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_handle_text_typing_shown_while_request_pending():
+    message = make_telegram_message(text="Vanessa?")
+    message.reply = AsyncMock()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_process(incoming):
+        started.set()
+        await release.wait()
+        return ChatProcessResult(
+            action="reply", reason="intent", reply="Да?", relevance_score=0.9
+        )
+
+    services = _services()
+    services.chat_client.process = AsyncMock(side_effect=slow_process)
+
+    handler_task = asyncio.create_task(_call_text_handler(services, message))
+    await started.wait()
+    # Give the typing loop a chance to run its first iteration.
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert message.bot.send_chat_action.await_count >= 1
+    release.set()
+    await handler_task
+    message.reply.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_text_typing_before_access_check():
+    message = make_telegram_message(text="Vanessa?")
+    message.answer = AsyncMock()
+    message.reply = AsyncMock()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_access(incoming):
+        started.set()
+        await release.wait()
+        return None
+
+    services = _services()
+    services.access_guard.ensure_access = AsyncMock(side_effect=slow_access)
+
+    handler_task = asyncio.create_task(_call_text_handler(services, message))
+    await started.wait()
+    # Give the typing loop a chance to run while the access guard is blocked.
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    # typing must already be visible even though getChatMember is still running
+    assert message.bot.send_chat_action.await_count >= 1
+    release.set()
+    await handler_task
+
+
+@pytest.mark.asyncio
+async def test_handle_text_pings_typing_again_before_reply():
+    message = make_telegram_message(text="Vanessa?")
+    message.reply = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Привет!",
+            relevance_score=0.9,
+        )
+    )
+    await _call_text_handler(services, message)
+    message.reply.assert_awaited_once()
+    # typing is refreshed right before the reply is delivered (start ping plus
+    # the pre-reply ping), so the indicator never dies in the tail of the
+    # pipeline.
+    assert message.bot.send_chat_action.await_count >= 2

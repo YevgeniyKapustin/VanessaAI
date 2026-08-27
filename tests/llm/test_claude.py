@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from anthropic import APIStatusError
 
+from app.config.content import get_content
 from app.core.messages import ContextBlock, ContextMessage
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.providers.claude import ClaudeLLMProvider
@@ -84,3 +85,19 @@ async def test_claude_generate_includes_critic_feedback(provider: ClaudeLLMProvi
     user_prompt = call.kwargs["messages"][0]["content"]
     assert "Humor editor's note" in user_prompt
     assert "добавь больше иронии" in user_prompt
+
+
+@pytest.mark.asyncio
+async def test_claude_generate_includes_clarification_instruction(
+    provider: ClaudeLLMProvider,
+):
+    await provider.generate(
+        "ванесса я думаю ты виновата",
+        [],
+        needs_clarification=True,
+        clarification_hint="почему",
+    )
+    call = provider._client.messages.create.await_args
+    user_prompt = call.kwargs["messages"][0]["content"]
+    assert get_content().llm.clarification_instruction.strip() in user_prompt
+    assert "What is unclear: почему" in user_prompt

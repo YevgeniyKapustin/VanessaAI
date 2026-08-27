@@ -246,3 +246,60 @@ async def test_background_indexing_swallows_errors(monkeypatch):
     record = StoredMessage(id=7, role="user", content="hello")
 
     await service._index_in_background(record)
+
+
+@pytest.mark.asyncio
+async def test_schedule_submits_to_background_executor(monkeypatch):
+    from app.services.background import BackgroundExecutor
+
+    indexer = FakeIndexer()
+    updated: list[tuple[int, str]] = []
+    committed: list[bool] = []
+
+    class FakeMessageRepository:
+        def __init__(self, session: object) -> None:
+            pass
+
+        async def update_qdrant_point_id(
+            self,
+            message_id: int,
+            point_id: str,
+        ) -> None:
+            updated.append((message_id, point_id))
+
+    class FakeSession:
+        async def commit(self) -> None:
+            committed.append(True)
+
+        async def __aenter__(self) -> "FakeSession":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+    def session_factory() -> FakeSession:
+        return FakeSession()
+
+    monkeypatch.setattr(
+        "app.services.indexing.message_indexing.MessageRepository",
+        FakeMessageRepository,
+    )
+    executor = BackgroundExecutor(maxsize=10, workers=1)
+    executor.start()
+    try:
+        service = MessageIndexingService(
+            indexer=indexer,
+            messages=FakeRepo(),
+            session_factory=session_factory,
+            max_retries=0,
+            background=executor,
+        )
+        record = StoredMessage(id=7, role="user", content="hello")
+        service.schedule(record)
+        await executor.join()
+    finally:
+        await executor.shutdown()
+
+    assert indexer.calls == [7]
+    assert updated == [(7, "point-7")]
+    assert committed == [True]

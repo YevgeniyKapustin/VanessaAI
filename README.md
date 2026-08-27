@@ -280,6 +280,9 @@ does not apply them today.
 | `KNOWLEDGE_PARTICIPANT_MAX_PEOPLE` | Max people in the planner's participants digest |
 | `KNOWLEDGE_PARTICIPANT_MAX_FACTS` | Max recent facts per person in the digest |
 | `RAG_REACT_MAX_STEPS` | ReAct steps for deep search |
+| `EMBEDDING_THREADS` | Dedicated thread pool size for local embedding inference (default 1) |
+| `BACKGROUND_QUEUE_SIZE` | Bounded queue size for post-reply background work (memory/metrics/indexing) |
+| `BACKGROUND_WORKERS` | Worker tasks consuming the background queue |
 | `CONTENT_CONFIG_PATH` | Path to content dir (one YAML per section) or a single file |
 
 See `.env.example` for the full list.

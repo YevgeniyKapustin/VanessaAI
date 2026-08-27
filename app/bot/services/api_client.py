@@ -13,11 +13,28 @@ class HttpChatApiClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout: float = 120.0,
+        timeout: float | None = None,
+        connect_timeout: float | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = (base_url or settings.api_base_url).rstrip("/")
-        self._timeout = timeout
+        # The pipeline (Gate -> Retrieve -> Compose -> Critique) can take 2-6s+,
+        # so the read/write timeout must be generous; the connect timeout stays
+        # short so an unreachable API fails fast instead of hanging the handler.
+        self._timeout = (
+            timeout if timeout is not None else settings.api_client_read_timeout
+        )
+        self._connect_timeout = (
+            connect_timeout
+            if connect_timeout is not None
+            else settings.api_client_connect_timeout
+        )
+        self._timeout_config = httpx.Timeout(
+            read=self._timeout,
+            write=self._timeout,
+            connect=self._connect_timeout,
+            pool=self._connect_timeout,
+        )
         self._client = client
 
     def _request_headers(self, message: IncomingMessage) -> dict[str, str]:
@@ -51,7 +68,7 @@ class HttpChatApiClient:
                 response.raise_for_status()
                 data = response.json()
             else:
-                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                async with httpx.AsyncClient(timeout=self._timeout_config) as client:
                     response = await client.post(
                         url,
                         json=payload,

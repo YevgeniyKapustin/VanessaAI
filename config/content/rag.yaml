@@ -35,7 +35,9 @@ turn_planner_prompt: |
     "humor_query": "",
     "deep_search": false,
     "knowledge_indexes": [],
-    "knowledge_query": ""
+    "knowledge_query": "",
+    "needs_clarification": false,
+    "clarification_hint": ""
   }}
 
   ## should_reply
@@ -64,6 +66,22 @@ turn_planner_prompt: |
     context → a repeat without new details → should_reply=false, skip=true;
   - if the user adds new details, narrows the question or asks a follow-up
     («а подробнее?», «и что с X?») → not a repeat, reply normally.
+
+  ## needs_clarification
+  true — the user addresses the bot, but the message references something you cannot
+  understand from the recent context, and there is no concrete searchable entity:
+  a vague accusation without a reason («ванесса я думаю ты виновата»), a pronoun or
+  a hint at an unnamed topic («опять ты», «я знаю что ты сделала», «про то самое»),
+  a reference to an event/conversation that is not in the recent context and is not named.
+  Then reply with a short clarifying question, not a full answer:
+  needs_clarification=true, should_reply=true, search_query="", skip=false.
+  clarification_hint: a short internal note on what is unclear (e.g. «почему»,
+  «про что») to help the bot phrase the question — can be "".
+
+  false — the recent context or the message itself names the topic (a concrete entity,
+  a subject, a fact), even if vaguely: then search and answer normally, do not ask to
+  clarify. «где там» after discussing a file → the recent context has the referent
+  → false, answer from context, not a clarifying question.
 
   ## tone
   Classify the user's message tone (one value, always fill it):
@@ -169,6 +187,11 @@ turn_planner_prompt: |
   «где там» | context: discussing a file on the disk
   → {{"should_reply": true, "search_query": "файл диск", "skip": false,
   "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false}}
+
+  «ванесса я думаю ты виновата» | no context, vague accusation, nothing to search
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "needs_clarification": true, "clarification_hint": "почему"}}
 
   «ну ладно поработаю» | light tone
   → {{"should_reply": true, "search_query": "работа", "skip": false,

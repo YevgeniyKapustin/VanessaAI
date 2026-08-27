@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock
 
@@ -13,6 +15,7 @@ from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from app.services.humor_pipeline import HumorPipeline
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
+from app.services.pipeline.context import TurnPipelineContext
 from app.services.pipeline.critique_stage import CritiqueStage
 from app.services.pipeline.stages import (
     ComposeStage,
@@ -169,6 +172,8 @@ class FakeLLM:
         self.last_meme_blocks: list | None = None
         self.last_meme_menu: list | None = None
         self.last_critic_feedback: str | None = None
+        self.last_needs_clarification: bool = False
+        self.last_clarification_hint: str = ""
 
     async def generate(
         self,
@@ -185,6 +190,8 @@ class FakeLLM:
         system_prompt: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        needs_clarification: bool = False,
+        clarification_hint: str = "",
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
@@ -197,6 +204,8 @@ class FakeLLM:
         self.last_sender_name = sender_name
         self.last_critic_feedback = critic_feedback
         self.last_tone = tone
+        self.last_needs_clarification = needs_clarification
+        self.last_clarification_hint = clarification_hint
         self.last_reply_to_text = reply_to_text
         self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
         self.last_reply_to_sender_name = reply_to_sender_name
@@ -565,3 +574,135 @@ async def test_orchestrator_passes_reply_context_to_llm():
     assert user_stored[0].reply_to_text == "Личь не делает карты"
     assert user_stored[0].reply_to_sender_telegram_id == 99
     assert user_stored[0].reply_to_sender_name == "Личь"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_returns_reply_before_background_memory_metrics():
+    from app.services.background import BackgroundExecutor
+
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    release = asyncio.Event()
+
+    class BlockingMemory:
+        def __init__(self) -> None:
+            self.finished = False
+
+        async def run(
+            self,
+            *,
+            recent_messages: list,
+            source_message_ids: list[int] | None = None,
+        ) -> int:
+            await release.wait()
+            self.finished = True
+            return 0
+
+    class RecordingMetrics:
+        def __init__(self) -> None:
+            self.ran = False
+
+        async def run(self, repo, *, semantic: bool = False, batch=None) -> int:
+            self.ran = True
+            return 0
+
+    memory = BlockingMemory()
+    metrics = RecordingMetrics()
+
+    retriever = FakeContextRetriever()
+    llm = FakeLLM()
+    turn_metrics = TurnMetrics()
+    config = OrchestratorConfig(
+        session_window_size=10,
+        session_idle_seconds=300.0,
+        post_reply_listen_count=5,
+        planner_prefilter_enabled=False,
+        defer_index_on_ignore=False,
+        critic_enabled=False,
+    )
+    humor = HumorPipeline(retriever, FakeTurnQuery(), config)
+    registry = ChatIgnoreRegistry()
+    gate = GateStage(
+        QueryRewriter(use_llm=False),
+        decision,
+        None,
+        config,
+        turn_metrics,
+        messages,
+        indexing,
+        registry,
+    )
+    background = BackgroundExecutor(maxsize=10, workers=1)
+    background.start()
+    try:
+        orchestrator = ConversationOrchestrator(
+            messages=messages,
+            users=FakeUserRepo(),
+            config=config,
+            gate=gate,
+            retrieve=RetrieveStage(retriever, humor, None),
+            compose=ComposeStage(llm),
+            critique=CritiqueStage(llm, FakeCritic(), config),
+            finalize=FinalizeStage(messages, indexing, decision, config, turn_metrics),
+            memory=memory,
+            metrics=metrics,
+            background=background,
+        )
+
+        # If memory/metrics ran inline, this would block on `release` forever,
+        # so the timeout proves the reply path is now non-blocking.
+        result = await asyncio.wait_for(
+            orchestrator.handle_incoming(
+                ChatTurnInput(
+                    telegram_chat_id=-1001,
+                    message="Vanessa, привет",
+                    sender_telegram_id=42,
+                )
+            ),
+            timeout=1.0,
+        )
+
+        assert result.action == DecisionAction.REPLY
+        assert result.reply == "echo: Vanessa, привет"
+        # Reply returned before the background jobs completed.
+        assert memory.finished is False
+        assert metrics.ran is False
+
+        release.set()
+        await background.join()
+
+        assert memory.finished is True
+        assert metrics.ran is True
+    finally:
+        release.set()
+        await background.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_forwards_needs_clarification():
+    llm = FakeLLM()
+    compose = ComposeStage(llm)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса я думаю ты виновата",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="ванесса я думаю ты виновата",
+            text="",
+            skip_search=True,
+            should_reply=True,
+            needs_clarification=True,
+            clarification_hint="почему",
+        ),
+    )
+    ctx.recent = []
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    assert llm.last_needs_clarification is True
+    assert llm.last_clarification_hint == "почему"
+    assert ctx.reply == "echo: ванесса я думаю ты виновата"

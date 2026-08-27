@@ -41,6 +41,8 @@ class TurnPlan:
     deep_search: bool = False
     knowledge_indexes: tuple[str, ...] = ()
     knowledge_query: str = ""
+    needs_clarification: bool = False
+    clarification_hint: str = ""
 
 
 class TurnPlanner:
@@ -84,7 +86,8 @@ class TurnPlanner:
             result = self._fallback(message)
             logger.info(
                 "turn_plan source=fallback search=%r skip=%s should_reply=%s "
-                "tone=%s humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r",
+                "tone=%s humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r "
+                "needs_clarification=%s",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -93,6 +96,7 @@ class TurnPlanner:
                 result.humor_query,
                 result.knowledge_indexes,
                 result.knowledge_query,
+                result.needs_clarification,
             )
             return result
 
@@ -115,7 +119,7 @@ class TurnPlanner:
             logger.info(
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
-                "knowledge=%s knowledge_query=%r",
+                "knowledge=%s knowledge_query=%r needs_clarification=%s",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -125,6 +129,7 @@ class TurnPlanner:
                 result.deep_search,
                 result.knowledge_indexes,
                 result.knowledge_query,
+                result.needs_clarification,
             )
         return result
 
@@ -181,6 +186,21 @@ class TurnPlanner:
                 text="",
                 skip_search=True,
                 should_reply=False,
+            )
+
+        if payload.get("needs_clarification") is True:
+            # The user's message references something without context — reply with
+            # a short clarifying question, not a full answer. There is nothing
+            # meaningful to search for.
+            clarification_hint = str(payload.get("clarification_hint", "")).strip()
+            return TurnPlan(
+                original=original,
+                text="",
+                skip_search=True,
+                tone=_parse_tone(payload.get("tone")),
+                should_reply=True,
+                needs_clarification=True,
+                clarification_hint=clarification_hint,
             )
 
         text = str(payload.get("search_query", "")).strip()

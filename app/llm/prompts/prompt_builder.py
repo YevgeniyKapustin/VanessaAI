@@ -69,6 +69,8 @@ class PromptBuilder:
         sender_name: str | None = None,
         critic_feedback: str | None = None,
         tone: str | None = None,
+        needs_clarification: bool = False,
+        clarification_hint: str = "",
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
@@ -148,7 +150,12 @@ class PromptBuilder:
             sender_name=sender_name,
         )
         parts.append(f"{llm.current_message_header}\n{current_line}")
-        if tone and llm.tone_note.strip():
+        if needs_clarification and llm.clarification_instruction.strip():
+            instruction = llm.clarification_instruction.strip()
+            if clarification_hint and clarification_hint.strip():
+                instruction += f"\nWhat is unclear: {clarification_hint.strip()}"
+            parts.append(instruction)
+        elif tone and llm.tone_note.strip():
             parts.append(llm.tone_note.strip().format(tone=tone))
         if critic_feedback and critic_feedback.strip():
             fix_header = (

@@ -143,6 +143,7 @@ class LLMContent(BaseModel):
     knowledge_block_line: str = "- [{kind}] {title}:\n  {content}"
     tone_note: str = ""
     owner_message_note: str = ""
+    clarification_instruction: str = ""
     critic: CriticContent = Field(default_factory=CriticContent)
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
 

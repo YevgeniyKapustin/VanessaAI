@@ -35,6 +35,9 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
         logger.warning("API_AUTO_CREATE_SCHEMA enabled: used create_all")
     await create_vector_store().ensure_collection()
+    # Bounded background executor for non-critical post-reply work (memory,
+    # metrics, message indexing). Must be running before the app serves /chat.
+    get_app_container().background.start()
     vault = KnowledgeVault()
     await vault.ensure_structure()
     vault_index = KnowledgeIndex(vault)
@@ -91,6 +94,7 @@ async def lifespan(app: FastAPI):
             await sweep_task
         except asyncio.CancelledError:
             pass
+    await get_app_container().background.shutdown()
     await engine.dispose()
 
 

@@ -29,6 +29,11 @@ class Settings(BaseSettings):
 
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dimensions: int = 384
+    # Dedicated thread pool size for CPU-bound SentenceTransformer inference.
+    # Kept small (default 1) because inference is already serialized by an
+    # asyncio lock; the pool just isolates embedding work from the default
+    # asyncio thread pool so it never starves other to_thread callers.
+    embedding_threads: int = 1
 
     llm_provider: str = "deepseek"  # "deepseek" (default) or "claude"
     anthropic_api_key: str = ""
@@ -97,9 +102,26 @@ class Settings(BaseSettings):
     api_base_url: str = "http://api:8000"
     api_internal_token: str = ""
     api_auto_create_schema: bool = False
+    # HTTP timeouts for the bot -> API /api/v1/chat call. The full pipeline
+    # (Gate -> Retrieve -> Compose -> Critique) can take 2-6s+, so the read
+    # timeout must sit comfortably above that. The connect timeout stays short
+    # so a dead API is reported quickly instead of hanging the handler.
+    api_client_read_timeout: float = 120.0
+    api_client_connect_timeout: float = 10.0
+
+    # How often the bot re-sends the "typing..." chat action while the API
+    # pipeline runs. Telegram expires the typing state after ~5s, so keep this
+    # comfortably below that (4s default).
+    bot_typing_interval_seconds: float = 4.0
 
     indexing_max_retries: int = 2
     llm_max_retries: int = 2
+
+    # Bounded background executor for non-critical post-reply work (memory
+    # extraction, metrics snapshots, message indexing). The queue is bounded so
+    # overload drops jobs (fail-open) instead of blocking the reply path.
+    background_queue_size: int = 200
+    background_workers: int = 2
 
     log_level: str = "INFO"
 

@@ -13,16 +13,6 @@
 # is only used as a fallback if `file_id` is missing. Refresh the list with:
 #   python scripts/export_sticker_pack.py
 #
-# Current mapping (by emoji meaning):
-#   0 ❤️   → love          (одобрение / тепло)
-#   1 👋   → greeting/farewell (приветствие и прощание)
-#   2 🤩   → delight       (дикий восторг)
-#   3 😮‍💨 → irritation    («горит» / выдох под нагрузкой)
-#   4 🤔   → thinking      (задумчивость)
-#   5 🥺   → embarrassment (смущение / «ладно, виновата»)
-#   6 😐   → bemused       (сказали что-то странное, но всё же отвечаешь)
-#   7 🫤   → weary         (утомляет ерундой / повторными просьбами)
-#
 # `description` on each sticker is shown to the LLM so it knows when to use the
 # emotion, not just the bare tag + emoji. Tags that have no dedicated sticker are
 # mapped onto the closest available one (approval → love, facepalm → irritation,
@@ -50,21 +40,21 @@ stickers:
     index: 0
     emoji: "❤️"
     file_id: "CAACAgIAAxUAAWqOt_GAnIXjY0ZifpUnPDzG4pFGAAL7pQACWyBwSJSpNLR0IJwXPQQ"
-    description: "тепло и одобрение, «согласна / точно / спасибо»"
+    description: "тепло и одобрение, «согласна / спасибо»"
   - name: wave
     tags: [greeting, farewell]
     weight: 1.0
     index: 1
     emoji: "👋"
     file_id: "CAACAgIAAxUAAWqOt_FD3L3wosYC0Nmhzt1flKNQAALlpAACUOtwSH7S8g6ygEZbPQQ"
-    description: "приветствие или прощание"
+    description: "машет рукой — только приветствие («привет», «здарова», «хай») или прощание («пока», «бывай», «до связи»), не для всякой реплики подряд"
   - name: hype
     tags: [delight]
     weight: 1.0
     index: 2
     emoji: "🤩"
     file_id: "CAACAgIAAxUAAWqOt_FG_pTszmS2xZQ2PTJCjElcAAKhnwACHul5SMmaGVoma0UjPQQ"
-    description: "восторг, дикая радость"
+    description: "восторг, радость"
   - name: burning
     tags: [irritation]
     weight: 1.0

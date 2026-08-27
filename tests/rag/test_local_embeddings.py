@@ -73,3 +73,14 @@ def test_preload_embedding_model():
 
         preload_embedding_model()
         load.assert_called_once()
+
+
+def test_embed_executor_is_dedicated_thread_pool():
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.config.settings import settings
+    from app.rag.embeddings.local_embeddings import _get_embed_executor
+
+    executor = _get_embed_executor()
+    assert isinstance(executor, ThreadPoolExecutor)
+    assert executor._max_workers == max(1, settings.embedding_threads)

@@ -1,11 +1,30 @@
 import asyncio
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
 from app.config import settings
 from app.rag.text import truncate_for_embedding
 
 _embed_lock = asyncio.Lock()
+
+_embed_executor: ThreadPoolExecutor | None = None
+
+
+def _get_embed_executor() -> ThreadPoolExecutor:
+    """Dedicated pool for CPU-bound SentenceTransformer inference.
+
+    Kept separate from asyncio's default thread pool so embedding work never
+    starves other ``asyncio.to_thread`` callers and its concurrency stays
+    bounded (see ``EMBEDDING_THREADS``).
+    """
+    global _embed_executor
+    if _embed_executor is None:
+        _embed_executor = ThreadPoolExecutor(
+            max_workers=max(1, settings.embedding_threads),
+            thread_name_prefix="embed",
+        )
+    return _embed_executor
 
 
 @lru_cache(maxsize=1)
@@ -53,6 +72,10 @@ class LocalEmbeddingProvider:
         )
         return [self._to_list(vector) for vector in vectors]
 
+    async def _run_in_pool(self, func, *args):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(_get_embed_executor(), func, *args)
+
     async def embed(self, text: str) -> list[float]:
         normalized = self._normalize(text)
         cached = self._cache.get(normalized)
@@ -65,7 +88,7 @@ class LocalEmbeddingProvider:
             if cached is not None:
                 self._cache.move_to_end(normalized)
                 return cached
-            vector = await asyncio.to_thread(self._encode_sync, normalized)
+            vector = await self._run_in_pool(self._encode_sync, normalized)
             self._cache[normalized] = vector
             if len(self._cache) > self._cache_size:
                 self._cache.popitem(last=False)
@@ -76,4 +99,4 @@ class LocalEmbeddingProvider:
             return []
         normalized = [self._normalize(text) for text in texts]
         async with _embed_lock:
-            return await asyncio.to_thread(self._encode_batch_sync, normalized)
+            return await self._run_in_pool(self._encode_batch_sync, normalized)

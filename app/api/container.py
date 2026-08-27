@@ -25,6 +25,7 @@ from app.core.protocols import (
 )
 from app.rag.embeddings.embeddings import LocalEmbeddingProvider
 from app.rag.qdrant_client import KnowledgeQdrantStore, QdrantVectorStore
+from app.services.background import BackgroundExecutor
 
 
 @dataclass
@@ -43,6 +44,7 @@ class AppContainer:
     knowledge_vector_store: KnowledgeVectorStoreProtocol
     meme_catalog: MemeCatalog
     meme_decider: MemeDecider
+    background: BackgroundExecutor
 
 
 _container: AppContainer | None = None
@@ -92,6 +94,10 @@ def build_app_container() -> AppContainer:
         knowledge_vector_store=KnowledgeQdrantStore(),
         meme_catalog=meme_catalog,
         meme_decider=meme_decider,
+        background=BackgroundExecutor(
+            maxsize=settings.background_queue_size,
+            workers=settings.background_workers,
+        ),
     )
 
 

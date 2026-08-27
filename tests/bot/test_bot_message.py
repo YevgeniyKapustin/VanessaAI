@@ -143,3 +143,19 @@ async def test_api_client_parses_reply_response():
 
     assert result.action == DecisionAction.REPLY
     assert result.reply == "Привет!"
+
+
+def test_api_client_timeout_config_from_settings(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "api_client_read_timeout", 45.0)
+    monkeypatch.setattr(settings, "api_client_connect_timeout", 5.0)
+
+    api = HttpChatApiClient()
+
+    assert api._timeout == 45.0
+    assert api._connect_timeout == 5.0
+    assert api._timeout_config.read == 45.0
+    assert api._timeout_config.write == 45.0
+    assert api._timeout_config.connect == 5.0
+    assert api._timeout_config.pool == 5.0

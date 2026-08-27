@@ -10,6 +10,7 @@ from app.core.protocols import (
     MessageRepositoryProtocol,
 )
 from app.db.repository import MessageRepository
+from app.services.background import BackgroundExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,13 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
         messages: MessageRepositoryProtocol,
         session_factory: async_sessionmaker[AsyncSession],
         max_retries: int = 2,
+        background: BackgroundExecutor | None = None,
     ) -> None:
         self._indexer = indexer
         self._messages = messages
         self._session_factory = session_factory
         self._max_retries = max_retries
+        self._background = background
 
     async def _embed_with_retry(self, record: StoredMessage) -> str:
         if record.role != RAG_SOURCE_ROLE:
@@ -68,5 +71,10 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
 
     def schedule(self, record: StoredMessage) -> None:
         if record.role != RAG_SOURCE_ROLE:
+            return
+        if self._background is not None:
+            # Bounded background queue: never lets indexing tasks pile up
+            # unboundedly and starve the reply path.
+            self._background.submit(lambda: self._index_in_background(record))
             return
         asyncio.create_task(self._index_in_background(record))

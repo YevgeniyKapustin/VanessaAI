@@ -181,6 +181,7 @@ def get_message_indexing(
         messages=messages,
         session_factory=async_session_factory,
         max_retries=settings.indexing_max_retries,
+        background=get_app_container().background,
     )
 
 
@@ -279,4 +280,6 @@ async def get_incoming_turn_handler(
         finalize=finalize,
         memory=memory,
         metrics=metrics_pipeline,
+        background=container.background,
+        session_factory=async_session_factory,
     )

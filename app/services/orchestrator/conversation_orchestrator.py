@@ -8,11 +8,13 @@ from app.core.protocols import (
     MessageRepositoryProtocol,
     UserRepositoryProtocol,
 )
+from app.db.repository import MessageRepository
 from app.knowledge.memory_stage import MemoryStage
 from app.knowledge.metrics.pipeline import MetricsPipeline
 from app.core.request_context import get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason
+from app.services.background import BackgroundExecutor
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
 from app.services.pipeline.protocols import FinalizeStageProtocol, PipelineStage
@@ -33,6 +35,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         critique: PipelineStage | None = None,
         memory: MemoryStage | None = None,
         metrics: MetricsPipeline | None = None,
+        background: BackgroundExecutor | None = None,
+        session_factory=None,
     ) -> None:
         self._messages = messages
         self._users = users
@@ -44,6 +48,8 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         self._critique = critique
         self._memory = memory
         self._metrics = metrics
+        self._background = background
+        self._session_factory = session_factory
 
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
         ctx = TurnPipelineContext(turn=turn)
@@ -97,6 +103,24 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 assert ctx.result is not None
                 return ctx.result
         await self._finalize.run(ctx)
+        await self._run_post_reply(ctx)
+        self._log_processed(turn, ctx)
+        assert ctx.result is not None
+        return ctx.result
+
+    async def _run_post_reply(self, ctx: TurnPipelineContext) -> None:
+        """Run memory extraction + metrics.
+
+        With a background executor injected, both are submitted as jobs and the
+        reply returns immediately (non-blocking). Without one (unit tests /
+        fallback) they run inline exactly as before.
+        """
+        if self._background is not None:
+            if self._memory is not None:
+                self._background.submit(self._build_memory_job(ctx))
+            if self._metrics is not None:
+                self._background.submit(self._build_metrics_job())
+            return
         if self._memory is not None:
             try:
                 await self._memory.run(
@@ -104,15 +128,55 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                     source_message_ids=[ctx.user_msg.id] if ctx.user_msg else None,
                 )
             except Exception:
-                logger.exception("memory_stage_run_failed request_id=%s", get_request_id())
+                logger.exception(
+                    "memory_stage_run_failed request_id=%s", get_request_id()
+                )
         if self._metrics is not None:
             try:
                 await self._metrics.run(self._messages, semantic=False)
             except Exception:
-                logger.exception("metrics_stage_run_failed request_id=%s", get_request_id())
-        self._log_processed(turn, ctx)
-        assert ctx.result is not None
-        return ctx.result
+                logger.exception(
+                    "metrics_stage_run_failed request_id=%s", get_request_id()
+                )
+
+    def _build_memory_job(self, ctx: TurnPipelineContext):
+        recent = ctx.recent
+        source_ids = [ctx.user_msg.id] if ctx.user_msg is not None else None
+
+        async def job() -> None:
+            try:
+                assert self._memory is not None
+                await self._memory.run(
+                    recent_messages=recent,
+                    source_message_ids=source_ids,
+                )
+            except Exception:
+                logger.exception(
+                    "memory_stage_run_failed request_id=%s", get_request_id()
+                )
+
+        return job
+
+    def _build_metrics_job(self):
+        async def job() -> None:
+            try:
+                assert self._metrics is not None
+                if self._session_factory is not None:
+                    # The request-scoped repo dies with the response, so metrics
+                    # must open its own session in the background.
+                    async with self._session_factory() as session:
+                        await self._metrics.run(
+                            MessageRepository(session),
+                            semantic=False,
+                        )
+                else:
+                    await self._metrics.run(self._messages, semantic=False)
+            except Exception:
+                logger.exception(
+                    "metrics_stage_run_failed request_id=%s", get_request_id()
+                )
+
+        return job
 
     def _log_processed(self, turn: ChatTurnInput, ctx: TurnPipelineContext) -> None:
         assert ctx.result is not None

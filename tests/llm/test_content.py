@@ -143,3 +143,23 @@ def test_prompt_builder_omits_tone_note_when_not_provided():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt("привет", [])
     assert "Detected tone of the user's message" not in prompt
+
+
+def test_prompt_builder_includes_clarification_instruction():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "ванесса я думаю ты виновата",
+        [],
+        needs_clarification=True,
+        clarification_hint="почему",
+    )
+
+    content = get_content()
+    assert content.llm.clarification_instruction.strip() in prompt
+    assert "What is unclear: почему" in prompt
+
+
+def test_prompt_builder_omits_clarification_instruction_when_not_needed():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [])
+    assert get_content().llm.clarification_instruction.strip() not in prompt

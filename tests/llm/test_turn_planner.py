@@ -134,3 +134,41 @@ async def test_turn_planner_fallback_tone_neutral():
     planner = TurnPlanner(use_llm=False)
     result = planner._fallback("привет")
     assert result.tone == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_parse_needs_clarification():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "ванесса я думаю ты виновата",
+        '{"should_reply": true, "search_query": "", "skip": false, '
+        '"tone": "neutral", "humor_ok": false, "humor_query": "", '
+        '"deep_search": false, "needs_clarification": true, '
+        '"clarification_hint": "почему"}',
+    )
+
+    assert result.needs_clarification is True
+    assert result.clarification_hint == "почему"
+    assert result.should_reply is True
+    assert result.skip_search is True
+    assert result.text == ""
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_needs_clarification_defaults_false():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "привет",
+        '{"should_reply": true, "search_query": "", "skip": false, '
+        '"humor_ok": false, "humor_query": ""}',
+    )
+
+    assert result.needs_clarification is False
+    assert result.clarification_hint == ""
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_fallback_needs_clarification_false():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._fallback("привет")
+    assert result.needs_clarification is False

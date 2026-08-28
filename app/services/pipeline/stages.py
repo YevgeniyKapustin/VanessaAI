@@ -218,7 +218,7 @@ class GateStage:
         logger.info(
             "turn_stage plan request_id=%s search=%r skip=%s should_reply=%s "
             "humor_ok=%s humor_query=%r deep_search=%s listen_window=%s "
-            "needs_clarification=%s reaction_gate_ms=%.1f plan_ms=%.1f "
+            "needs_clarification=%s detail=%s reaction_gate_ms=%.1f plan_ms=%.1f "
             "decision_ms=%.1f action=%s reason=%s",
             get_request_id(),
             ctx.turn_plan.text,
@@ -229,6 +229,7 @@ class GateStage:
             ctx.turn_plan.deep_search,
             ctx.session.in_listen_window,
             ctx.turn_plan.needs_clarification,
+            ctx.turn_plan.detail,
             ctx.reaction_gate_ms,
             ctx.plan_ms,
             ctx.decision_ms,
@@ -580,6 +581,7 @@ class ComposeStage:
             tone=ctx.turn_plan.tone,
             needs_clarification=ctx.turn_plan.needs_clarification,
             clarification_hint=ctx.turn_plan.clarification_hint,
+            detail=ctx.turn_plan.detail,
             uses_pro_model=ctx.turn_plan.uses_pro_model,
             reply_to_text=ctx.turn.reply_to_text,
             reply_to_sender_telegram_id=ctx.turn.reply_to_sender_telegram_id,

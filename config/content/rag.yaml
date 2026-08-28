@@ -43,6 +43,7 @@ turn_planner_prompt: |
     "needs_clarification": false,
     "clarification_hint": "",
     "uses_pro_model": false,
+    "detail": "normal",
     "repeated_topic": false,
     "loop_level": 0,
     "reason": ""
@@ -175,6 +176,20 @@ turn_planner_prompt: |
   answers, everyday banter. Keep false unless truly necessary — the upscaled model
   costs more.
 
+  ## detail
+  Desired reply length (always fill it):
+  - "normal" (default) — ordinary dialogue: answer the question properly, no
+    padding, no stub;
+  - "detailed" — the user explicitly asks for a fuller answer («давай подробнее»,
+    «расскажи подробно», «разверни ответ», «поподробнее») or the question is
+    clearly complex and wants a full explanation (deep_search=true, a substantive
+    «как»/«почему» that needs a real answer, a code question wanting an
+    explanation). Give the compose step room to cover the substance fully;
+  - "brief" — the user explicitly wants it short («кратко», «в двух словах»,
+    «без лишнего») or the reply only needs a confirmation/one-liner.
+  The compose step also checks the raw message directly, so explicit phrasing
+  wins even if you get it wrong — use "detailed"/"brief" for the implicit cases.
+
   ## reason
   A short internal reason ONLY when you decline to reply (should_reply=false or
   skip=true): e.g. «пустая фраза», «общение между собой», «прощание»,
@@ -283,6 +298,14 @@ turn_planner_prompt: |
   "humor_ok": false, "humor_query": "", "deep_search": false,
   "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «давай более развёрнутый ответ» (right after the bot answered the same user) |
+  in-window continuation, wants a fuller answer → detail="detailed"
+  → {{"should_reply": true, "search_query": "", "skip": true, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false,
+  "detail": "detailed"}}
 
   «ну так что там с мешем?» / «а меш?» / «дай нормальный меш» — the same sender
   keeps re-asking the SAME topic with new words | loop «по кругу» → still a direct

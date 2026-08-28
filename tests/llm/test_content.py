@@ -217,6 +217,51 @@ def test_prompt_builder_omits_clarification_instruction_when_not_needed():
     assert get_content().llm.clarification_instruction.strip() not in prompt
 
 
+def test_prompt_builder_includes_detailed_note():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "давай подробнее",
+        [],
+        detail="detailed",
+    )
+
+    assert get_content().llm.detail_note_detailed.strip() in prompt
+    assert "Do NOT compress the answer" in prompt
+
+
+def test_prompt_builder_includes_brief_note():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "в двух словах",
+        [],
+        detail="brief",
+    )
+
+    assert get_content().llm.detail_note_brief.strip() in prompt
+
+
+def test_prompt_builder_omits_detail_note_when_normal():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [], detail="normal")
+
+    assert get_content().llm.detail_note_detailed.strip() not in prompt
+    assert get_content().llm.detail_note_brief.strip() not in prompt
+
+
+def test_prompt_builder_suppresses_detailed_note_when_attitude_note_present():
+    """An annoyed Vanessa stays brief — the cold/annoyance note wins over
+    a request for a detailed answer (no contradictory directives)."""
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "давай подробнее",
+        [],
+        detail="detailed",
+        attitude_note="reply coldly and briefly",
+    )
+
+    assert get_content().llm.detail_note_detailed.strip() not in prompt
+
+
 def test_portrait_content_configured():
     content = get_content()
     assert content.portrait.enabled

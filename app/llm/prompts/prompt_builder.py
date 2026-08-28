@@ -106,6 +106,7 @@ class PromptBuilder:
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
+        detail: str = "normal",
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
@@ -219,6 +220,21 @@ class PromptBuilder:
             # Cold-reply directive: the sender is stuck in a same-topic loop and
             # Vanessa is annoyed — reply dry, sharp and brief.
             parts.append((PRIORITY_DIRECTIVES, "directives", attitude_note.strip()))
+        # Detail-level directive: the planner/heuristic decided the reply should
+        # be brief or detailed. Skipped when the cold/annoyance note is present —
+        # an annoyed Vanessa stays brief regardless of the user's request.
+        if (
+            detail
+            and detail != "normal"
+            and not (attitude_note and attitude_note.strip())
+        ):
+            note = (
+                llm.detail_note_detailed.strip()
+                if detail == "detailed"
+                else llm.detail_note_brief.strip()
+            )
+            if note:
+                parts.append((PRIORITY_DIRECTIVES, "directives", note))
         if has_image and llm.vision_note.strip():
             # Vision directive: the turn carries an image — describe / OCR it and
             # be honest about unclear text instead of hallucinating.

@@ -81,6 +81,7 @@ class ClaudeLLMProvider:
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
+        detail: str = "normal",
         uses_pro_model: bool = False,
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
@@ -111,6 +112,7 @@ class ClaudeLLMProvider:
             tone=tone,
             needs_clarification=needs_clarification,
             clarification_hint=clarification_hint,
+            detail=detail,
             reply_to_text=reply_to_text,
             reply_to_sender_telegram_id=reply_to_sender_telegram_id,
             reply_to_sender_name=reply_to_sender_name,
@@ -122,12 +124,22 @@ class ClaudeLLMProvider:
         session_chars = sum(
             len(message.content or "") for message in (session_messages or [])
         )
+        # Effective sampling params; a "detailed" reply gets more room so a
+        # fuller answer is not truncated.
+        generation_kwargs = self._generation.to_llm_kwargs()
+        if (
+            detail == "detailed"
+            and self._content.llm.detailed_max_tokens > 0
+        ):
+            generation_kwargs["max_tokens"] = self._content.llm.detailed_max_tokens
         logger.info(
-            "llm_prompt_prepared model=%s context_blocks=%s context_messages=%s "
-            "humor_quotes=%s meme_blocks=%s meme_menu=%s system_chars=%s "
-            "user_chars=%s knowledge_blocks=%s knowledge_chars=%s session_chars=%s "
-            "temperature=%s top_p=%s max_tokens=%s",
+            "llm_prompt_prepared model=%s detail=%s context_blocks=%s "
+            "context_messages=%s humor_quotes=%s meme_blocks=%s meme_menu=%s "
+            "system_chars=%s user_chars=%s knowledge_blocks=%s "
+            "knowledge_chars=%s session_chars=%s temperature=%s top_p=%s "
+            "max_tokens=%s",
             self._model,
+            detail,
             len(context_blocks),
             message_count,
             len(humor_quotes or []),
@@ -140,7 +152,7 @@ class ClaudeLLMProvider:
             session_chars,
             self._generation.temperature,
             self._generation.top_p,
-            self._generation.max_tokens,
+            generation_kwargs.get("max_tokens"),
         )
         logger.info("llm_system_prompt:\n%s", system)
         logger.info("llm_user_prompt:\n%s", user_prompt)
@@ -166,7 +178,7 @@ class ClaudeLLMProvider:
                                 "content": user_prompt,
                             }
                         ],
-                        **self._generation.to_llm_kwargs(),
+                        **generation_kwargs,
                     )
                     text = response.content[0].text
                     usage = _usage_from_anthropic(response)

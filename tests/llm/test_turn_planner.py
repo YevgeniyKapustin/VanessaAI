@@ -364,6 +364,92 @@ def test_turn_planner_prompt_documents_uses_pro_model():
     assert '"uses_pro_model": false' in prompt
 
 
+def test_turn_planner_prompt_documents_detail():
+    """The planner prompt must teach the desired reply-length field."""
+    prompt = get_content().rag.turn_planner_prompt
+    assert '"detail": "normal"' in prompt
+    assert "## detail" in prompt
+    assert '"detailed"' in prompt
+    assert '"brief"' in prompt
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_parse_detail():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "давай подробнее",
+        '{"should_reply": true, "search_query": "", "skip": false, '
+        '"detail": "detailed"}',
+    )
+
+    assert result.detail == "detailed"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_detail_defaults_normal():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "привет",
+        '{"should_reply": true, "search_query": "", "skip": false}',
+    )
+
+    assert result.detail == "normal"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_detail_invalid_value_defaults_normal():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "привет",
+        '{"should_reply": true, "search_query": "", "skip": false, '
+        '"detail": "very-long"}',
+    )
+
+    assert result.detail == "normal"
+
+
+def test_turn_planner_apply_detail_heuristic_overrides_planner():
+    """Explicit «в двух словах» must beat the planner's wrong 'detailed'."""
+    planner = TurnPlanner(use_llm=False)
+    plan = TurnPlan(
+        original="расскажи в двух словах",
+        text="расскажи",
+        skip_search=False,
+        should_reply=True,
+        detail="detailed",
+    )
+
+    result = planner._apply_detail(plan, "расскажи в двух словах")
+
+    assert result.detail == "brief"
+
+
+def test_turn_planner_apply_detail_keeps_planner_when_no_explicit_phrasing():
+    """No explicit phrasing → the planner's implicit detail stands."""
+    planner = TurnPlanner(use_llm=False)
+    plan = TurnPlan(
+        original="объясни как это работает",
+        text="объясни как работает",
+        skip_search=False,
+        should_reply=True,
+        detail="detailed",
+    )
+
+    result = planner._apply_detail(plan, "объясни как это работает")
+
+    assert result.detail == "detailed"
+
+
+@pytest.mark.asyncio
+async def test_turn_planner_fallback_applies_detail_heuristic():
+    """Even the no-LLM fallback path honors an explicit detail request."""
+    planner = TurnPlanner(use_llm=False)
+
+    result = await planner.prepare("давай более развёрнутый ответ")
+
+    assert result.detail == "detailed"
+
+
 class _FakeClient:
     """Minimal LLM chat completer that returns a valid planner JSON."""
 
@@ -418,6 +504,7 @@ def test_turn_plan_to_trace_dict():
         knowledge_detail=True,
         needs_clarification=False,
         uses_pro_model=False,
+        detail="detailed",
     )
     data = plan.to_trace_dict()
     assert data["search_query"] == "крабер игры"
@@ -432,5 +519,6 @@ def test_turn_plan_to_trace_dict():
     assert data["knowledge_detail"] is True
     assert data["needs_clarification"] is False
     assert data["uses_pro_model"] is False
+    assert data["detail"] == "detailed"
     # The raw user message is already on the trace root — not duplicated here.
     assert "original" not in data

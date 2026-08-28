@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.llm.format.llm_json import normalize_llm_json
@@ -13,6 +13,7 @@ from app.config.content import AppContent, get_content
 from app.config.conversation_config import load_conversation_config
 from app.config.settings import settings
 from app.llm.planner.generation_config import LLMGenerationParams
+from app.llm.planner.detail_detector import detect_detail_level
 from app.core.messages import ContextMessage
 from app.core.users.nicknames import format_nicknames_for_planner
 from app.llm.prompts.session_format import format_session_messages, session_context_messages
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 _TONE_VALUES = frozenset({"neutral", "serious", "ironic", "humorous"})
+_DETAIL_VALUES = frozenset({"brief", "normal", "detailed"})
 
 
 def _parse_tone(value: object) -> str:
@@ -28,6 +30,13 @@ def _parse_tone(value: object) -> str:
         return "neutral"
     tone = value.strip().lower()
     return tone if tone in _TONE_VALUES else "neutral"
+
+
+def _parse_detail(value: object) -> str:
+    if not isinstance(value, str):
+        return "normal"
+    detail = value.strip().lower()
+    return detail if detail in _DETAIL_VALUES else "normal"
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +72,11 @@ class TurnPlan:
     # her attitude, raises her ignore tendency and turns her replies cold.
     repeated_topic: bool = False
     loop_level: int = 0
+    # Desired reply length chosen by the planner + the deterministic heuristic:
+    # "brief" | "normal" | "detailed" ("normal" = the default persona voice).
+    # Feeds a compose directive so Vanessa gives a fuller answer when the user
+    # asks for detail and a one-liner when brevity is requested.
+    detail: str = "normal"
 
     def to_trace_dict(self) -> dict[str, Any]:
         """Serialize the plan for the Langfuse trace (gate span output).
@@ -88,6 +102,7 @@ class TurnPlan:
             "uses_pro_model": self.uses_pro_model,
             "repeated_topic": self.repeated_topic,
             "loop_level": self.loop_level,
+            "detail": self.detail,
             "reason": self.reason,
         }
 
@@ -132,11 +147,11 @@ class TurnPlanner:
         in_listen_window: bool = False,
     ) -> TurnPlan:
         if not self._use_llm:
-            result = self._fallback(message)
+            result = self._apply_detail(self._fallback(message), message)
             logger.info(
                 "turn_plan source=fallback search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r knowledge=%s knowledge_query=%r "
-                "knowledge_detail=%s needs_clarification=%s reason=%r",
+                "knowledge_detail=%s needs_clarification=%s detail=%s reason=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -147,6 +162,7 @@ class TurnPlanner:
                 result.knowledge_query,
                 result.knowledge_detail,
                 result.needs_clarification,
+                result.detail,
                 result.reason,
             )
             return result
@@ -171,7 +187,7 @@ class TurnPlanner:
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r knowledge_detail=%s "
-                "needs_clarification=%s uses_pro_model=%s reason=%r",
+                "needs_clarification=%s uses_pro_model=%s detail=%s reason=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -184,9 +200,27 @@ class TurnPlanner:
                 result.knowledge_detail,
                 result.needs_clarification,
                 result.uses_pro_model,
+                result.detail,
                 result.reason,
             )
-        return result
+        return self._apply_detail(result, message)
+
+    @staticmethod
+    def _apply_detail(plan: TurnPlan, message: str) -> TurnPlan:
+        """Overlay the deterministic detail heuristic on the planner's verdict.
+
+        Explicit "give me more / keep it short" phrasing in the raw message wins
+        over the planner's judgment (the user said what they want); otherwise
+        the planner's ``detail`` (default "normal") stands.
+        """
+        heuristic = detect_detail_level(message)
+        if heuristic in ("brief", "detailed"):
+            detail = heuristic
+        else:
+            detail = plan.detail
+        if detail == plan.detail:
+            return plan
+        return replace(plan, detail=detail)
 
     async def _plan_with_llm(
         self,
@@ -252,6 +286,7 @@ class TurnPlanner:
                 should_reply=False,
                 repeated_topic=repeated_topic,
                 loop_level=loop_level,
+                detail=_parse_detail(payload.get("detail")),
                 reason=reason,
             )
 
@@ -268,6 +303,7 @@ class TurnPlanner:
                 should_reply=True,
                 needs_clarification=True,
                 clarification_hint=clarification_hint,
+                detail=_parse_detail(payload.get("detail")),
                 repeated_topic=repeated_topic,
                 loop_level=loop_level,
             )
@@ -303,6 +339,7 @@ class TurnPlanner:
             uses_pro_model=uses_pro_model,
             repeated_topic=repeated_topic,
             loop_level=loop_level,
+            detail=_parse_detail(payload.get("detail")),
             reason=reason,
         )
 

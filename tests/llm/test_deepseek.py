@@ -222,6 +222,30 @@ async def test_deepseek_generate_includes_clarification_instruction(
 
 
 @pytest.mark.asyncio
+async def test_deepseek_generate_forwards_detail_and_bumps_max_tokens(
+    provider: DeepSeekLLMProvider,
+):
+    await provider.generate(
+        "давай подробнее",
+        [],
+        detail="detailed",
+    )
+    call = provider._client.chat.completions.create.await_args
+    user_prompt = call.kwargs["messages"][1]["content"]
+    assert get_content().llm.detail_note_detailed.strip() in user_prompt
+    assert call.kwargs["max_tokens"] == get_content().llm.detailed_max_tokens
+
+
+@pytest.mark.asyncio
+async def test_deepseek_generate_keeps_base_max_tokens_for_normal(
+    provider: DeepSeekLLMProvider,
+):
+    await provider.generate("привет", [], detail="normal")
+    call = provider._client.chat.completions.create.await_args
+    assert call.kwargs["max_tokens"] == 128
+
+
+@pytest.mark.asyncio
 async def test_deepseek_vision_routes_vision_model_and_sends_image_blocks(
     provider: DeepSeekLLMProvider,
 ):

@@ -152,6 +152,14 @@ class LLMContent(BaseModel):
     tone_note: str = ""
     owner_message_note: str = ""
     clarification_instruction: str = ""
+    # Detail-level directives injected when the planner decides the reply should
+    # be brief or detailed (TurnPlan.detail). Empty string = no directive for
+    # that level; "normal" injects nothing (the default persona voice applies).
+    detail_note_brief: str = ""
+    detail_note_detailed: str = ""
+    # Composer max_tokens override for "detailed" replies, so a fuller answer
+    # is not truncated. 0 = use the base composer max_tokens.
+    detailed_max_tokens: int = 0
     # Instruction injected when the turn carries an image (vision): tells the
     # model how to handle the attached picture (describe / OCR / be honest about
     # unclear text instead of hallucinating).

@@ -199,6 +199,7 @@ class FakeLLM:
         self.last_meme_menu: list | None = None
         self.last_needs_clarification: bool = False
         self.last_clarification_hint: str = ""
+        self.last_detail: str = "normal"
         self.last_uses_pro_model: bool = False
         self.last_images: list | None = None
         self.last_photo_candidates: list | None = None
@@ -220,6 +221,7 @@ class FakeLLM:
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
+        detail: str = "normal",
         uses_pro_model: bool = False,
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
@@ -236,6 +238,7 @@ class FakeLLM:
         self.last_tone = tone
         self.last_needs_clarification = needs_clarification
         self.last_clarification_hint = clarification_hint
+        self.last_detail = detail
         self.last_uses_pro_model = uses_pro_model
         self.last_reply_to_text = reply_to_text
         self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
@@ -691,6 +694,33 @@ async def test_compose_stage_forwards_needs_clarification():
     assert llm.last_needs_clarification is True
     assert llm.last_clarification_hint == "почему"
     assert ctx.reply == "echo: ванесса я думаю ты виновата"
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_forwards_detail():
+    llm = FakeLLM()
+    compose = ComposeStage(llm)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="давай подробнее",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="давай подробнее",
+            text="",
+            skip_search=True,
+            should_reply=True,
+            detail="detailed",
+        ),
+    )
+    ctx.recent = []
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    assert llm.last_detail == "detailed"
+    assert ctx.reply == "echo: давай подробнее"
 
 
 @pytest.mark.asyncio

@@ -169,3 +169,24 @@ async def test_claude_generate_includes_clarification_instruction(
     user_prompt = call.kwargs["messages"][0]["content"]
     assert get_content().llm.clarification_instruction.strip() in user_prompt
     assert "What is unclear: почему" in user_prompt
+
+
+@pytest.mark.asyncio
+async def test_claude_generate_forwards_brief_note(provider: ClaudeLLMProvider):
+    await provider.generate(
+        "в двух словах",
+        [],
+        detail="brief",
+    )
+    call = provider._client.messages.create.await_args
+    user_prompt = call.kwargs["messages"][0]["content"]
+    assert get_content().llm.detail_note_brief.strip() in user_prompt
+
+
+@pytest.mark.asyncio
+async def test_claude_generate_bumps_max_tokens_for_detailed(
+    provider: ClaudeLLMProvider,
+):
+    await provider.generate("давай подробнее", [], detail="detailed")
+    call = provider._client.messages.create.await_args
+    assert call.kwargs["max_tokens"] == get_content().llm.detailed_max_tokens

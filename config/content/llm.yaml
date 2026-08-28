@@ -63,12 +63,15 @@ answer: |
   several short messages (blocks) of 1–2 sentences each — like sequential
   messages in a chat, never one wall of text. Each block must be self-contained.
   Put the tag [next] on its own line at the end of every block except the last;
-  the last block has no tag. A short one-line reply needs no [next].
+  the last block has no tag. A short one-line reply needs no [next]. If a note
+  below asks for a more detailed answer, blocks may be longer (2–4 sentences
+  each) — the split is about readability, not compression.
 
   Before replying, check:
   1. Reply to the current message, not to your background.
   2. Nothing to say on the substance — a short «хз» or a one-line sharp reply
-     beats a wall of text.
+     is fine. But if the question has substance, answer it fully — don't
+     compress a real answer into a stub.
   3. Use the context and archive facts only when they fit and matter — leave out
      what's irrelevant, don't dump everything you were given.
   4. If the user repeats the same thing they already said (the same question or
@@ -107,6 +110,20 @@ answer_examples: |
     «Но в последнее время он забил на стройку и подсел на классику»
     [next]
     «Хочешь — расскажу его сагу целиком»
+
+  Message: «давай более развёрнутый ответ» (follow-up right after a short reply)
+  Good (detailed, several blocks): answer the question fully — don't repeat the
+  stub, don't just add a line: cover the substance in 2–4 sentence blocks with
+  [next].
+    «Ну смотри, тут всё не так просто. Меш текстуры собирается отдельным
+    пайплайном в блендере»
+    [next]
+    «Сначала unwrap и бейк в нормали, потом уже пак в папку Assets/Textures»
+    [next]
+    «Если хочешь — накидаю порядок шагов по пунктам»
+
+  Message: «кратко» / «в двух словах»
+  Good: «Меш текстуры — в Assets/Textures» — one line, no elaboration.
 
 sticker_instruction: |
   Stickers: the chat has a sticker pack that plays your personality. When a fitting
@@ -149,6 +166,17 @@ tone_note: |
   - ironic — keep the banter, answer with subtext, a light jab is fine;
   - humorous — playful, you can joke in reply;
   - neutral — usual tone.
+
+detail_note_brief: |
+  The user wants it short. Keep the reply to one line or a couple of words —
+  no elaboration, no extra context, no [next] blocks. Brevity wins over
+  completeness.
+detail_note_detailed: |
+  The user wants a detailed, fuller answer. Cover the substance completely —
+  several connected points, all the relevant facts and context — while keeping
+  the chatty tone. If it's long, split it into several chat messages (blocks)
+  of 2–4 sentences each with [next] on its own line between them, never one
+  wall of text. Do NOT compress the answer to a stub.
 
 clarification_instruction: |
   The user's message references something without context — you don't understand what
@@ -204,6 +232,11 @@ generation:
     max_tokens: 192
     presence_penalty: 0.0
     frequency_penalty: 0.0
+
+# Composer max_tokens override for "detailed" replies (TurnPlan.detail), so a
+# fuller answer — reasoning prefix + several blocks — is not truncated. 0 = use
+# the base composer max_tokens.
+detailed_max_tokens: 2048
 
 budget:
   enabled: true

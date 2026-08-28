@@ -62,7 +62,7 @@ def test_prompt_builder_uses_sender_name():
             created_at=datetime(2023, 5, 1, 14, 30, tzinfo=timezone.utc),
         )
     )
-    assert "[user:Краб]" in line
+    assert 'sender="Краб"' in line
     assert "6765300380" not in line
 
 

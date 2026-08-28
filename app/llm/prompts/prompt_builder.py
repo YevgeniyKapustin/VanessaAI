@@ -15,11 +15,18 @@ from app.llm.prompts.budget import (
     PRIORITY_MEME,
     PRIORITY_MEME_MENU,
     PRIORITY_METRICS,
-    PRIORITY_REPLY,
     PRIORITY_SESSION,
     apply_budget,
 )
 from app.llm.prompts.context_format import block_time_range, format_message_time
+from app.llm.prompts.message_xml import (
+    BOT_SENDER,
+    message_attachment_blocks,
+    render_messages,
+    render_msg,
+    xml_attr,
+    xml_text,
+)
 from app.llm.prompts.session_format import format_session_messages
 
 
@@ -28,24 +35,28 @@ class PromptBuilder:
         self._content = content or get_content()
 
     def format_message_line(self, message: ContextMessage) -> str:
-        llm = self._content.llm
         time_label = format_message_time(message.created_at)
-        anchor = llm.anchor_marker if message.is_anchor else ""
         if message.role == "assistant":
-            return llm.assistant_line.format(
-                time=time_label,
-                anchor=anchor,
-                content=message.content,
+            sender = BOT_SENDER
+        else:
+            sender = resolve_sender_display_name(
+                message.sender_telegram_id,
+                message.sender_name,
             )
-        sender = resolve_sender_display_name(
-            message.sender_telegram_id,
-            message.sender_name,
-        )
-        return llm.user_line.format(
-            time=time_label,
-            sender=sender,
-            anchor=anchor,
+        # One <msg> element (XML input-block convention): a verbatim <text>,
+        # plus <reply_text> / <attachment> children and metadata attributes.
+        return render_msg(
             content=message.content,
+            sender=sender,
+            time=time_label,
+            msg_id=message.id,
+            anchor=message.is_anchor,
+            reply_to=message.reply_to_message_id,
+            reply_text=message.reply_to_text,
+            attachments=message_attachment_blocks(
+                message.attachments,
+                message.photo_caption,
+            ),
         )
 
     def format_context_block(self, index: int, block: ContextBlock) -> str:
@@ -57,7 +68,7 @@ class PromptBuilder:
             ended_at=ended_at,
         )
         lines = [self.format_message_line(message) for message in block.messages]
-        return "\n".join([header, *lines])
+        return "\n".join([header, render_messages(lines)])
 
     def format_current_message(
         self,
@@ -66,15 +77,17 @@ class PromptBuilder:
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         created_at: datetime | None = None,
+        reply_to_text: str | None = None,
     ) -> str:
-        llm = self._content.llm
         sender = resolve_sender_display_name(sender_telegram_id, sender_name)
         time_label = format_message_time(created_at or datetime.now())
-        return llm.current_message_line.format(
-            time=time_label,
-            sender=sender,
+        msg = render_msg(
             content=content,
+            sender=sender,
+            time=time_label,
+            reply_text=reply_to_text,
         )
+        return render_messages([msg])
 
     def build_user_prompt(
         self,
@@ -178,25 +191,20 @@ class PromptBuilder:
             parts.append(
                 (PRIORITY_DIRECTIVES, "aliases", f"{llm.aliases_header.strip()}\n{aliases_text}")
             )
-        if reply_to_text:
-            reply_sender = resolve_sender_display_name(
-                reply_to_sender_telegram_id,
-                reply_to_sender_name,
-            )
-            reply_line = llm.reply_message_line.format(
-                sender=reply_sender,
-                content=reply_to_text,
-            )
-            parts.append(
-                (PRIORITY_REPLY, "reply_to", f"{llm.reply_message_header}\n{reply_line}")
-            )
+        # The current message is the one to reply to. A reply-to quote is folded
+        # into the same <msg> as <reply_text> (XML input-block convention) rather
+        # than rendered as a separate section.
         current_line = self.format_current_message(
             user_message,
             sender_telegram_id=sender_telegram_id,
             sender_name=sender_name,
+            reply_to_text=reply_to_text,
         )
+        current_header = llm.current_message_header
+        if reply_to_text and llm.reply_message_header.strip():
+            current_header = f"{llm.reply_message_header.strip()}\n{current_header}"
         parts.append(
-            (PRIORITY_CURRENT, "current_message", f"{llm.current_message_header}\n{current_line}")
+            (PRIORITY_CURRENT, "current_message", f"{current_header}\n{current_line}")
         )
         if needs_clarification and llm.clarification_instruction.strip():
             instruction = llm.clarification_instruction.strip()
@@ -218,23 +226,25 @@ class PromptBuilder:
         if photo_candidates:
             # Photo album: photos the bot could re-send, matched to the context
             # by RAG "по смыслу" + the recent session. High priority so the model
-            # can always choose to send one.
+            # can always choose to send one. Rendered as <attachment> entries
+            # inside an <attachments> root (XML input-block convention); the
+            # values are escaped so a literal <...> / & never breaks the markup.
             album_lines = [
                 llm.photo_album_line.format(
                     index=candidate.index,
-                    sender=candidate.sender_name or "кто-то",
-                    time=format_message_time(candidate.created_at),
-                    caption=candidate.caption,
+                    sender=xml_attr(candidate.sender_name or "кто-то"),
+                    time=xml_attr(format_message_time(candidate.created_at)),
+                    caption=xml_text(candidate.caption),
                 )
                 for candidate in photo_candidates
             ]
-            parts.append(
-                (
-                    PRIORITY_DIRECTIVES,
-                    "photo_album",
-                    f"{llm.photo_album_header}\n" + "\n".join(album_lines),
-                )
+            album = (
+                f"{llm.photo_album_header}\n"
+                "<attachments>\n"
+                + "\n".join(album_lines)
+                + "\n</attachments>"
             )
+            parts.append((PRIORITY_DIRECTIVES, "photo_album", album))
             if llm.photo_album_instruction.strip():
                 parts.append(
                     (PRIORITY_DIRECTIVES, "directives", llm.photo_album_instruction.strip())
@@ -276,13 +286,14 @@ class PromptBuilder:
         if profanity.enabled and profanity.instruction.strip():
             parts.append(f"## Emotional language\n{profanity.instruction.strip()}")
         stickers = self._content.stickers
-        if stickers.enabled and llm.sticker_instruction.strip():
+        if stickers.enabled:
+            sections: list[str] = []
             instruction = llm.sticker_instruction.strip()
-            tag_lines = stickers.tag_lines()
-            if tag_lines:
-                instruction += (
-                    "\n\nAvailable sticker tags (ONLY these exist in the pack — "
-                    "use exactly these tags, nothing else):\n" + "\n".join(tag_lines)
-                )
-            parts.append(f"## Stickers\n{instruction}")
+            if instruction:
+                sections.append(instruction)
+            xml_block = stickers.xml_system_block()
+            if xml_block:
+                sections.append(xml_block)
+            if sections:
+                parts.append("## Stickers\n" + "\n\n".join(sections))
         return "\n\n".join(parts)

@@ -55,7 +55,7 @@ def test_is_sticker_only():
     service = StickerService(
         catalog,
         StickerDecider(catalog),
-        sticker_only_tags=("bemused", "weary"),
+        sticker_only_tags=("bemused", "tease"),
     )
     assert service.is_sticker_only("bemused") is True
     assert service.is_sticker_only("BEMUSED") is True

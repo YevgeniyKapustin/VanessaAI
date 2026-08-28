@@ -1,5 +1,6 @@
 import logging
 import random
+from typing import Mapping
 
 from app.bot.stickers.heuristics import reply_tags
 from app.bot.stickers.models import StickerCatalog, StickerPick
@@ -25,6 +26,7 @@ class StickerDecider:
         probability: float = 0.6,
         heuristic_probability: float = 0.45,
         min_messages_between: int = 3,
+        tag_probability: Mapping[str, float] | None = None,
         rng: random.Random | None = None,
     ) -> None:
         self._catalog = catalog
@@ -32,6 +34,10 @@ class StickerDecider:
         self._probability = probability
         self._heuristic_probability = heuristic_probability
         self._min_messages_between = max(1, int(min_messages_between))
+        # Per-tag overrides of the base probability, keyed by lowercase tag.
+        self._tag_probability = {
+            tag.lower(): float(p) for tag, p in (tag_probability or {}).items()
+        }
         self._rng = rng or random.Random()
         self._messages_since: dict[int, int] = {}
 
@@ -90,16 +96,17 @@ class StickerDecider:
         chosen_tag, from_llm = resolved
 
         if not force:
-            probability = (
-                self._probability if from_llm else self._heuristic_probability
-            )
+            base = self._probability if from_llm else self._heuristic_probability
+            probability = self._tag_probability.get(chosen_tag, base)
             if self._rng.random() >= probability:
                 logger.info(
                     "sticker_skip chat_id=%s tag=%r reason=probability "
-                    "p=%.2f",
+                    "p=%.2f base=%.2f tag_probability=%s",
                     chat_id,
                     tag,
                     probability,
+                    base,
+                    chosen_tag in self._tag_probability,
                 )
                 return None
         return self._pick(chosen_tag)

@@ -13,23 +13,34 @@ def build_catalog(content: StickersContent | None = None) -> StickerCatalog:
 
 
 def _match_remote(remote, index, emoji):
-    if index is not None:
-        if 0 <= index < len(remote):
-            return remote[index]
-        return None
+    """Find the live sticker for a config entry.
+
+    Resolution order:
+    1. exact (``index``, ``emoji``) match — disambiguates stickers that share an
+       emoji (e.g. two 👋 for wave_hello / wave_bye);
+    2. a *unique* emoji match — the reliable semantic signal, so a stale index
+       never binds a config sticker to the wrong remote image;
+    3. positional ``index`` fallback.
+    """
+    if index is not None and 0 <= index < len(remote) and remote[index].emoji == emoji:
+        return remote[index]
     if emoji:
-        for candidate in remote:
-            if candidate.emoji == emoji:
-                return candidate
+        candidates = [candidate for candidate in remote if candidate.emoji == emoji]
+        if len(candidates) == 1:
+            return candidates[0]
+    if index is not None and 0 <= index < len(remote):
+        return remote[index]
     return None
 
 
 async def resolve_file_ids(catalog: StickerCatalog, bot) -> None:
     """Fill runtime file ids from the Telegram sticker set (best effort).
 
-    Priority per sticker: explicit ``file_id`` from config > position ``index`` in
-    the pack > first sticker with a matching ``emoji``. Any Telegram failure
-    disables stickers gracefully — the bot keeps working without them.
+    The live pack is the source of truth at startup: every config sticker is
+    matched to a remote one (by index+emoji, emoji, or index) and its file id is
+    refreshed, so baked ids in the config heal automatically when the pack's
+    links change. If the Telegram fetch fails, the config's ``file_id`` values are
+    kept and stickers still work offline.
     """
     if not catalog.set_name or not catalog.stickers:
         return
@@ -46,12 +57,10 @@ async def resolve_file_ids(catalog: StickerCatalog, bot) -> None:
     remote = sticker_set.stickers
     resolved = 0
     for sticker in catalog.stickers:
-        if sticker.file_id:
-            resolved += 1
-            continue
         match = _match_remote(remote, sticker.index, sticker.emoji)
         if match is not None:
-            sticker.resolved_file_id = match.file_id
+            sticker.file_id = match.file_id
+            sticker.resolved_file_id = None
             resolved += 1
     logger.info(
         "sticker_set_resolved set_name=%s resolved=%s/%s",

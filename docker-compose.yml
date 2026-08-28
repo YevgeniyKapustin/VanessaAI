@@ -110,7 +110,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      # The lifespan cold start (sentence-transformers model download into the
+      # empty huggingface_cache volume + full knowledge vector reindex + first
+      # sweep) routinely takes 60-90s+, so a 30s grace would mark the container
+      # "unhealthy" and abort `docker compose up` (bot depends on api healthy).
+      start_period: 300s
     volumes:
       - ./app:/app/app
       - ./config:/app/config

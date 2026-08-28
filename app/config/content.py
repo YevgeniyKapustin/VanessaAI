@@ -1,8 +1,9 @@
 from functools import lru_cache
+from html import escape as _xml_escape
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.config.settings import settings
 
@@ -124,26 +125,16 @@ class LLMContent(BaseModel):
     # truth when splitting the finished reply for delivery.
     block_marker: str = "[next]"
     context_header: str
-    context_block_header: str = (
-        "--- Block {index} ({started_at} — {ended_at}) ---"
-    )
+    context_block_header: str = "<!-- Block {index} ({started_at} — {ended_at}) -->"
     context_block_separator: str = "\n\n"
     current_message_header: str
-    current_message_line: str = "{time} [user:{sender}] text: {content}"
-    reply_message_header: str = "The user's message is a reply to this message:"
-    reply_message_line: str = "[{sender}] text: {content}"
+    reply_message_header: str = "<!-- The user's message is a reply to this message -->"
     aliases_header: str = (
         "Aliases — the same person is often called by different names in the chat"
         " (a Telegram nickname, a nickname, a shortened form). Treat them as ONE"
         " person:"
     )
-    session_header: str = "Recent correspondence in the chat:"
-    session_user_line: str = "{time} [user:{sender}] text: {content}"
-    session_assistant_line: str = "{time} [assistant] text: {content}"
-    session_reply_line: str = "  ↳ reply to [{sender}] text: {content}"
-    anchor_marker: str = " ← matches the query"
-    assistant_line: str = "{time} [assistant]{anchor} text: {content}"
-    user_line: str = "{time} [user:{sender}]{anchor} text: {content}"
+    session_header: str = "<!-- Recent correspondence in the chat -->"
     humor_quotes_header: str = "Recognizable memes and jokes from the chat (if appropriate):"
     humor_quote_line: str = "- {quote}"
     meme_header: str = (
@@ -167,8 +158,13 @@ class LLMContent(BaseModel):
     vision_note: str = ""
     # Photo album section: a list of photos the bot could re-send (RAG-selected),
     # with the instruction to emit [photo:<index>] when one fits the message.
-    photo_album_header: str = "Photos I can send (from our chat, matched to the context):"
-    photo_album_line: str = "- [{index}] {sender}, {time}: {caption}"
+    # Rendered as XML-like <attachment> entries (the input-block convention).
+    photo_album_header: str = "<!-- Photos I can send (from our chat, matched to the context) -->"
+    photo_album_line: str = (
+        '<attachment index="{index}" type="photo" sender="{sender}" time="{time}">\n'
+        "  <description>{caption}</description>\n"
+        "</attachment>"
+    )
     photo_album_instruction: str = ""
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
     budget: PromptBudgetContent = Field(default_factory=PromptBudgetContent)
@@ -302,12 +298,32 @@ class StickersContent(BaseModel):
     probability: float = Field(default=0.6, ge=0.0, le=1.0)
     heuristic_probability: float = Field(default=0.45, ge=0.0, le=1.0)
     min_messages_between: int = Field(default=3, ge=1, le=100)
+    # Per-tag overrides of ``probability``: warm/positive tags (love, delight)
+    # send more often, «дежурные» tags (thinking) less, so they don't get stale.
+    # Falls back to the base ``probability``/``heuristic_probability`` otherwise.
+    tag_probability: dict[str, float] = Field(default_factory=dict)
+    # Soft fallback for tags the model invents but the pack doesn't have: the
+    # parser maps them to the closest real tag or drops them (see sticker_tag.py).
+    tag_aliases: dict[str, str] = Field(default_factory=dict)
+    # The sticker-system cheat-sheet rendered as XML into the LLM prompt.
+    system_description: str = ""
+    tag_rules: list[str] = Field(default_factory=list)
     # Tags whose sticker fully replaces the text reply: the bot sends ONLY the
     # sticker because the image already carries the message (e.g. bemused 😐 has
     # a caption on it). The anti-spam gate is bypassed for these — the sticker IS
     # the reply.
     sticker_only_tags: list[str] = Field(default_factory=list)
     stickers: list[StickerDefContent] = Field(default_factory=list)
+
+    @field_validator("tag_probability")
+    @classmethod
+    def _validate_tag_probability(cls, value: dict[str, float]) -> dict[str, float]:
+        for tag, p in value.items():
+            if not 0.0 <= p <= 1.0:
+                raise ValueError(
+                    f"tag_probability[{tag}] must be within [0, 1], got {p}"
+                )
+        return value
 
     @property
     def available_tags(self) -> tuple[str, ...]:
@@ -348,6 +364,47 @@ class StickersContent(BaseModel):
                     label += f" — {sticker.description.strip()}"
                 lines.append(label)
         return lines
+
+    def xml_system_block(self) -> str:
+        """Render the sticker cheat-sheet as an XML block for the LLM prompt.
+
+        Built entirely from the yaml so the tag list can never drift from the
+        pack: ``<description>`` from ``system_description``, one ``<tag>`` per
+        available tag (emoji + sticker name + usage note) and ``<tag_rules>``
+        from ``tag_rules``.
+        """
+        lines: list[str] = ["<sticker_system>"]
+        if self.system_description.strip():
+            body = " ".join(
+                part.strip()
+                for part in self.system_description.splitlines()
+                if part.strip()
+            )
+            lines.append(f"  <description>{_xml_escape(body)}</description>")
+        lines.append("  <available_tags>")
+        seen: set[str] = set()
+        for sticker in self.stickers:
+            for tag in sticker.tags:
+                key = tag.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                hint = sticker.emoji or sticker.name
+                label = f"{hint} ({sticker.name})" if hint else sticker.name
+                if sticker.description.strip():
+                    label += f" — {sticker.description.strip()}"
+                lines.append(
+                    f'    <tag name="{_xml_escape(key)}">{_xml_escape(label)}</tag>'
+                )
+        lines.append("  </available_tags>")
+        if self.tag_rules:
+            lines.append("  <tag_rules>")
+            for rule in self.tag_rules:
+                if rule.strip():
+                    lines.append(f"    <rule>{_xml_escape(rule.strip())}</rule>")
+            lines.append("  </tag_rules>")
+        lines.append("</sticker_system>")
+        return "\n".join(lines)
 
 
 class MemeDefContent(BaseModel):

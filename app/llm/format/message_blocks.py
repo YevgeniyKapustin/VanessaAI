@@ -11,8 +11,10 @@ reply into the messages the bot actually sends:
 
 Robustness mirrors ``answer_tag``: a ``[next]`` inside a fenced code block is
 NOT a separator. If the model never emits markers (older prompt / refusal) the
-reply is split deterministically on sentence/paragraph boundaries instead, and
-every block is hard-capped at ``max_chars`` (Telegram's 4096-char limit).
+reply is split deterministically on sentence/paragraph boundaries instead —
+each short unit is delivered as its own message (the same "several short
+messages" shape the markers would produce, never one multi-line wall of text) —
+and every block is hard-capped at ``max_chars`` (Telegram's 4096-char limit).
 """
 
 from __future__ import annotations
@@ -152,6 +154,11 @@ def _chunk_words(unit: str, size: int) -> list[str]:
     return chunks
 
 
+def _is_fenced_code(unit: str) -> bool:
+    """True when ``unit`` is (or contains) a fenced code block."""
+    return bool(_FENCED_CODE.search(unit))
+
+
 def _sentence_fallback(
     text: str,
     *,
@@ -160,15 +167,18 @@ def _sentence_fallback(
 ) -> list[str]:
     """Deterministic fallback splitter used when the model emitted no markers.
 
-    Splits into paragraphs/sentences, hard-chunks any unit longer than
-    ``target_chars`` on word boundaries, then packs the pieces into blocks of up
-    to ``target_chars`` (never exceeding ``max_chars``). This guarantees a long
-    reply never arrives as one wall of text even without any ``[next]`` markers
-    or sentence punctuation. Never returns empty strings.
+    Splits into paragraphs/sentences and delivers them as several short
+    messages — the same "1–2 sentences per message" shape the ``[next]``
+    markers would produce — instead of packing the whole reply into one
+    multi-line wall of text. Consecutive short units are joined with a single
+    space (never a newline) up to two per block; a fenced code block is glue,
+    never a message boundary of its own (a code reply stays one message); any
+    unit longer than ``target_chars`` (a run-on sentence, an unpunctuated
+    paragraph) is hard-chunked on word boundaries; every block is capped at
+    ``max_chars``. Never returns empty strings.
     """
-    units = _split_units(text)
     pieces: list[str] = []
-    for unit in units:
+    for unit in _split_units(text):
         for chunk in _chunk_words(unit, target_chars):
             if len(chunk) <= max_chars:
                 pieces.append(chunk)
@@ -177,12 +187,20 @@ def _sentence_fallback(
 
     blocks: list[str] = []
     current = ""
+    current_count = 0
     for piece in pieces:
-        if current and len(current) + len(piece) + 1 > target_chars:
+        sticky = _is_fenced_code(piece)
+        if current and not sticky and (
+            current_count >= 2
+            or len(current) + len(piece) + 1 > target_chars
+        ):
             blocks.append(current)
-            current = piece
-        else:
-            current = f"{current}\n{piece}" if current else piece
+            current = ""
+            current_count = 0
+        current = f"{current} {piece}" if current else piece
+        # A code fence attaches to the surrounding block, not a countable unit.
+        if not sticky:
+            current_count += 1
     if current:
         blocks.append(current)
     return [block.strip() for block in blocks if block.strip()]

@@ -54,7 +54,10 @@ services:
       - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/health"]
+      # NB: use 127.0.0.1, not "localhost" — in the alpine image localhost
+      # resolves to ::1 (IPv6) first, but nginx only listens on IPv4 0.0.0.0:80,
+      # so wget gets "Connection refused" and the container stays unhealthy.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/health"]
       interval: 10s
       timeout: 5s
       retries: 3

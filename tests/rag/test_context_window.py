@@ -32,10 +32,10 @@ def test_prompt_builder_formats_block_with_time_and_anchor():
 
     text = builder.format_context_block(1, block)
 
-    assert "--- Block 1 (" in text
+    assert "<!-- Block 1 (" in text
     assert "01.05.2023" in text
-    assert "[user:alice]" in text
-    assert "← matches the query" in text
+    assert 'sender="alice"' in text
+    assert 'anchor="true"' in text
     assert "про крабера" in text
 
 
@@ -68,12 +68,12 @@ def test_prompt_builder_builds_separated_blocks():
 
     prompt = builder.build_user_prompt("вопрос", blocks)
 
-    assert prompt.count("--- Block") == 2
+    assert prompt.count("<!-- Block") == 2
     assert "Block 1" in prompt
     assert "Block 2" in prompt
     assert "первый" in prompt
     assert "второй" in prompt
-    assert "первый\n\n--- Block 2" in prompt
+    assert "</messages>\n\n<!-- Block 2" in prompt
 
 
 @pytest.mark.asyncio

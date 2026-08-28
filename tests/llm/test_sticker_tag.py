@@ -1,5 +1,9 @@
 from app.config.content import get_content
-from app.llm.format.sticker_tag import KNOWN_STICKER_TAGS, extract_sticker_tag
+from app.llm.format.sticker_tag import (
+    KNOWN_STICKER_TAGS,
+    TAG_ALIASES,
+    extract_sticker_tag,
+)
 
 
 def test_strips_marker_at_the_end():
@@ -58,10 +62,45 @@ def test_known_tags_match_catalog_single_source_of_truth():
 
 
 def test_tag_without_catalog_sticker_is_dropped():
-    """A tag the pack doesn't have must be stripped and never passed on."""
+    """A tag the pack doesn't have (and has no alias) must be stripped, never leaked."""
     missing = "facepalm"
-    if missing in KNOWN_STICKER_TAGS:  # someone added it to the pack — nothing to check
-        return
+    if missing in KNOWN_STICKER_TAGS or missing in TAG_ALIASES:
+        return  # became a real/aliased tag — nothing to check
+    cleaned, tag = extract_sticker_tag(f"текст [sticker:{missing}]")
+    assert tag is None
+    assert "sticker" not in cleaned
+
+
+def test_unknown_tag_mapped_to_alias():
+    """An invented tag with an alias resolves to the closest real tag."""
+    cleaned, tag = extract_sticker_tag("текст [sticker:angry]")
+    assert tag == "irritation"
+    assert "sticker" not in cleaned
+
+
+def test_alias_is_case_insensitive():
+    cleaned, tag = extract_sticker_tag("[STICKER:Angry]")
+    assert tag == "irritation"
+    assert cleaned == ""
+
+
+def test_alias_first_known_wins():
+    cleaned, tag = extract_sticker_tag("a [sticker:laugh] b [sticker:angry]")
+    assert tag == "delight"
+    assert "sticker" not in cleaned
+
+
+def test_real_tag_preferred_over_alias():
+    cleaned, tag = extract_sticker_tag("a [sticker:laugh] b [sticker:delight]")
+    assert tag == "delight"
+    assert "sticker" not in cleaned
+
+
+def test_unknown_tag_without_alias_dropped():
+    """A tag that isn't in the pack and has no alias is dropped, not leaked."""
+    missing = "gloomy"
+    if missing in KNOWN_STICKER_TAGS or missing in TAG_ALIASES:
+        return  # became real/aliased — nothing to check
     cleaned, tag = extract_sticker_tag(f"текст [sticker:{missing}]")
     assert tag is None
     assert "sticker" not in cleaned

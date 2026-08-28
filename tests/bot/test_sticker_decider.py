@@ -165,3 +165,35 @@ def test_force_still_skips_when_no_files():
     )
     decider = _decider(catalog=catalog)
     assert decider.decide(1, tag="sarcasm", force=True) is None
+
+
+def test_per_tag_probability_raises_chance():
+    # base probability low, but the tag override is high
+    decider = _decider(rng=_Rng(0.5), probability=0.2, tag_probability={"delight": 0.9})
+    pick = decider.decide(1, tag="delight")
+    assert pick is not None
+    assert pick.tag == "delight"
+
+
+def test_per_tag_probability_lowers_chance():
+    # base probability high, but the tag override is low
+    blocked = _decider(rng=_Rng(0.5), probability=0.9, tag_probability={"delight": 0.3})
+    assert blocked.decide(1, tag="delight") is None
+
+    passed = _decider(rng=_Rng(0.2), probability=0.9, tag_probability={"delight": 0.3})
+    assert passed.decide(1, tag="delight") is not None
+
+
+def test_per_tag_probability_falls_back_for_other_tags():
+    # override only exists for delight; sarcasm uses the base probability
+    decider = _decider(rng=_Rng(0.5), probability=1.0, tag_probability={"delight": 0.1})
+    pick = decider.decide(1, tag="sarcasm")
+    assert pick is not None
+    assert pick.tag == "sarcasm"
+
+
+def test_per_tag_probability_is_case_insensitive():
+    decider = _decider(rng=_Rng(0.5), probability=0.2, tag_probability={"delight": 0.9})
+    pick = decider.decide(1, tag="DELIGHT")
+    assert pick is not None
+    assert pick.tag == "delight"

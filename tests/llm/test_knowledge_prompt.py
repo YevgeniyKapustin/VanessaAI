@@ -31,6 +31,8 @@ def test_build_user_prompt_without_knowledge():
 
 def test_system_prompt_stickers_list_only_catalog_tags():
     """The Stickers section must advertise exactly the tags that have stickers."""
+    import xml.etree.ElementTree as ET
+
     builder = PromptBuilder()
     prompt = builder.system_prompt
     stickers = get_content().stickers
@@ -39,13 +41,11 @@ def test_system_prompt_stickers_list_only_catalog_tags():
 
     assert "## Stickers" in prompt
     section = prompt.split("## Stickers", 1)[1]
-    assert "Available sticker tags" in section
-    for line in stickers.tag_lines():
-        assert line in section
-    # every advertised tag is a real catalog tag
-    advertised: set[str] = set()
-    for part in section.split("Available sticker tags", 1)[1].split("\n")[1:]:
-        stripped = part.strip()
-        if stripped.startswith("- "):
-            advertised.add(stripped[2:].split("(", 1)[0].strip())
+    assert "<sticker_system>" in section
+    # the prose may mention the block, so slice from the last occurrence
+    xml_start = section.rindex("<sticker_system>")
+    root = ET.fromstring(section[xml_start:])  # raises on malformed XML
+    advertised = {tag.get("name") for tag in root.find("available_tags")}
     assert advertised == set(stickers.available_tags)
+    assert root.find("description") is not None
+    assert root.find("tag_rules") is not None

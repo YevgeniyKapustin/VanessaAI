@@ -2,49 +2,58 @@ from app.config.content import AppContent, get_content
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.messages import ContextMessage
 from app.llm.prompts.context_format import format_message_time
+from app.llm.prompts.message_xml import (
+    BOT_SENDER,
+    message_attachment_blocks,
+    render_messages,
+    render_msg,
+)
 
 
 def format_session_messages(
     messages: list[ContextMessage],
     content: AppContent | None = None,
 ) -> str:
+    """Render the recent-session messages as an XML-like ``<messages>`` block.
+
+    Each message becomes a ``<msg>`` element (``id``/``sender``/``time``
+    attributes, a verbatim ``<text>`` child, plus ``<reply_text>`` and
+    ``<attachment>`` children when present) — the dynamic input-block convention.
+    Returns an empty string when there is nothing to render.
+    """
     if not messages:
         return ""
-    llm = (content or get_content()).llm
-    lines: list[str] = []
+    rendered: list[str] = []
     for message in messages:
         time_label = format_message_time(message.created_at)
         text = message.content.replace("\n", " ").strip()
         if not text:
             continue
         if message.role == "assistant":
-            lines.append(
-                llm.session_assistant_line.format(
-                    time=time_label,
-                    content=text,
-                )
-            )
+            sender = BOT_SENDER
         else:
             sender = resolve_sender_display_name(
                 message.sender_telegram_id,
                 message.sender_name,
             )
-            line = llm.session_user_line.format(
-                time=time_label,
-                sender=sender,
+        reply_text = message.reply_to_text
+        if reply_text:
+            reply_text = reply_text.replace("\n", " ").strip()
+        rendered.append(
+            render_msg(
                 content=text,
+                sender=sender,
+                time=time_label,
+                msg_id=message.id,
+                reply_to=message.reply_to_message_id,
+                reply_text=reply_text,
+                attachments=message_attachment_blocks(
+                    message.attachments,
+                    message.photo_caption,
+                ),
             )
-            if message.reply_to_text:
-                reply_sender = resolve_sender_display_name(
-                    message.reply_to_sender_telegram_id,
-                    message.reply_to_sender_name,
-                )
-                line += "\n" + llm.session_reply_line.format(
-                    sender=reply_sender,
-                    content=message.reply_to_text.replace("\n", " ").strip(),
-                )
-            lines.append(line)
-    return "\n".join(lines)
+        )
+    return render_messages(rendered)
 
 
 def session_context_messages(

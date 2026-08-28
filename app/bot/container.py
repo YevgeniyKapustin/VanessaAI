@@ -36,6 +36,7 @@ def create_bot_services() -> BotServices:
         probability=stickers_config.probability,
         heuristic_probability=stickers_config.heuristic_probability,
         min_messages_between=stickers_config.min_messages_between,
+        tag_probability=stickers_config.tag_probability,
     )
     return BotServices(
         chat_client=HttpChatApiClient(

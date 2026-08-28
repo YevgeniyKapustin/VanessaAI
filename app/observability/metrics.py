@@ -281,6 +281,20 @@ llm_cache_miss_tokens_total = Counter(
     registry=registry,
 )
 
+# --- Stickers ---------------------------------------------------------------
+sticker_unknown_tags_total = Counter(
+    "vanessa_sticker_unknown_tags_total",
+    "Sticker tags the model emitted that are not in the pack (soft fallback outcome)",
+    ["action"],  # mapped | dropped
+    registry=registry,
+)
+sticker_tagged_total = Counter(
+    "vanessa_sticker_tagged_total",
+    "Sticker tags accepted from the LLM reply (after alias mapping)",
+    ["tag"],
+    registry=registry,
+)
+
 # --- User activity / engagement ---------------------------------------------
 active_users = Gauge(
     "vanessa_active_users",

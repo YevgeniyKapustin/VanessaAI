@@ -83,3 +83,34 @@ def test_split_fallback_splits_long_single_paragraph():
     blocks = split_reply_into_blocks(reply, fallback_target_chars=120)
     assert len(blocks) > 1
     assert all(len(block) <= 120 for block in blocks)
+
+
+def test_fallback_splits_reply_into_short_messages_without_newlines():
+    # A normal multi-sentence reply with no `[next]` markers used to arrive as
+    # ONE message with line breaks. It must now arrive as several short
+    # messages ("1-2 sentences per message"), never a multi-line wall of text.
+    reply = (
+        "First thought about the garages. "
+        "Second thought keeps it going. "
+        "Third thought wraps it up."
+    )
+    blocks = split_reply_into_blocks(reply)
+    assert len(blocks) == 2
+    assert all("\n" not in block for block in blocks)
+    assert "First thought about the garages. Second thought keeps it going." in blocks
+
+
+def test_fallback_groups_at_most_two_sentences_per_message():
+    reply = "One. Two. Three. Four."
+    blocks = split_reply_into_blocks(reply)
+    assert len(blocks) == 2
+    assert blocks == ["One. Two.", "Three. Four."]
+
+
+def test_fallback_never_joins_paragraphs_with_newline():
+    # Paragraphs become separate short messages too, instead of being packed
+    # into one message with blank-line breaks.
+    reply = "One thought.\n\nAnother thought.\n\nA third one."
+    blocks = split_reply_into_blocks(reply)
+    assert len(blocks) == 2
+    assert all("\n" not in block for block in blocks)

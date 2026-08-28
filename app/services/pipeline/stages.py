@@ -16,6 +16,7 @@ from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
+from app.decision.repeated_question import is_repeated_message
 from app.decision.repeated_loop import LoopRegistry, loop_registry as default_loop_registry
 from app.decision.gate.protocols import (
     PlannerPrefilterProtocol,
@@ -30,17 +31,25 @@ from app.knowledge.metrics.feedback import (
 )
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
+from app.llm.format.answer_tag import extract_ignore_reason, has_ignore_marker
 from app.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
 from app.llm.format.photo_tag import extract_photo_index
 from app.llm.format.reply_format import strip_trailing_periods
 from app.llm.format.sticker_tag import extract_sticker_tag
+from app.llm.photo_request import is_photo_request
 from app.llm.planner.turn_planner import TurnPlan
 from app.llm.prompts.session_format import session_context_messages
+from app.observability.metrics import (
+    record_photo_request_missed,
+    record_photo_send,
+    record_web_search,
+)
 from app.rag.search.react_retriever import retrieve_with_react
 from app.rag.search.search_plan import build_main_rag_plan
 from app.services.humor_pipeline import HumorPipelineProtocol
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
+from app.services.websearch.protocols import WebSearchService
 from app.llm.memes import MemeCatalog, MemeDecider
 from app.services.pipeline.gate_support import (
     apply_owner_ignore_if_needed,
@@ -299,6 +308,7 @@ class RetrieveStage:
         knowledge: KnowledgeRetriever | None = None,
         meme_catalog: MemeCatalog | None = None,
         meme_decider: MemeDecider | None = None,
+        web_search: WebSearchService | None = None,
     ) -> None:
         self._retriever = retriever
         self._humor = humor_pipeline
@@ -306,6 +316,8 @@ class RetrieveStage:
         self._knowledge = knowledge
         self._meme_catalog = meme_catalog
         self._meme_decider = meme_decider
+        # Live web search (the "googling" skill); None disables it (default).
+        self._web_search = web_search
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         if self._uow is not None:
@@ -389,6 +401,11 @@ class RetrieveStage:
             )
         ctx.rag_ms = (time.perf_counter() - rag_started) * 1000
 
+        # Live web search (the "googling" skill): runs alongside RAG when the
+        # planner flagged the turn. Fail-open — results only ever enrich the
+        # compose prompt, never block the reply.
+        await self._run_web_search(ctx)
+
         humor_started = time.perf_counter()
         ctx.humor_quotes = await self._humor.fetch_quotes(
             ctx.turn_plan,
@@ -442,6 +459,46 @@ class RetrieveStage:
             ctx.rag_ms,
         )
         return True
+
+    async def _run_web_search(self, ctx: TurnPipelineContext) -> None:
+        """Run the live web search when the planner flagged the turn.
+
+        Fail-open by design: a search error or an empty result never blocks the
+        turn — the composer simply answers from the archive / its own knowledge.
+        Timing and outcome are recorded so search quality is observable.
+        """
+        assert ctx.turn_plan is not None
+        if not settings.web_search_enabled or self._web_search is None:
+            return
+        query = (ctx.turn_plan.web_query or "").strip()
+        if not ctx.turn_plan.web_search or not query:
+            return
+        started = time.perf_counter()
+        try:
+            results = await self._web_search.search(
+                query,
+                limit=settings.web_search_max_results,
+            )
+            ctx.web_blocks = list(results)
+            status = "found" if results else "empty"
+        except Exception:
+            # Fail-open: never let a broken search API block the reply.
+            logger.exception(
+                "web_search_failed request_id=%s query=%r",
+                get_request_id(),
+                query,
+            )
+            ctx.web_blocks = []
+            status = "error"
+        ctx.web_ms = (time.perf_counter() - started) * 1000
+        record_web_search(status, ctx.web_ms)
+        logger.info(
+            "turn_stage web_search request_id=%s query=%r results=%s web_ms=%.1f",
+            get_request_id(),
+            query,
+            len(ctx.web_blocks),
+            ctx.web_ms,
+        )
 
     @staticmethod
     def _semantic_query(turn_plan, message: str) -> str:
@@ -500,7 +557,8 @@ def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
     Deduplicated by telegram_file_id and bounded by ``vision_photo_candidates``.
     """
     seen: set[str] = set()
-    collected: list[tuple[str, str, str, object]] = []  # (file_id, caption, sender, msg)
+    # (file_id, data_url, caption, sender, msg)
+    collected: list[tuple[str, str, str, str, object]] = []
 
     def _add(message) -> None:
         for attachment in message.attachments:
@@ -509,7 +567,13 @@ def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
                 continue
             seen.add(file_id)
             collected.append(
-                (file_id, _photo_caption_for(message), message.sender_name or "", message)
+                (
+                    file_id,
+                    attachment.data_url or "",
+                    _photo_caption_for(message),
+                    message.sender_name or "",
+                    message,
+                )
             )
 
     # RAG context first (meaning match), then the recent session (recency).
@@ -520,7 +584,9 @@ def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
         _add(message)
 
     candidates: list[PhotoCandidate] = []
-    for index, (file_id, caption, sender, message) in enumerate(collected, start=1):
+    for index, (file_id, data_url, caption, sender, message) in enumerate(
+        collected, start=1
+    ):
         if len(candidates) >= settings.vision_photo_candidates:
             break
         candidates.append(
@@ -530,22 +596,53 @@ def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
                 caption=caption,
                 sender_name=sender or None,
                 created_at=getattr(message, "created_at", None),
+                data_url=data_url or None,
             )
         )
     return candidates
 
 
 class ComposeStage:
-    def __init__(self, llm: LLMProviderProtocol) -> None:
+    def __init__(
+        self,
+        llm: LLMProviderProtocol,
+        *,
+        refuse_enabled: bool = True,
+        refuse_min_occurrences: int = 2,
+    ) -> None:
         self._llm = llm
+        self._refuse_enabled = refuse_enabled
+        self._refuse_min_occurrences = max(2, refuse_min_occurrences)
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
+        # Compose-stage refusal, defense-in-depth for spam: the gate usually
+        # catches repeats, but some paths never run the decision engine (the
+        # vision forced-turn path) or could be bypassed in the future. Re-check
+        # deterministically here, at the very moment of preparing the answer, so
+        # the expensive LLM is not even invoked for an identical spam burst.
+        if self._refuse_enabled and is_repeated_message(
+            ctx.turn.message,
+            ctx.recent,
+            sender_telegram_id=ctx.turn.sender_telegram_id,
+            min_occurrences=self._refuse_min_occurrences,
+        ):
+            return self._refuse(
+                ctx,
+                reason=DecisionReason.REPEATED.value,
+                log_event="turn_stage compose_refuse_repeated",
+            )
+
         llm_started = time.perf_counter()
         session_messages = session_context_messages(ctx.recent)
+        # The notes must name the sender EXACTLY as the current <msg sender="...">
+        # does (ctx.sender_name — the same resolved display name), so the model
+        # never has to reconcile two different names for one person (e.g. the
+        # profile's «Гриша» vs the message's «Ну я») and burns chain-of-thought
+        # guessing who the sender is.
         metrics_block = None
         if ctx.sender_profile is not None and ctx.sender_metrics is not None:
             metrics_block = render_feedback_block(
-                name=ctx.sender_profile.display_name,
+                name=ctx.sender_name,
                 metrics=ctx.sender_metrics,
                 mood=ctx.sender_profile.mood,
             )
@@ -557,7 +654,7 @@ class ComposeStage:
             and ctx.annoyance >= settings.feedback_annoyance_threshold
         ):
             attitude_note = render_annoyance_note(
-                name=ctx.sender_profile.display_name,
+                name=ctx.sender_name,
                 annoyance=ctx.annoyance,
             )
         # Vision: attach the current + recent-session images when enabled; the
@@ -566,12 +663,16 @@ class ComposeStage:
         # Photo album: photos the bot could re-send, matched to the context by
         # RAG "по смыслу" + the recent session.
         photo_candidates = _collect_photo_candidates(ctx) if settings.vision_enabled else []
+        # Did the user explicitly ask for a photo? Drives the honesty directives
+        # (marker required / honest refusal) and the missed-request metric below.
+        photo_requested = is_photo_request(ctx.turn.message)
         ctx.reply = await self._llm.generate(
             user_message=ctx.turn.message,
             context_blocks=ctx.context_blocks,
             session_messages=session_messages,
             humor_quotes=ctx.humor_quotes or None,
             knowledge_blocks=ctx.knowledge_blocks or None,
+            web_blocks=ctx.web_blocks or None,
             meme_blocks=ctx.meme_blocks or None,
             meme_menu=ctx.meme_menu or None,
             metrics_block=metrics_block,
@@ -589,12 +690,42 @@ class ComposeStage:
             images=images or None,
             photo_candidates=photo_candidates or None,
         )
+        # The compose model is instructed to output the tag `[ignore]` (plus an
+        # optional short debug-only reason after it — never an `[answer]` or a
+        # message) when the user repeats the same thing — an explicit refusal
+        # signal, far more robust than an empty reply. Honor it here (at the
+        # moment of preparing the answer) instead of letting it flow through as
+        # a literal `[ignore]` message.
+        if self._refuse_enabled and has_ignore_marker(ctx.reply or ""):
+            return self._refuse(
+                ctx,
+                reason=DecisionReason.REPEATED.value,
+                log_event="turn_stage compose_refuse_marker",
+                # The model writes a short reason after the tag (e.g.
+                # `[ignore] повтор того же вопроса`) purely for debugging — it
+                # is never delivered to the chat.
+                detail=extract_ignore_reason(ctx.reply),
+            )
+        # Fallback: an empty reply is also treated as the model staying silent
+        # (older prompt / the model forgetting the marker). Previously an empty
+        # reply still created an empty assistant message and a recorded REPLY
+        # turn — the bot "replied" with nothing while believing it answered.
+        if self._refuse_enabled and not (ctx.reply or "").strip():
+            return self._refuse(
+                ctx,
+                reason=DecisionReason.REPEATED.value,
+                log_event="turn_stage compose_refuse_empty",
+            )
         # Resolve the [photo:<index>] marker the model may have emitted: strip it
         # from the reply and remember the file_id the bot should re-send.
         clean_reply, photo_index = extract_photo_index(ctx.reply)
         if photo_index is not None:
             if 1 <= photo_index <= len(photo_candidates):
-                ctx.photo_file_id = photo_candidates[photo_index - 1].telegram_file_id
+                candidate = photo_candidates[photo_index - 1]
+                ctx.photo_file_id = candidate.telegram_file_id
+                # Carry the stored bytes so the bot can fall back to an upload
+                # if the Telegram file_id is stale when it tries to re-send.
+                ctx.photo_data_url = candidate.data_url
                 logger.info(
                     "photo_send_resolved request_id=%s index=%s file_id=%s",
                     get_request_id(),
@@ -609,6 +740,27 @@ class ComposeStage:
                     len(photo_candidates),
                 )
             ctx.reply = clean_reply
+
+        # Honesty + observability: a photo request that resolved to no delivery
+        # is exactly the "сказала что отправила, но фото не пришло" bug. When the
+        # user asked for a photo and we end up with no photo_file_id, record the
+        # failure with a reason so it can be monitored and investigated.
+        if ctx.photo_file_id:
+            record_photo_send("resolved")
+        elif photo_requested:
+            if photo_index is not None:
+                reason = "index_out_of_range"
+            elif photo_candidates:
+                reason = "no_marker"
+            else:
+                reason = "album_empty"
+            record_photo_request_missed(reason)
+            logger.warning(
+                "photo_request_missed request_id=%s reason=%s candidates=%s",
+                get_request_id(),
+                reason,
+                len(photo_candidates),
+            )
         ctx.llm_ms = (time.perf_counter() - llm_started) * 1000
         logger.info(
             "turn_stage llm request_id=%s reply_len=%s llm_ms=%.1f",
@@ -617,6 +769,36 @@ class ComposeStage:
             ctx.llm_ms,
         )
         return True
+
+    def _refuse(
+        self,
+        ctx: TurnPipelineContext,
+        *,
+        reason: str,
+        log_event: str,
+        detail: str = "",
+    ) -> bool:
+        """Refuse the answer at compose time.
+
+        Drops the (already generated or never-started) reply and returns False so
+        the orchestrator finalizes the turn as an IGNORE via ``FinalizeStage.skip``
+        — the user message is still indexed, no assistant message is created and
+        nothing is delivered to the chat. ``detail`` is an optional extra debug
+        context (e.g. the model's reason written after the ``[ignore]`` marker);
+        it is only logged, never sent anywhere.
+        """
+        ctx.reply = None
+        ctx.refuse_reason = reason
+        logger.info(
+            "%s request_id=%s reason=%s ignore_reason=%r sender_id=%s text=%r",
+            log_event,
+            get_request_id(),
+            reason,
+            detail,
+            ctx.turn.sender_telegram_id,
+            ctx.turn.message,
+        )
+        return False
 
 
 class FinalizeStage:
@@ -706,6 +888,9 @@ class FinalizeStage:
             sticker_tag=sticker_tag,
             # Photo the compose model asked to re-send (resolved from [photo:N]).
             photo_file_id=ctx.photo_file_id,
+            # Stored bytes of the same photo, so the bot can fall back to an
+            # upload when the Telegram file_id is stale at delivery time.
+            photo_data_url=ctx.photo_data_url,
         )
         self._metrics.record_turn(
             action=ctx.result.action,

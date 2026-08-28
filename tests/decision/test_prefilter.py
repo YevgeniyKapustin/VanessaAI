@@ -84,6 +84,16 @@ def test_prefilter_skips_noise(prefilter: PlannerPrefilter):
     assert result.reason == "noise"
 
 
+def test_prefilter_defers_short_maybe_message(prefilter: PlannerPrefilter):
+    # A short but possibly meaningful message ("го" = "let's go") is no longer
+    # hard-dropped as noise: it is deferred to the reaction gate so the neural
+    # network decides when there is doubt.
+    result = prefilter.evaluate("го", [])
+
+    assert result.run_planner is True
+    assert result.reason == "short_maybe"
+
+
 def test_prefilter_runs_follow_up_question(prefilter: PlannerPrefilter):
     recent = [
         ContextMessage(id=1, role="user", content="Vanessa, расскажи"),

@@ -21,6 +21,11 @@ import re
 _FENCED_CODE = re.compile(r"```[\s\S]*?```", re.DOTALL)
 # Tag like `[answer]`, `[ANSWER]`, `[ Answer ]`.
 _ANSWER_TAG = re.compile(r"\[\s*answer\s*\]", re.IGNORECASE)
+# Explicit "this is a repeat, stay silent" tag the compose model emits INSTEAD
+# of an `[answer]` + message. A dedicated tag is a far more robust refusal
+# signal than an empty reply — the model never has to produce a blank message.
+IGNORE_MARKER = "[ignore]"
+_IGNORE_TAG = re.compile(r"\[\s*ignore\s*\]", re.IGNORECASE)
 
 
 def _last_tag_span(text: str) -> tuple[int, int] | None:
@@ -73,3 +78,41 @@ def extract_answer(raw: str) -> tuple[str, str]:
     reasoning = text[:start].strip()
     final_reply = text[end:].strip()
     return final_reply, reasoning
+
+
+def has_ignore_marker(text: str) -> bool:
+    """True when the compose output contains a standalone ``[ignore]`` marker.
+
+    The compose model is instructed to output the ``[ignore]`` tag (instead of
+    the ``[answer]`` tag + a message) when the user repeats the same message and
+    no reply is needed, optionally followed by a short internal reason on the
+    same line (e.g. ``[ignore] повтор того же вопроса``) — the reason is only
+    for debugging and never reaches the chat. Any line that STARTS with the tag
+    (whitespace-tolerant, case-insensitive) counts: normally the whole output is
+    just the marker, but a missing ``[answer]`` tag makes the reasoning land in
+    the reply, so a lone marker line anywhere is still treated as a refusal
+    signal. A marker embedded inside a sentence ("он написал [ignore] в чате")
+    is NOT a refusal.
+    """
+    text = text or ""
+    for line in text.splitlines():
+        if _IGNORE_TAG.match(line.strip()):
+            return True
+    return False
+
+
+def extract_ignore_reason(text: str) -> str:
+    """Return the reason written after a standalone ``[ignore]`` marker, if any.
+
+    The model may append a short internal reason on the same line as the tag
+    (``[ignore] повтор``) purely for debugging — it is never delivered to the
+    chat. Returns the stripped reason text, or ``""`` when there is no marker or
+    no text after it.
+    """
+    text = text or ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        match = _IGNORE_TAG.match(stripped)
+        if match:
+            return stripped[match.end():].strip()
+    return ""

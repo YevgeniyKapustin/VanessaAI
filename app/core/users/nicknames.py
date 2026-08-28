@@ -13,7 +13,9 @@ _SPACE_RE = re.compile(r"\s+")
 
 
 def _normalize(text: str) -> str:
-    return _SPACE_RE.sub(" ", text.replace("ё", "е").lower()).strip()
+    # A leading '@' is stripped so a Telegram username (@nu_ya) and its bare form
+    # (nu_ya) normalize to the same key.
+    return _SPACE_RE.sub(" ", text.replace("ё", "е").lower().lstrip("@")).strip()
 
 
 def resolve_nicknames_path() -> Path:
@@ -33,9 +35,10 @@ def get_chat_nicknames() -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 # Aliases: the single source of truth is the knowledge vault — each People card
 # carries its own frontmatter ``aliases``/``names`` (e.g. «гриша.md» lists both
-# «Гриша» and «Ну я»). The canonical display name is the roster name from
-# ``config/nicknames.yaml`` (by telegram_id) — the same name the bot shows as the
-# sender. No separate aliases config exists; editing a People card is enough.
+# «Гриша» and «Ну я»), plus a dedicated ``telegram_username`` field for the TG
+# @username (e.g. ``nu_ya`` for ``@nu_ya``). The canonical display name is the
+# roster name from ``config/nicknames.yaml`` (by telegram_id) — the same name the
+# bot shows as the sender. Editing a People card is enough.
 # ---------------------------------------------------------------------------
 
 
@@ -71,8 +74,10 @@ def _load_vault_aliases() -> dict[str, tuple[str, ...]]:
 
     For every card the canonical name is the roster name (``config/nicknames.yaml``
     by telegram_id), falling back to the card's ``nickname``/``id``. The aliases
-    are the card's frontmatter ``aliases``/``names`` minus the canonical name
-    itself, deduplicated in order.
+    are the card's frontmatter ``aliases``/``names`` plus the Telegram @username
+    (``telegram_username`` / ``username``, e.g. ``nu_ya`` for ``@nu_ya``) minus
+    the canonical name itself, deduplicated in order. A leading ``@`` is stripped
+    so both ``@nu_ya`` and ``nu_ya`` resolve.
     """
     from app.knowledge.format import parse_frontmatter  # lazy: avoids import cycle
 
@@ -103,6 +108,16 @@ def _load_vault_aliases() -> dict[str, tuple[str, ...]]:
                     continue
                 seen.add(key)
                 aliases.append(alias)
+        # Telegram @username — its own frontmatter field (e.g. ``nu_ya`` for
+        # ``@nu_ya``). A leading '@' is stripped so the bare username also matches.
+        for field in ("telegram_username", "username"):
+            username = str(meta.get(field) or "").strip()
+            if not username:
+                continue
+            key = _normalize(username)
+            if key and key not in seen and key != _normalize(canonical):
+                seen.add(key)
+                aliases.append(username)
         if aliases:
             result[canonical] = tuple(aliases)
     return result

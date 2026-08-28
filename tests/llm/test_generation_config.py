@@ -8,18 +8,28 @@ def test_composer_generation_loaded_from_content():
     assert isinstance(params, LLMGenerationParams)
     assert params.temperature == 0.8
     assert params.top_p == 0.9
-    # Headroom for the chain-of-thought prefix + [answer] tag on top of the
-    # final message (reasoning must not eat the reply's token budget).
-    assert params.max_tokens == 1024
+    # The composer runs on a reasoning (V4) model whose chain-of-thought counts
+    # against max_tokens — the budget must cover reasoning + [answer] tag + the
+    # reply itself, not just the final message.
+    assert params.max_tokens == 2048
     assert params.presence_penalty == 0.4
     assert params.frequency_penalty == 0.35
+    # The composer forces a deep chain of thought on every reply (fewer logical
+    # errors) — reasoning_effort is forwarded to the DeepSeek V4 API.
+    assert params.reasoning_effort == "high"
+    assert params.to_llm_kwargs()["reasoning_effort"] == "high"
 
 
 def test_planner_generation_is_more_deterministic():
     params = get_content().llm.generation.planner.to_params()
     assert params.temperature == 0.1
     assert params.top_p == 0.85
-    assert params.max_tokens == 192
+    # The planner runs on a reasoning (V4) model whose chain-of-thought counts
+    # against max_tokens — the budget must cover reasoning + the JSON object,
+    # not just the JSON itself (2048 is plenty, the JSON is ~300 tokens).
+    assert params.max_tokens == 2048
+    assert params.reasoning_effort == "low"
+    assert params.to_llm_kwargs()["reasoning_effort"] == "low"
 
 
 def test_llm_kwargs_include_sampling_params():
@@ -34,12 +44,15 @@ def test_llm_kwargs_include_sampling_params():
     }
 
 
-def test_reasoning_effort_omitted_by_default():
-    # The gate planner must stay in the API's default normal mode — the
-    # parameter is never sent unless explicitly configured.
+def test_planner_reasoning_effort_low_and_forwarded():
+    # The planner runs a reasoning model: it thinks through the flag decision
+    # before emitting the JSON (see turn_planner_prompt "How to decide"), so
+    # reasoning_effort="low" is forwarded to the DeepSeek V4 API. The chain of
+    # thought lives in reasoning_content, separate from content — the JSON parse
+    # stays clean.
     params = get_content().llm.generation.planner.to_params()
-    assert params.reasoning_effort is None
-    assert "reasoning_effort" not in params.to_llm_kwargs()
+    assert params.reasoning_effort == "low"
+    assert params.to_llm_kwargs()["reasoning_effort"] == "low"
 
 
 def test_reasoning_effort_sent_when_configured():

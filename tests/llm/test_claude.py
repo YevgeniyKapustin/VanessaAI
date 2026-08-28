@@ -49,6 +49,31 @@ async def test_claude_generate_returns_capitalized_reply(provider: ClaudeLLMProv
 
 
 @pytest.mark.asyncio
+async def test_claude_never_sends_reasoning_effort():
+    # The composer profile may carry reasoning_effort (a DeepSeek-only V4 param).
+    # Claude must strip it — sending an unknown parameter would 400.
+    client = AsyncMock()
+    response = MagicMock()
+    response.content = [MagicMock(text="привет мир")]
+    client.messages.create = AsyncMock(return_value=response)
+    provider = ClaudeLLMProvider(
+        client=client,
+        model="test-model",
+        profanity_substitutor=FakeSubstitutor(),
+        max_retries=1,
+        generation=LLMGenerationParams(
+            temperature=0.8,
+            top_p=0.9,
+            max_tokens=128,
+            reasoning_effort="high",
+        ),
+    )
+    await provider.generate("hello", [])
+    call = provider._client.messages.create.await_args
+    assert "reasoning_effort" not in call.kwargs
+
+
+@pytest.mark.asyncio
 async def test_claude_generate_strips_leading_sender_name(
     provider: ClaudeLLMProvider,
 ):

@@ -114,3 +114,35 @@ def test_fallback_never_joins_paragraphs_with_newline():
     blocks = split_reply_into_blocks(reply)
     assert len(blocks) == 2
     assert all("\n" not in block for block in blocks)
+
+
+def test_split_does_not_leak_trailing_marker():
+    # The model hits the output cap right after emitting `[next]`, so the reply
+    # ends with a dangling marker. The fallback splitter must strip it instead of
+    # delivering the control tag (or a block containing it) to the chat.
+    reply = "First reply text\n[next]"
+    blocks = split_reply_into_blocks(reply)
+    assert blocks == ["First reply text"]
+    assert all("[next]" not in block for block in blocks)
+
+
+def test_split_only_marker_returns_empty():
+    # The whole (truncated) output was just the `[next]` marker — nothing is
+    # delivered rather than sending a literal `[next]` message.
+    assert split_reply_into_blocks("[next]") == []
+    assert split_reply_into_blocks("  [ Next ]  ") == []
+
+
+def test_split_trailing_marker_custom_marker_is_stripped():
+    reply = "A\n<|msg|>"
+    blocks = split_reply_into_blocks(reply, marker="<|msg|>")
+    assert blocks == ["A"]
+
+
+def test_split_does_not_leak_marker_inside_content():
+    # A marker line in the MIDDLE still splits into blocks, and neither delivered
+    # block may contain the marker.
+    reply = "Один\n[next]\nДва"
+    blocks = split_reply_into_blocks(reply)
+    assert blocks == ["Один", "Два"]
+    assert all("[next]" not in block for block in blocks)

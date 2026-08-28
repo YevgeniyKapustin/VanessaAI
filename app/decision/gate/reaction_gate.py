@@ -8,6 +8,7 @@ from typing import Pattern
 from app.config.content import AppContent, get_content, get_continuation_phrases
 from app.config.settings import settings
 from app.core.messages import ContextMessage
+from app.decision.detectors.noise import NoiseFilter
 from app.decision.gate.continuation import is_sender_continuation_demand
 from app.llm.providers.protocols import LLMChatCompleter, create_chat_completer
 
@@ -127,6 +128,7 @@ class ReactionGate:
         bot_names: tuple[str, ...] | None = None,
     ) -> None:
         self._content = content or get_content()
+        self._noise_filter = NoiseFilter()
         self._client = llm_client or create_chat_completer()
         self._model = (
             model
@@ -293,16 +295,13 @@ class ReactionGate:
         ):
             return ReactionGateResult(respond=True, reason="heuristic_continuation")
 
-        # Obvious noise / one-word filler with no request signal — clear NO
-        # (instant short-circuit). Conservative: only very short non-addresses.
-        noise_words, noise_chars = (
-            self._content.decision.noise_max_words,
-            self._content.decision.noise_max_chars,
-        )
-        if noise_words and noise_chars:
-            tokens = lowered.split()
-            if len(tokens) <= noise_words and len(text.strip()) <= noise_chars:
-                return ReactionGateResult(respond=False, reason="heuristic_noise")
+        # Unambiguous filler/acknowledgment ("ок", "ага", "👍") — clear NO
+        # (instant short-circuit, no LLM). Short-but-possibly-meaningful
+        # messages ("го", "хз", "погнали") are NOT dropped here: they fall
+        # through to the Tier-2 LLM so the neural network decides when there
+        # is doubt.
+        if self._noise_filter.is_definite_noise(text):
+            return ReactionGateResult(respond=False, reason="heuristic_noise")
 
         return None
 

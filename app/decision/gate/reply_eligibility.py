@@ -217,7 +217,7 @@ class ReplyEligibility:
             return PrefilterVerdict(True, "continuation")
 
         if in_listen_window:
-            if self._noise.is_noise(text) and not trigger.detected:
+            if self._noise.is_definite_noise(text) and not trigger.detected:
                 return PrefilterVerdict(False, "noise")
             if is_unsolicited_remark(text):
                 return PrefilterVerdict(False, "side_talk")
@@ -226,7 +226,12 @@ class ReplyEligibility:
             return PrefilterVerdict(True, "listen_window")
 
         if self._noise.is_noise(text) and not trigger.detected:
-            return PrefilterVerdict(False, "noise")
+            if self._noise.is_definite_noise(text):
+                return PrefilterVerdict(False, "noise")
+            # Short but possibly meaningful ("го", "хз", "погнали", "стой") —
+            # not unambiguous filler. Don't hard-drop it: defer to the reaction
+            # gate so the neural network decides when there is doubt.
+            return PrefilterVerdict(True, "short_maybe")
 
         if is_conversation_closure(text):
             return PrefilterVerdict(False, "closure")

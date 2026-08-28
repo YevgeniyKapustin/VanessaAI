@@ -440,6 +440,24 @@ def test_turn_planner_apply_detail_keeps_planner_when_no_explicit_phrasing():
     assert result.detail == "detailed"
 
 
+def test_turn_planner_apply_detail_clarification_wins_over_heuristic():
+    """A clarification turn stays a short question — «подробнее» must not force
+    a detailed answer when the planner needs to ask for context."""
+    planner = TurnPlanner(use_llm=False)
+    plan = TurnPlan(
+        original="про то самое, подробнее",
+        text="",
+        skip_search=True,
+        should_reply=True,
+        needs_clarification=True,
+        detail="normal",
+    )
+
+    result = planner._apply_detail(plan, "про то самое, подробнее")
+
+    assert result.detail == "normal"
+
+
 @pytest.mark.asyncio
 async def test_turn_planner_fallback_applies_detail_heuristic():
     """Even the no-LLM fallback path honors an explicit detail request."""
@@ -522,3 +540,57 @@ def test_turn_plan_to_trace_dict():
     assert data["detail"] == "detailed"
     # The raw user message is already on the trace root — not duplicated here.
     assert "original" not in data
+
+
+def test_turn_plan_to_trace_dict_includes_web_search():
+    plan = TurnPlan(
+        original="какая цена биткоина",
+        text="bitcoin цена",
+        skip_search=False,
+        web_search=True,
+        web_query="bitcoin цена сегодня",
+    )
+    data = plan.to_trace_dict()
+    assert data["web_search"] is True
+    assert data["web_query"] == "bitcoin цена сегодня"
+
+
+def test_turn_planner_parses_web_search_flag():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "какая цена биткоина",
+        '{"should_reply": true, "search_query": "bitcoin цена", "skip": false, '
+        '"web_search": true, "web_query": "bitcoin цена сегодня"}',
+    )
+    assert result.web_search is True
+    assert result.web_query == "bitcoin цена сегодня"
+
+
+def test_turn_planner_web_search_falls_back_to_search_query():
+    """A flagged web search with an empty web_query uses search_query instead."""
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "какая цена биткоина",
+        '{"should_reply": true, "search_query": "bitcoin цена", "skip": false, '
+        '"web_search": true, "web_query": ""}',
+    )
+    assert result.web_search is True
+    assert result.web_query == "bitcoin цена"
+
+
+def test_turn_planner_web_search_defaults_off():
+    planner = TurnPlanner(use_llm=False)
+    result = planner._parse_llm_response(
+        "расскажи про крабера",
+        '{"should_reply": true, "search_query": "крабер", "skip": false}',
+    )
+    assert result.web_search is False
+    assert result.web_query == ""
+
+
+def test_turn_planner_prompt_teaches_web_search():
+    prompt = get_content().rag.turn_planner_prompt
+    assert '"web_search": false' in prompt
+    assert '"web_query": ""' in prompt
+    assert "## web_search / web_query" in prompt
+    assert "web_search=true" in prompt

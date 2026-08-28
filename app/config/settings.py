@@ -142,6 +142,13 @@ class Settings(BaseSettings):
     decision_prefilter_defer_questions: bool = True
     decision_post_reply_listen_count: int = 4
     decision_session_idle_seconds: int = 300
+    # Compose-stage refusal: when the answer-preparation (compose) stage detects
+    # a repeated same-sender message, or the compose model returns an empty
+    # "stay silent" reply, the turn is refused (finalized as IGNORE) instead of
+    # sending an empty/duplicate answer. A final safety net for spam the earlier
+    # gate let through (also covers the vision forced-turn path that bypasses
+    # the decision engine).
+    decision_compose_refuse_enabled: bool = True
 
     # Lightweight Decision Gate (reaction classifier) — runs BEFORE the heavy
     # LLM turn planner. One fast, cheap YES/NO call decides whether the message
@@ -314,6 +321,12 @@ class Settings(BaseSettings):
     knowledge_memory_enabled: bool = True
     knowledge_memory_cooldown_seconds: int = 300
     knowledge_memory_max_tokens: int = 512
+    # Deterministic prefilter: skip the memory LLM call when the new transcript
+    # is mundane (short replies, chit-chat) and would only return an empty plan.
+    knowledge_memory_prefilter_enabled: bool = True
+    knowledge_memory_prefilter_min_messages: int = 1
+    knowledge_memory_prefilter_min_content_chars: int = 40
+    knowledge_memory_prefilter_score_threshold: float = 1.5
     knowledge_sweep_enabled: bool = True
     knowledge_sweep_interval_messages: int = 50
     knowledge_sweep_batch_size: int = 200
@@ -396,6 +409,26 @@ class Settings(BaseSettings):
     decision_loop_similarity_threshold: float = 0.4
     decision_loop_decay_half_life_seconds: int = 3600
     feedback_annoyance_threshold: float = 0.5
+
+    # --- Web search (the "googling" skill) ------------------------------------
+    # Master switch for live internet search. When on, the gate planner may flag
+    # a turn with web_search=true and the Retrieve stage runs a real search API;
+    # the results are injected into the compose prompt as a "live web results"
+    # block (search-then-inject, no tool-calling loop, so no extra LLM round-trip).
+    web_search_enabled: bool = False
+    # Search provider: "tavily" (default, built for LLM agents), "serper",
+    # or "duckduckgo" (free but rate-limited / less stable).
+    web_search_provider: str = "tavily"
+    web_search_api_key: str = ""
+    # Max results injected into the compose prompt per turn.
+    web_search_max_results: int = 5
+    # Hard cap on the search HTTP call so a slow provider never stalls the reply.
+    web_search_timeout_seconds: float = 5.0
+    # Per-result snippet cap (chars); longer snippets are cut at a boundary.
+    # The whole web-results block is capped by the compose prompt budget
+    # (config/content/llm.yaml budget: web_blocks), so it trims together with
+    # the rest of the context.
+    web_search_snippet_max_chars: int = 300
 
     @property
     def planner_model(self) -> str:

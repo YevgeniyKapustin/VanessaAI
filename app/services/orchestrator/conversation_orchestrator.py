@@ -155,6 +155,19 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
 
         await self._run_stage("retrieve", self._retrieve.run(ctx))
         await self._run_stage("compose", self._compose.run(ctx))
+
+        # The compose stage refused the answer (repeated same-sender message /
+        # spam, or the compose model returned an empty "stay silent" reply):
+        # finalize the turn as an IGNORE instead of sending a reply. The user
+        # message is still indexed, no assistant message is created, nothing is
+        # delivered to the chat, and post-reply memory/metrics are skipped — the
+        # same shape as a gate-level ignore.
+        if ctx.refuse_reason is not None:
+            await self._finalize.skip(ctx, reason=ctx.refuse_reason)
+            self._log_processed(turn, ctx)
+            assert ctx.result is not None
+            return ctx.result
+
         await self._run_stage("finalize", self._finalize.run(ctx))
         await self._run_post_reply(ctx)
         self._log_processed(turn, ctx)
@@ -188,7 +201,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             if self._memory is not None:
                 self._background.submit(self._build_memory_job(ctx))
             if self._metrics is not None:
-                self._background.submit(self._build_metrics_job())
+                self._background.submit(self._build_metrics_job(ctx))
             if self._eval is not None and self._eval.should_run():
                 self._background.submit(self._build_eval_job(ctx))
             if caption_job is not None:
@@ -201,6 +214,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 await self._memory.run(
                     recent_messages=ctx.recent,
                     source_message_ids=[ctx.user_msg.id] if ctx.user_msg else None,
+                    telegram_chat_id=ctx.turn.telegram_chat_id,
                 )
             except Exception:
                 logger.exception(
@@ -208,7 +222,11 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 )
         if self._metrics is not None:
             try:
-                await self._metrics.run(self._messages, semantic=False)
+                await self._metrics.run(
+                    self._messages,
+                    semantic=False,
+                    only_senders={ctx.turn.sender_telegram_id},
+                )
             except Exception:
                 logger.exception(
                     "metrics_stage_run_failed request_id=%s", get_request_id()
@@ -217,6 +235,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
     def _build_memory_job(self, ctx: TurnPipelineContext):
         recent = ctx.recent
         source_ids = [ctx.user_msg.id] if ctx.user_msg is not None else None
+        chat_id = ctx.turn.telegram_chat_id
 
         async def job() -> None:
             try:
@@ -224,6 +243,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 await self._memory.run(
                     recent_messages=recent,
                     source_message_ids=source_ids,
+                    telegram_chat_id=chat_id,
                 )
             except Exception:
                 logger.exception(
@@ -232,7 +252,9 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
 
         return job
 
-    def _build_metrics_job(self):
+    def _build_metrics_job(self, ctx: TurnPipelineContext):
+        sender_id = ctx.turn.sender_telegram_id
+
         async def job() -> None:
             try:
                 assert self._metrics is not None
@@ -243,9 +265,14 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                         await self._metrics.run(
                             MessageRepository(session),
                             semantic=False,
+                            only_senders={sender_id},
                         )
                 else:
-                    await self._metrics.run(self._messages, semantic=False)
+                    await self._metrics.run(
+                        self._messages,
+                        semantic=False,
+                        only_senders={sender_id},
+                    )
             except Exception:
                 logger.exception(
                     "metrics_stage_run_failed request_id=%s", get_request_id()

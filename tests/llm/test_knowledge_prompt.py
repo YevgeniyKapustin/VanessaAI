@@ -41,6 +41,9 @@ def test_system_prompt_stickers_list_only_catalog_tags():
 
     assert "## Stickers" in prompt
     section = prompt.split("## Stickers", 1)[1]
+    # The Examples block now follows Stickers (recommended order); stop at the
+    # next section header so only the Stickers block is parsed.
+    section = section.split("\n## ", 1)[0]
     assert "<sticker_system>" in section
     # the prose may mention the block, so slice from the last occurrence
     xml_start = section.rindex("<sticker_system>")

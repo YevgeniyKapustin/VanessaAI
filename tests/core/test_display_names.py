@@ -50,6 +50,37 @@ def test_resolve_user_display_name_prefers_nickname():
     ) == "Евгений"
 
 
+def test_resolve_sender_uses_vault_telegram_username(monkeypatch, tmp_path):
+    # The People card declares that the Telegram @username «nu_ya» (and the
+    # display name «Ну я») are the same person as «Гриша» — the sender renders
+    # consistently from the vault (the single source of truth).
+    from pathlib import Path
+
+    from app.core.users import nicknames
+
+    people = tmp_path / "People"
+    people.mkdir(parents=True, exist_ok=True)
+    (people / "гриша.md").write_text(
+        "---\ntype: person\nid: гриша\n"
+        "aliases:\n- Гриша\n- Ну я\n"
+        "telegram_id: '1071793838'\ntelegram_username: 'nu_ya'\n"
+        "---\n\n## Контекст жизни\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
+    monkeypatch.setattr(
+        nicknames,
+        "load_nicknames",
+        lambda _: {1071793838: "Гриша"},
+    )
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
+
+    assert resolve_sender_display_name(1071793838, "Ну я") == "Гриша"
+    assert resolve_sender_display_name(1071793838, "nu_ya") == "Гриша"
+    assert resolve_sender_display_name(1071793838, "@nu_ya") == "Гриша"
+    assert resolve_sender_display_name(1071793838, "Капустин") == "Капустин"
+
+
 def test_prompt_builder_uses_sender_name():
     builder = PromptBuilder()
     line = builder.format_message_line(

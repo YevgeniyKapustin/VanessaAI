@@ -4,8 +4,9 @@ from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.users.nicknames import format_aliases_for_prompt
-from app.core.messages import ContextBlock, ContextMessage, PhotoCandidate
+from app.core.messages import ContextBlock, ContextMessage, PhotoCandidate, WebResult
 from app.knowledge.schema import KnowledgeBlock
+from app.llm.photo_request import is_photo_request
 from app.llm.prompts.budget import (
     PRIORITY_CONTEXT,
     PRIORITY_CURRENT,
@@ -16,7 +17,9 @@ from app.llm.prompts.budget import (
     PRIORITY_MEME_MENU,
     PRIORITY_METRICS,
     PRIORITY_SESSION,
+    PRIORITY_WEB,
     apply_budget,
+    truncate_body,
 )
 from app.llm.prompts.context_format import block_time_range, format_message_time
 from app.llm.prompts.message_xml import (
@@ -31,6 +34,12 @@ from app.llm.prompts.session_format import format_session_messages
 
 
 class PromptBuilder:
+    """Assemble the compose prompt following the recommended block order:
+
+    system message (blocks 1-3): role/persona -> constraints/rules -> examples;
+    user prompt (blocks 4-5):     input data -> final task.
+    """
+
     def __init__(self, content: AppContent | None = None) -> None:
         self._content = content or get_content()
 
@@ -96,6 +105,7 @@ class PromptBuilder:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        web_blocks: list[WebResult] | None = None,
         meme_blocks: list[MemeDefContent] | None = None,
         meme_menu: list[MemeDefContent] | None = None,
         metrics_block: str | None = None,
@@ -114,6 +124,77 @@ class PromptBuilder:
         photo_candidates: list[PhotoCandidate] | None = None,
     ) -> str:
         llm = self._content.llm
+        # Recommended block order for the user prompt (blocks 4-5):
+        #   constraints/directives (upper middle) -> input data (closer to the
+        #   end) -> final task (very end, the freshest model memory).
+        #
+        # Budgeted parts: (priority, section, body). Section names match the
+        # PromptBudgetContent fields so per-section caps apply generically; the
+        # priority controls which sections survive the global cap.
+        parts: list[tuple[int, str, str]] = []
+
+        # --- Constraints / directives (upper middle) -------------------------
+        # Short turn-level rules that apply regardless of the input; they come
+        # before all dynamic data so the model reads them as standing rules.
+        aliases_text = format_aliases_for_prompt()
+        if aliases_text:
+            parts.append(
+                (PRIORITY_DIRECTIVES, "aliases", f"{llm.aliases_header.strip()}\n{aliases_text}")
+            )
+        if needs_clarification and llm.clarification_instruction.strip():
+            instruction = llm.clarification_instruction.strip()
+            if clarification_hint and clarification_hint.strip():
+                instruction += f"\nWhat is unclear: {clarification_hint.strip()}"
+            parts.append((PRIORITY_DIRECTIVES, "directives", instruction))
+        elif tone and llm.tone_note.strip():
+            parts.append(
+                (PRIORITY_DIRECTIVES, "directives", llm.tone_note.strip().format(tone=tone))
+            )
+        if attitude_note and attitude_note.strip():
+            # Cold-reply directive: the sender is stuck in a same-topic loop and
+            # Vanessa is annoyed — reply dry, sharp and brief.
+            parts.append((PRIORITY_DIRECTIVES, "directives", attitude_note.strip()))
+        # Detail-level directive: the planner/heuristic decided the reply should
+        # be brief or detailed. Skipped when the cold/annoyance note is present —
+        # an annoyed Vanessa stays brief regardless of the user's request.
+        if (
+            detail
+            and detail != "normal"
+            and not (attitude_note and attitude_note.strip())
+        ):
+            note = (
+                llm.detail_note_detailed.strip()
+                if detail == "detailed"
+                else llm.detail_note_brief.strip()
+            )
+            if note:
+                parts.append((PRIORITY_DIRECTIVES, "directives", note))
+        if has_image and llm.vision_note.strip():
+            # Vision directive: the turn carries an image — describe / OCR it and
+            # be honest about unclear text instead of hallucinating.
+            parts.append((PRIORITY_DIRECTIVES, "directives", llm.vision_note.strip()))
+        owner_id = settings.required_user_telegram_id
+        owner_note = llm.owner_message_note.strip()
+        if (
+            owner_id
+            and sender_telegram_id == owner_id
+            and owner_note
+        ):
+            parts.append((PRIORITY_DIRECTIVES, "directives", owner_note))
+        photo_requested = is_photo_request(user_message)
+        if (
+            not photo_candidates
+            and photo_requested
+            and llm.photo_album_empty_note.strip()
+        ):
+            # No photos available and the user asked for one: force an honest
+            # refusal instead of letting the model fake a "sent" claim. Rendered
+            # only on an explicit photo request to avoid noise on every turn.
+            parts.append(
+                (PRIORITY_DIRECTIVES, "directives", llm.photo_album_empty_note.strip())
+            )
+
+        # --- Input data (closer to the end) ----------------------------------
         if context_blocks:
             separator = llm.context_block_separator.strip() or "\n\n"
             blocks_text = separator.join(
@@ -123,11 +204,7 @@ class PromptBuilder:
             history_block = f"{llm.context_header}\n{blocks_text}"
         else:
             history_block = llm.context_header
-
-        # Budgeted parts: (priority, section, body). Section names match the
-        # PromptBudgetContent fields so per-section caps apply generically; the
-        # priority controls which sections survive the global cap.
-        parts = [(PRIORITY_CONTEXT, "context_blocks", history_block)]
+        parts.append((PRIORITY_CONTEXT, "context_blocks", history_block))
         if knowledge_blocks:
             block_lines = [
                 llm.knowledge_block_line.format(
@@ -140,6 +217,35 @@ class PromptBuilder:
             parts.append(
                 (PRIORITY_KNOWLEDGE, "knowledge_blocks", f"{llm.knowledge_header}\n" + "\n".join(block_lines))
             )
+        # Live web search results (the "googling" skill): rendered as their own
+        # block when the planner flagged the turn for web search and the Retrieve
+        # stage found results. Each snippet is cut at a boundary to the settings
+        # cap; the whole block is then handled by the prompt budget (web_blocks).
+        if web_blocks:
+            snippet_cap = settings.web_search_snippet_max_chars
+            web_lines: list[str] = []
+            for block in web_blocks:
+                snippet = block.snippet or ""
+                if snippet_cap > 0:
+                    snippet = truncate_body(snippet, snippet_cap)
+                title = block.title or block.url
+                line = llm.web_block_line.format(
+                    title=title,
+                    url=block.url,
+                    snippet=snippet,
+                )
+                if block.published_date:
+                    # Freshness marker at the line start (e.g. [2026-08-28]),
+                    # so the model can judge how current the source is.
+                    line = f"[{block.published_date}] {line}"
+                web_lines.append(line)
+            parts.append(
+                (PRIORITY_WEB, "web_blocks", f"{llm.web_header}\n" + "\n".join(web_lines))
+            )
+            if llm.web_instruction.strip():
+                parts.append(
+                    (PRIORITY_DIRECTIVES, "directives", llm.web_instruction.strip())
+                )
         if humor_quotes:
             quote_lines = [
                 llm.humor_quote_line.format(quote=quote)
@@ -187,64 +293,15 @@ class PromptBuilder:
             parts.append(
                 (PRIORITY_SESSION, "session_messages", f"{llm.session_header}\n{session_text}")
             )
-        aliases_text = format_aliases_for_prompt()
-        if aliases_text:
-            parts.append(
-                (PRIORITY_DIRECTIVES, "aliases", f"{llm.aliases_header.strip()}\n{aliases_text}")
-            )
-        # The current message is the one to reply to. A reply-to quote is folded
-        # into the same <msg> as <reply_text> (XML input-block convention) rather
-        # than rendered as a separate section.
-        current_line = self.format_current_message(
-            user_message,
-            sender_telegram_id=sender_telegram_id,
-            sender_name=sender_name,
-            reply_to_text=reply_to_text,
-        )
-        current_header = llm.current_message_header
-        if reply_to_text and llm.reply_message_header.strip():
-            current_header = f"{llm.reply_message_header.strip()}\n{current_header}"
-        parts.append(
-            (PRIORITY_CURRENT, "current_message", f"{current_header}\n{current_line}")
-        )
-        if needs_clarification and llm.clarification_instruction.strip():
-            instruction = llm.clarification_instruction.strip()
-            if clarification_hint and clarification_hint.strip():
-                instruction += f"\nWhat is unclear: {clarification_hint.strip()}"
-            parts.append((PRIORITY_DIRECTIVES, "directives", instruction))
-        elif tone and llm.tone_note.strip():
-            parts.append(
-                (PRIORITY_DIRECTIVES, "directives", llm.tone_note.strip().format(tone=tone))
-            )
-        if attitude_note and attitude_note.strip():
-            # Cold-reply directive: the sender is stuck in a same-topic loop and
-            # Vanessa is annoyed — reply dry, sharp and brief.
-            parts.append((PRIORITY_DIRECTIVES, "directives", attitude_note.strip()))
-        # Detail-level directive: the planner/heuristic decided the reply should
-        # be brief or detailed. Skipped when the cold/annoyance note is present —
-        # an annoyed Vanessa stays brief regardless of the user's request.
-        if (
-            detail
-            and detail != "normal"
-            and not (attitude_note and attitude_note.strip())
-        ):
-            note = (
-                llm.detail_note_detailed.strip()
-                if detail == "detailed"
-                else llm.detail_note_brief.strip()
-            )
-            if note:
-                parts.append((PRIORITY_DIRECTIVES, "directives", note))
-        if has_image and llm.vision_note.strip():
-            # Vision directive: the turn carries an image — describe / OCR it and
-            # be honest about unclear text instead of hallucinating.
-            parts.append((PRIORITY_DIRECTIVES, "directives", llm.vision_note.strip()))
         if photo_candidates:
             # Photo album: photos the bot could re-send, matched to the context
-            # by RAG "по смыслу" + the recent session. High priority so the model
-            # can always choose to send one. Rendered as <attachment> entries
-            # inside an <attachments> root (XML input-block convention); the
-            # values are escaped so a literal <...> / & never breaks the markup.
+            # by RAG "по смыслу" + the recent session. Kept as ONE coupled block
+            # (list + its usage instructions) right before the current message:
+            # the instructions reference "the photos listed above", so splitting
+            # them from the list would break the reference. Rendered as
+            # <attachment> entries inside an <attachments> root (XML input-block
+            # convention); the values are escaped so a literal <...> / & never
+            # breaks the markup.
             album_lines = [
                 llm.photo_album_line.format(
                     index=candidate.index,
@@ -265,18 +322,38 @@ class PromptBuilder:
                 parts.append(
                     (PRIORITY_DIRECTIVES, "directives", llm.photo_album_instruction.strip())
                 )
-        owner_id = settings.required_user_telegram_id
-        owner_note = llm.owner_message_note.strip()
-        if (
-            owner_id
-            and sender_telegram_id == owner_id
-            and owner_note
-        ):
-            parts.append((PRIORITY_DIRECTIVES, "directives", owner_note))
+            if photo_requested and llm.photo_request_required_note.strip():
+                # The user explicitly asked for a photo: the marker is mandatory,
+                # not optional — the model must not "say" it sent one.
+                parts.append(
+                    (PRIORITY_DIRECTIVES, "directives", llm.photo_request_required_note.strip())
+                )
+        # The current message is the one to reply to. A reply-to quote is folded
+        # into the same <msg> as <reply_text> (XML input-block convention) rather
+        # than rendered as a separate section.
+        current_line = self.format_current_message(
+            user_message,
+            sender_telegram_id=sender_telegram_id,
+            sender_name=sender_name,
+            reply_to_text=reply_to_text,
+        )
+        current_header = llm.current_message_header
+        if reply_to_text and llm.reply_message_header.strip():
+            current_header = f"{llm.reply_message_header.strip()}\n{current_header}"
+        parts.append(
+            (PRIORITY_CURRENT, "current_message", f"{current_header}\n{current_line}")
+        )
+
+        # --- Final task (very end) -------------------------------------------
+        # A short, explicit call to action in the freshest part of the model's
+        # memory, right after the current message.
+        final_task = llm.final_task_text()
+        if final_task:
+            parts.append((PRIORITY_DIRECTIVES, "final_task", final_task))
 
         # Enforce the compose-prompt budget: per-section caps + a global cap
         # (trimming lowest-priority sections first). Never cuts the current
-        # message or the short directives.
+        # message or the short directives (including the final task).
         budget = self._content.llm.budget
         enabled = bool(settings.compose_budget_enabled and budget.enabled)
         parts = apply_budget(parts, budget, enabled=enabled)
@@ -285,6 +362,11 @@ class PromptBuilder:
 
     @property
     def system_prompt(self) -> str:
+        # Recommended block order for the system message (blocks 1-3):
+        #   role/persona -> constraints/rules -> few-shot examples.
+        # The examples close the system message so they sit right before the
+        # dynamic input data that opens the user prompt (block 4) and the final
+        # task that closes it (block 5).
         persona = self._content.persona
         llm = self._content.llm
         sections = [
@@ -292,7 +374,7 @@ class PromptBuilder:
             ("Voice", persona.voice_text()),
             ("Content rules", persona.rules_text()),
             ("Context handling", llm.task_text()),
-            ("Answer formulation", llm.answer_text()),
+            ("Answer formulation", llm.answer_format_text()),
             ("Reply language", llm.language_text()),
         ]
         parts = [
@@ -312,4 +394,10 @@ class PromptBuilder:
                 sections.append(xml_block)
             if sections:
                 parts.append("## Stickers\n" + "\n\n".join(sections))
+        # Few-shot examples — their own block, after every constraint (the
+        # recommended "lower middle" position). The yaml block already carries
+        # its own "## Examples" header, so it is appended whole.
+        examples = llm.examples_text()
+        if examples:
+            parts.append(examples)
         return "\n\n".join(parts)

@@ -62,8 +62,33 @@ async def test_deepseek_uses_default_model_by_default(provider: DeepSeekLLMProvi
     await provider.generate("hello", [])
     call = provider._client.chat.completions.create.await_args
     assert call.kwargs["model"] == "test-model"
-    # Gate/compose never send reasoning_effort (default normal mode).
+    # The fixture's generation params carry no reasoning_effort → not forwarded.
     assert "reasoning_effort" not in call.kwargs
+
+
+@pytest.mark.asyncio
+async def test_deepseek_forwards_reasoning_effort_when_configured():
+    # The composer runs on a DeepSeek V4 (thinking) model with reasoning_effort
+    # forced high — the chain of thought must be requested from the API.
+    client = AsyncMock()
+    client.chat.completions.create = AsyncMock(
+        return_value=_make_response("привет мир")
+    )
+    provider = DeepSeekLLMProvider(
+        client=client,
+        model="test-model",
+        profanity_substitutor=FakeSubstitutor(),
+        max_retries=1,
+        generation=LLMGenerationParams(
+            temperature=0.8,
+            top_p=0.9,
+            max_tokens=128,
+            reasoning_effort="high",
+        ),
+    )
+    await provider.generate("hello", [])
+    call = provider._client.chat.completions.create.await_args
+    assert call.kwargs["reasoning_effort"] == "high"
 
 
 @pytest.mark.asyncio
@@ -322,3 +347,28 @@ async def test_deepseek_photo_candidates_injected_into_prompt(
     assert get_content().llm.photo_album_header.strip() in text
     assert "кот на диване" in text
     assert "[photo:1]" in text or "[photo:<index>]" in text
+
+
+@pytest.mark.asyncio
+async def test_deepseek_web_blocks_injected_into_prompt(provider: DeepSeekLLMProvider):
+    """The compose prompt carries the live web-results block verbatim."""
+    from app.core.messages import WebResult
+
+    results = [
+        WebResult(
+            title="Bitcoin price",
+            url="https://example.com/btc",
+            snippet="Bitcoin is trading at 100k",
+            published_date="2026-08-28",
+        )
+    ]
+    await provider.generate("какая цена биткоина", [], web_blocks=results)
+
+    call = provider._client.chat.completions.create.await_args
+    content = call.kwargs["messages"][1]["content"]
+    text = content[0]["text"] if isinstance(content, list) else content
+    assert get_content().llm.web_header.strip() in text
+    assert "Bitcoin price (https://example.com/btc):" in text
+    assert "Bitcoin is trading at 100k" in text
+    assert "[2026-08-28]" in text
+    assert "LIVE search results" in text

@@ -3,7 +3,7 @@ import time
 
 from app.config.content import MemeDefContent
 from app.core.session.chat_session_state import ChatSessionState
-from app.core.messages import ContextBlock, ContextMessage, StoredMessage
+from app.core.messages import ContextBlock, ContextMessage, StoredMessage, WebResult
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.decision.models import DecisionResult
 from app.knowledge.metrics.retriever import SenderProfile
@@ -26,6 +26,10 @@ class TurnPipelineContext:
     context_blocks: list[ContextBlock] = field(default_factory=list)
     humor_quotes: list[str] = field(default_factory=list)
     knowledge_blocks: list[KnowledgeBlock] = field(default_factory=list)
+    # Live web search results (the "googling" skill), fetched by the Retrieve
+    # stage when the planner flagged the turn and injected into the compose
+    # prompt as a "live web results" block.
+    web_blocks: list[WebResult] = field(default_factory=list)
     meme_blocks: list[MemeDefContent] = field(default_factory=list)
     meme_menu: list[MemeDefContent] = field(default_factory=list)
     sender_profile: SenderProfile | None = None
@@ -34,9 +38,17 @@ class TurnPipelineContext:
     loop_strength: int = 0
     annoyance: float = 0.0
     reply: str | None = None
+    # When the compose stage decides to refuse the answer (repeated same-sender
+    # message / spam, or the model returned an empty "stay silent" reply), the
+    # orchestrator finalizes the turn as an IGNORE via ``FinalizeStage.skip``
+    # with this reason instead of sending a reply.
+    refuse_reason: str | None = None
     # When the compose model picks a photo from the album, the resolved Telegram
     # file_id of the photo to re-send (via the [photo:<index>] marker).
     photo_file_id: str | None = None
+    # Base64 data URL of the same photo (the stored bytes) — lets the bot fall
+    # back to an upload when the Telegram file_id is stale at delivery time.
+    photo_data_url: str | None = None
     result: ConversationTurnResult | None = None
     plan_ms: float = 0.0
     decision_ms: float = 0.0
@@ -44,6 +56,8 @@ class TurnPipelineContext:
     reaction_gate_ms: float = 0.0
     rag_ms: float = 0.0
     semantic_ms: float = 0.0
+    # Live web-search latency (only set when the turn was flagged for search).
+    web_ms: float = 0.0
     humor_rag_ms: float = 0.0
     llm_ms: float = 0.0
     embed_ms: float = 0.0

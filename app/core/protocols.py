@@ -8,6 +8,7 @@ from app.core.messages import (
     ImageAttachment,
     PhotoCandidate,
     StoredMessage,
+    WebResult,
 )
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.knowledge.schema import KnowledgeBlock
@@ -218,6 +219,7 @@ class LLMProviderProtocol(Protocol):
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        web_blocks: list[WebResult] | None = None,
         meme_blocks: list[MemeDefContent] | None = None,
         meme_menu: list[MemeDefContent] | None = None,
         metrics_block: str | None = None,

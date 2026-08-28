@@ -7,7 +7,13 @@ from openai import APIStatusError, AsyncOpenAI
 
 from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
-from app.core.messages import ContextBlock, ContextMessage, ImageAttachment, PhotoCandidate
+from app.core.messages import (
+    ContextBlock,
+    ContextMessage,
+    ImageAttachment,
+    PhotoCandidate,
+    WebResult,
+)
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.format.answer_tag import extract_answer
@@ -87,6 +93,7 @@ class DeepSeekLLMProvider:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        web_blocks: list[WebResult] | None = None,
         meme_blocks: list[MemeDefContent] | None = None,
         meme_menu: list[MemeDefContent] | None = None,
         metrics_block: str | None = None,
@@ -121,6 +128,7 @@ class DeepSeekLLMProvider:
             session_messages=session_messages,
             humor_quotes=humor_quotes,
             knowledge_blocks=knowledge_blocks,
+            web_blocks=web_blocks,
             meme_blocks=meme_blocks,
             meme_menu=meme_menu,
             metrics_block=metrics_block,
@@ -156,8 +164,8 @@ class DeepSeekLLMProvider:
             "llm_prompt_prepared model=%s uses_pro_model=%s detail=%s "
             "context_blocks=%s context_messages=%s humor_quotes=%s meme_blocks=%s "
             "meme_menu=%s system_chars=%s user_chars=%s knowledge_blocks=%s "
-            "knowledge_chars=%s session_chars=%s temperature=%s top_p=%s "
-            "max_tokens=%s vision_images=%s",
+            "web_blocks=%s knowledge_chars=%s session_chars=%s temperature=%s "
+            "top_p=%s max_tokens=%s vision_images=%s",
             model,
             uses_pro_model,
             detail,
@@ -169,6 +177,7 @@ class DeepSeekLLMProvider:
             len(system),
             len(user_prompt),
             len(knowledge_blocks or []),
+            len(web_blocks or []),
             knowledge_chars,
             session_chars,
             self._generation.temperature,
@@ -225,6 +234,19 @@ class DeepSeekLLMProvider:
                         **generation_kwargs,
                     )
                     text = response.choices[0].message.content or ""
+                    # The output cap hit the model mid-reply. This is the usual
+                    # cause of a dangling `[next]` block marker leaking into a
+                    # delivered message (the fallback splitter strips it, but the
+                    # truncation itself is worth surfacing for diagnostics).
+                    finish_reason = getattr(response.choices[0], "finish_reason", None)
+                    if finish_reason == "length":
+                        logger.warning(
+                            "llm_truncated model=%s finish_reason=length "
+                            "content_chars=%s ends_with_marker=%s",
+                            model,
+                            len(text),
+                            text.rstrip().endswith("]"),
+                        )
                     # DeepSeek reasoning models put the chain of thought here; it
                     # is separate from ``content`` and would otherwise be invisible.
                     reasoning_content = getattr(

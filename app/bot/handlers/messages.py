@@ -10,7 +10,7 @@ from aiogram import Bot, F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
-from aiogram.types import Message as TelegramMessage, PhotoSize
+from aiogram.types import BufferedInputFile, Message as TelegramMessage, PhotoSize
 
 from app.bot.container import BotServices
 from app.bot.messages import IncomingMessage
@@ -19,7 +19,11 @@ from app.bot.telegram_format import markdown_to_telegram_html
 from app.config.settings import settings
 from app.core.messages import ImageAttachment
 from app.decision.models import DecisionAction
-from app.observability.metrics import record_telegram, record_telegram_error
+from app.observability.metrics import (
+    record_photo_send,
+    record_telegram,
+    record_telegram_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,22 +119,73 @@ async def _send_reply_messages(
             break
 
 
-async def _send_photo(telegram_message: TelegramMessage, file_id: str) -> None:
-    """Re-send a photo by its Telegram file_id (from the compose photo album).
+def _data_url_to_input_file(data_url: str):
+    """Decode a ``data:image/...;base64,...`` URL into an aiogram input file.
 
-    Re-sending by file_id costs no upload and works for any photo the bot has
-    received. A failure is logged and never breaks the reply path.
+    Returns ``None`` (and lets the caller fail visibly) when the payload is
+    malformed or empty — the fallback must never crash the reply path.
     """
+    if not data_url or "," not in data_url:
+        return None
+    raw = base64.b64decode(data_url.split(",", 1)[1], validate=False)
+    if not raw:
+        return None
+    return BufferedInputFile(raw, filename="photo.jpg")
+
+
+async def _send_photo(
+    telegram_message: TelegramMessage,
+    file_id: str,
+    data_url: str | None = None,
+) -> bool:
+    """Deliver a photo to the chat; return True only when it actually arrived.
+
+    Robust delivery so a "sent" claim can never silently lose the photo:
+    1. re-send by Telegram ``file_id`` (costs no upload, works for any received
+       photo);
+    2. if that fails and the stored bytes are available, fall back to uploading
+       them from ``data_url`` — Telegram file_ids expire, the DB copy does not;
+    3. if both fail, tell the user plainly instead of leaving a fake "sent".
+    """
+    photo_input = _data_url_to_input_file(data_url) if data_url else None
     try:
         await telegram_message.bot.send_photo(telegram_message.chat.id, photo=file_id)
         record_telegram("send_photo", "success")
+        record_photo_send("delivered")
+        return True
     except Exception as exc:
-        record_telegram("send_photo", "error")
         logger.warning(
-            "photo_send_failed chat_id=%s error=%s",
+            "photo_send_failed chat_id=%s error=%s fallback=%s",
             telegram_message.chat.id,
             exc,
+            photo_input is not None,
         )
+
+    if photo_input is not None:
+        try:
+            await telegram_message.bot.send_photo(
+                telegram_message.chat.id, photo=photo_input
+            )
+            record_telegram("send_photo", "success")
+            record_photo_send("delivered")
+            return True
+        except Exception as exc:
+            record_telegram("send_photo", "error")
+            logger.warning(
+                "photo_send_fallback_failed chat_id=%s error=%s",
+                telegram_message.chat.id,
+                exc,
+            )
+    else:
+        record_telegram("send_photo", "error")
+
+    # Neither path worked: never leave the user believing a photo was sent.
+    await _send_reply(
+        telegram_message,
+        "Не получилось отправить фото — оно устарело. Попробуй переслать его ещё раз.",
+    )
+    record_photo_send("failed")
+    return False
 
 
 _TYPING_INTERVAL_SECONDS = 4.0
@@ -381,7 +436,9 @@ def create_messages_router(services: BotServices) -> Router:
             )
             return
 
-        if result.action != DecisionAction.REPLY or not result.reply:
+        if result.action != DecisionAction.REPLY or (
+            not result.reply and not result.sticker_tag
+        ):
             logger.info(
                 "message_ignored chat_id=%s reason=%s relevance=%.3f",
                 incoming.telegram_chat_id,
@@ -418,7 +475,17 @@ def create_messages_router(services: BotServices) -> Router:
                 sent,
             )
             if sent is None:
-                await _send_reply(telegram_message, result.reply)
+                if result.reply:
+                    await _send_reply(telegram_message, result.reply)
+                else:
+                    # The sticker could not be delivered and there is no text
+                    # answer to fall back on — send nothing, but surface the
+                    # failure so a "nothing was sent" turn stays observable.
+                    logger.warning(
+                        "sticker_only_failed chat_id=%s tag=%s no_text_fallback",
+                        incoming.telegram_chat_id,
+                        result.sticker_tag,
+                    )
             return
 
         # Refresh "typing..." right before the reply is delivered so the
@@ -450,13 +517,19 @@ def create_messages_router(services: BotServices) -> Router:
             len(blocks),
         )
         # The compose model asked to re-send a photo from the album: deliver it
-        # by file_id after the text (so the text reads like a normal reply).
+        # after the text (so the text reads like a normal reply). The data_url is
+        # the stored-bytes fallback when the Telegram file_id is stale.
         if result.photo_file_id:
-            await _send_photo(telegram_message, result.photo_file_id)
+            sent = await _send_photo(
+                telegram_message,
+                result.photo_file_id,
+                data_url=result.photo_data_url,
+            )
             logger.info(
-                "photo_sent chat_id=%s file_id=%s",
+                "photo_sent chat_id=%s file_id=%s sent=%s",
                 incoming.telegram_chat_id,
                 result.photo_file_id,
+                sent,
             )
         if services.stickers is not None:
             services.stickers.register_reply(incoming.telegram_chat_id)

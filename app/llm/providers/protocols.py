@@ -52,7 +52,7 @@ class _InstrumentedCompleterMixin:
             metadata={"provider": self.provider, "kind": kind},
         ) as gen:
             try:
-                text, usage = await call()
+                text, usage, reasoning = await call()
             except Exception as exc:
                 record_llm_call(
                     provider=self.provider,
@@ -68,7 +68,25 @@ class _InstrumentedCompleterMixin:
             # late update() is silently dropped — which is exactly why the planner
             # (this completer path) showed no output in the trace while the
             # composer (which updates inside its block) did.
-            gen.update(output=text, usage=usage or None)
+            # Reasoning models (DeepSeek V4) return the chain of thought in
+            # ``reasoning_content``, separate from ``content``. Surface it on the
+            # observation (output header + metadata) so it is debuggable in the
+            # Langfuse panel — mirroring the composer provider.
+            if reasoning:
+                gen.update(
+                    output=f"[reasoning_content]\n{reasoning}\n\n{text}",
+                    metadata={"reasoning_content": reasoning},
+                    usage=usage or None,
+                )
+                logger.debug(
+                    "llm_reasoning_content kind=%s model=%s chars=%s head=%r",
+                    kind,
+                    model,
+                    len(reasoning),
+                    reasoning[:120],
+                )
+            else:
+                gen.update(output=text, usage=usage or None)
         record_llm_call(
             provider=self.provider,
             model=model,
@@ -97,7 +115,11 @@ class ClaudeChatCompleter(_InstrumentedCompleterMixin):
         kind: str = "completion",
         **kwargs: Any,
     ) -> str:
-        async def call() -> tuple[str, dict[str, int] | None]:
+        async def call() -> tuple[str, dict[str, int] | None, str]:
+            # ``reasoning_effort`` is DeepSeek-only (V4 thinking models). Claude
+            # has its own extended-thinking API and would 400 on the unknown
+            # param, so strip it here — same as the composer provider does.
+            kwargs.pop("reasoning_effort", None)
             response = await self._client.messages.create(
                 model=model,
                 messages=messages,
@@ -114,7 +136,7 @@ class ClaudeChatCompleter(_InstrumentedCompleterMixin):
                 }
                 if usage is not None
                 else None
-            )
+            ), ""
 
         return await self._run_completion(model, messages, kind, call)
 
@@ -144,7 +166,7 @@ class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
         kind: str = "completion",
         **kwargs: Any,
     ) -> str:
-        async def call() -> tuple[str, dict[str, int] | None]:
+        async def call() -> tuple[str, dict[str, int] | None, str]:
             response = await self._openai_client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -152,8 +174,10 @@ class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
             )
             msg = response.choices[0].message
             text = getattr(msg, "content", None) or ""
+            # DeepSeek V4 reasoning models put the chain of thought here, separate
+            # from ``content``; surfaced on the trace (see _run_completion).
+            reasoning = getattr(msg, "reasoning_content", None) or ""
             if not text.strip():
-                reasoning = getattr(msg, "reasoning_content", None) or ""
                 logger.warning(
                     "deepseek_empty_completion kind=%s model=%s finish_reason=%s "
                     "reasoning_content_len=%s reasoning_head=%r usage=%s",
@@ -166,7 +190,7 @@ class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
                 )
             usage = getattr(response, "usage", None)
             if usage is None:
-                return text, None
+                return text, None, reasoning
             return text, {
                 "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
                 "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
@@ -175,7 +199,7 @@ class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
                 # the discounted cache-hit input price in cost estimation.
                 "cache_hit_tokens": int(getattr(usage, "prompt_cache_hit_tokens", 0) or 0),
                 "cache_miss_tokens": int(getattr(usage, "prompt_cache_miss_tokens", 0) or 0),
-            }
+            }, reasoning
 
         return await self._run_completion(model, messages, kind, call)
 

@@ -213,11 +213,39 @@ async def test_tier1_noise_short_message_is_no_without_llm():
     completer = FakeCompleter("YES")
     gate = _gate(completer)
 
-    result = await gate.evaluate("хз", [])
+    # An unambiguous acknowledgment is definite noise — instant NO, no LLM.
+    result = await gate.evaluate("ок", [])
 
     assert result.respond is False
     assert result.reason == "heuristic_noise"
     assert completer.calls == []
+
+
+@pytest.mark.asyncio
+async def test_tier1_emoji_reaction_is_no_without_llm():
+    completer = FakeCompleter("YES")
+    gate = _gate(completer)
+
+    result = await gate.evaluate("👍", [])
+
+    assert result.respond is False
+    assert result.reason == "heuristic_noise"
+    assert completer.calls == []
+
+
+@pytest.mark.asyncio
+async def test_tier1_ambiguous_short_message_defers_to_llm():
+    completer = FakeCompleter("YES")
+    gate = _gate(completer)
+
+    # "го" ("let's go") is short but possibly meaningful — it is NOT hard
+    # dropped as noise at Tier 1: it falls through to the Tier-2 LLM, which
+    # decides when there is doubt.
+    result = await gate.evaluate("го", [])
+
+    assert result.respond is True
+    assert result.reason == "yes"
+    assert len(completer.calls) == 1
 
 
 @pytest.mark.asyncio

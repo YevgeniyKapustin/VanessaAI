@@ -384,6 +384,68 @@ async def test_handle_text_sticker_only_falls_back_to_text():
 
 
 @pytest.mark.asyncio
+async def test_handle_text_sticker_only_empty_reply_sends_sticker():
+    # The model answered with ONLY a sticker marker (e.g. [sticker:bemused]):
+    # the pipeline strips the marker, so reply is "" but sticker_tag is set.
+    # This must NOT be treated as an ignored message — the sticker IS the reply
+    # and has to be delivered even though there is no accompanying text.
+    message = make_telegram_message(text="что?")
+    message.reply = AsyncMock()
+    sticker_service = AsyncMock()
+    sticker_service.register_reply = MagicMock()
+    sticker_service.is_sticker_only = MagicMock(return_value=True)
+    sticker_service.send_if_any = AsyncMock(return_value="bemused")
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="",
+            messages=[],
+            relevance_score=0.9,
+            sticker_tag="bemused",
+        ),
+        stickers=sticker_service,
+    )
+    await _call_text_handler(services, message)
+    # the sticker is delivered, no (empty) text is sent
+    message.reply.assert_not_awaited()
+    sticker_service.register_reply.assert_called_once_with(-100123)
+    sticker_service.send_if_any.assert_awaited_once()
+    kwargs = sticker_service.send_if_any.await_args.kwargs
+    assert kwargs["sticker_tag"] == "bemused"
+    assert kwargs["reply_text"] is None
+    assert kwargs["force"] is True
+
+
+@pytest.mark.asyncio
+async def test_handle_text_sticker_only_empty_reply_no_text_fallback():
+    # Same marker-only answer, but the sticker could not be delivered: with no
+    # text answer to fall back on, the handler sends nothing instead of an empty
+    # message — the failure is logged, the turn never crashes.
+    message = make_telegram_message(text="что?")
+    message.reply = AsyncMock()
+    sticker_service = AsyncMock()
+    sticker_service.register_reply = MagicMock()
+    sticker_service.is_sticker_only = MagicMock(return_value=True)
+    sticker_service.send_if_any = AsyncMock(return_value=None)
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="",
+            messages=[],
+            relevance_score=0.9,
+            sticker_tag="bemused",
+        ),
+        stickers=sticker_service,
+    )
+    await _call_text_handler(services, message)
+    # nothing is sent (no empty message) and the sticker was attempted
+    message.reply.assert_not_awaited()
+    sticker_service.send_if_any.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_handle_text_no_sticker_when_service_absent():
     message = make_telegram_message(text="Vanessa?")
     message.reply = AsyncMock()
@@ -715,8 +777,61 @@ async def test_handle_text_no_photo_without_photo_file_id():
 
 
 @pytest.mark.asyncio
-async def test_send_photo_swallows_errors():
+async def test_send_photo_success_by_file_id():
+    message = make_telegram_message()
+    message.bot.send_photo = AsyncMock()
+    sent = await _send_photo(message, "file-1")
+    assert sent is True
+    message.bot.send_photo.assert_awaited_once()
+    message.reply.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_send_photo_falls_back_to_upload_from_data_url():
+    """A stale Telegram file_id must not lose the photo: fall back to uploading
+    the stored bytes (data_url) instead of silently leaving a fake 'sent'."""
+    message = make_telegram_message()
+    message.bot.send_photo = AsyncMock(
+        side_effect=[RuntimeError("stale file_id"), None]
+    )
+    sent = await _send_photo(
+        message,
+        "file-1",
+        data_url="data:image/jpeg;base64,aGVsbG8=",  # base64("hello")
+    )
+    assert sent is True
+    assert message.bot.send_photo.await_count == 2
+    # The second call re-uploads the decoded bytes, not the stale file_id.
+    second_args = message.bot.send_photo.await_args_list[1]
+    assert second_args.kwargs["photo"] is not None
+    message.reply.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_send_photo_sends_text_fallback_when_no_data_url():
+    """No stored bytes available and the file_id fails: tell the user plainly
+    instead of leaving them believing a photo was sent."""
     message = make_telegram_message()
     message.bot.send_photo = AsyncMock(side_effect=RuntimeError("cannot resend"))
-    await _send_photo(message, "file-1")
+    message.reply = AsyncMock()
+    sent = await _send_photo(message, "file-1")
+    assert sent is False
     message.bot.send_photo.assert_awaited_once()
+    message.reply.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_send_photo_sends_text_fallback_when_upload_also_fails():
+    message = make_telegram_message()
+    message.bot.send_photo = AsyncMock(
+        side_effect=[RuntimeError("stale file_id"), RuntimeError("upload failed")]
+    )
+    message.reply = AsyncMock()
+    sent = await _send_photo(
+        message,
+        "file-1",
+        data_url="data:image/jpeg;base64,aGVsbG8=",
+    )
+    assert sent is False
+    assert message.bot.send_photo.await_count == 2
+    message.reply.assert_awaited_once()

@@ -56,6 +56,8 @@ from app.services.pipeline.stages import (
     RetrieveStage,
 )
 from app.services.turn_metrics import turn_metrics
+from app.services.websearch.factory import create_web_search
+from app.services.websearch.protocols import WebSearchService
 
 
 def create_embedding_provider() -> EmbeddingProviderProtocol:
@@ -165,6 +167,11 @@ def get_llm_provider() -> LLMProviderProtocol:
     return create_llm_provider()
 
 
+def get_web_search() -> WebSearchService | None:
+    """Configured live web-search provider, or None when the skill is off."""
+    return create_web_search()
+
+
 def get_decision_engine(
     embeddings: EmbeddingProviderProtocol = Depends(get_embedding_provider),
     vector_store: VectorStoreProtocol = Depends(get_vector_store),
@@ -199,6 +206,7 @@ async def get_incoming_turn_handler(
     query_rewriter: QueryRewriter = Depends(get_query_rewriter),
     uow: UnitOfWorkProtocol = Depends(get_unit_of_work),
     metrics: TurnMetricsProtocol = Depends(get_turn_metrics),
+    web_search: WebSearchService | None = Depends(get_web_search),
 ) -> IncomingTurnHandlerProtocol:
     config = OrchestratorConfig.from_settings()
     container = get_app_container()
@@ -242,6 +250,14 @@ async def get_incoming_turn_handler(
         MemoryPlanner(),
         enabled=settings.knowledge_memory_enabled,
         cooldown_seconds=settings.knowledge_memory_cooldown_seconds,
+        prefilter_enabled=settings.knowledge_memory_prefilter_enabled,
+        prefilter_min_messages=settings.knowledge_memory_prefilter_min_messages,
+        prefilter_min_content_chars=(
+            settings.knowledge_memory_prefilter_min_content_chars
+        ),
+        prefilter_score_threshold=(
+            settings.knowledge_memory_prefilter_score_threshold
+        ),
     )
     metrics_pipeline = MetricsPipeline(
         MetricsStore(knowledge_vault, knowledge_index),
@@ -259,8 +275,9 @@ async def get_incoming_turn_handler(
         knowledge=knowledge,
         meme_catalog=container.meme_catalog,
         meme_decider=container.meme_decider,
+        web_search=web_search,
     )
-    compose = ComposeStage(llm)
+    compose = ComposeStage(llm, refuse_enabled=config.compose_refuse_enabled)
     finalize = FinalizeStage(
         messages,
         indexing,

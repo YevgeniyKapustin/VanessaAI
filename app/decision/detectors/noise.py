@@ -53,6 +53,24 @@ class NoiseFilter:
 
         return self._is_reaction_only(normalized)
 
+    def is_definite_noise(self, text: str) -> bool:
+        """Unambiguous filler/acknowledgment — safe to hard-drop without an LLM.
+
+        Covers empty text, bare acknowledgments ("ок", "ага", "да", "лол"),
+        and punctuation/emoji-only reactions. Short-but-maybe-meaningful
+        messages ("го", "хз", "погнали", "стой") are NOT definite noise: they
+        are deferred to the neural network when there is doubt instead of being
+        hard-dropped by the deterministic prefilter.
+        """
+        normalized = text.strip()
+        if not normalized:
+            return True
+        if _ACK_RE.match(normalized):
+            return True
+        if self._is_reaction_only(normalized):
+            return True
+        return False
+
     def _looks_substantive(self, text: str) -> bool:
         if "?" in text:
             return True

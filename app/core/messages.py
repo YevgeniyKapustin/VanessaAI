@@ -74,7 +74,10 @@ class PhotoCandidate:
     """One photo the bot could re-send, listed for the compose model.
 
     ``index`` is the stable [photo:<index>] reference the model may emit; the
-    bot re-sends the photo via ``telegram_file_id``.
+    bot re-sends the photo via ``telegram_file_id``. ``data_url`` carries the
+    stored bytes (base64) so the bot can fall back to an upload when the
+    Telegram file_id is stale or expired — a stale file_id must not silently
+    turn a "sent" claim into a lost photo.
     """
 
     index: int
@@ -82,6 +85,26 @@ class PhotoCandidate:
     caption: str
     sender_name: str | None = None
     created_at: datetime | None = None
+    data_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WebResult:
+    """A single live web-search hit injected into the compose prompt.
+
+    ``title`` / ``snippet`` are plain text (the providers return clean snippets,
+    not HTML), ready to be rendered verbatim into the prompt. ``published_date``
+    is optional — Tavily returns it when the page has one; it helps the model
+    judge freshness (e.g. "how old is this news item"). Defined here (core) so
+    the LLM provider protocol can reference it without importing the web-search
+    service package (avoids a core -> services import cycle).
+    """
+
+    title: str
+    url: str
+    snippet: str
+    # ISO date when the provider exposes one (e.g. Tavily's published_date).
+    published_date: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

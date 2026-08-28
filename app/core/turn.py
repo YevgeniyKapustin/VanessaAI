@@ -44,3 +44,6 @@ class ConversationTurnResult:
     # Telegram file_id of a photo the bot should re-send (compose model picked
     # one from the photo album via the [photo:<index>] marker).
     photo_file_id: str | None = None
+    # Base64 data URL of the same photo (the stored bytes) — lets the bot fall
+    # back to an upload when the Telegram file_id is stale at delivery time.
+    photo_data_url: str | None = None

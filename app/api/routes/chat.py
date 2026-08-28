@@ -83,6 +83,7 @@ async def chat(
                 relevance_score=result.relevance_score,
                 sticker_tag=result.sticker_tag,
                 photo_file_id=result.photo_file_id,
+                photo_data_url=result.photo_data_url,
             )
             yield _sse("result", payload.model_dump())
         finally:

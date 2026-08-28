@@ -241,8 +241,11 @@ def split_reply_into_blocks(
 
     # No explicit blocks (single reply or the model skipped markers): apply the
     # deterministic splitter so long replies still arrive as several messages.
+    # Marker lines are stripped FIRST: when the reply is cut off by the output
+    # limit right after emitting `[next]` (a dangling or standalone marker), the
+    # fallback must never deliver that control marker as a real chat message.
     return _sentence_fallback(
-        text,
+        strip_block_markers(text, marker=marker),
         max_chars=max_chars,
         target_chars=fallback_target_chars,
     )

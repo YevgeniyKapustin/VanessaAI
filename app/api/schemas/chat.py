@@ -43,3 +43,7 @@ class ChatResponse(BaseModel):
     sticker_tag: str | None = None
     # Telegram file_id of a photo to re-send (compose picked one from the album).
     photo_file_id: str | None = None
+    # Base64 data URL of the same photo (stored bytes) — the bot falls back to an
+    # upload when the Telegram file_id is stale at delivery time. Only set when a
+    # photo is actually being sent.
+    photo_data_url: str | None = None

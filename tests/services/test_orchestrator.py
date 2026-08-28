@@ -3,9 +3,11 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock
 
+from app.config.settings import settings
 from app.core.messages import ContextBlock, ContextMessage, ImageAttachment, StoredMessage
 from app.core.turn import ChatTurnInput
 from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
+from app.knowledge.metrics.retriever import SenderProfile
 from app.knowledge.schema import KnowledgeBlock
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
@@ -203,6 +205,9 @@ class FakeLLM:
         self.last_uses_pro_model: bool = False
         self.last_images: list | None = None
         self.last_photo_candidates: list | None = None
+        self.last_attitude_note: str | None = None
+        self.last_sender_name: str | None = None
+        self.last_web_blocks: list | None = None
 
     async def generate(
         self,
@@ -211,6 +216,7 @@ class FakeLLM:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        web_blocks: list | None = None,
         meme_blocks: list | None = None,
         meme_menu: list | None = None,
         metrics_block: str | None = None,
@@ -232,8 +238,10 @@ class FakeLLM:
         self.last_metrics_block = metrics_block
         self.last_humor_quotes = humor_quotes
         self.last_knowledge_blocks = knowledge_blocks
+        self.last_web_blocks = web_blocks
         self.last_meme_blocks = meme_blocks
         self.last_meme_menu = meme_menu
+        self.last_attitude_note = attitude_note
         self.last_sender_name = sender_name
         self.last_tone = tone
         self.last_needs_clarification = needs_clarification
@@ -297,6 +305,7 @@ def _build_orchestrator(
     query_rewriter: QueryRewriter | None = None,
     defer_index_on_ignore: bool = True,
     photo_captioner=None,
+    compose_refuse_enabled: bool = True,
 ) -> ConversationOrchestrator:
     retriever = retriever or FakeContextRetriever()
     llm = llm or FakeLLM()
@@ -326,7 +335,7 @@ def _build_orchestrator(
         config=config,
         gate=gate,
         retrieve=RetrieveStage(retriever, humor, None),
-        compose=ComposeStage(llm),
+        compose=ComposeStage(llm, refuse_enabled=compose_refuse_enabled),
         finalize=FinalizeStage(messages, indexing, decision, config, metrics),
         photo_captioner=photo_captioner,
     )
@@ -584,6 +593,7 @@ async def test_orchestrator_returns_reply_before_background_memory_metrics():
             *,
             recent_messages: list,
             source_message_ids: list[int] | None = None,
+            telegram_chat_id: int | None = None,
         ) -> int:
             await release.wait()
             self.finished = True
@@ -593,7 +603,14 @@ async def test_orchestrator_returns_reply_before_background_memory_metrics():
         def __init__(self) -> None:
             self.ran = False
 
-        async def run(self, repo, *, semantic: bool = False, batch=None) -> int:
+        async def run(
+            self,
+            repo,
+            *,
+            semantic: bool = False,
+            batch=None,
+            only_senders: set[int] | None = None,
+        ) -> int:
             self.ran = True
             return 0
 
@@ -850,6 +867,107 @@ async def test_compose_stage_forwards_photo_candidates_and_resolves_marker():
     assert candidate.caption == "кот на диване"
     # The [photo:1] marker was resolved to the file_id and stripped from the reply.
     assert ctx.photo_file_id == "file-1"
+    assert ctx.photo_data_url == "data:image/jpeg;base64,AAAA"
+    assert ctx.reply == "Держи"
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_photo_request_without_marker_resolves_nothing():
+    """The reported bug: the user asks for a photo, the model answers but never
+    emits [photo:N] — no photo_file_id must be resolved."""
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+    prior = ContextMessage(
+        id=10,
+        role="user",
+        content="[фото]",
+        sender_telegram_id=42,
+        sender_name="Тест",
+        attachments=(photo,),
+        photo_caption="кот на диване",
+    )
+
+    class NoMarkerLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "у меня нет такого фото"
+
+    llm = NoMarkerLLM()
+    compose = ComposeStage(llm)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="отправь любую картинку",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="отправь любую картинку",
+            text="отправь любую картинку",
+            skip_search=False,
+            should_reply=True,
+        ),
+    )
+    ctx.recent = [prior]
+    ctx.context_blocks = [ContextBlock(anchor_id=10, messages=(prior,))]
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    # The album exists but the model never emitted the marker → nothing resolves.
+    assert ctx.photo_file_id is None
+    assert ctx.photo_data_url is None
+    assert ctx.reply == "у меня нет такого фото"
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_out_of_range_marker_resolves_nothing():
+    """A marker pointing past the album must not resolve to a photo (the model
+    must not invent numbers outside the list)."""
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+    prior = ContextMessage(
+        id=10,
+        role="user",
+        content="[фото]",
+        sender_telegram_id=42,
+        sender_name="Тест",
+        attachments=(photo,),
+        photo_caption="кот на диване",
+    )
+
+    class BadMarkerLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "Держи\n[photo:9]"
+
+    llm = BadMarkerLLM()
+    compose = ComposeStage(llm)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="скинь то фото",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="скинь то фото",
+            text="скинь то фото",
+            skip_search=False,
+            should_reply=True,
+        ),
+    )
+    ctx.recent = [prior]
+    ctx.context_blocks = [ContextBlock(anchor_id=10, messages=(prior,))]
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    assert ctx.photo_file_id is None
+    assert ctx.photo_data_url is None
+    # The marker is still stripped so it is never shown to the user.
     assert ctx.reply == "Держи"
 
 
@@ -886,3 +1004,262 @@ async def test_orchestrator_stores_photo_caption_in_background():
     # The generated caption was persisted to the photo message (inline fallback
     # when no background executor is injected).
     assert messages._messages[1].photo_caption == "кот на диване"
+
+
+class SilentLLM(FakeLLM):
+    """Compose model following the prompt — "reply with nothing" for a repeat."""
+
+    async def generate(self, *args, **kwargs):
+        return ""
+
+
+class CountingLLM(FakeLLM):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    async def generate(self, *args, **kwargs):
+        self.calls += 1
+        return "echo"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_compose_refuses_empty_reply():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=SilentLLM(),
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса, ну чё там с мешем",
+            sender_telegram_id=42,
+        )
+    )
+
+    # The compose model's empty "stay silent" reply is honored as a refusal: the
+    # turn is finalized as IGNORE, nothing is sent, no empty assistant message is
+    # created (previously an empty reply still became an empty assistant message
+    # and a recorded REPLY turn).
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.REPEATED
+    assert result.reply is None
+    # Only the user message exists — no empty assistant message.
+    assert len(messages._messages) == 1
+    # The user message is still indexed.
+    assert len(indexing.scheduled) == 1
+    # No reply was recorded → no rate-limit / reply side effects.
+    assert decision.recorded_chats == []
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    llm = CountingLLM()
+    # A prior identical user message from the same sender is already in history.
+    await messages.create(
+        role="user",
+        content="ванесса, ну чё там с мешем",
+        sender_telegram_id=42,
+    )
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=llm,
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса, ну чё там с мешем",
+            sender_telegram_id=42,
+        )
+    )
+
+    # The same-sender spam burst is refused deterministically at compose time —
+    # the answer-preparation stage refuses before the expensive LLM is invoked.
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.REPEATED
+    assert result.reply is None
+    assert llm.calls == 0
+    # User message still indexed; only user messages exist (no assistant reply).
+    assert len(indexing.scheduled) == 1
+    assert len(messages._messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_compose_refuse_can_be_disabled():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=SilentLLM(),
+        defer_index_on_ignore=False,
+        compose_refuse_enabled=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса, привет",
+            sender_telegram_id=42,
+        )
+    )
+
+    # With the refusal disabled, the previous behavior is kept: an empty reply
+    # flows through the normal finalize path unchanged.
+    assert result.action == DecisionAction.REPLY
+    assert result.reply == ""
+    assert decision.recorded_chats == [-1001]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_compose_refuses_ignore_marker():
+    class IgnoreMarkerLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "[ignore]"
+
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=IgnoreMarkerLLM(),
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса, ну чё там с мешем",
+            sender_telegram_id=42,
+        )
+    )
+
+    # The model's explicit [ignore] tag is honored: the turn is finalized as
+    # IGNORE, nothing is sent, no assistant message is created, and the literal
+    # tag never reaches the chat or the DB.
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.REPEATED
+    assert result.reply is None
+    assert len(messages._messages) == 1
+    assert len(indexing.scheduled) == 1
+    assert decision.recorded_chats == []
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_compose_refuses_ignore_marker_with_reason():
+    # The model writes a short debug-only reason after the tag; the line still
+    # starts with the marker, so it is still a refusal — and the reason never
+    # reaches the chat, the DB or the result reply.
+    class IgnoreMarkerWithReasonLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "[ignore] повтор того же вопроса"
+
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=IgnoreMarkerWithReasonLLM(),
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса, ну чё там с мешем",
+            sender_telegram_id=42,
+        )
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == DecisionReason.REPEATED
+    assert result.reply is None
+    assert len(messages._messages) == 1
+    assert len(indexing.scheduled) == 1
+    assert decision.recorded_chats == []
+    assert all("ignore" not in m.content for m in messages._messages.values())
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_does_not_refuse_when_marker_inside_reply():
+    class MarkerInSentenceLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "он написал [ignore] в чате, я молчу"
+
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=MarkerInSentenceLLM(),
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="скажи что-нибудь",
+            sender_telegram_id=42,
+        )
+    )
+
+    # A marker embedded inside a sentence is a normal reply, not a refusal.
+    assert result.action == DecisionAction.REPLY
+    assert result.reply == "он написал [ignore] в чате, я молчу"
+
+
+@pytest.mark.asyncio
+async def test_compose_attitude_note_uses_sender_name_not_profile_name(monkeypatch):
+    # Regression: the cold-reply note must name the sender exactly as the
+    # <msg sender="..."> does (ctx.sender_name), NOT the metrics profile's
+    # display_name. Otherwise the model sees two names for one person (e.g.
+    # «Ну я» in the message vs «Гриша» in the note) and burns chain-of-thought
+    # guessing whether they are the same person.
+    monkeypatch.setattr(settings, "vision_enabled", False)
+    llm = FakeLLM()
+    compose = ComposeStage(llm, refuse_enabled=True)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="мои шутки ахуенная классика",
+            sender_telegram_id=42,
+        ),
+        sender_name="Ну я",
+        sender_profile=SenderProfile(person_id="Гриша", metrics=None, mood="?"),
+        annoyance=0.9,
+        turn_plan=TurnPlan(
+            original="мои шутки ахуенная классика",
+            text="мои шутки ахуенная классика",
+            skip_search=True,
+        ),
+    )
+
+    result = await compose.run(ctx)
+
+    assert result is True
+    assert llm.last_attitude_note is not None
+    assert "Ну я" in llm.last_attitude_note
+    assert "Гриша" not in llm.last_attitude_note
+    assert llm.last_sender_name == "Ну я"

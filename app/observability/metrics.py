@@ -295,6 +295,34 @@ sticker_tagged_total = Counter(
     registry=registry,
 )
 
+# --- Photo sending ----------------------------------------------------------
+photo_send_total = Counter(
+    "vanessa_photo_send_total",
+    "Photo delivery outcomes: requested / resolved / delivered / failed / missed",
+    ["status"],
+    registry=registry,
+)
+photo_request_missed_total = Counter(
+    "vanessa_photo_request_missed_total",
+    "User explicitly asked for a photo but no photo_file_id was resolved "
+    "(the 'сказала что отправила, но фото не пришло' bug)",
+    ["reason"],  # no_marker | index_out_of_range | album_empty
+    registry=registry,
+)
+
+# --- Web search (the "googling" skill) ----------------------------------------
+web_search_total = Counter(
+    "vanessa_web_search_total",
+    "Live web-search outcomes per turn: attempted / found / empty / error",
+    ["status"],
+    registry=registry,
+)
+web_search_duration_seconds = Histogram(
+    "vanessa_web_search_duration_seconds",
+    "Live web-search API latency (seconds)",
+    registry=registry,
+)
+
 # --- User activity / engagement ---------------------------------------------
 active_users = Gauge(
     "vanessa_active_users",
@@ -602,6 +630,31 @@ def record_telegram_error(operation: str, error_type: str) -> None:
         telegram_limit_outcomes.add((operation, error_type))
 
 
+def record_photo_send(status: str) -> None:
+    """Record one photo-delivery outcome (requested/resolved/delivered/failed)."""
+    photo_send_total.labels(status=status).inc()
+
+
+def record_photo_request_missed(reason: str) -> None:
+    """Record a photo request that resolved to no actual delivery.
+
+    ``reason`` is one of ``no_marker`` / ``index_out_of_range`` / ``album_empty``
+    — the exact "сказала что отправила, но фото не пришло" failure.
+    """
+    photo_request_missed_total.labels(reason=reason).inc()
+    record_photo_send("missed")
+
+
+def record_web_search(status: str, ms: float) -> None:
+    """Record one live web-search outcome and its latency.
+
+    ``status`` is ``found`` / ``empty`` / ``error`` (the Retrieve stage fails
+    open on errors, so an ``error`` here never blocks the turn).
+    """
+    web_search_total.labels(status=status).inc()
+    web_search_duration_seconds.observe(ms / 1000.0)
+
+
 def record_rag_eval(dimension: str, score: float) -> None:
     rag_eval_score.labels(dimension=dimension).set(score)
     rag_eval_total.labels(dimension=dimension).inc()
@@ -649,6 +702,8 @@ __all__ = [
     "record_prompt_truncation",
     "record_telegram",
     "record_telegram_error",
+    "record_photo_send",
+    "record_photo_request_missed",
     "record_rag_eval",
     "classify_llm_error",
 ]

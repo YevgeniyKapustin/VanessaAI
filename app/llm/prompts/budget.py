@@ -11,7 +11,7 @@ This module applies two guards:
   sections first while the current message and short directives always survive.
 
 Priority order (highest survives first): current message > directives >
-reply-to > knowledge > session > context > metrics > humor > memes.
+reply-to > knowledge > web > session > context > metrics > humor > memes.
 """
 
 from __future__ import annotations
@@ -23,6 +23,9 @@ PRIORITY_CURRENT = 100
 PRIORITY_DIRECTIVES = 95
 PRIORITY_REPLY = 90
 PRIORITY_KNOWLEDGE = 80
+# Live web-search results sit just below the archive: fresh, external facts are
+# valuable for the answer but less authoritative than the bot's own memory.
+PRIORITY_WEB = 78
 PRIORITY_SESSION = 70
 PRIORITY_CONTEXT = 60
 PRIORITY_METRICS = 45

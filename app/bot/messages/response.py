@@ -13,3 +13,6 @@ class ChatProcessResult:
     sticker_tag: str | None = None
     # Telegram file_id of a photo to re-send (compose picked one from the album).
     photo_file_id: str | None = None
+    # Base64 data URL of the same photo (stored bytes) — fallback source for an
+    # upload when the Telegram file_id is stale at delivery time.
+    photo_data_url: str | None = None

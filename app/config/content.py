@@ -31,6 +31,12 @@ class LLMGenerationProfile(BaseModel):
     max_tokens: int = Field(default=512, ge=64, le=4096)
     presence_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
     frequency_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
+    # Reasoning mode for the composer on DeepSeek V4 (thinking) models: forces a
+    # deeper chain of thought before every answer, cutting logical errors. The
+    # planner profile leaves it unset (None → the API's default normal mode), so
+    # the gate stays fast and cheap. ``reasoning_effort`` is DeepSeek-only —
+    # Claude ignores it (the param is stripped in the Claude provider).
+    reasoning_effort: str | None = None
 
     def to_params(self):
         from app.llm.planner.generation_config import LLMGenerationParams
@@ -41,6 +47,7 @@ class LLMGenerationProfile(BaseModel):
             max_tokens=self.max_tokens,
             presence_penalty=self.presence_penalty,
             frequency_penalty=self.frequency_penalty,
+            reasoning_effort=self.reasoning_effort,
         )
 
 
@@ -108,6 +115,9 @@ class PromptBudgetContent(BaseModel):
     meme_blocks: int = 0
     meme_menu: int = 0
     metrics_block: int = 0
+    # Live web-search results block cap (chars). The section also yields to the
+    # global prompt cap by priority (web sits just below knowledge).
+    web_blocks: int = 2000
 
 
 class LLMContent(BaseModel):
@@ -117,6 +127,10 @@ class LLMContent(BaseModel):
     language: str = ""
     reply_instruction: str = ""
     compose_instruction: str = ""
+    # Explicit final-task line appended at the very end of the user prompt (the
+    # recommended "final task / call to action" block) — a clear statement of
+    # what to do right now, in the freshest part of the model's memory.
+    final_task: str = ""
     sticker_instruction: str = ""
     # Marker line the composer uses to split a long reply into several short
     # messages (blocks) of 1-2 sentences each. The prompt (llm.yaml ``answer:``)
@@ -149,6 +163,16 @@ class LLMContent(BaseModel):
     meme_menu_line: str = "- {name} — {usage}"
     knowledge_header: str = "From my archive on the topic:"
     knowledge_block_line: str = "- [{kind}] {title}:\n  {content}"
+    # Live web search results ("the googling skill"): header + one line per hit
+    # + a short directive on how to use them. Rendered only when the planner
+    # flagged the turn for web search and the Retrieve stage found results.
+    web_header: str = "<!-- Live web results on the topic -->"
+    web_block_line: str = "- {title} ({url}):\n  {snippet}"
+    web_instruction: str = (
+        "The web results above are LIVE search results — fresh, external data. "
+        "Answer from them when they are relevant; if they do not answer the "
+        "question, say so honestly instead of inventing facts."
+    )
     tone_note: str = ""
     owner_message_note: str = ""
     clarification_instruction: str = ""
@@ -174,6 +198,13 @@ class LLMContent(BaseModel):
         "</attachment>"
     )
     photo_album_instruction: str = ""
+    # Note appended when the user EXPLICITLY asked for a photo and the album is
+    # non-empty: the [photo:<index>] marker is required, never just implied — the
+    # model must not "say" it sent a photo without the marker that delivers it.
+    photo_request_required_note: str = ""
+    # Honesty directive rendered when the album is empty AND the user asked for a
+    # photo: the model must refuse truthfully instead of faking a "sent" claim.
+    photo_album_empty_note: str = ""
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
     budget: PromptBudgetContent = Field(default_factory=PromptBudgetContent)
 
@@ -185,6 +216,23 @@ class LLMContent(BaseModel):
         if self.answer_examples.strip():
             parts.append(self.answer_examples.strip())
         return "\n\n".join(part for part in parts if part)
+
+    # Answer-format rules only (no examples) — the "constraints" part of the
+    # recommended order. Examples are kept separate (see ``examples_text``) so
+    # they can sit in their own block after the constraints and before the
+    # dynamic input data.
+    def answer_format_text(self) -> str:
+        return (self.answer or self.compose_instruction).strip()
+
+    # Few-shot examples block (the recommended "examples" position), rendered as
+    # a standalone section instead of being bundled into the answer format.
+    def examples_text(self) -> str:
+        return self.answer_examples.strip()
+
+    # Explicit final-task line that closes the user prompt (the recommended
+    # "final task / call to action" position, the freshest model memory).
+    def final_task_text(self) -> str:
+        return self.final_task.strip()
 
     def language_text(self) -> str:
         return self.language.strip()

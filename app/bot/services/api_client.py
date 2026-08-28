@@ -102,6 +102,7 @@ class HttpChatApiClient:
             relevance_score=float(data.get("relevance_score", 0.0)),
             sticker_tag=data.get("sticker_tag"),
             photo_file_id=data.get("photo_file_id"),
+            photo_data_url=data.get("photo_data_url"),
         )
         record_http_client(
             service="api",

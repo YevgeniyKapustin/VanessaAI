@@ -1,4 +1,6 @@
 from app.config.content import get_content
+from app.core.messages import ContextBlock, ContextMessage
+from app.knowledge.schema import KnowledgeBlock
 from app.llm.prompts.prompt_builder import PromptBuilder
 
 
@@ -32,12 +34,54 @@ def test_compose_prompt_uses_context_selectively():
 
 
 def test_compose_prompt_teaches_chain_of_thought_answer_tag():
-    # The compose prompt must instruct the model to think first, then emit the
-    # final message after the [answer] tag.
+    # The compose prompt must instruct the model to ALWAYS reason first (chain
+    # of thought on every reply), then emit the final message after the
+    # [answer] tag.
     llm = get_content().llm
-    assert "Output format — think first, then answer" in llm.answer_text()
+    assert "ALWAYS reason before you answer" in llm.answer_text()
+    assert "every time, no exceptions" in llm.answer_text()
     assert "[answer]" in llm.answer_text()
     assert "final message" in llm.answer_text()
+
+
+def test_compose_prompt_ignore_tag_carries_debug_reason():
+    # When ignoring a repeat, the model writes the tag followed by a short
+    # internal reason — for debugging only, never shown in the chat.
+    llm = get_content().llm
+    assert "[ignore]" in llm.answer_text()
+    assert "reason after the tag" in llm.answer_text()
+    assert "never shown" in llm.answer_text()
+
+
+def test_compose_prompt_never_ignores_real_questions():
+    # The ignore rules must not swallow legitimate questions: a question is
+    # never ignored just because it was asked before, and when in doubt the
+    # model should answer rather than stay silent.
+    llm = get_content().llm
+    assert "always gets an answer" in llm.answer_text()
+    assert "When in doubt, answer" in llm.answer_text()
+
+
+def test_compose_prompt_sender_identity_is_authoritative():
+    # Vanessa must never burn chain-of-thought guessing who the sender "really"
+    # is (e.g. whether «Ну я» == «Гриша»): the `sender` attribute is
+    # authoritative, already resolved by the system, and attached notes/directives
+    # refer to the current sender — no name reconciliation in the reasoning.
+    llm = get_content().llm
+    task = llm.task_text()
+    assert "the sender is authoritative" in task
+    assert "never spend reasoning on names" in task
+    assert "don't reconcile names" in task
+
+
+def test_compose_prompt_answers_deferred_questions():
+    # When someone pokes the bot to answer an earlier message it never answered,
+    # the model must reply to that earlier question's substance, not to the poke.
+    llm = get_content().llm
+    assert "Deferred questions" in llm.task_text()
+    assert "not to the poke" in llm.task_text()
+    # Substring must not cross a line break inside the YAML block scalar.
+    assert "substance of that earlier question, not the poke itself" in llm.answer_text()
 
 
 def test_prompt_builder_assembles_system_prompt_from_persona():
@@ -299,3 +343,126 @@ def test_prompt_builder_owner_note_forbids_calling_owner_by_name(monkeypatch):
     # The per-turn owner note (injected into the user prompt) must NOT tell the
     # model to address the owner by name — it must forbid it.
     assert "Never call him by name" in prompt
+
+
+def test_prompt_builder_renders_album_instruction_when_candidates():
+    from app.core.messages import PhotoCandidate
+
+    builder = PromptBuilder()
+    candidates = [
+        PhotoCandidate(index=1, telegram_file_id="f1", caption="кот на диване"),
+    ]
+    prompt = builder.build_user_prompt(
+        "скинь фото с котом", [], photo_candidates=candidates
+    )
+    llm = get_content().llm
+    assert llm.photo_album_header.strip() in prompt
+    assert llm.photo_album_instruction.strip() in prompt
+
+
+def test_prompt_builder_requires_marker_on_explicit_photo_request():
+    from app.core.messages import PhotoCandidate
+
+    builder = PromptBuilder()
+    candidates = [PhotoCandidate(index=1, telegram_file_id="f1", caption="кот")]
+    prompt = builder.build_user_prompt(
+        "отправь картинку", [], photo_candidates=candidates
+    )
+    assert get_content().llm.photo_request_required_note.strip() in prompt
+
+
+def test_prompt_builder_omits_required_note_without_photo_request():
+    from app.core.messages import PhotoCandidate
+
+    builder = PromptBuilder()
+    candidates = [PhotoCandidate(index=1, telegram_file_id="f1", caption="кот")]
+    prompt = builder.build_user_prompt("как дела", [], photo_candidates=candidates)
+    assert get_content().llm.photo_request_required_note.strip() not in prompt
+
+
+def test_prompt_builder_renders_empty_note_on_photo_request_without_candidates():
+    """The reported bug: «отправь любую картинку» with no album must make the
+    model refuse honestly instead of faking a 'sent' claim."""
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("отправь любую картинку", [])
+    assert get_content().llm.photo_album_empty_note.strip() in prompt
+
+
+def test_prompt_builder_omits_empty_note_on_normal_message():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет как дела", [])
+    assert get_content().llm.photo_album_empty_note.strip() not in prompt
+
+
+def test_system_prompt_block_order_role_constraints_examples():
+    """Recommended order: role -> constraints -> examples (examples last)."""
+    builder = PromptBuilder()
+    prompt = builder.system_prompt
+    assert "## Examples" in prompt
+    before_examples = prompt.split("## Examples")[0]
+    for header in (
+        "## Persona",
+        "## Content rules",
+        "## Answer formulation",
+        "## Reply language",
+    ):
+        assert header in before_examples
+
+
+def test_system_prompt_examples_not_fused_into_answer_format():
+    """The few-shot examples are a separate block, not part of Answer
+    formulation (the answer checklist stays in the constraints section)."""
+    builder = PromptBuilder()
+    prompt = builder.system_prompt
+    answer_section, _, examples_section = prompt.partition("## Examples")
+    assert "Before replying, check" in answer_section
+    assert "Before replying, check" not in examples_section
+    assert "Bad:" in examples_section
+    assert "Good:" in examples_section
+
+
+def test_user_prompt_block_order_directives_then_input_then_task():
+    """Recommended order: constraints/directives -> input data -> final task."""
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt(
+        "расскажи подробнее про гошу",
+        context_blocks=[
+            ContextBlock(
+                anchor_id=1,
+                messages=(
+                    ContextMessage(id=1, role="user", content="старое сообщение"),
+                ),
+            )
+        ],
+        session_messages=[
+            ContextMessage(id=2, role="user", content="недавняя реплика")
+        ],
+        knowledge_blocks=[
+            KnowledgeBlock(
+                path="People/гоша.md",
+                title="гоша",
+                kind="people",
+                content="Гоша — программист.",
+            )
+        ],
+        detail="detailed",
+    )
+    llm = get_content().llm
+    # Constraints (detail note) come before the input data.
+    assert prompt.index(llm.detail_note_detailed.strip()) < prompt.index(
+        llm.context_header
+    )
+    # Input data keeps the natural order: history -> knowledge -> session ->
+    # current message.
+    assert prompt.index(llm.context_header) < prompt.index(llm.knowledge_header)
+    assert prompt.index(llm.knowledge_header) < prompt.index(llm.session_header)
+    assert prompt.index(llm.session_header) < prompt.index(llm.current_message_header)
+    # The final task closes the prompt, right after the current message.
+    assert prompt.index(llm.current_message_header) < prompt.index(llm.final_task_text())
+    assert prompt.rstrip().endswith(llm.final_task_text())
+
+
+def test_user_prompt_includes_final_task_line():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [])
+    assert get_content().llm.final_task_text() in prompt

@@ -40,6 +40,8 @@ turn_planner_prompt: |
     "knowledge_indexes": [],
     "knowledge_query": "",
     "knowledge_detail": false,
+    "web_search": false,
+    "web_query": "",
     "needs_clarification": false,
     "clarification_hint": "",
     "uses_pro_model": false,
@@ -48,6 +50,46 @@ turn_planner_prompt: |
     "loop_level": 0,
     "reason": ""
   }}
+
+  ## How to decide (reason first)
+  You run with a reasoning model: use your chain of thought to work through the
+  decisions below BEFORE writing the JSON. Reason about the real intent of the
+  message and the recent context, not the surface wording. Your OUTPUT must be
+  ONLY the JSON object — never write the reasoning into the reply, no prose
+  around it («думаю», «итак», «в общем»), no markdown fences. If the right
+  answer is "stay silent", express it through the flags (skip=true,
+  should_reply=false), not through an explanation.
+
+  Defaults-first principle: start from the conservative baseline —
+  should_reply as the evidence dictates, skip=false, tone="neutral",
+  detail="normal", all flags false, knowledge_indexes=[], loop_level=0. Flip a
+  flag to true ONLY when the message and context clearly justify it. When in
+  doubt, leave it off: a wrongly-false flag costs nothing, a wrongly-triggered
+  web_search, deep_search or uses_pro_model costs time and money.
+
+  ## Decision order (apply in this order, then check consistency)
+  1. Who is the message for? → decide should_reply / skip (## should_reply).
+     If skip=true or should_reply=false → fill reason, turn OFF search_query,
+     knowledge, web, humor, deep_search and pro_model, keep tone/detail at
+     defaults, and stop — we do not run a search for a message we do not reply to.
+  2. Can we understand what the user means? → decide needs_clarification
+     (## needs_clarification). If true → should_reply=true, skip=false,
+     search_query="", clarification_hint filled, all search/knowledge/web flags
+     OFF (there is nothing concrete to search for), reason="".
+  3. Which data source answers the question?
+     - chat history / archive → search_query (semantic query, entities kept);
+     - about our people/lore/events → knowledge_indexes (+ knowledge_query),
+       NOT live web;
+     - fresh or external facts the archive cannot hold → web_search=true;
+     - comparison / several threads / technical analysis → deep_search=true.
+     Pick the source that actually answers; do not stack web_search and
+     knowledge_indexes unless both are genuinely required.
+  4. Fill tone, humor_ok / humor_query, detail — always.
+  5. Escalate to uses_pro_model ONLY for coding / super-complex synthesis /
+     deep technical reasoning (## uses_pro_model).
+  6. Detect repeated_topic / loop_level when the same sender re-asks the same
+     topic (## should_reply, loop rules).
+  7. Re-check the consistency rules before emitting the JSON.
 
   ## should_reply
   true — addressing the bot, a question to her, a continuation of her dialogue, an explicit expectation of a reaction.
@@ -166,15 +208,20 @@ turn_planner_prompt: |
   - humor_ok=false → humor_query="".
 
   ## deep_search
-  true — a complex question needing a multi-step search over history (comparison, several
-  topics, «как было с X и Y», technical analysis). false — a regular short query.
+  true — a complex question needing a multi-step search over history (comparison,
+  several topics, «как было с X и Y», technical analysis across multiple
+  points). false (default) — a regular short query answered from one search. Do
+  NOT set true just because the message is long, technical or contains «почему»:
+  only when the answer genuinely needs to pull several sources/threads together.
 
   ## uses_pro_model
-  true — the reply needs the upscaled, most capable compose model: coding (writing or
-  fixing code), super-complex synthesis, deep technical analysis, long multi-step
-  reasoning that a fast model would fumble. false (default) — regular dialogue, RAG
-  answers, everyday banter. Keep false unless truly necessary — the upscaled model
-  costs more.
+  true — the reply needs the upscaled, most capable compose model: coding (writing
+  or fixing code), super-complex synthesis, deep technical analysis, long
+  multi-step reasoning that a fast model would fumble. false (default) — regular
+  dialogue, RAG answers, everyday banter, and ordinary "how does X work" questions
+  a normal answer covers. Keep false unless truly necessary — the upscaled model
+  costs more, so escalate only for real coding or genuinely hard synthesis, not
+  for any technical-sounding question.
 
   ## detail
   Desired reply length (always fill it):
@@ -225,6 +272,46 @@ turn_planner_prompt: |
     this injects the top matching text blocks of the dossier (multiple fragments
     of the same file) instead of a single short portrait.
   If knowledge_indexes is empty or has no "people", keep knowledge_detail=false.
+
+  ## web_search / web_query
+  Live web search — Vanessa can "google". Set web_search=true ONLY when the
+  question needs FRESH or EXTERNAL data that the chat archive and the semantic
+  archive cannot hold:
+  - current events / news, prices, dates, versions, release dates, weather,
+    live scores, "what's the latest about X";
+  - an unknown person / thing / place / technology with NO local context
+    («кто такой N», «что такое X», «как настроить Y» — if it is not from our
+    chat, the archive has nothing);
+  - factual questions where the model's own knowledge may be stale or wrong.
+  web_search=false (default) — about people/events from our chat, archive
+  knowledge (dossiers, lore), or ordinary dialogue. Do NOT trigger web search
+  just because the message contains a question mark or a mention, and do NOT
+  trigger it for "how do I do X" when the topic is already in our chat / archive —
+  prefer the local sources. Ask: would fresh external data actually change the
+  answer? If not, web_search stays false.
+  web_query: 2–8 words, the ACTUAL search query for the web (entities + topic,
+  e.g. «unity mesh texture pipeline», «deepseek v4 release date»). Drop
+  addresses to the bot and filler words. If web_search=true and web_query="",
+  the app falls back to search_query.
+
+  ## Flag consistency rules (ALL must hold in the output)
+  - skip=true → should_reply=false; search_query, knowledge_indexes,
+    knowledge_query, web_search, web_query, deep_search, humor_ok and
+    uses_pro_model stay off; reason is filled.
+  - needs_clarification=true → should_reply=true, skip=false, search_query="",
+    clarification_hint filled; all search/knowledge/web/humor/deep_search off;
+    reason="".
+  - knowledge_detail=true is valid ONLY when knowledge_indexes contains "people";
+    otherwise keep it false.
+  - humor_ok=true requires a non-empty humor_query; humor_ok=false → humor_query="".
+  - web_search=true requires a real need for fresh/external data; web_query
+    should be non-empty (the app falls back to search_query if it is empty).
+  - deep_search and uses_pro_model are independent but both conservative:
+    ordinary RAG and dialogue keep them false.
+  - repeated_topic=true does NOT force should_reply=false — a direct question
+    still gets a reply (the loop only changes Vanessa's attitude).
+  - tone and detail are always filled ("neutral" / "normal" when nothing special).
+  - reason is filled ONLY when declining (should_reply=false or skip=true), else "".
 
   ## Examples (input → JSON)
 
@@ -313,5 +400,54 @@ turn_planner_prompt: |
   → {{"should_reply": true, "search_query": "меш", "skip": false, "tone": "neutral",
   "humor_ok": false, "humor_query": "", "deep_search": false,
   "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": false, "web_query": "",
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false,
   "repeated_topic": true, "loop_level": 2}}
+
+  «ванесса, а какая сейчас цена на биткоин?» | fresh live data the archive cannot
+  hold → web search
+  → {{"should_reply": true, "search_query": "bitcoin цена", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": true, "web_query": "bitcoin цена сегодня",
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «а что нового в unity 6 вышло?» | current version / release info, no local
+  context → web search
+  → {{"should_reply": true, "search_query": "unity 6", "skip": false, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": true, "web_query": "unity 6 release notes",
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «напомни, что там у Крабера с гаражами» | about OUR chat → archive, no web
+  → {{"should_reply": true, "search_query": "крабер гараж", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": ["people"], "knowledge_query": "крабер гараж",
+  "knowledge_detail": false, "web_search": false, "web_query": "",
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «ванесса я думаю ты виновата» | vague accusation, no concrete referent in
+  context → ask one clarifying question, not a full answer
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral",
+  "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": false, "web_query": "",
+  "needs_clarification": true, "clarification_hint": "почему",
+  "uses_pro_model": false}}
+
+  «сравни, как было с мешем и с текстурами в прошлом месяце» | comparison across
+  several threads → deep search
+  → {{"should_reply": true, "search_query": "меш текстуры сравнение", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": true,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": false, "web_query": "",
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}
+
+  «объясни, как работает baking текстур в юнити» | technical "how", but a normal
+  explanation answers it → NO pro model, NO web, NO deep search
+  → {{"should_reply": true, "search_query": "unity baking текстур", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": false, "web_query": "",
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false}}

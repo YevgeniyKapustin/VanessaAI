@@ -42,7 +42,11 @@ class NoiseRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.intent.detected or context.trigger.detected:
             return None
-        if not self._noise.is_noise(context.text):
+        # Only unambiguous filler/acknowledgment ("ок", "ага", "👍") is
+        # hard-dropped here. Short-but-possibly-meaningful messages ("го",
+        # "хз", "погнали") are not — they already survived the LLM planner and
+        # the deterministic gate, so the neural network's verdict decides.
+        if not self._noise.is_definite_noise(context.text):
             return None
         return _ignore(context, DecisionReason.NOISE)
 
@@ -114,7 +118,7 @@ class ListenWindowRule(_PreRelevanceRuleMixin):
             return None
         if context.directly_addressed or context.intent.mentions_bot:
             return None
-        if self._noise.is_noise(context.text) and not context.trigger.detected:
+        if self._noise.is_definite_noise(context.text) and not context.trigger.detected:
             return None
         if is_conversation_closure(context.text):
             return None

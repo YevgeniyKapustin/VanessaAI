@@ -624,6 +624,56 @@ async def test_decision_engine_ignores_noise(
 
 
 @pytest.mark.asyncio
+async def test_decision_engine_does_not_hard_drop_short_maybe(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerCheckerKeyword,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.9)
+
+    result = await engine.decide(
+        text="го",
+        telegram_chat_id=1,
+        recent_messages=[],
+    )
+
+    # A short but possibly meaningful message ("го") is no longer hard-dropped
+    # as deterministic NOISE — it survived the LLM planner and the gates, so
+    # the neural network's verdict (or the base fallback) decides instead.
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason != DecisionReason.NOISE
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_listen_window_short_maybe_replies_when_planner_affirms(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerCheckerKeyword,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    recent = [
+        ContextMessage(
+            id=1,
+            role="user",
+            content="ванесса подскажи алгоритм генерации меша",
+        ),
+        ContextMessage(id=2, role="assistant", content="Кратко про меш"),
+        ContextMessage(id=3, role="user", content="го"),
+    ]
+
+    result = await engine.decide(
+        text="го",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        should_reply=True,
+        in_listen_window=True,
+    )
+
+    # In a post-reply listen window a short demand ("го") is not dropped as
+    # noise: the planner's should_reply=True verdict leads to a reply.
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.LISTEN_WINDOW
+
+
+@pytest.mark.asyncio
 async def test_decision_engine_skips_noise_when_trigger_present(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,

@@ -55,6 +55,13 @@ class TurnPlan:
     # Крабер?") -> the compose prompt injects the raw dossier; False (default)
     # injects only the compact LLM portrait as background context.
     knowledge_detail: bool = False
+    # Live web search (the "googling" skill): when true, the Retrieve stage
+    # runs a search API with ``web_query`` and injects the results into the
+    # compose prompt as a "live web results" block. Used for fresh or external
+    # facts the archive cannot hold (news, prices, current versions, unknown
+    # people and things). ``web_query`` falls back to ``text`` when empty.
+    web_search: bool = False
+    web_query: str = ""
     needs_clarification: bool = False
     clarification_hint: str = ""
     # True when the turn needs the upscaled compose model (deepseek-v4-pro):
@@ -97,6 +104,8 @@ class TurnPlan:
             "knowledge_indexes": list(self.knowledge_indexes),
             "knowledge_query": self.knowledge_query,
             "knowledge_detail": self.knowledge_detail,
+            "web_search": self.web_search,
+            "web_query": self.web_query,
             "needs_clarification": self.needs_clarification,
             "clarification_hint": self.clarification_hint,
             "uses_pro_model": self.uses_pro_model,
@@ -187,7 +196,8 @@ class TurnPlanner:
                 "turn_plan source=llm search=%r skip=%s should_reply=%s "
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r knowledge_detail=%s "
-                "needs_clarification=%s uses_pro_model=%s detail=%s reason=%r",
+                "web_search=%s web_query=%r needs_clarification=%s "
+                "uses_pro_model=%s detail=%s reason=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -198,6 +208,8 @@ class TurnPlanner:
                 result.knowledge_indexes,
                 result.knowledge_query,
                 result.knowledge_detail,
+                result.web_search,
+                result.web_query,
                 result.needs_clarification,
                 result.uses_pro_model,
                 result.detail,
@@ -211,10 +223,14 @@ class TurnPlanner:
 
         Explicit "give me more / keep it short" phrasing in the raw message wins
         over the planner's judgment (the user said what they want); otherwise
-        the planner's ``detail`` (default "normal") stands.
+        the planner's ``detail`` (default "normal") stands. A clarification turn
+        is the exception: it replies with one short question, so no detail
+        directive is applied even if the message contains «подробнее».
         """
         heuristic = detect_detail_level(message)
-        if heuristic in ("brief", "detailed"):
+        if plan.needs_clarification:
+            detail = "normal"
+        elif heuristic in ("brief", "detailed"):
             detail = heuristic
         else:
             detail = plan.detail
@@ -324,6 +340,15 @@ class TurnPlanner:
         knowledge_query = str(payload.get("knowledge_query", "")).strip()
         knowledge_detail = payload.get("knowledge_detail") is True
         uses_pro_model = payload.get("uses_pro_model") is True
+        # Live web search: the planner flags it when the question needs fresh /
+        # external data. ``web_query`` is the search query; when the planner
+        # forgot it, fall back to the composed search_query so the search never
+        # runs on an empty string.
+        web_search = payload.get("web_search") is True
+        web_query = str(payload.get("web_query", "")).strip()
+        if web_search and not web_query:
+            web_query = text
+        web_search = web_search and bool(web_query)
         return TurnPlan(
             original=original,
             text=text,
@@ -336,6 +361,8 @@ class TurnPlanner:
             knowledge_indexes=knowledge_indexes,
             knowledge_query=knowledge_query,
             knowledge_detail=knowledge_detail,
+            web_search=web_search,
+            web_query=web_query,
             uses_pro_model=uses_pro_model,
             repeated_topic=repeated_topic,
             loop_level=loop_level,

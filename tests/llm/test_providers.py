@@ -76,7 +76,7 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
             "prompt_tokens": 10,
             "completion_tokens": 5,
             "total_tokens": 15,
-        }
+        }, ""
 
     tracer = _RecordingTracer()
     monkeypatch.setattr("app.llm.providers.protocols.get_tracer", lambda: tracer)
@@ -91,6 +91,47 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
     assert tracer.updates == [
         {
             "output": "planner json output",
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_completer_records_reasoning_content(monkeypatch) -> None:
+    """The completer (planner) must surface DeepSeek V4's chain of thought on the
+    observation so it is debuggable in Langfuse, mirroring the composer provider."""
+    from app.llm.providers.protocols import _InstrumentedCompleterMixin
+
+    class _FakeCompleter(_InstrumentedCompleterMixin):
+        @property
+        def provider(self) -> str:
+            return "fake"
+
+    async def call():
+        return "planner json output", {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+        }, "похоже, это адрес к боту -> should_reply=true"
+
+    tracer = _RecordingTracer()
+    monkeypatch.setattr("app.llm.providers.protocols.get_tracer", lambda: tracer)
+
+    text = await _FakeCompleter()._run_completion(
+        "deepseek-chat",
+        [{"role": "user", "content": "plan it"}],
+        "planner",
+        call,
+    )
+    assert text == "planner json output"
+    assert tracer.updates == [
+        {
+            "output": (
+                "[reasoning_content]\n"
+                "похоже, это адрес к боту -> should_reply=true\n\n"
+                "planner json output"
+            ),
+            "metadata": {"reasoning_content": "похоже, это адрес к боту -> should_reply=true"},
             "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
         }
     ]

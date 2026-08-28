@@ -70,6 +70,7 @@ class ClaudeLLMProvider:
         session_messages: list[ContextMessage] | None = None,
         humor_quotes: list[str] | None = None,
         knowledge_blocks: list[KnowledgeBlock] | None = None,
+        web_blocks: list | None = None,
         meme_blocks: list[MemeDefContent] | None = None,
         meme_menu: list[MemeDefContent] | None = None,
         metrics_block: str | None = None,
@@ -103,6 +104,7 @@ class ClaudeLLMProvider:
             session_messages=session_messages,
             humor_quotes=humor_quotes,
             knowledge_blocks=knowledge_blocks,
+            web_blocks=web_blocks,
             meme_blocks=meme_blocks,
             meme_menu=meme_menu,
             metrics_block=metrics_block,
@@ -127,6 +129,10 @@ class ClaudeLLMProvider:
         # Effective sampling params; a "detailed" reply gets more room so a
         # fuller answer is not truncated.
         generation_kwargs = self._generation.to_llm_kwargs()
+        # ``reasoning_effort`` is DeepSeek-only (V4 thinking models). Claude has
+        # its own extended-thinking API and would 400 on an unknown param, so
+        # strip it here; the in-prompt chain-of-thought still applies on Claude.
+        generation_kwargs.pop("reasoning_effort", None)
         if (
             detail == "detailed"
             and self._content.llm.detailed_max_tokens > 0
@@ -135,7 +141,7 @@ class ClaudeLLMProvider:
         logger.info(
             "llm_prompt_prepared model=%s detail=%s context_blocks=%s "
             "context_messages=%s humor_quotes=%s meme_blocks=%s meme_menu=%s "
-            "system_chars=%s user_chars=%s knowledge_blocks=%s "
+            "system_chars=%s user_chars=%s knowledge_blocks=%s web_blocks=%s "
             "knowledge_chars=%s session_chars=%s temperature=%s top_p=%s "
             "max_tokens=%s",
             self._model,
@@ -148,6 +154,7 @@ class ClaudeLLMProvider:
             len(system),
             len(user_prompt),
             len(knowledge_blocks or []),
+            len(web_blocks or []),
             knowledge_chars,
             session_chars,
             self._generation.temperature,

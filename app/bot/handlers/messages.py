@@ -1,5 +1,7 @@
 import asyncio
+import base64
 import contextlib
+import io
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 
@@ -8,12 +10,14 @@ from aiogram import Bot, F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
-from aiogram.types import Message as TelegramMessage
+from aiogram.types import Message as TelegramMessage, PhotoSize
 
 from app.bot.container import BotServices
 from app.bot.messages import IncomingMessage
 from app.bot.stickers.heuristics import is_sticker_request
 from app.bot.telegram_format import markdown_to_telegram_html
+from app.config.settings import settings
+from app.core.messages import ImageAttachment
 from app.decision.models import DecisionAction
 from app.observability.metrics import record_telegram, record_telegram_error
 
@@ -109,6 +113,24 @@ async def _send_reply_messages(
                 exc,
             )
             break
+
+
+async def _send_photo(telegram_message: TelegramMessage, file_id: str) -> None:
+    """Re-send a photo by its Telegram file_id (from the compose photo album).
+
+    Re-sending by file_id costs no upload and works for any photo the bot has
+    received. A failure is logged and never breaks the reply path.
+    """
+    try:
+        await telegram_message.bot.send_photo(telegram_message.chat.id, photo=file_id)
+        record_telegram("send_photo", "success")
+    except Exception as exc:
+        record_telegram("send_photo", "error")
+        logger.warning(
+            "photo_send_failed chat_id=%s error=%s",
+            telegram_message.chat.id,
+            exc,
+        )
 
 
 _TYPING_INTERVAL_SECONDS = 4.0
@@ -211,6 +233,69 @@ async def _typing_on_signal(
             typing_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await typing_task
+
+
+def _pick_photo_size(sizes: list[PhotoSize], max_bytes: int) -> PhotoSize | None:
+    """Pick the largest Telegram photo size whose raw bytes fit ``max_bytes``.
+
+    Telegram provides several resized copies of every photo; the vision model
+    auto-resizes to ~800x800 anyway, so a size within the cap keeps the API body
+    and the DB attachment column bounded. When every size exceeds the cap, the
+    smallest is used as a best-effort fallback (still small enough in practice).
+    """
+    if not sizes:
+        return None
+    fitting = [size for size in sizes if size.file_size is not None and size.file_size <= max_bytes]
+    if fitting:
+        return max(fitting, key=lambda size: size.file_size or 0)
+    return min(sizes, key=lambda size: size.file_size or 0)
+
+
+async def _photo_to_attachment(bot: Bot, photo: PhotoSize) -> ImageAttachment | None:
+    """Download one Telegram photo size and encode it as a base64 data URL."""
+    try:
+        buffer = io.BytesIO()
+        await bot.download(photo, destination=buffer)
+        raw = buffer.getvalue()
+    except Exception as exc:
+        logger.warning(
+            "photo_download_failed file_id=%s error=%s",
+            photo.file_id,
+            exc,
+        )
+        return None
+    if not raw:
+        logger.warning("photo_download_empty file_id=%s", photo.file_id)
+        return None
+    mime_type = "image/jpeg"  # Telegram photos are JPEG
+    data_url = f"data:{mime_type};base64,{base64.b64encode(raw).decode('ascii')}"
+    return ImageAttachment(
+        data_url=data_url,
+        mime_type=mime_type,
+        telegram_file_id=photo.file_id,
+    )
+
+
+async def _download_photo_images(
+    telegram_message: TelegramMessage,
+    *,
+    max_bytes: int,
+) -> list[ImageAttachment]:
+    """Download the best-fitting size of each attached photo as data URLs.
+
+    Failures are per-photo: a broken download is logged and skipped, never
+    raised — a photo that can't be read simply becomes a caption-only turn.
+    """
+    sizes = list(telegram_message.photo or [])
+    if not sizes:
+        return []
+    photo = _pick_photo_size(sizes, max_bytes)
+    if photo is None:
+        return []
+    attachment = await _photo_to_attachment(telegram_message.bot, photo)
+    if attachment is None:
+        return []
+    return [attachment]
 
 
 def create_messages_router(services: BotServices) -> Router:
@@ -364,6 +449,15 @@ def create_messages_router(services: BotServices) -> Router:
             len(result.reply or ""),
             len(blocks),
         )
+        # The compose model asked to re-send a photo from the album: deliver it
+        # by file_id after the text (so the text reads like a normal reply).
+        if result.photo_file_id:
+            await _send_photo(telegram_message, result.photo_file_id)
+            logger.info(
+                "photo_sent chat_id=%s file_id=%s",
+                incoming.telegram_chat_id,
+                result.photo_file_id,
+            )
         if services.stickers is not None:
             services.stickers.register_reply(incoming.telegram_chat_id)
             # A direct request («кинь стикер») must always be honoured: bypass
@@ -373,6 +467,73 @@ def create_messages_router(services: BotServices) -> Router:
                 sticker_tag=result.sticker_tag,
                 reply_text=result.reply,
                 force=is_sticker_request(incoming.text),
+            )
+
+    @router.message(F.photo)
+    async def handle_photo(telegram_message: TelegramMessage) -> None:
+        """Handle photos (with or without a caption) via the vision pipeline.
+
+        The bot auto-replies to ANY photo in an allowed chat: the image is
+        downloaded by file_id, base64-encoded and sent to the API, which routes
+        the turn to the DeepSeek vision model. A photo with a caption uses the
+        caption as the message text; a bare photo uses the placeholder.
+        """
+        if not settings.vision_enabled:
+            # Vision off: treat the photo as its caption only (bare photos are
+            # dropped, captions flow through the normal text pipeline).
+            caption = (telegram_message.caption or "").strip()
+            if not caption:
+                logger.info(
+                    "photo_ignored_vision_disabled chat_id=%s",
+                    telegram_message.chat.id,
+                )
+                return
+            incoming = IncomingMessage.from_telegram(
+                telegram_message,
+                text=caption[:4096],
+            )
+            async with _typing_on_signal(
+                telegram_message.bot,
+                incoming.telegram_chat_id,
+                interval=services.typing_interval_seconds,
+            ) as start_typing:
+                await _handle_text_core(
+                    telegram_message, incoming, services, start_typing
+                )
+            return
+
+        images = await _download_photo_images(
+            telegram_message,
+            max_bytes=settings.vision_max_image_bytes,
+        )
+        caption = (telegram_message.caption or "").strip()
+        if not images:
+            # Download/encode failed: fall back to the caption (if any) so the
+            # photo is not silently lost; a bare photo is dropped with a log.
+            if not caption:
+                logger.warning(
+                    "photo_dropped_download_failed chat_id=%s",
+                    telegram_message.chat.id,
+                )
+                return
+            incoming = IncomingMessage.from_telegram(
+                telegram_message,
+                text=caption[:4096],
+            )
+        else:
+            incoming = IncomingMessage.from_telegram(
+                telegram_message,
+                images=tuple(images),
+                text=(caption or settings.vision_photo_placeholder)[:4096],
+            )
+
+        async with _typing_on_signal(
+            telegram_message.bot,
+            incoming.telegram_chat_id,
+            interval=services.typing_interval_seconds,
+        ) as start_typing:
+            await _handle_text_core(
+                telegram_message, incoming, services, start_typing
             )
 
     return router

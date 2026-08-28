@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any
 
 from app.bot.addressing import extract_addressing
+from app.core.messages import ImageAttachment
 from aiogram import Bot
 from aiogram.types import Message as TelegramMessage
 
@@ -32,16 +33,26 @@ class IncomingMessage:
     reply_to_message_id: int | None = None
     reply_to_text: str | None = None
     reply_to_sender_name: str | None = None
+    # Images attached to this message (vision). Empty for plain text turns.
+    images: tuple[ImageAttachment, ...] = ()
 
     @classmethod
-    def from_telegram(cls, message: TelegramMessage) -> "IncomingMessage":
+    def from_telegram(
+        cls,
+        message: TelegramMessage,
+        *,
+        images: tuple[ImageAttachment, ...] = (),
+        text: str | None = None,
+    ) -> "IncomingMessage":
         if message.from_user is None:
             raise ValueError("Сообщение без отправителя не поддерживается")
         addressing = extract_addressing(message)
         return cls(
             telegram_chat_id=message.chat.id,
             telegram_message_id=message.message_id,
-            text=message.text or "",
+            # Text messages use ``text``; photos use the caption (or the caller's
+            # override, e.g. the bare-photo placeholder).
+            text=text if text is not None else (message.text or message.caption or ""),
             sender_telegram_id=message.from_user.id,
             chat_type=_enum_to_str(message.chat.type),
             bot=message.bot,
@@ -56,6 +67,7 @@ class IncomingMessage:
             reply_to_message_id=addressing.reply_to_message_id,
             reply_to_text=addressing.reply_to_text,
             reply_to_sender_name=addressing.reply_to_sender_name,
+            images=images,
         )
 
     def to_api_payload(self) -> dict[str, Any]:
@@ -75,6 +87,14 @@ class IncomingMessage:
             "reply_to_message_id": self.reply_to_message_id,
             "reply_to_text": self.reply_to_text,
             "reply_to_sender_name": self.reply_to_sender_name,
+            "images": [
+                {
+                    "data_url": image.data_url,
+                    "mime_type": image.mime_type,
+                    "telegram_file_id": image.telegram_file_id,
+                }
+                for image in self.images
+            ],
         }
 
     @property

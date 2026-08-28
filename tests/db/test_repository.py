@@ -260,12 +260,16 @@ async def test_message_fulltext_search():
         "content": "привет",
         "qdrant_point_id": None,
         "created_at": datetime.now(timezone.utc),
+        "attachments": None,
+        "photo_caption": None,
     }
     session.execute = AsyncMock(return_value=_mappings_result([row]))
     repo = MessageRepository(session)
     hits = await repo.fulltext_search("привет", limit=5)
     assert len(hits) == 1
     assert hits[0].content == "привет"
+    assert hits[0].attachments is None
+    assert hits[0].photo_caption is None
 
 
 @pytest.mark.asyncio

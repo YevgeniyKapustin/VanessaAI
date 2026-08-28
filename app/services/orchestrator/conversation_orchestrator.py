@@ -1,11 +1,14 @@
 import logging
 import time
 
+from app.config.settings import settings
+from app.core.messages import ImageAttachment, attachments_to_dicts
 from app.core.session.chat_session_state import load_chat_session_state
 from app.core.users.display_names import resolve_user_display_name
 from app.core.protocols import (
     IncomingTurnHandlerProtocol,
     MessageRepositoryProtocol,
+    PhotoCaptionerProtocol,
     UserRepositoryProtocol,
 )
 from app.db.repository import MessageRepository
@@ -54,6 +57,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         background: BackgroundExecutor | None = None,
         session_factory=None,
         eval: RagTriadEvaluator | None = None,
+        photo_captioner: PhotoCaptionerProtocol | None = None,
     ) -> None:
         self._messages = messages
         self._users = users
@@ -67,6 +71,7 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         self._background = background
         self._session_factory = session_factory
         self._eval = eval
+        self._photo_captioner = photo_captioner
 
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
         tracer = get_tracer()
@@ -110,6 +115,9 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             reply_to_text=turn.reply_to_text,
             reply_to_sender_telegram_id=turn.reply_to_sender_telegram_id,
             reply_to_sender_name=turn.reply_to_sender_name,
+            # Persist vision images so a follow-up turn ("а переведи вон ту
+            # надпись на ней") can reload them from the session window.
+            attachments=attachments_to_dicts(turn.images) or None,
         )
 
         ctx.session = await load_chat_session_state(
@@ -169,12 +177,13 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             return ok
 
     async def _run_post_reply(self, ctx: TurnPipelineContext) -> None:
-        """Run memory extraction + metrics.
+        """Run memory extraction + metrics + photo captioning.
 
-        With a background executor injected, both are submitted as jobs and the
+        With a background executor injected, all are submitted as jobs and the
         reply returns immediately (non-blocking). Without one (unit tests /
         fallback) they run inline exactly as before.
         """
+        caption_job = self._build_photo_caption_job(ctx)
         if self._background is not None:
             if self._memory is not None:
                 self._background.submit(self._build_memory_job(ctx))
@@ -182,7 +191,11 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
                 self._background.submit(self._build_metrics_job())
             if self._eval is not None and self._eval.should_run():
                 self._background.submit(self._build_eval_job(ctx))
+            if caption_job is not None:
+                self._background.submit(caption_job)
             return
+        if caption_job is not None:
+            await caption_job()
         if self._memory is not None:
             try:
                 await self._memory.run(
@@ -256,6 +269,56 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             except Exception:
                 logger.exception(
                     "rag_eval_failed request_id=%s", get_request_id()
+                )
+
+        return job
+
+    def _build_photo_caption_job(self, ctx: TurnPipelineContext):
+        """Enrich a photo message with a short generated caption (background).
+
+        The caption is stored in ``messages.photo_caption`` and folded into the
+        FTS search_vector, so a bare photo becomes findable "by meaning" in RAG
+        and is listed (with its caption) in the photo album the compose model
+        can pick from. Returns None when there is nothing to caption.
+        """
+        if (
+            self._photo_captioner is None
+            or not settings.vision_photo_caption_enabled
+        ):
+            return None
+        user_msg = ctx.user_msg
+        if user_msg is None or not user_msg.attachments:
+            return None
+        first_attachment = user_msg.attachments[0]
+        if not isinstance(first_attachment, dict):
+            return None
+        attachment = ImageAttachment.from_dict(first_attachment)
+        if not attachment.data_url:
+            return None
+        message_id = user_msg.id
+
+        async def job() -> None:
+            try:
+                caption = await self._photo_captioner.generate(attachment)
+                if not caption:
+                    return
+                if self._session_factory is not None:
+                    # The request-scoped repo dies with the response, so the job
+                    # opens its own session in the background.
+                    async with self._session_factory() as session:
+                        await MessageRepository(session).update_photo_caption(
+                            message_id, caption
+                        )
+                else:
+                    await self._messages.update_photo_caption(message_id, caption)
+                logger.info(
+                    "photo_caption_stored message_id=%s caption=%r",
+                    message_id,
+                    caption,
+                )
+            except Exception:
+                logger.exception(
+                    "photo_caption_stage_failed request_id=%s", get_request_id()
                 )
 
         return job

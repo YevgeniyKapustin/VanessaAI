@@ -8,7 +8,9 @@ from aiogram.exceptions import TelegramBadRequest
 
 from app.bot.container import BotServices, create_bot_services
 from app.bot.handlers.messages import (
+    _pick_photo_size,
     _preview,
+    _send_photo,
     _send_reply,
     _send_reply_messages,
     _typing_loop,
@@ -17,6 +19,7 @@ from app.bot.handlers.messages import (
 )
 from app.bot.messages.response import ChatProcessResult
 from app.config.content import get_content
+from app.config.settings import settings
 from tests.bot.test_bot_message import make_telegram_message
 
 
@@ -135,15 +138,28 @@ def _services(
     )
 
 
+def _find_handler(router, name: str):
+    for handler in router.message.handlers:
+        if getattr(handler.callback, "__name__", "") == name:
+            return handler.callback
+    raise AssertionError(f"handler '{name}' not found")
+
+
 async def _call_text_handler(services: BotServices, message: MagicMock) -> None:
     router = create_messages_router(services)
-    handler = router.message.handlers[-1].callback
+    handler = _find_handler(router, "handle_text")
     await handler(message)
 
 
 async def _call_start_handler(services: BotServices, message: MagicMock) -> None:
     router = create_messages_router(services)
-    handler = router.message.handlers[0].callback
+    handler = _find_handler(router, "cmd_start")
+    await handler(message)
+
+
+async def _call_photo_handler(services: BotServices, message: MagicMock) -> None:
+    router = create_messages_router(services)
+    handler = _find_handler(router, "handle_photo")
     await handler(message)
 
 
@@ -532,3 +548,175 @@ async def test_handle_text_pings_typing_again_before_reply():
     # the pre-reply ping), so the indicator never dies in the tail of the
     # pipeline.
     assert message.bot.send_chat_action.await_count >= 2
+
+
+def test_pick_photo_size_prefers_largest_within_cap():
+    small = MagicMock(file_id="small", file_size=1000)
+    medium = MagicMock(file_id="medium", file_size=50000)
+    huge = MagicMock(file_id="huge", file_size=10_000_000)
+    chosen = _pick_photo_size([small, medium, huge], max_bytes=1_500_000)
+    assert chosen.file_id == "medium"
+
+
+def test_pick_photo_size_falls_back_to_smallest_when_all_exceed_cap():
+    big = MagicMock(file_id="big", file_size=2_000_000)
+    bigger = MagicMock(file_id="bigger", file_size=5_000_000)
+    chosen = _pick_photo_size([big, bigger], max_bytes=1_000_000)
+    assert chosen.file_id == "big"
+
+
+def test_pick_photo_size_empty_returns_none():
+    assert _pick_photo_size([], max_bytes=1_500_000) is None
+
+
+@pytest.mark.asyncio
+async def test_handle_photo_downloads_and_sends_image_to_api():
+    message = make_telegram_message()
+    message.text = None
+    message.caption = None
+    message.photo = [
+        MagicMock(file_id="small", file_size=1000),
+        MagicMock(file_id="large", file_size=50_000),
+    ]
+    message.bot.download = AsyncMock(
+        side_effect=lambda photo, destination=None: destination.write(b"fakejpegbytes")
+    )
+    message.reply = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="На фото кот",
+            relevance_score=0.9,
+        )
+    )
+
+    await _call_photo_handler(services, message)
+
+    # The API received a bare photo as the placeholder text + one base64 image.
+    call = services.chat_client.process.await_args
+    incoming = call.args[0]
+    assert incoming.text == settings.vision_photo_placeholder
+    assert len(incoming.images) == 1
+    assert incoming.images[0].data_url.startswith("data:image/jpeg;base64,")
+    assert incoming.images[0].telegram_file_id == "large"
+    message.reply.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_photo_uses_caption_as_text():
+    message = make_telegram_message()
+    message.text = None
+    message.caption = "смотри что за зверь"
+    message.photo = [MagicMock(file_id="p1", file_size=1000)]
+    message.bot.download = AsyncMock(
+        side_effect=lambda photo, destination=None: destination.write(b"fakejpegbytes")
+    )
+    message.reply = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Это же крабер",
+            relevance_score=0.9,
+        )
+    )
+
+    await _call_photo_handler(services, message)
+
+    call = services.chat_client.process.await_args
+    incoming = call.args[0]
+    assert incoming.text == "смотри что за зверь"
+    assert len(incoming.images) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_photo_vision_disabled_drops_bare_photo(monkeypatch):
+    monkeypatch.setattr(settings, "vision_enabled", False)
+    message = make_telegram_message()
+    message.text = None
+    message.caption = None
+    message.photo = [MagicMock(file_id="p1", file_size=1000)]
+    message.bot.download = AsyncMock()
+    message.reply = AsyncMock()
+    services = _services()
+
+    await _call_photo_handler(services, message)
+
+    services.chat_client.process.assert_not_awaited()
+    message.reply.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handle_photo_vision_disabled_uses_caption_text(monkeypatch):
+    monkeypatch.setattr(settings, "vision_enabled", False)
+    message = make_telegram_message()
+    message.text = None
+    message.caption = "голый текст"
+    message.photo = [MagicMock(file_id="p1", file_size=1000)]
+    message.reply = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Понял",
+            relevance_score=0.9,
+        )
+    )
+
+    await _call_photo_handler(services, message)
+
+    call = services.chat_client.process.await_args
+    incoming = call.args[0]
+    assert incoming.text == "голый текст"
+    assert incoming.images == ()
+    message.reply.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_text_sends_photo_when_requested():
+    message = make_telegram_message(text="скинь фото с котом")
+    message.reply = AsyncMock()
+    message.bot.send_photo = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Держи",
+            relevance_score=0.9,
+            photo_file_id="file-1",
+        )
+    )
+
+    await _call_text_handler(services, message)
+
+    message.reply.assert_awaited_once()
+    message.bot.send_photo.assert_awaited_once_with(-100123, photo="file-1")
+
+
+@pytest.mark.asyncio
+async def test_handle_text_no_photo_without_photo_file_id():
+    message = make_telegram_message(text="скинь фото с котом")
+    message.reply = AsyncMock()
+    message.bot.send_photo = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Нет фото",
+            relevance_score=0.9,
+        )
+    )
+
+    await _call_text_handler(services, message)
+
+    message.reply.assert_awaited_once()
+    message.bot.send_photo.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_photo_swallows_errors():
+    message = make_telegram_message()
+    message.bot.send_photo = AsyncMock(side_effect=RuntimeError("cannot resend"))
+    await _send_photo(message, "file-1")
+    message.bot.send_photo.assert_awaited_once()

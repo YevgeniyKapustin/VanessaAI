@@ -2,7 +2,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict
 
 from app.config.content import MemeDefContent
-from app.core.messages import ContextBlock, ContextMessage, StoredMessage
+from app.core.messages import (
+    ContextBlock,
+    ContextMessage,
+    ImageAttachment,
+    PhotoCandidate,
+    StoredMessage,
+)
 from app.core.turn import ChatTurnInput, ConversationTurnResult
 from app.knowledge.schema import KnowledgeBlock
 
@@ -44,6 +50,7 @@ class MessageRepositoryProtocol(Protocol):
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        attachments: list[dict] | None = None,
     ) -> StoredMessage: ...
 
     async def fulltext_search(
@@ -86,6 +93,18 @@ class MessageRepositoryProtocol(Protocol):
         message_id: int,
         point_id: str,
     ) -> None: ...
+
+    async def update_photo_caption(
+        self,
+        message_id: int,
+        caption: str,
+    ) -> None: ...
+
+    async def search_photo_messages(
+        self,
+        query: str,
+        limit: int = 30,
+    ) -> list[StoredMessage]: ...
 
 
 class EmbeddingProviderProtocol(Protocol):
@@ -214,7 +233,15 @@ class LLMProviderProtocol(Protocol):
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        images: list[ImageAttachment] | None = None,
+        photo_candidates: list[PhotoCandidate] | None = None,
     ) -> str: ...
+
+
+class PhotoCaptionerProtocol(Protocol):
+    """Generates a short one-line description of a photo (RAG enrichment)."""
+
+    async def generate(self, attachment: ImageAttachment) -> str | None: ...
 
 
 class IncomingTurnHandlerProtocol(Protocol):

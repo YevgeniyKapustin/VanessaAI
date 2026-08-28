@@ -3,6 +3,7 @@ import time
 
 from app.config.content import get_content
 from app.config.settings import settings
+from app.core.messages import ImageAttachment, PhotoCandidate
 from app.core.protocols import (
     ContextRetrieverProtocol,
     LLMProviderProtocol,
@@ -13,7 +14,7 @@ from app.core.protocols import (
 )
 from app.core.request_context import get_request_id
 from app.core.turn import ConversationTurnResult
-from app.decision.models import DecisionAction, DecisionReason
+from app.decision.models import DecisionAction, DecisionReason, DecisionResult
 from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
 from app.decision.repeated_loop import LoopRegistry, loop_registry as default_loop_registry
 from app.decision.gate.protocols import (
@@ -30,8 +31,10 @@ from app.knowledge.metrics.feedback import (
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
 from app.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
+from app.llm.format.photo_tag import extract_photo_index
 from app.llm.format.reply_format import strip_trailing_periods
 from app.llm.format.sticker_tag import extract_sticker_tag
+from app.llm.planner.turn_planner import TurnPlan
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.search.react_retriever import retrieve_with_react
 from app.rag.search.search_plan import build_main_rag_plan
@@ -82,6 +85,13 @@ class GateStage:
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         await apply_owner_ignore_if_needed(self._ignore_registry, ctx)
+
+        # Vision turns ("reply to any photo"): the empty/placeholder caption must
+        # not be dropped by the prefilter/reaction-gate noise heuristics, and the
+        # text-based planner has nothing useful to classify. A forced plan + REPLY
+        # decision sends the turn straight to Retrieve/Compose for the vision model.
+        if ctx.turn.has_image and settings.vision_enabled:
+            return await self._force_vision_turn(ctx)
 
         if (
             self._config.planner_prefilter_enabled
@@ -235,6 +245,47 @@ class GateStage:
             )
             return False
 
+        return True
+
+    async def _force_vision_turn(self, ctx: TurnPipelineContext) -> bool:
+        """Auto-reply path for image turns ("reply to any photo").
+
+        Skips the prefilter/reaction-gate noise short-circuits (a bare photo has
+        an empty/placeholder caption the heuristics would drop) and the text
+        planner (nothing useful to classify). Builds a forced ``TurnPlan`` and a
+        REPLY ``DecisionResult`` so the turn proceeds to Retrieve/Compose, where
+        the vision model describes the image. ``FinalizeStage`` asserts a
+        non-None decision, so the forced decision is required here.
+        """
+        if self._metrics_retriever is not None:
+            try:
+                ctx.sender_profile = await self._metrics_retriever.get_by_telegram_id(
+                    ctx.turn.sender_telegram_id
+                )
+            except Exception:
+                logger.exception("metrics_retrieve_failed")
+                ctx.sender_profile = None
+        message = ctx.turn.message.strip()
+        ctx.turn_plan = TurnPlan(
+            original=ctx.turn.message,
+            text=message or "(описание фото)",
+            skip_search=True,
+            should_reply=True,
+        )
+        ctx.decision = DecisionResult(
+            action=DecisionAction.REPLY,
+            reason=DecisionReason.FORCE_REPLY,
+            relevance_score=1.0,
+        )
+        ctx.plan_ms = 0.0
+        ctx.decision_ms = 0.0
+        logger.info(
+            "turn_stage vision_forced request_id=%s chat_id=%s text=%r images=%s",
+            get_request_id(),
+            ctx.turn.telegram_chat_id,
+            ctx.turn.message,
+            len(ctx.turn.images),
+        )
         return True
 
 
@@ -400,6 +451,89 @@ class RetrieveStage:
         return message.strip()
 
 
+def _collect_turn_images(ctx: TurnPipelineContext) -> list[ImageAttachment]:
+    """Assemble the images for a vision turn.
+
+    Current-turn images come first; then attachments from prior session messages
+    (newest first, excluding the current message — it already contributes via
+    ``ctx.turn.images``) so follow-ups like "а переведи вон ту надпись на ней"
+    can reference an earlier photo. Bounded by ``vision_session_images`` per
+    session and ``vision_max_images_per_turn`` overall.
+    """
+    images: list[ImageAttachment] = list(ctx.turn.images)
+    prior = ctx.recent[:-1] if ctx.recent else []
+    session_count = 0
+    session_limit = settings.vision_session_images
+    max_total = settings.vision_max_images_per_turn
+    for message in reversed(prior):
+        if session_count >= session_limit or len(images) >= max_total:
+            break
+        for attachment in message.attachments:
+            if not attachment.data_url:
+                continue
+            images.append(attachment)
+            session_count += 1
+            if session_count >= session_limit or len(images) >= max_total:
+                break
+    return images[:max_total]
+
+
+def _photo_caption_for(message) -> str:
+    """Best human label of a photo message for the album list."""
+    if message.photo_caption and message.photo_caption.strip():
+        return message.photo_caption.strip()
+    content = (message.content or "").strip()
+    if content and content != settings.vision_photo_placeholder:
+        return content
+    return settings.vision_photo_placeholder
+
+
+def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
+    """Assemble the "photo album" — photos the bot could re-send.
+
+    Candidates come from two sources, both meaning-driven:
+    - messages the RAG retrieval surfaced for THIS turn (``ctx.context_blocks``) —
+      the "по смыслу" leg (photo captions are folded into the FTS search_vector);
+    - recent session messages with attachments (so "верни то фото" without a
+      precise query still works).
+    Deduplicated by telegram_file_id and bounded by ``vision_photo_candidates``.
+    """
+    seen: set[str] = set()
+    collected: list[tuple[str, str, str, object]] = []  # (file_id, caption, sender, msg)
+
+    def _add(message) -> None:
+        for attachment in message.attachments:
+            file_id = attachment.telegram_file_id
+            if not file_id or file_id in seen:
+                continue
+            seen.add(file_id)
+            collected.append(
+                (file_id, _photo_caption_for(message), message.sender_name or "", message)
+            )
+
+    # RAG context first (meaning match), then the recent session (recency).
+    for block in ctx.context_blocks:
+        for message in block.messages:
+            _add(message)
+    for message in ctx.recent:
+        _add(message)
+
+    candidates: list[PhotoCandidate] = []
+    for index, (file_id, caption, sender, message) in enumerate(collected, start=1):
+        if len(candidates) >= settings.vision_photo_candidates:
+            break
+        candidates.append(
+            PhotoCandidate(
+                index=index,
+                telegram_file_id=file_id,
+                caption=caption,
+                sender_name=sender or None,
+                created_at=getattr(message, "created_at", None),
+            )
+        )
+    return candidates
+
+
 class ComposeStage:
     def __init__(self, llm: LLMProviderProtocol) -> None:
         self._llm = llm
@@ -425,6 +559,12 @@ class ComposeStage:
                 name=ctx.sender_profile.display_name,
                 annoyance=ctx.annoyance,
             )
+        # Vision: attach the current + recent-session images when enabled; the
+        # provider routes the call to the vision model only when images are present.
+        images = _collect_turn_images(ctx) if settings.vision_enabled else []
+        # Photo album: photos the bot could re-send, matched to the context by
+        # RAG "по смыслу" + the recent session.
+        photo_candidates = _collect_photo_candidates(ctx) if settings.vision_enabled else []
         ctx.reply = await self._llm.generate(
             user_message=ctx.turn.message,
             context_blocks=ctx.context_blocks,
@@ -444,7 +584,29 @@ class ComposeStage:
             reply_to_text=ctx.turn.reply_to_text,
             reply_to_sender_telegram_id=ctx.turn.reply_to_sender_telegram_id,
             reply_to_sender_name=ctx.turn.reply_to_sender_name,
+            images=images or None,
+            photo_candidates=photo_candidates or None,
         )
+        # Resolve the [photo:<index>] marker the model may have emitted: strip it
+        # from the reply and remember the file_id the bot should re-send.
+        clean_reply, photo_index = extract_photo_index(ctx.reply)
+        if photo_index is not None:
+            if 1 <= photo_index <= len(photo_candidates):
+                ctx.photo_file_id = photo_candidates[photo_index - 1].telegram_file_id
+                logger.info(
+                    "photo_send_resolved request_id=%s index=%s file_id=%s",
+                    get_request_id(),
+                    photo_index,
+                    ctx.photo_file_id,
+                )
+            else:
+                logger.warning(
+                    "photo_send_index_out_of_range request_id=%s index=%s total=%s",
+                    get_request_id(),
+                    photo_index,
+                    len(photo_candidates),
+                )
+            ctx.reply = clean_reply
         ctx.llm_ms = (time.perf_counter() - llm_started) * 1000
         logger.info(
             "turn_stage llm request_id=%s reply_len=%s llm_ms=%.1f",
@@ -540,6 +702,8 @@ class FinalizeStage:
             context_count=ctx.context_count,
             relevance_score=ctx.decision.relevance_score,
             sticker_tag=sticker_tag,
+            # Photo the compose model asked to re-send (resolved from [photo:N]).
+            photo_file_id=ctx.photo_file_id,
         )
         self._metrics.record_turn(
             action=ctx.result.action,

@@ -115,6 +115,7 @@ class MessageRepository:
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        attachments: list[dict] | None = None,
     ) -> StoredMessage:
         message = Message(
             sender_telegram_id=sender_telegram_id,
@@ -126,6 +127,7 @@ class MessageRepository:
             reply_to_text=reply_to_text,
             reply_to_sender_telegram_id=reply_to_sender_telegram_id,
             reply_to_sender_name=reply_to_sender_name,
+            attachments=attachments,
         )
         if created_at is not None:
             message.created_at = created_at
@@ -184,6 +186,7 @@ class MessageRepository:
                        m.role, m.content, m.qdrant_point_id, m.created_at,
                        m.reply_to_message_id, m.reply_to_text,
                        m.reply_to_sender_telegram_id, m.reply_to_sender_name,
+                       m.attachments, m.photo_caption,
                        COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                 FROM messages m
                 LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
@@ -207,6 +210,7 @@ class MessageRepository:
                 """
                 SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
                        m.role, m.content, m.qdrant_point_id, m.created_at,
+                       m.attachments, m.photo_caption,
                        COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                 FROM messages m
                 LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
@@ -235,6 +239,7 @@ class MessageRepository:
                 """
                 SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
                        m.role, m.content, m.qdrant_point_id, m.created_at,
+                       m.attachments, m.photo_caption,
                        COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                 FROM messages m
                 LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
@@ -265,7 +270,7 @@ class MessageRepository:
             text(
                 """
                 SELECT id, sender_telegram_id, telegram_message_id, role, content,
-                       qdrant_point_id, created_at
+                       qdrant_point_id, created_at, attachments, photo_caption
                 FROM messages
                 WHERE role = 'user'
                   AND search_vector @@ plainto_tsquery('russian', :query)
@@ -288,8 +293,67 @@ class MessageRepository:
                 content=row["content"],
                 qdrant_point_id=row["qdrant_point_id"],
                 created_at=row["created_at"],
+                attachments=row["attachments"],
+                photo_caption=row["photo_caption"],
             )
             for row in rows
+        ]
+
+    async def update_photo_caption(
+        self,
+        message_id: int,
+        caption: str,
+    ) -> None:
+        """Persist the generated caption of a photo message.
+
+        The FTS ``search_vector`` is recomputed to include the caption, so a bare
+        photo becomes findable "by meaning" in the text/hybrid RAG.
+        """
+        await self._session.execute(
+            text(
+                "UPDATE messages "
+                "SET photo_caption = :caption, "
+                "    search_vector = to_tsvector('russian', content || ' ' || :caption) "
+                "WHERE id = :message_id AND role = 'user'"
+            ),
+            {"caption": caption, "message_id": message_id},
+        )
+
+    async def search_photo_messages(
+        self,
+        query: str,
+        limit: int = 30,
+    ) -> list[StoredMessage]:
+        """FTS over messages that carry a photo (attachments non-empty).
+
+        Used by the "RAG по смыслу" photo-album gathering: finds photo messages
+        whose content/caption matches the meaning of the current turn.
+        """
+        result = await self._session.execute(
+            text(
+                """
+                SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
+                       m.role, m.content, m.qdrant_point_id, m.created_at,
+                       m.attachments, m.photo_caption,
+                       COALESCE(u.nickname, u.first_name, u.username) AS sender_name
+                FROM messages m
+                LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
+                WHERE m.role = 'user'
+                  AND m.attachments IS NOT NULL
+                  AND jsonb_array_length(m.attachments) > 0
+                  AND m.search_vector @@ plainto_tsquery('russian', :query)
+                ORDER BY ts_rank(
+                    m.search_vector,
+                    plainto_tsquery('russian', :query)
+                ) DESC, m.id DESC
+                LIMIT :limit
+                """
+            ),
+            {"query": query, "limit": limit},
+        )
+        return [
+            self._row_to_stored(row)
+            for row in result.mappings().all()
         ]
 
     async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
@@ -319,6 +383,8 @@ class MessageRepository:
             reply_to_text=row.get("reply_to_text"),
             reply_to_sender_telegram_id=row.get("reply_to_sender_telegram_id"),
             reply_to_sender_name=row.get("reply_to_sender_name"),
+            attachments=row.get("attachments"),
+            photo_caption=row.get("photo_caption"),
         )
 
     async def _window_for_anchor(
@@ -338,6 +404,7 @@ class MessageRepository:
                     """
                     SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
                            m.role, m.content, m.qdrant_point_id, m.created_at,
+                           m.attachments, m.photo_caption,
                            COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                     FROM messages m
                     LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
@@ -363,6 +430,7 @@ class MessageRepository:
                 """
                 SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
                        m.role, m.content, m.qdrant_point_id, m.created_at,
+                       m.attachments, m.photo_caption,
                        COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                 FROM messages m
                 LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
@@ -383,6 +451,7 @@ class MessageRepository:
                     """
                     SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
                            m.role, m.content, m.qdrant_point_id, m.created_at,
+                           m.attachments, m.photo_caption,
                            COALESCE(u.nickname, u.first_name, u.username) AS sender_name
                     FROM messages m
                     LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id

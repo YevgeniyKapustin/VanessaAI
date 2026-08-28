@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock
 
-from app.core.messages import ContextBlock, ContextMessage, StoredMessage
+from app.core.messages import ContextBlock, ContextMessage, ImageAttachment, StoredMessage
 from app.core.turn import ChatTurnInput
 from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
 from app.knowledge.schema import KnowledgeBlock
@@ -41,6 +41,7 @@ class FakeMessageRepo:
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        attachments: list[dict] | None = None,
     ) -> StoredMessage:
         message = StoredMessage(
             id=self._next_id,
@@ -53,6 +54,7 @@ class FakeMessageRepo:
             reply_to_text=reply_to_text,
             reply_to_sender_telegram_id=reply_to_sender_telegram_id,
             reply_to_sender_name=reply_to_sender_name,
+            attachments=attachments,
         )
         self._messages[message.id] = message
         self._next_id += 1
@@ -83,6 +85,32 @@ class FakeMessageRepo:
             qdrant_point_id=point_id,
             telegram_message_id=message.telegram_message_id,
         )
+
+    async def update_photo_caption(self, message_id: int, caption: str) -> None:
+        if message_id not in self._messages:
+            return
+        message = self._messages[message_id]
+        self._messages[message_id] = StoredMessage(
+            id=message.id,
+            role=message.role,
+            content=message.content,
+            sender_telegram_id=message.sender_telegram_id,
+            qdrant_point_id=message.qdrant_point_id,
+            telegram_message_id=message.telegram_message_id,
+            reply_to_message_id=message.reply_to_message_id,
+            reply_to_text=message.reply_to_text,
+            reply_to_sender_telegram_id=message.reply_to_sender_telegram_id,
+            reply_to_sender_name=message.reply_to_sender_name,
+            attachments=message.attachments,
+            photo_caption=caption,
+        )
+
+    async def search_photo_messages(
+        self,
+        query: str,
+        limit: int = 30,
+    ) -> list[StoredMessage]:
+        return [m for m in self._messages.values() if m.attachments][:limit]
 
 
 class FakeUser:
@@ -172,6 +200,8 @@ class FakeLLM:
         self.last_needs_clarification: bool = False
         self.last_clarification_hint: str = ""
         self.last_uses_pro_model: bool = False
+        self.last_images: list | None = None
+        self.last_photo_candidates: list | None = None
 
     async def generate(
         self,
@@ -194,6 +224,8 @@ class FakeLLM:
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        images: list | None = None,
+        photo_candidates: list | None = None,
     ) -> str:
         self.last_metrics_block = metrics_block
         self.last_humor_quotes = humor_quotes
@@ -208,6 +240,8 @@ class FakeLLM:
         self.last_reply_to_text = reply_to_text
         self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
         self.last_reply_to_sender_name = reply_to_sender_name
+        self.last_images = images
+        self.last_photo_candidates = photo_candidates
         return f"echo: {user_message}"
 
 
@@ -215,6 +249,7 @@ class FakeDecisionEngine:
     def __init__(self, action: DecisionAction) -> None:
         self._action = action
         self.recorded_chats: list[int] = []
+        self.decide_calls: int = 0
 
     async def decide(
         self,
@@ -235,6 +270,7 @@ class FakeDecisionEngine:
         loop_strength: int = 0,
         annoyance: float = 0.0,
     ) -> DecisionResult:
+        self.decide_calls += 1
         return DecisionResult(
             action=self._action,
             reason=(
@@ -257,6 +293,7 @@ def _build_orchestrator(
     llm: FakeLLM | None = None,
     query_rewriter: QueryRewriter | None = None,
     defer_index_on_ignore: bool = True,
+    photo_captioner=None,
 ) -> ConversationOrchestrator:
     retriever = retriever or FakeContextRetriever()
     llm = llm or FakeLLM()
@@ -288,6 +325,7 @@ def _build_orchestrator(
         retrieve=RetrieveStage(retriever, humor, None),
         compose=ComposeStage(llm),
         finalize=FinalizeStage(messages, indexing, decision, config, metrics),
+        photo_captioner=photo_captioner,
     )
 
 
@@ -653,3 +691,168 @@ async def test_compose_stage_forwards_needs_clarification():
     assert llm.last_needs_clarification is True
     assert llm.last_clarification_hint == "почему"
     assert ctx.reply == "echo: ванесса я думаю ты виновата"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_forces_reply_for_image_turn():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    # Even though the decision engine would IGNORE this bare-photo turn, the
+    # vision short-circuit forces a REPLY so the photo is always described.
+    decision = FakeDecisionEngine(DecisionAction.IGNORE)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    assert result.action == DecisionAction.REPLY
+    # The decision engine was bypassed entirely (the forced path never consults it).
+    assert decision.decide_calls == 0
+    # The image is persisted so a follow-up turn can reload it from the session.
+    stored = messages._messages[1]
+    assert stored.attachments == [
+        {
+            "data_url": "data:image/jpeg;base64,AAAA",
+            "mime_type": "image/jpeg",
+            "telegram_file_id": "f1",
+            "description": None,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_forwards_images_to_llm():
+    llm = FakeLLM()
+    compose = ComposeStage(llm)
+    image = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="f1",
+    )
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            images=(image,),
+        ),
+        turn_plan=TurnPlan(
+            original="[фото]",
+            text="(описание фото)",
+            skip_search=True,
+            should_reply=True,
+        ),
+    )
+    ctx.recent = []
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    assert llm.last_images == [image]
+    assert ctx.reply == "echo: [фото]"
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_forwards_photo_candidates_and_resolves_marker():
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+    prior = ContextMessage(
+        id=10,
+        role="user",
+        content="[фото]",
+        sender_telegram_id=42,
+        sender_name="Тест",
+        attachments=(photo,),
+        photo_caption="кот на диване",
+    )
+
+    class MarkerLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            self.last_photo_candidates = kwargs.get("photo_candidates")
+            return "Держи\n[photo:1]"
+
+    llm = MarkerLLM()
+    compose = ComposeStage(llm)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="скинь то фото с котом",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="скинь то фото с котом",
+            text="скинь то фото с котом",
+            skip_search=False,
+            should_reply=True,
+        ),
+    )
+    ctx.recent = [prior]
+    ctx.context_blocks = [ContextBlock(anchor_id=10, messages=(prior,))]
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    # The album (RAG context + session) was offered to the model.
+    assert llm.last_photo_candidates is not None
+    assert len(llm.last_photo_candidates) == 1
+    candidate = llm.last_photo_candidates[0]
+    assert candidate.index == 1
+    assert candidate.telegram_file_id == "file-1"
+    assert candidate.caption == "кот на диване"
+    # The [photo:1] marker was resolved to the file_id and stripped from the reply.
+    assert ctx.photo_file_id == "file-1"
+    assert ctx.reply == "Держи"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_stores_photo_caption_in_background():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    captioner = AsyncMock()
+    captioner.generate = AsyncMock(return_value="кот на диване")
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        photo_captioner=captioner,
+    )
+
+    await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    captioner.generate.assert_awaited_once()
+    # The generated caption was persisted to the photo message (inline fallback
+    # when no background executor is injected).
+    assert messages._messages[1].photo_caption == "кот на диване"

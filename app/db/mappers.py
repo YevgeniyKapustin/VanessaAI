@@ -15,6 +15,8 @@ def message_to_stored(message: Message) -> StoredMessage:
         reply_to_text=message.reply_to_text,
         reply_to_sender_telegram_id=message.reply_to_sender_telegram_id,
         reply_to_sender_name=message.reply_to_sender_name,
+        attachments=message.attachments,
+        photo_caption=message.photo_caption,
     )
 
 

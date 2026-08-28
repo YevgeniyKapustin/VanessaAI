@@ -67,6 +67,37 @@ class Settings(BaseSettings):
     deepseek_pro_model: str = "deepseek-v4-pro"
     deepseek_max_tokens: int = 4096
 
+    # --- Vision (DeepSeek multimodal) ------------------------------------------
+    # Master switch for image understanding. When off, photo turns fall back to
+    # today's behavior (caption treated as a normal text message, image ignored).
+    vision_enabled: bool = True
+    # Compose model used when a turn carries an image. The Exp (experimental)
+    # Flash vision model is cheap (~384 tokens/image, auto-resized to ~800x800).
+    deepseek_vision_model: str = "deepseek-v4-flash-vision-exp"
+    # Pick the largest Telegram photo size whose file_size fits this cap; base64
+    # encoding adds ~33% on top of the raw bytes. Keeps API bodies and the DB
+    # attachment column bounded.
+    vision_max_image_bytes: int = 1_500_000
+    # Max prior session images attached to a vision turn for follow-up questions
+    # ("а переведи вон ту надпись на ней" referring to an earlier photo).
+    vision_session_images: int = 2
+    # Hard cap on images sent to the model in one turn (current + session).
+    vision_max_images_per_turn: int = 2
+    # Text stored for a caption-less photo so the API schema (min_length=1), the
+    # DB row and the session history stay consistent; the vision path ignores it.
+    vision_photo_placeholder: str = "[фото]"
+    # Photo album: max photos listed in the compose prompt that the bot could
+    # re-send (selected by RAG "по смыслу" + recent session).
+    vision_photo_candidates: int = 5
+    # Background enrichment: after a photo turn, generate a short description
+    # with the vision model and store it (photo_caption) so bare photos become
+    # findable "by meaning" in RAG.
+    vision_photo_caption_enabled: bool = True
+    # Caption model; empty = the active vision model (deepseek_vision_model).
+    vision_photo_caption_model: str = ""
+    # Max length of the generated photo caption.
+    vision_photo_caption_max_chars: int = 160
+
     rag_context_min: int = 20
     rag_context_max: int = 50
     rag_anchor_max: int = 10

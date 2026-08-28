@@ -141,6 +141,27 @@ clarification_instruction: |
   question — one sentence («Не поняла, почему?» / «Не поняла, про что?»).
   No jokes, no jabs, no sticker.
 
+vision_note: |
+  The current message has an attached image (and possibly earlier images from the
+  recent session). Use it as the primary source when the user asks about the photo:
+  - describe what is happening in the image;
+  - read the text on it (OCR) — screenshots, receipts, documents, charts, interfaces;
+  - if the text is small, blurry or illegible — say so directly, never invent it;
+  - if earlier images are attached, the user may refer to any of them ("вон та
+    надпись на ней") — match the reference to the image it points to.
+
+photo_album_header: "Photos I can send (from our chat, matched to the context):"
+photo_album_line: "- [{index}] {sender}, {time}: {caption}"
+photo_album_instruction: |
+  The chat already received the photos listed above — the app can re-send any of
+  them by number. If one of them fits the current message (the user asks to send,
+  show or return a photo that is clearly one of these), append the marker
+  [photo:<index>] on its own line at the very end of the reply, using the exact
+  number from the list. Rules:
+  - never invent a number outside the list; at most one [photo:...] per reply;
+  - the marker goes on its own final line, never inside code blocks or quotes;
+  - if no listed photo fits — emit nothing and reply normally.
+
 humor_quote_line: "- {quote}"
 context_header: "From old conversations in the chat:"
 context_block_header: "--- Block {index} ({started_at} — {ended_at}) ---"

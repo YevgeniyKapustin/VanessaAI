@@ -4,7 +4,7 @@ from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.users.nicknames import format_aliases_for_prompt
-from app.core.messages import ContextBlock, ContextMessage
+from app.core.messages import ContextBlock, ContextMessage, PhotoCandidate
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.prompts.budget import (
     PRIORITY_CONTEXT,
@@ -96,6 +96,8 @@ class PromptBuilder:
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        has_image: bool = False,
+        photo_candidates: list[PhotoCandidate] | None = None,
     ) -> str:
         llm = self._content.llm
         if context_blocks:
@@ -209,6 +211,34 @@ class PromptBuilder:
             # Cold-reply directive: the sender is stuck in a same-topic loop and
             # Vanessa is annoyed — reply dry, sharp and brief.
             parts.append((PRIORITY_DIRECTIVES, "directives", attitude_note.strip()))
+        if has_image and llm.vision_note.strip():
+            # Vision directive: the turn carries an image — describe / OCR it and
+            # be honest about unclear text instead of hallucinating.
+            parts.append((PRIORITY_DIRECTIVES, "directives", llm.vision_note.strip()))
+        if photo_candidates:
+            # Photo album: photos the bot could re-send, matched to the context
+            # by RAG "по смыслу" + the recent session. High priority so the model
+            # can always choose to send one.
+            album_lines = [
+                llm.photo_album_line.format(
+                    index=candidate.index,
+                    sender=candidate.sender_name or "кто-то",
+                    time=format_message_time(candidate.created_at),
+                    caption=candidate.caption,
+                )
+                for candidate in photo_candidates
+            ]
+            parts.append(
+                (
+                    PRIORITY_DIRECTIVES,
+                    "photo_album",
+                    f"{llm.photo_album_header}\n" + "\n".join(album_lines),
+                )
+            )
+            if llm.photo_album_instruction.strip():
+                parts.append(
+                    (PRIORITY_DIRECTIVES, "directives", llm.photo_album_instruction.strip())
+                )
         owner_id = settings.required_user_telegram_id
         owner_note = llm.owner_message_note.strip()
         if (

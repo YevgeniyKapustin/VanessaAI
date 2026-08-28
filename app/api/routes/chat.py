@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from app.api.auth import verify_internal_token
 from app.api.deps import get_incoming_turn_handler
 from app.api.schemas.chat import ChatRequest, ChatResponse
+from app.core.messages import ImageAttachment
 from app.core.protocols import IncomingTurnHandlerProtocol
 from app.core.request_context import set_planning_started_signal
 from app.core.turn import ChatTurnInput
@@ -41,6 +42,14 @@ async def chat(
         reply_to_message_id=body.reply_to_message_id,
         reply_to_text=body.reply_to_text,
         reply_to_sender_name=body.reply_to_sender_name,
+        images=tuple(
+            ImageAttachment(
+                data_url=image.data_url,
+                mime_type=image.mime_type,
+                telegram_file_id=image.telegram_file_id,
+            )
+            for image in body.images
+        ),
     )
 
     async def event_stream():
@@ -73,6 +82,7 @@ async def chat(
                 context_count=result.context_count,
                 relevance_score=result.relevance_score,
                 sticker_tag=result.sticker_tag,
+                photo_file_id=result.photo_file_id,
             )
             yield _sse("result", payload.model_dump())
         finally:

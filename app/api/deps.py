@@ -40,6 +40,7 @@ from app.knowledge.retriever import KnowledgeRetriever
 from app.knowledge.vault import KnowledgeVault
 from app.knowledge.vector_index import KnowledgeVectorIndexer
 from app.knowledge.writer import KnowledgeVaultWriter
+from app.llm.photo_captioner import PhotoCaptioner
 from app.llm.providers import create_llm_provider
 from app.observability.eval import RagTriadEvaluator
 from app.rag.search.hybrid_search import HybridSearchService
@@ -282,4 +283,6 @@ async def get_incoming_turn_handler(
         session_factory=async_session_factory,
         # RAG Triad LLM-as-judge evaluation (sampled, off by default).
         eval=RagTriadEvaluator(),
+        # Background one-line captions for photos (RAG-by-meaning enrichment).
+        photo_captioner=PhotoCaptioner(),
     )

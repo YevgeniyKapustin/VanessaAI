@@ -161,6 +161,15 @@ class LLMContent(BaseModel):
     tone_note: str = ""
     owner_message_note: str = ""
     clarification_instruction: str = ""
+    # Instruction injected when the turn carries an image (vision): tells the
+    # model how to handle the attached picture (describe / OCR / be honest about
+    # unclear text instead of hallucinating).
+    vision_note: str = ""
+    # Photo album section: a list of photos the bot could re-send (RAG-selected),
+    # with the instruction to emit [photo:<index>] when one fits the message.
+    photo_album_header: str = "Photos I can send (from our chat, matched to the context):"
+    photo_album_line: str = "- [{index}] {sender}, {time}: {caption}"
+    photo_album_instruction: str = ""
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
     budget: PromptBudgetContent = Field(default_factory=PromptBudgetContent)
 

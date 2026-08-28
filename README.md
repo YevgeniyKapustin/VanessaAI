@@ -36,6 +36,12 @@ common problems:
 - Keeps an internal **knowledge vault** — dossiers on people, a glossary of
   in-chat memes, recommendations and weekly logs — and consults it to answer
   “что было про Макса и утку?” and to joke with the chat's own lore.
+- **Understands photos** — the bot auto-describes images and reads text on them
+  (OCR of screenshots, receipts, documents, charts) via a cheap DeepSeek vision
+  model, and remembers an image across the session for follow-ups
+  («а переведи вон ту надпись на ней»). It can also **re-send a photo it was
+  sent before**: the prompt lists meaning-relevant photos (RAG «по смыслу» via
+  generated captions + the recent session) and the model can pick one to send.
 
 ### For developers
 
@@ -273,6 +279,15 @@ does not apply them today.
 | `LLM_PROVIDER` | LLM backend: `deepseek` (default) or `claude` |
 | `DEEPSEEK_PLANNER_MODEL` | Separate DeepSeek planner model (optional) |
 | `ANTHROPIC_PLANNER_MODEL` | Separate Claude planner model (optional) |
+| `VISION_ENABLED` | Image understanding on/off (photos auto-described via vision model) |
+| `DEEPSEEK_VISION_MODEL` | Vision compose model (default `deepseek-v4-flash-vision-exp`) |
+| `VISION_MAX_IMAGE_BYTES` | Largest Telegram photo size (bytes) used per image |
+| `VISION_SESSION_IMAGES` | Max prior session images attached for follow-ups |
+| `VISION_MAX_IMAGES_PER_TURN` | Hard cap on images sent per vision turn |
+| `VISION_PHOTO_CANDIDATES` | Max photos in the "photo album" the bot can re-send |
+| `VISION_PHOTO_CAPTION_ENABLED` | Generate one-line photo captions (RAG-by-meaning) in background |
+| `VISION_PHOTO_CAPTION_MODEL` | Caption model; empty = the vision model |
+| `VISION_PHOTO_CAPTION_MAX_CHARS` | Max length of a generated photo caption |
 | `CRITIC_ENABLED` | Enable the humor critic loop (humor turns only) |
 | `CRITIC_MAX_ITERATIONS` | Max regeneration rounds after a REJECTED draft |
 | `CRITIC_MODEL` | Optional separate model for the critic |

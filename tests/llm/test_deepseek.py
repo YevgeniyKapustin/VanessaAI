@@ -4,7 +4,8 @@ import pytest
 from openai import APIStatusError
 
 from app.config.content import get_content
-from app.core.messages import ContextBlock, ContextMessage
+from app.config.settings import settings
+from app.core.messages import ContextBlock, ContextMessage, ImageAttachment
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.providers.deepseek import DeepSeekLLMProvider, _usage_from_openai
 
@@ -218,3 +219,82 @@ async def test_deepseek_generate_includes_clarification_instruction(
     user_prompt = call.kwargs["messages"][1]["content"]
     assert get_content().llm.clarification_instruction.strip() in user_prompt
     assert "What is unclear: почему" in user_prompt
+
+
+@pytest.mark.asyncio
+async def test_deepseek_vision_routes_vision_model_and_sends_image_blocks(
+    provider: DeepSeekLLMProvider,
+):
+    image = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+    await provider.generate("что на фото", [], images=[image])
+
+    call = provider._client.chat.completions.create.await_args
+    # Images route the call to the vision model (not the default/pro model).
+    assert call.kwargs["model"] == settings.deepseek_vision_model
+    # The user content becomes a list of OpenAI multimodal blocks: text + image_url.
+    user_content = call.kwargs["messages"][1]["content"]
+    assert isinstance(user_content, list)
+    assert user_content[0]["type"] == "text"
+    assert "что на фото" in user_content[0]["text"]
+    # The vision instruction is injected so the model knows it can see an image.
+    assert get_content().llm.vision_note.strip() in user_content[0]["text"]
+    assert user_content[1] == {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,AAAA"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_deepseek_plain_content_stays_string_without_images(
+    provider: DeepSeekLLMProvider,
+):
+    await provider.generate("hello", [])
+    call = provider._client.chat.completions.create.await_args
+    # Backwards compatible: no images -> the prompt stays a plain string.
+    assert isinstance(call.kwargs["messages"][1]["content"], str)
+    assert call.kwargs["model"] == "test-model"
+
+
+@pytest.mark.asyncio
+async def test_deepseek_vision_caps_images_per_turn(
+    provider: DeepSeekLLMProvider,
+):
+    # The provider itself does not cap — the ComposeStage does — but it must
+    # attach exactly the images it is given and route them all as blocks.
+    images = [
+        ImageAttachment(data_url=f"data:image/jpeg;base64,{i}", mime_type="image/jpeg")
+        for i in range(2)
+    ]
+    await provider.generate("фото", [], images=images)
+    call = provider._client.chat.completions.create.await_args
+    user_content = call.kwargs["messages"][1]["content"]
+    image_blocks = [b for b in user_content if b["type"] == "image_url"]
+    assert len(image_blocks) == 2
+
+
+@pytest.mark.asyncio
+async def test_deepseek_photo_candidates_injected_into_prompt(
+    provider: DeepSeekLLMProvider,
+):
+    from app.core.messages import PhotoCandidate
+
+    candidates = [
+        PhotoCandidate(
+            index=1,
+            telegram_file_id="f1",
+            caption="кот на диване",
+            sender_name="Тест",
+        )
+    ]
+    await provider.generate("скинь фото с котом", [], photo_candidates=candidates)
+
+    call = provider._client.chat.completions.create.await_args
+    content = call.kwargs["messages"][1]["content"]
+    text = content[0]["text"] if isinstance(content, list) else content
+    assert get_content().llm.photo_album_header.strip() in text
+    assert "кот на диване" in text
+    assert "[photo:1]" in text or "[photo:<index>]" in text

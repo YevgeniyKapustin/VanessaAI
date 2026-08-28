@@ -11,3 +11,5 @@ class ChatProcessResult:
     messages: list[str] | None = None
     relevance_score: float = 0.0
     sticker_tag: str | None = None
+    # Telegram file_id of a photo to re-send (compose picked one from the album).
+    photo_file_id: str | None = None

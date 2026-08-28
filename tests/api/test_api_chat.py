@@ -131,6 +131,70 @@ async def test_chat_endpoint_passes_reply_context(api_client_override):
 
 
 @pytest.mark.asyncio
+async def test_chat_endpoint_passes_images_to_turn(api_client_override):
+    _shared_handler.last_turn = None
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        await _post_chat(
+            client,
+            {
+                "telegram_chat_id": -100123,
+                "message": "[фото]",
+                "sender_telegram_id": 42,
+                "images": [
+                    {
+                        "data_url": "data:image/jpeg;base64,AAAA",
+                        "mime_type": "image/jpeg",
+                        "telegram_file_id": "f1",
+                    }
+                ],
+            },
+        )
+
+    assert _shared_handler.last_turn is not None
+    assert _shared_handler.last_turn.has_image is True
+    assert len(_shared_handler.last_turn.images) == 1
+    image = _shared_handler.last_turn.images[0]
+    assert image.data_url == "data:image/jpeg;base64,AAAA"
+    assert image.telegram_file_id == "f1"
+
+
+@pytest.mark.asyncio
+async def test_chat_endpoint_returns_photo_file_id():
+    class PhotoHandler(FakeHandler):
+        async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
+            return ConversationTurnResult(
+                action="reply",
+                reason="intent",
+                reply="Держи",
+                relevance_score=0.9,
+                photo_file_id="file-1",
+            )
+
+    app.dependency_overrides[get_incoming_turn_handler] = lambda: PhotoHandler()
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            body = await _post_chat(
+                client,
+                {
+                    "telegram_chat_id": -100123,
+                    "message": "скинь фото",
+                    "sender_telegram_id": 42,
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    events = _parse_sse_events(body)
+    assert events["result"][0]["photo_file_id"] == "file-1"
+
+
+@pytest.mark.asyncio
 async def test_chat_endpoint_returns_request_id(api_client_override):
     async with AsyncClient(
         transport=ASGITransport(app=app),

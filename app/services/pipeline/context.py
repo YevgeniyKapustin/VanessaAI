@@ -34,6 +34,9 @@ class TurnPipelineContext:
     loop_strength: int = 0
     annoyance: float = 0.0
     reply: str | None = None
+    # When the compose model picks a photo from the album, the resolved Telegram
+    # file_id of the photo to re-send (via the [photo:<index>] marker).
+    photo_file_id: str | None = None
     result: ConversationTurnResult | None = None
     plan_ms: float = 0.0
     decision_ms: float = 0.0

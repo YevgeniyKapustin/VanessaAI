@@ -7,7 +7,7 @@ from openai import APIStatusError, AsyncOpenAI
 
 from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
-from app.core.messages import ContextBlock, ContextMessage
+from app.core.messages import ContextBlock, ContextMessage, ImageAttachment, PhotoCandidate
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
 from app.llm.format.answer_tag import extract_answer
@@ -35,6 +35,7 @@ class DeepSeekLLMProvider:
         generation: LLMGenerationParams | None = None,
         content: AppContent | None = None,
         pro_model: str | None = None,
+        vision_model: str | None = None,
     ) -> None:
         self._content = content or get_content()
         self._client = client
@@ -42,6 +43,9 @@ class DeepSeekLLMProvider:
         # Upscaled model for super-complex synthesis / coding turns. Selected
         # per-call when generate(uses_pro_model=True) is set by the gate.
         self._pro_model = pro_model or settings.deepseek_pro_model
+        # Multimodal model for turns that carry images (vision). Selected
+        # per-call when generate(images=[...]) is non-empty.
+        self._vision_model = vision_model or settings.deepseek_vision_model
         self._prompts = prompt_builder or PromptBuilder(self._content)
         self._profanity = profanity_substitutor
         self._max_retries = (
@@ -98,10 +102,17 @@ class DeepSeekLLMProvider:
         reply_to_text: str | None = None,
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
+        images: list[ImageAttachment] | None = None,
+        photo_candidates: list[PhotoCandidate] | None = None,
     ) -> str:
         # Route complex turns (coding / deep synthesis, flagged by the gate)
-        # to the upscaled model; everything else stays on the fast default.
-        model = self._pro_model if uses_pro_model else self._model
+        # to the upscaled model; a turn with images goes to the vision model;
+        # everything else stays on the fast default.
+        uses_vision = bool(images)
+        if uses_vision:
+            model = self._vision_model
+        else:
+            model = self._pro_model if uses_pro_model else self._model
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
             user_message,
@@ -121,6 +132,8 @@ class DeepSeekLLMProvider:
             reply_to_text=reply_to_text,
             reply_to_sender_telegram_id=reply_to_sender_telegram_id,
             reply_to_sender_name=reply_to_sender_name,
+            has_image=uses_vision,
+            photo_candidates=photo_candidates,
         )
         message_count = sum(len(block.messages) for block in context_blocks)
         knowledge_chars = sum(
@@ -134,7 +147,7 @@ class DeepSeekLLMProvider:
             "context_messages=%s humor_quotes=%s meme_blocks=%s meme_menu=%s "
             "system_chars=%s user_chars=%s knowledge_blocks=%s "
             "knowledge_chars=%s session_chars=%s temperature=%s top_p=%s "
-            "max_tokens=%s",
+            "max_tokens=%s vision_images=%s",
             model,
             uses_pro_model,
             len(context_blocks),
@@ -150,9 +163,30 @@ class DeepSeekLLMProvider:
             self._generation.temperature,
             self._generation.top_p,
             self._generation.max_tokens,
+            len(images or []),
         )
         logger.info("llm_system_prompt:\n%s", system)
         logger.info("llm_user_prompt:\n%s", user_prompt)
+        if uses_vision:
+            logger.info(
+                "llm_vision model=%s images=%s mime_types=%s",
+                model,
+                len(images or []),
+                [image.mime_type for image in (images or [])],
+            )
+
+        # OpenAI multimodal content: text + image_url blocks when the turn has
+        # images, otherwise the plain string prompt (backwards compatible).
+        if uses_vision:
+            user_content: str | list[dict[str, Any]] = [
+                {"type": "text", "text": user_prompt}
+            ]
+            for image in images or []:
+                user_content.append(
+                    {"type": "image_url", "image_url": {"url": image.data_url}}
+                )
+        else:
+            user_content = user_prompt
 
         provider = "deepseek"
         tracer = get_tracer()
@@ -161,7 +195,12 @@ class DeepSeekLLMProvider:
             name="llm_generation",
             model=model,
             input={"system": system, "user": user_prompt},
-            metadata={"provider": provider, "kind": "generation"},
+            metadata={
+                "provider": provider,
+                "kind": "generation",
+                "vision": uses_vision,
+                "images": len(images or []),
+            },
         ) as gen:
             for attempt in range(self._max_retries + 1):
                 started = time.perf_counter()
@@ -170,7 +209,7 @@ class DeepSeekLLMProvider:
                         model=model,
                         messages=[
                             {"role": "system", "content": system},
-                            {"role": "user", "content": user_prompt},
+                            {"role": "user", "content": user_content},
                         ],
                         **self._generation.to_llm_kwargs(),
                     )
@@ -219,6 +258,8 @@ class DeepSeekLLMProvider:
                             "reasoning": reasoning,
                             "reasoning_content": reasoning_content,
                             "reply": reply,
+                            "vision": uses_vision,
+                            "images": len(images or []),
                         },
                         usage=usage or None,
                     )

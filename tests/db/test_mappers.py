@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.core.messages import ContextMessage, StoredMessage
+from app.core.messages import ContextMessage, StoredMessage, stored_to_context
 from app.db.mappers import (
     message_to_context,
     message_to_stored,
@@ -60,3 +60,76 @@ def test_messages_stored_to_context_batch():
     contexts = messages_stored_to_context(stored)
     assert len(contexts) == 2
     assert contexts[1].content == "y"
+
+
+def test_message_to_stored_maps_attachments():
+    message = Message(
+        id=10,
+        role="user",
+        content="фото",
+        attachments=[
+            {
+                "data_url": "data:image/jpeg;base64,AAAA",
+                "mime_type": "image/jpeg",
+                "telegram_file_id": "f1",
+            }
+        ],
+    )
+    stored = message_to_stored(message)
+    assert stored.attachments == [
+        {
+            "data_url": "data:image/jpeg;base64,AAAA",
+            "mime_type": "image/jpeg",
+            "telegram_file_id": "f1",
+        }
+    ]
+    # stored_to_context converts the raw dicts into ImageAttachment objects so
+    # the session/vision pipeline can consume them.
+    context = stored_to_context(stored)
+    assert len(context.attachments) == 1
+    assert context.attachments[0].data_url == "data:image/jpeg;base64,AAAA"
+    assert context.attachments[0].mime_type == "image/jpeg"
+    assert context.attachments[0].telegram_file_id == "f1"
+
+
+def test_stored_to_context_without_attachments_is_empty():
+    stored = StoredMessage(id=1, role="user", content="x")
+    context = stored_to_context(stored)
+    assert context.attachments == ()
+
+
+def test_stored_to_context_maps_photo_caption():
+    stored = StoredMessage(
+        id=2,
+        role="user",
+        content="[фото]",
+        attachments=[
+            {
+                "data_url": "data:image/jpeg;base64,AAAA",
+                "mime_type": "image/jpeg",
+                "telegram_file_id": "f1",
+            }
+        ],
+        photo_caption="кот на диване",
+    )
+    context = stored_to_context(stored)
+    assert context.photo_caption == "кот на диване"
+    assert context.attachments[0].telegram_file_id == "f1"
+
+
+def test_message_to_stored_maps_photo_caption():
+    message = Message(
+        id=3,
+        role="user",
+        content="[фото]",
+        attachments=[
+            {
+                "data_url": "data:image/jpeg;base64,AAAA",
+                "mime_type": "image/jpeg",
+                "telegram_file_id": "f1",
+            }
+        ],
+        photo_caption="кот на диване",
+    )
+    stored = message_to_stored(message)
+    assert stored.photo_caption == "кот на диване"

@@ -251,6 +251,54 @@ async def test_api_client_falls_back_to_plain_json():
     assert result.reply == "legacy"
 
 
+@pytest.mark.asyncio
+async def test_api_client_parses_messages_list():
+    incoming = IncomingMessage.from_telegram(make_telegram_message())
+    mock_client = MagicMock()
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "reply",
+                "reason": "intent",
+                "reply": "Первая\nВторая",
+                "messages": ["Первая", "Вторая"],
+                "relevance_score": 0.1,
+            },
+            with_started=True,
+        )
+    )
+
+    api = HttpChatApiClient(client=mock_client)
+    result = await api.process(incoming)
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reply == "Первая\nВторая"
+    assert result.messages == ["Первая", "Вторая"]
+
+
+@pytest.mark.asyncio
+async def test_api_client_messages_none_when_absent():
+    incoming = IncomingMessage.from_telegram(make_telegram_message())
+    mock_client = MagicMock()
+    mock_client.stream = MagicMock(
+        return_value=_stream_ctx(
+            {
+                "action": "reply",
+                "reason": "intent",
+                "reply": "legacy",
+                "relevance_score": 0.1,
+            },
+            with_started=True,
+        )
+    )
+
+    api = HttpChatApiClient(client=mock_client)
+    result = await api.process(incoming)
+
+    assert result.action == DecisionAction.REPLY
+    assert result.messages is None
+
+
 def test_api_client_timeout_config_from_settings(monkeypatch):
     from app.config import settings
 

@@ -9,7 +9,6 @@ from app.decision.models import DecisionResult
 from app.knowledge.metrics.retriever import SenderProfile
 from app.knowledge.metrics.schema import PersonMetrics
 from app.knowledge.schema import KnowledgeBlock
-from app.llm.humor.critic import CriticVerdict
 from app.llm.planner.turn_planner import TurnPlan
 
 
@@ -36,9 +35,6 @@ class TurnPipelineContext:
     annoyance: float = 0.0
     reply: str | None = None
     result: ConversationTurnResult | None = None
-    critic_verdict: CriticVerdict | None = None
-    critic_iterations: int = 0
-    critic_ms: float = 0.0
     plan_ms: float = 0.0
     decision_ms: float = 0.0
     # Latency of the lightweight pre-planner Decision Gate (reaction classifier).

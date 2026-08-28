@@ -88,18 +88,25 @@ services:
     <<: *app-image
     command: >
       sh -c "alembic upgrade head &&
-      uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload"
+      uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}"
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     env_file:
       - .env
+    restart: unless-stopped
+    # Give in-flight requests time to finish after SIGTERM (see /health/ready).
+    stop_grace_period: 45s
     depends_on:
       postgres:
         condition: service_healthy
       qdrant:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # /health/ready returns 503 until Postgres is reachable, so the container
+      # only turns "healthy" once it can actually serve traffic — the proxy
+      # (Nginx) waits for this before sending new requests here.
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -117,6 +124,8 @@ services:
     <<: *app-image
     command: python -m app.bot.main
     restart: unless-stopped
+    # aiogram stops polling on SIGTERM and lets in-flight updates drain.
+    stop_grace_period: 45s
     env_file:
       - .env
     depends_on:

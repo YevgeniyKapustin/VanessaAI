@@ -19,6 +19,11 @@ class BotServices:
     # How often the bot re-sends the "typing..." chat action while the API
     # pipeline runs (Telegram expires typing after ~5s).
     typing_interval_seconds: float = 4.0
+    # Delay (seconds) between consecutive reply blocks of a multi-message reply,
+    # so the messages appear one by one ("по мере написания").
+    message_delay_seconds: float = 0.7
+    # Safety cap on how many reply blocks are sent in one turn.
+    max_messages: int = 8
 
 
 def create_bot_services() -> BotServices:
@@ -46,4 +51,6 @@ def create_bot_services() -> BotServices:
             sticker_only_tags=tuple(stickers_config.sticker_only_tags),
         ),
         typing_interval_seconds=settings.bot_typing_interval_seconds,
+        message_delay_seconds=settings.bot_message_delay_seconds,
+        max_messages=settings.bot_max_messages,
     )

@@ -10,6 +10,7 @@ from app.config.settings import settings
 from app.core.messages import ContextBlock, ContextMessage
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
+from app.llm.format.answer_tag import extract_answer
 from app.llm.format.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompts.prompt_builder import PromptBuilder
 from app.llm.format.reply_format import (
@@ -77,7 +78,6 @@ class ClaudeLLMProvider:
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
-        critic_feedback: str | None = None,
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
@@ -102,7 +102,6 @@ class ClaudeLLMProvider:
             attitude_note=attitude_note,
             sender_telegram_id=sender_telegram_id,
             sender_name=sender_name,
-            critic_feedback=critic_feedback,
             tone=tone,
             needs_clarification=needs_clarification,
             clarification_hint=clarification_hint,
@@ -174,12 +173,33 @@ class ClaudeLLMProvider:
                         usage=usage,
                         output=text,
                     )
+                    reply_text, reasoning = extract_answer(text)
+                    if reasoning:
+                        logger.info(
+                            "llm_reasoning model=%s reasoning=%r",
+                            self._model,
+                            reasoning,
+                        )
+                    # The reasoning never leaves this method: only the text after
+                    # the [answer] tag is post-processed and returned.
                     cleaned = strip_leading_address(
-                        self._substitute_profanity(text),
+                        self._substitute_profanity(reply_text),
                         sender_name,
                     )
                     reply = capitalize_sentences(strip_trailing_periods(cleaned))
-                    gen.update(output=reply, usage=usage or None)
+                    # Surface the FULL raw model output (the [answer] tag + the
+                    # [next] block markers) so block-splitting is debuggable in
+                    # Langfuse / logs; the processed reply stays in metadata.
+                    logger.debug(
+                        "llm_raw_output model=%s output=%r",
+                        self._model,
+                        text,
+                    )
+                    gen.update(
+                        output=text,
+                        metadata={"reasoning": reasoning, "reply": reply},
+                        usage=usage or None,
+                    )
                     return reply
                 except Exception as exc:
                     last_error = exc

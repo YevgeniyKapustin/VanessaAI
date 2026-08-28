@@ -31,6 +31,15 @@ def test_compose_prompt_uses_context_selectively():
     assert "don't dump everything" in llm.answer_text()
 
 
+def test_compose_prompt_teaches_chain_of_thought_answer_tag():
+    # The compose prompt must instruct the model to think first, then emit the
+    # final message after the [answer] tag.
+    llm = get_content().llm
+    assert "Output format — think first, then answer" in llm.answer_text()
+    assert "[answer]" in llm.answer_text()
+    assert "final message" in llm.answer_text()
+
+
 def test_prompt_builder_assembles_system_prompt_from_persona():
     builder = PromptBuilder()
     prompt = builder.system_prompt
@@ -122,23 +131,18 @@ def test_prompt_builder_includes_humor_quotes_block():
     assert "- найди работу" in prompt
 
 
-def test_prompt_builder_includes_critic_feedback_section():
-    builder = PromptBuilder()
-    prompt = builder.build_user_prompt(
-        "ну ладно поработаю",
-        [],
-        critic_feedback="добавь гиперболу",
-    )
-
-    content = get_content()
-    assert content.llm.critic.fix_instruction_header.strip() in prompt
-    assert "добавь гиперболу" in prompt
+def test_compose_prompt_instructs_message_blocks():
+    # The compose prompt must teach the model to split long replies into short
+    # 1-2 sentence blocks separated by the [next] marker, so the bot can send
+    # them as separate messages instead of one wall of text.
+    llm = get_content().llm
+    assert llm.block_marker == "[next]"
+    assert "Message blocks" in llm.answer_text()
+    assert "[next]" in llm.answer_text()
 
 
-def test_prompt_builder_omits_critic_feedback_when_empty():
-    builder = PromptBuilder()
-    prompt = builder.build_user_prompt("ну ладно поработаю", [])
-    assert "Humor editor's note" not in prompt
+def test_compose_prompt_examples_show_multiblock_reply():
+    assert "[next]" in get_content().llm.answer_examples
 
 
 def test_prompt_builder_system_includes_answer_checklist():

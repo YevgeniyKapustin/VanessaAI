@@ -1,0 +1,63 @@
+# Production override — zero-downtime deployment.
+#
+# Run together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences vs. the dev base file:
+#   * `api` runs WITHOUT --reload, uses N workers and a bounded graceful
+#     shutdown; the container is NOT published to the host — Nginx fronts it.
+#   * Dev bind-mounts (./app, ./config, ./alembic) are dropped — the image is
+#     the single source of truth (built in CI with a commit hash tag).
+#   * `nginx` terminates external HTTP on :80 and load-balances across API
+#     replicas (upstream max_fails/fail_timeout + keepalive).
+#
+# Scale API replicas (rolling update):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
+#       --no-deps --scale api=2
+
+services:
+  api:
+    # Do not publish 8000 to the host; Nginx is the only entry point.
+    ports: !reset []
+    command: >
+      sh -c "alembic upgrade head &&
+      uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+      --workers ${API_WORKERS:-1}
+      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}"
+    # The image is built in CI (with a version tag); no host source mounts.
+    # NOTE: `docker compose up -d` does NOT rebuild an existing
+    # `vanessa-app:latest` — pass `--build` (or use the deploy script, which
+    # always runs `docker build`).
+    volumes: !reset []
+    restart: always
+    stop_grace_period: 45s
+
+  bot:
+    # Keep the Obsidian vault + SSH (runtime data) but drop the dev source
+    # bind-mounts so the built image is authoritative.
+    volumes: !reset
+      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
+      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
+    restart: always
+    stop_grace_period: 45s
+
+  # --- Load balancer --------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # Reload without dropping active connections:
+    #   docker compose -f docker-compose.yml -f docker-compose.prod.yml exec nginx nginx -s reload
+    stop_grace_period: 10s

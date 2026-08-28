@@ -1,0 +1,30 @@
+name: Deploy (zero-downtime)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Single deploy at a time: if a previous run is still in progress, let the
+# newest tag finish first and cancel older runs.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64]
+    if: github.repository == 'vanessa/vanessa-ai'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build the image on the deploy host so the blue-green containers stay
+      # on the same host as Postgres/Qdrant/Nginx (compose network).
+      - name: Run zero-downtime deploy
+        run: |
+          chmod +x scripts/zero_downtime_deploy.sh
+          scripts/zero_downtime_deploy.sh "${{ github.ref_name }}"
+        env:
+          # .env is present on the host (holds tokens/keys); the script uses
+          # --env-file .env and the running compose project.
+          DOCKER_BUILDKIT: "1"

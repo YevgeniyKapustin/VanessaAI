@@ -62,15 +62,6 @@ class LLMGenerationProfiles(BaseModel):
             frequency_penalty=0.0,
         )
     )
-    critic: LLMGenerationProfile = Field(
-        default_factory=lambda: LLMGenerationProfile(
-            temperature=0.1,
-            top_p=0.85,
-            max_tokens=256,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-        )
-    )
 
 
 class ConversationContent(BaseModel):
@@ -94,14 +85,6 @@ class PersonaContent(BaseModel):
 
     def rules_text(self) -> str:
         return self.rules.strip()
-
-
-class CriticContent(BaseModel):
-    system_prompt: str = ""
-    user_prompt: str = ""
-    fix_instruction_header: str = (
-        "Humor editor's note (you MUST address it in the new version of the reply):"
-    )
 
 
 class PromptBudgetContent(BaseModel):
@@ -134,6 +117,12 @@ class LLMContent(BaseModel):
     reply_instruction: str = ""
     compose_instruction: str = ""
     sticker_instruction: str = ""
+    # Marker line the composer uses to split a long reply into several short
+    # messages (blocks) of 1-2 sentences each. The prompt (llm.yaml ``answer:``)
+    # instructs the model to put this tag on its own line at the end of every
+    # block except the last; message_blocks.py uses it as the single source of
+    # truth when splitting the finished reply for delivery.
+    block_marker: str = "[next]"
     context_header: str
     context_block_header: str = (
         "--- Block {index} ({started_at} — {ended_at}) ---"
@@ -172,7 +161,6 @@ class LLMContent(BaseModel):
     tone_note: str = ""
     owner_message_note: str = ""
     clarification_instruction: str = ""
-    critic: CriticContent = Field(default_factory=CriticContent)
     generation: LLMGenerationProfiles = Field(default_factory=LLMGenerationProfiles)
     budget: PromptBudgetContent = Field(default_factory=PromptBudgetContent)
 

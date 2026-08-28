@@ -39,14 +39,24 @@ async def main() -> None:
     router = create_router(services)
     router.message.middleware(BotLoggingMiddleware())
     dp.include_router(router)
+
+    # Graceful shutdown: aiogram's start_polling(handle_signals=True default)
+    # already registers SIGINT/SIGTERM handlers that stop the polling loop
+    # cooperatively and close the bot session (close_bot_session=True default).
+    # We keep our own signal handler registration OUT so we don't shadow the
+    # framework's, and rely on the finally block for final cleanup.
     logger.info("Bot polling started")
     try:
         await dp.start_polling(bot)
     finally:
+        logger.info("Bot polling stopped, cleaning up")
         if alert_task is not None:
             alert_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await alert_task
+        with contextlib.suppress(Exception):
+            await bot.session.close()
+        logger.info("Bot shutdown complete")
 
 
 if __name__ == "__main__":

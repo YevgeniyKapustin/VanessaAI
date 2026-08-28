@@ -58,6 +58,59 @@ async def _send_reply(telegram_message: TelegramMessage, reply: str) -> None:
     record_telegram("send_reply", "success")
 
 
+async def _send_reply_messages(
+    telegram_message: TelegramMessage,
+    messages: list[str],
+    *,
+    delay: float = 0.0,
+) -> None:
+    """Send a reply split into several messages, one Telegram message each.
+
+    The first block replies to the user's message; the following blocks are sent
+    as plain messages in the same chat, so they read as a natural sequential
+    reply. A small ``delay`` between blocks makes the bot look like she is
+    writing them one by one ("по мере написания"). A hard failure (flood
+    control, blocked chat, formatting that still fails after the plain-text
+    fallback) stops the loop — the bot never hammers a chat it can't reach, and
+    a mid-reply failure is logged, not raised.
+    """
+    for index, block in enumerate(messages):
+        if index > 0 and delay > 0:
+            await asyncio.sleep(delay)
+        formatted = markdown_to_telegram_html(block)
+        try:
+            if index == 0:
+                await telegram_message.reply(formatted, parse_mode=ParseMode.HTML)
+            else:
+                await telegram_message.answer(formatted, parse_mode=ParseMode.HTML)
+            record_telegram("send_reply", "success")
+        except TelegramBadRequest:
+            try:
+                if index == 0:
+                    await telegram_message.reply(block)
+                else:
+                    await telegram_message.answer(block)
+                record_telegram("send_reply", "success")
+            except Exception as exc:
+                logger.warning(
+                    "reply_block_failed chat_id=%s index=%s/%s error=%s",
+                    telegram_message.chat.id,
+                    index + 1,
+                    len(messages),
+                    exc,
+                )
+                break
+        except Exception as exc:
+            logger.warning(
+                "reply_block_failed chat_id=%s index=%s/%s error=%s",
+                telegram_message.chat.id,
+                index + 1,
+                len(messages),
+                exc,
+            )
+            break
+
+
 _TYPING_INTERVAL_SECONDS = 4.0
 
 
@@ -288,11 +341,28 @@ def create_messages_router(services: BotServices) -> Router:
         await _ping_typing(
             telegram_message.bot, incoming.telegram_chat_id, "pre_reply"
         )
-        await _send_reply(telegram_message, result.reply)
+        # Prefer the model-marked block list; fall back to the single reply.
+        # ``max_messages`` is a safety cap so a runaway model can never flood
+        # the chat (0 = no cap).
+        blocks = result.messages or ([result.reply] if result.reply else [])
+        if services.max_messages > 0 and len(blocks) > services.max_messages:
+            logger.warning(
+                "reply_blocks_capped chat_id=%s blocks=%s cap=%s",
+                incoming.telegram_chat_id,
+                len(blocks),
+                services.max_messages,
+            )
+            blocks = blocks[: services.max_messages]
+        await _send_reply_messages(
+            telegram_message,
+            blocks,
+            delay=services.message_delay_seconds,
+        )
         logger.info(
-            "reply_sent chat_id=%s reply_len=%s",
+            "reply_sent chat_id=%s reply_len=%s messages=%s",
             incoming.telegram_chat_id,
-            len(result.reply),
+            len(result.reply or ""),
+            len(blocks),
         )
         if services.stickers is not None:
             services.stickers.register_reply(incoming.telegram_chat_id)

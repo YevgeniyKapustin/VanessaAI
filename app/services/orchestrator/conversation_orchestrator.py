@@ -13,7 +13,7 @@ from app.knowledge.memory_stage import MemoryStage
 from app.knowledge.metrics.pipeline import MetricsPipeline
 from app.core.request_context import get_planning_started_signal, get_request_id
 from app.core.turn import ChatTurnInput, ConversationTurnResult
-from app.decision.models import DecisionAction, DecisionReason
+from app.decision.models import DecisionAction
 from app.observability.eval import RagTriadEvaluator
 from app.observability.metrics import (
     record_reply_length,
@@ -49,7 +49,6 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         retrieve: PipelineStage,
         compose: PipelineStage,
         finalize: FinalizeStageProtocol,
-        critique: PipelineStage | None = None,
         memory: MemoryStage | None = None,
         metrics: MetricsPipeline | None = None,
         background: BackgroundExecutor | None = None,
@@ -63,7 +62,6 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
         self._retrieve = retrieve
         self._compose = compose
         self._finalize = finalize
-        self._critique = critique
         self._memory = memory
         self._metrics = metrics
         self._background = background
@@ -149,16 +147,6 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
 
         await self._run_stage("retrieve", self._retrieve.run(ctx))
         await self._run_stage("compose", self._compose.run(ctx))
-        if self._critique is not None:
-            if not await self._run_stage("critique", self._critique.run(ctx)):
-                # The critic decided the message does not need a reply.
-                await self._finalize.skip(
-                    ctx,
-                    reason=DecisionReason.NO_REPLY_NEEDED.value,
-                )
-                self._log_processed(turn, ctx)
-                assert ctx.result is not None
-                return ctx.result
         await self._run_stage("finalize", self._finalize.run(ctx))
         await self._run_post_reply(ctx)
         self._log_processed(turn, ctx)
@@ -300,7 +288,6 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             ("rag", ctx.rag_ms),
             ("humor_rag", ctx.humor_rag_ms),
             ("llm", ctx.llm_ms),
-            ("critic", ctx.critic_ms),
         ):
             if ms > 0:
                 record_stage(stage, seconds=ms / 1000.0)
@@ -326,16 +313,12 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             return
 
         turn_plan = ctx.turn_plan
-        critic_verdict = ctx.critic_verdict
-        critic_status = critic_verdict.status.value if critic_verdict else "-"
-        critic_score = critic_verdict.score if critic_verdict else 0
         logger.info(
             "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "
             "reason=%s relevance=%.3f search=%r skip=%s humor_quotes=%s "
-            "context=%s critic_status=%s critic_score=%s critic_iterations=%s "
-            "sticker_tag=%s "
+            "context=%s sticker_tag=%s "
             "reaction_gate_ms=%.1f plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f "
-            "rag_ms=%.1f humor_rag_ms=%.1f llm_ms=%.1f critic_ms=%.1f total_ms=%.1f",
+            "rag_ms=%.1f humor_rag_ms=%.1f llm_ms=%.1f total_ms=%.1f",
             get_request_id(),
             turn.telegram_chat_id,
             turn.sender_telegram_id,
@@ -346,9 +329,6 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             turn_plan.skip_search if turn_plan else True,
             len(ctx.humor_quotes),
             ctx.result.context_count,
-            critic_status,
-            critic_score,
-            ctx.critic_iterations,
             ctx.result.sticker_tag,
             ctx.reaction_gate_ms,
             ctx.plan_ms,
@@ -357,6 +337,5 @@ class ConversationOrchestrator(IncomingTurnHandlerProtocol):
             ctx.rag_ms,
             ctx.humor_rag_ms,
             ctx.llm_ms,
-            ctx.critic_ms,
             total_ms,
         )

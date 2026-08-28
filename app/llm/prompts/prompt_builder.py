@@ -90,7 +90,6 @@ class PromptBuilder:
         attitude_note: str | None = None,
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
-        critic_feedback: str | None = None,
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
@@ -210,14 +209,6 @@ class PromptBuilder:
             # Cold-reply directive: the sender is stuck in a same-topic loop and
             # Vanessa is annoyed — reply dry, sharp and brief.
             parts.append((PRIORITY_DIRECTIVES, "directives", attitude_note.strip()))
-        if critic_feedback and critic_feedback.strip():
-            fix_header = (
-                llm.critic.fix_instruction_header.strip()
-                or "Humor editor's note (you MUST address it in the new version of the reply):"
-            )
-            parts.append(
-                (PRIORITY_DIRECTIVES, "directives", f"{fix_header}\n{critic_feedback.strip()}")
-            )
         owner_id = settings.required_user_telegram_id
         owner_note = llm.owner_message_note.strip()
         if (

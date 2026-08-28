@@ -9,14 +9,12 @@ from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
 from app.knowledge.schema import KnowledgeBlock
 from app.decision.gate.user_ignore import ChatIgnoreRegistry
 from app.decision.models import DecisionAction, DecisionReason, DecisionResult
-from app.llm.humor.critic import CriticStatus, CriticVerdict
 from app.llm.planner.turn_planner import TurnPlan
 from app.rag.query_rewriter import QueryRewriter
 from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from app.services.humor_pipeline import HumorPipeline
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
-from app.services.pipeline.critique_stage import CritiqueStage
 from app.services.pipeline.stages import (
     ComposeStage,
     FinalizeStage,
@@ -171,7 +169,6 @@ class FakeLLM:
         self.last_knowledge_blocks: list[KnowledgeBlock] | None = None
         self.last_meme_blocks: list | None = None
         self.last_meme_menu: list | None = None
-        self.last_critic_feedback: str | None = None
         self.last_needs_clarification: bool = False
         self.last_clarification_hint: str = ""
         self.last_uses_pro_model: bool = False
@@ -190,7 +187,6 @@ class FakeLLM:
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
-        critic_feedback: str | None = None,
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
@@ -205,7 +201,6 @@ class FakeLLM:
         self.last_meme_blocks = meme_blocks
         self.last_meme_menu = meme_menu
         self.last_sender_name = sender_name
-        self.last_critic_feedback = critic_feedback
         self.last_tone = tone
         self.last_needs_clarification = needs_clarification
         self.last_clarification_hint = clarification_hint
@@ -214,26 +209,6 @@ class FakeLLM:
         self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
         self.last_reply_to_sender_name = reply_to_sender_name
         return f"echo: {user_message}"
-
-
-class FakeCritic:
-    def __init__(self, verdict: CriticVerdict | None = None) -> None:
-        self._verdict = verdict or CriticVerdict(
-            status=CriticStatus.APPROVED,
-            score=5,
-            reason="ок",
-        )
-        self.reviews: list[str] = []
-
-    async def review(
-        self,
-        draft: str,
-        *,
-        user_message: str,
-        humor_quotes: list[str],
-    ) -> CriticVerdict:
-        self.reviews.append(draft)
-        return self._verdict
 
 
 class FakeDecisionEngine:
@@ -280,10 +255,8 @@ def _build_orchestrator(
     decision: FakeDecisionEngine,
     retriever: FakeContextRetriever | None = None,
     llm: FakeLLM | None = None,
-    critic: FakeCritic | None = None,
     query_rewriter: QueryRewriter | None = None,
     defer_index_on_ignore: bool = True,
-    critic_enabled: bool = False,
 ) -> ConversationOrchestrator:
     retriever = retriever or FakeContextRetriever()
     llm = llm or FakeLLM()
@@ -294,7 +267,6 @@ def _build_orchestrator(
         post_reply_listen_count=5,
         planner_prefilter_enabled=False,
         defer_index_on_ignore=defer_index_on_ignore,
-        critic_enabled=critic_enabled,
     )
     humor = HumorPipeline(retriever, FakeTurnQuery(), config)
     registry = ChatIgnoreRegistry()
@@ -315,7 +287,6 @@ def _build_orchestrator(
         gate=gate,
         retrieve=RetrieveStage(retriever, humor, None),
         compose=ComposeStage(llm),
-        critique=CritiqueStage(llm, critic or FakeCritic(), config),
         finalize=FinalizeStage(messages, indexing, decision, config, metrics),
     )
 
@@ -413,99 +384,71 @@ async def test_orchestrator_runs_humor_rag_when_planner_requests_it():
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_runs_critique_on_humor_turn_when_enabled():
+async def test_orchestrator_splits_reply_into_blocks():
     messages = FakeMessageRepo()
     indexing = FakeIndexing()
-    retriever = FakeContextRetriever()
-    llm = FakeLLM()
-    critic = FakeCritic()
-    planner = QueryRewriter(use_llm=False)
-    planner.prepare = AsyncMock(
-        return_value=TurnPlan(
-            original="ну ладно поработаю",
-            text="работа",
-            skip_search=False,
-            humor_ok=True,
-            humor_query="личь работа",
-        ),
-    )
-    orchestrator = _build_orchestrator(
-        messages=messages,
-        indexing=indexing,
-        decision=FakeDecisionEngine(DecisionAction.REPLY),
-        retriever=retriever,
-        llm=llm,
-        critic=critic,
-        query_rewriter=planner,
-        defer_index_on_ignore=False,
-        critic_enabled=True,
-    )
-
-    result = await orchestrator.handle_incoming(
-        ChatTurnInput(
-            telegram_chat_id=-1001,
-            message="ну ладно поработаю",
-            sender_telegram_id=42,
-        )
-    )
-
-    assert result.reply == "echo: ну ладно поработаю"
-    assert critic.reviews == ["echo: ну ладно поработаю"]
-    assert llm.last_critic_feedback is None
-
-
-@pytest.mark.asyncio
-async def test_orchestrator_critic_no_reply_ignores_turn():
-    messages = FakeMessageRepo()
-    indexing = FakeIndexing()
-    retriever = FakeContextRetriever()
-    llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
-    critic = FakeCritic(
-        CriticVerdict(
-            status=CriticStatus.NO_REPLY,
-            score=3,
-            reason="вопрос риторический",
-        )
-    )
-    planner = QueryRewriter(use_llm=False)
-    planner.prepare = AsyncMock(
-        return_value=TurnPlan(
-            original="ну ладно поработаю",
-            text="работа",
-            skip_search=False,
-            humor_ok=True,
-            humor_query="личь работа",
-        ),
-    )
+
+    class BlockLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "Первая мысль\n[next]\nВторая мысль\n[next]\nТретья"
+
     orchestrator = _build_orchestrator(
         messages=messages,
         indexing=indexing,
         decision=decision,
-        retriever=retriever,
-        llm=llm,
-        critic=critic,
-        query_rewriter=planner,
+        llm=BlockLLM(),
         defer_index_on_ignore=False,
-        critic_enabled=True,
     )
 
     result = await orchestrator.handle_incoming(
         ChatTurnInput(
             telegram_chat_id=-1001,
-            message="ну ладно поработаю",
+            message="расскажи",
             sender_telegram_id=42,
         )
     )
 
-    assert result.action == DecisionAction.IGNORE
-    assert result.reason == DecisionReason.NO_REPLY_NEEDED
-    assert result.reply is None
-    # the user message is stored and indexed, but no assistant message is created
-    assert len(messages._messages) == 1
-    assert len(indexing.scheduled) == 1
-    # no reply was recorded, so consecutive/rate-limit state is untouched
-    assert decision.recorded_chats == []
+    # markers are stripped from the stored reply, blocks drive Telegram delivery
+    assert result.reply == "Первая мысль\nВторая мысль\nТретья"
+    assert result.messages == ["Первая мысль", "Вторая мысль", "Третья"]
+    stored = [m for m in messages._messages.values() if m.role == "assistant"]
+    assert len(stored) == 1
+    assert stored[0].content == "Первая мысль\nВторая мысль\nТретья"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_strips_trailing_periods_from_each_block():
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+
+    class PeriodLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            return "Первая мысль.\n[next]\nВторая мысль.\n[next]\nТретья мысль."
+
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=PeriodLLM(),
+        defer_index_on_ignore=False,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="расскажи",
+            sender_telegram_id=42,
+        )
+    )
+
+    # the trailing period is cut deterministically from EVERY delivered block,
+    # not just the last one
+    assert result.messages == ["Первая мысль", "Вторая мысль", "Третья мысль"]
+    # the stored full text keeps the markers stripped (intermediate periods are
+    # legitimate sentence ends and stay; the provider strips the very last one)
+    assert result.reply == "Первая мысль.\nВторая мысль.\nТретья мысль."
 
 
 @pytest.mark.asyncio
@@ -625,7 +568,6 @@ async def test_orchestrator_returns_reply_before_background_memory_metrics():
         post_reply_listen_count=5,
         planner_prefilter_enabled=False,
         defer_index_on_ignore=False,
-        critic_enabled=False,
     )
     humor = HumorPipeline(retriever, FakeTurnQuery(), config)
     registry = ChatIgnoreRegistry()
@@ -649,7 +591,6 @@ async def test_orchestrator_returns_reply_before_background_memory_metrics():
             gate=gate,
             retrieve=RetrieveStage(retriever, humor, None),
             compose=ComposeStage(llm),
-            critique=CritiqueStage(llm, FakeCritic(), config),
             finalize=FinalizeStage(messages, indexing, decision, config, turn_metrics),
             memory=memory,
             metrics=metrics,

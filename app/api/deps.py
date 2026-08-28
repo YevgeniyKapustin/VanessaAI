@@ -40,7 +40,6 @@ from app.knowledge.retriever import KnowledgeRetriever
 from app.knowledge.vault import KnowledgeVault
 from app.knowledge.vector_index import KnowledgeVectorIndexer
 from app.knowledge.writer import KnowledgeVaultWriter
-from app.llm.humor.critic import HumorCritic
 from app.llm.providers import create_llm_provider
 from app.observability.eval import RagTriadEvaluator
 from app.rag.search.hybrid_search import HybridSearchService
@@ -49,7 +48,6 @@ from app.services.orchestrator.conversation_orchestrator import ConversationOrch
 from app.services.humor_pipeline import HumorPipeline
 from app.services.indexing.message_indexing import MessageIndexingService
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
-from app.services.pipeline.critique_stage import CritiqueStage
 from app.services.pipeline.stages import (
     ComposeStage,
     FinalizeStage,
@@ -262,7 +260,6 @@ async def get_incoming_turn_handler(
         meme_decider=container.meme_decider,
     )
     compose = ComposeStage(llm)
-    critique = CritiqueStage(llm, HumorCritic(), config)
     finalize = FinalizeStage(
         messages,
         indexing,
@@ -278,7 +275,6 @@ async def get_incoming_turn_handler(
         gate=gate,
         retrieve=retrieve,
         compose=compose,
-        critique=critique,
         finalize=finalize,
         memory=memory,
         metrics=metrics_pipeline,

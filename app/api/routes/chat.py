@@ -69,6 +69,7 @@ async def chat(
                 action=result.action,
                 reason=result.reason,
                 reply=result.reply,
+                messages=result.messages,
                 context_count=result.context_count,
                 relevance_score=result.relevance_score,
                 sticker_tag=result.sticker_tag,

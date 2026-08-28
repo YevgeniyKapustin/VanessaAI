@@ -207,7 +207,6 @@ class LLMProviderProtocol(Protocol):
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
-        critic_feedback: str | None = None,
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",

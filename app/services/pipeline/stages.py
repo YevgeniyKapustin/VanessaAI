@@ -1,6 +1,7 @@
 import logging
 import time
 
+from app.config.content import get_content
 from app.config.settings import settings
 from app.core.protocols import (
     ContextRetrieverProtocol,
@@ -28,6 +29,8 @@ from app.knowledge.metrics.feedback import (
 )
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
+from app.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
+from app.llm.format.reply_format import strip_trailing_periods
 from app.llm.format.sticker_tag import extract_sticker_tag
 from app.llm.prompts.session_format import session_context_messages
 from app.rag.search.react_retriever import retrieve_with_react
@@ -472,10 +475,9 @@ class FinalizeStage:
     async def skip(self, ctx: TurnPipelineContext, *, reason: str) -> None:
         """Finish the turn without a reply.
 
-        Used when a later stage (e.g. the critic) decides the user's message
-        does not need a reply. The user message is still indexed and the turn
-        is recorded as ignored (no assistant message is created, no reply is
-        registered).
+        Used when a later stage decides the user's message does not need a
+        reply. The user message is still indexed and the turn is recorded as
+        ignored (no assistant message is created, no reply is registered).
         """
         await index_user_on_ignore(ctx, self._indexing, self._config)
         ctx.result = ConversationTurnResult(
@@ -503,6 +505,23 @@ class FinalizeStage:
             await self._indexing.index_now(ctx.user_msg)
 
         clean_reply, sticker_tag = extract_sticker_tag(ctx.reply)
+        # Split the reply into the individual Telegram messages to send (on the
+        # marker-containing text, so the model's explicit `[next]` blocks drive
+        # the split; a deterministic sentence-aware split is the fallback when
+        # the model skipped markers). The persona avoids a trailing period at the
+        # end of a message, so it is cut deterministically from EVERY delivered
+        # block (not just the overall reply); the marker-free full text is what
+        # stays in the DB and metrics.
+        marker = get_content().llm.block_marker
+        messages = [
+            block
+            for block in (
+                strip_trailing_periods(b)
+                for b in split_reply_into_blocks(clean_reply, marker=marker)
+            )
+            if block.strip()
+        ]
+        clean_reply = strip_block_markers(clean_reply, marker=marker)
         ctx.reply = clean_reply
 
         await self._messages.create(
@@ -517,6 +536,7 @@ class FinalizeStage:
             action=ctx.decision.action.value,
             reason=ctx.decision.reason.value,
             reply=clean_reply,
+            messages=messages,
             context_count=ctx.context_count,
             relevance_score=ctx.decision.relevance_score,
             sticker_tag=sticker_tag,

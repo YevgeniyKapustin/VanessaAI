@@ -25,6 +25,11 @@ class ConversationTurnResult:
     action: str
     reason: str
     reply: str | None = None
+    # The reply split into the individual Telegram messages to send (1-2
+    # sentence blocks, model-marked with the block marker). ``None``/empty means
+    # the whole ``reply`` is delivered as a single message. ``reply`` stays the
+    # marker-free full text (stored in the DB, used for metrics).
+    messages: list[str] | None = None
     context_count: int = 0
     relevance_score: float = 0.0
     sticker_tag: str | None = None

@@ -10,6 +10,7 @@ from app.config.settings import settings
 from app.core.messages import ContextBlock, ContextMessage
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.planner.generation_config import LLMGenerationParams
+from app.llm.format.answer_tag import extract_answer
 from app.llm.format.profanity_substitution import ProfanitySubstitutor
 from app.llm.prompts.prompt_builder import PromptBuilder
 from app.llm.format.reply_format import (
@@ -90,7 +91,6 @@ class DeepSeekLLMProvider:
         sender_telegram_id: int | None = None,
         sender_name: str | None = None,
         system_prompt: str | None = None,
-        critic_feedback: str | None = None,
         tone: str | None = None,
         needs_clarification: bool = False,
         clarification_hint: str = "",
@@ -115,7 +115,6 @@ class DeepSeekLLMProvider:
             attitude_note=attitude_note,
             sender_telegram_id=sender_telegram_id,
             sender_name=sender_name,
-            critic_feedback=critic_feedback,
             tone=tone,
             needs_clarification=needs_clarification,
             clarification_hint=clarification_hint,
@@ -176,6 +175,11 @@ class DeepSeekLLMProvider:
                         **self._generation.to_llm_kwargs(),
                     )
                     text = response.choices[0].message.content or ""
+                    # DeepSeek reasoning models put the chain of thought here; it
+                    # is separate from ``content`` and would otherwise be invisible.
+                    reasoning_content = getattr(
+                        response.choices[0].message, "reasoning_content", None
+                    ) or ""
                     usage = _usage_from_openai(response)
                     _log_cache_usage(model, usage)
                     record_llm_call(
@@ -187,12 +191,37 @@ class DeepSeekLLMProvider:
                         usage=usage,
                         output=text,
                     )
+                    reply_text, reasoning = extract_answer(text)
+                    if reasoning:
+                        logger.info(
+                            "llm_reasoning model=%s reasoning=%r",
+                            model,
+                            reasoning,
+                        )
+                    # The reasoning never leaves this method: only the text after
+                    # the [answer] tag is post-processed and returned.
                     cleaned = strip_leading_address(
-                        self._substitute_profanity(text),
+                        self._substitute_profanity(reply_text),
                         sender_name,
                     )
                     reply = capitalize_sentences(strip_trailing_periods(cleaned))
-                    gen.update(output=reply, usage=usage or None)
+                    # Surface the FULL raw model output (reasoning + the [answer]
+                    # tag + the [next] block markers) so block-splitting and the
+                    # chain of thought are debuggable in Langfuse / logs; the
+                    # processed reply stays in metadata.
+                    raw_output = text
+                    if reasoning_content:
+                        raw_output = f"[reasoning_content]\n{reasoning_content}\n\n{text}"
+                    logger.debug("llm_raw_output model=%s output=%r", model, raw_output)
+                    gen.update(
+                        output=raw_output,
+                        metadata={
+                            "reasoning": reasoning,
+                            "reasoning_content": reasoning_content,
+                            "reply": reply,
+                        },
+                        usage=usage or None,
+                    )
                     return reply
                 except Exception as exc:
                     last_error = exc

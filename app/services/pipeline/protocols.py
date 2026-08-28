@@ -12,6 +12,6 @@ class FinalizeStageProtocol(PipelineStage):
     async def skip(self, ctx: TurnPipelineContext, *, reason: str) -> None:
         """Finish the turn without a reply (index + metrics + result).
 
-        Used when a later stage (e.g. the critic) decides the user's message
-        does not need a reply.
+        Used when a later stage decides the user's message does not need a
+        reply.
         """

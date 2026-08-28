@@ -118,6 +118,67 @@ async def test_deepseek_generate_strips_leading_sender_name(
 
 
 @pytest.mark.asyncio
+async def test_deepseek_generate_returns_only_after_answer_tag(
+    provider: DeepSeekLLMProvider,
+):
+    provider._client.chat.completions.create = AsyncMock(
+        return_value=_make_response(
+            "Подумала: про крабера надо коротко.\n\n"
+            "[answer]\n"
+            "Крабер — местный, у него своя пещера."
+        )
+    )
+    reply = await provider.generate("что там с крабером", [])
+    # The chain-of-thought reasoning before the tag must never reach the reply;
+    # the trailing period is stripped by the standard post-processing.
+    assert reply == "Крабер — местный, у него своя пещера"
+    assert "Подумала" not in reply
+
+
+@pytest.mark.asyncio
+async def test_deepseek_generate_traces_reasoning(provider: DeepSeekLLMProvider):
+    from contextlib import asynccontextmanager
+
+    from app.observability.tracing import set_tracer
+
+    class RecordingSpan:
+        def __init__(self) -> None:
+            self.updates: list[dict] = []
+
+        def update(self, **kwargs) -> None:
+            self.updates.append(kwargs)
+
+    class RecordingTracer:
+        enabled = True
+
+        def __init__(self, span: RecordingSpan) -> None:
+            self._span = span
+
+        @asynccontextmanager
+        async def generation(self, *, name, model=None, input=None, output=None,
+                             usage=None, metadata=None):
+            del name, model, input, output, usage, metadata
+            yield self._span
+
+    span = RecordingSpan()
+    set_tracer(RecordingTracer(span))
+    try:
+        provider._client.chat.completions.create = AsyncMock(
+            return_value=_make_response(
+                "Подумала: кратко.\n[answer]\nКрабер — местный."
+            )
+        )
+        await provider.generate("что там с крабером", [])
+    finally:
+        set_tracer(None)
+
+    assert any(
+        update.get("metadata", {}).get("reasoning") == "Подумала: кратко."
+        for update in span.updates
+    )
+
+
+@pytest.mark.asyncio
 async def test_deepseek_retries_on_rate_limit(provider: DeepSeekLLMProvider):
     rate_limit = APIStatusError(
         "rate limited",
@@ -141,15 +202,6 @@ def test_should_retry_only_transient_errors(provider: DeepSeekLLMProvider):
     assert provider._should_retry(transient) is True
     assert provider._should_retry(fatal) is False
     assert provider._should_retry(RuntimeError("x")) is False
-
-
-@pytest.mark.asyncio
-async def test_deepseek_generate_includes_critic_feedback(provider: DeepSeekLLMProvider):
-    await provider.generate("hello", [], critic_feedback="добавь больше иронии")
-    call = provider._client.chat.completions.create.await_args
-    user_prompt = call.kwargs["messages"][1]["content"]
-    assert "Humor editor's note" in user_prompt
-    assert "добавь больше иронии" in user_prompt
 
 
 @pytest.mark.asyncio

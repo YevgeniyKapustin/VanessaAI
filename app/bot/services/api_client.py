@@ -89,10 +89,16 @@ class HttpChatApiClient:
             )
             raise
 
+        messages = data.get("messages")
         result = ChatProcessResult(
             action=str(data["action"]),
             reason=data["reason"],
             reply=data.get("reply"),
+            messages=(
+                [str(part) for part in messages]
+                if isinstance(messages, list)
+                else None
+            ),
             relevance_score=float(data.get("relevance_score", 0.0)),
             sticker_tag=data.get("sticker_tag"),
         )

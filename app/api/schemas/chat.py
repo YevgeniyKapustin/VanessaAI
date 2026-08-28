@@ -23,6 +23,10 @@ class ChatResponse(BaseModel):
     action: str
     reason: str
     reply: str | None = None
+    # The reply split into the individual Telegram messages to send (model-
+    # marked 1-2 sentence blocks). Absent/empty = deliver ``reply`` as one
+    # message. ``reply`` remains the marker-free full text.
+    messages: list[str] | None = None
     context_count: int = 0
     relevance_score: float = 0.0
     sticker_tag: str | None = None

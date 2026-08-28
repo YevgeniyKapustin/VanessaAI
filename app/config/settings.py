@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +36,10 @@ class Settings(BaseSettings):
     # asyncio lock; the pool just isolates embedding work from the default
     # asyncio thread pool so it never starves other to_thread callers.
     embedding_threads: int = 1
+    # Hugging Face access token — authenticates the sentence-transformers model
+    # download from the HF Hub (higher rate limits / faster downloads). Pushed
+    # into os.environ below because huggingface_hub reads HF_TOKEN from there.
+    hf_token: str = ""
 
     llm_provider: str = "deepseek"  # "deepseek" (default) or "claude"
     anthropic_api_key: str = ""
@@ -60,12 +66,6 @@ class Settings(BaseSettings):
     # Upscaled compose model for super-complex synthesis / coding turns.
     deepseek_pro_model: str = "deepseek-v4-pro"
     deepseek_max_tokens: int = 4096
-
-    # Humor Critic (Generator–Critic pattern)
-    critic_enabled: bool = False
-    critic_max_iterations: int = 1
-    critic_model: str = ""
-    critic_apply_to_all: bool = False
 
     rag_context_min: int = 20
     rag_context_max: int = 50
@@ -162,6 +162,12 @@ class Settings(BaseSettings):
     # pipeline runs. Telegram expires the typing state after ~5s, so keep this
     # comfortably below that (4s default).
     bot_typing_interval_seconds: float = 4.0
+    # Delay (seconds) between consecutive blocks of a multi-message reply, so
+    # the messages appear one by one ("по мере написания"). 0 = back-to-back.
+    bot_message_delay_seconds: float = 0.7
+    # Safety cap on how many reply blocks are sent in one turn; anything beyond
+    # is dropped so a runaway model can never flood the chat.
+    bot_max_messages: int = 8
 
     indexing_max_retries: int = 2
     llm_max_retries: int = 2
@@ -371,14 +377,6 @@ class Settings(BaseSettings):
         return self.deepseek_model
 
     @property
-    def resolved_critic_model(self) -> str:
-        if self.critic_model.strip():
-            return self.critic_model.strip()
-        if self.llm_provider == "claude":
-            return self.anthropic_model
-        return self.deepseek_model
-
-    @property
     def database_url(self) -> str:
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
@@ -409,3 +407,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# huggingface_hub (used by sentence-transformers to download
+# EMBEDDING_MODEL_NAME) reads the token from os.environ, not from pydantic
+# settings. Propagate the .env HF_TOKEN into the process environment so local
+# (non-Docker) runs are authenticated too; a real environment variable always
+# wins over the .env value.
+if settings.hf_token:
+    os.environ.setdefault("HF_TOKEN", settings.hf_token)

@@ -8,7 +8,9 @@ def test_composer_generation_loaded_from_content():
     assert isinstance(params, LLMGenerationParams)
     assert params.temperature == 0.8
     assert params.top_p == 0.9
-    assert params.max_tokens == 512
+    # Headroom for the chain-of-thought prefix + [answer] tag on top of the
+    # final message (reasoning must not eat the reply's token budget).
+    assert params.max_tokens == 1024
     assert params.presence_penalty == 0.4
     assert params.frequency_penalty == 0.35
 

@@ -10,6 +10,7 @@ from app.bot.container import BotServices, create_bot_services
 from app.bot.handlers.messages import (
     _preview,
     _send_reply,
+    _send_reply_messages,
     _typing_loop,
     _typing_on_signal,
     create_messages_router,
@@ -54,12 +55,50 @@ async def test_send_reply_uses_html_parse_mode():
     assert message.reply.await_args.kwargs["parse_mode"] == ParseMode.HTML
 
 
+@pytest.mark.asyncio
+async def test_send_reply_messages_first_replies_rest_answer():
+    message = make_telegram_message()
+    message.reply = AsyncMock()
+    message.answer = AsyncMock()
+    await _send_reply_messages(message, ["Один", "Два", "Три"], delay=0.0)
+    assert message.reply.await_count == 1
+    assert message.answer.await_count == 2
+    # only the first block is sent as a reply to the user's message
+    assert message.reply.await_args.args[0] is not None
+    assert message.answer.await_args.args[0] is not None
+
+
+@pytest.mark.asyncio
+async def test_send_reply_messages_stops_on_hard_error():
+    message = make_telegram_message()
+    message.reply = AsyncMock(side_effect=RuntimeError("flood"))
+    message.answer = AsyncMock()
+    await _send_reply_messages(message, ["Один", "Два"], delay=0.0)
+    # a hard failure stops the loop — no hammering the unreachable chat
+    message.reply.assert_awaited_once()
+    message.answer.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_reply_messages_falls_back_to_plain_text():
+    message = make_telegram_message()
+    message.reply = AsyncMock(
+        side_effect=[TelegramBadRequest(MagicMock(), "bad"), None]
+    )
+    message.answer = AsyncMock()
+    await _send_reply_messages(message, ["Один"], delay=0.0)
+    assert message.reply.await_count == 2
+    assert message.reply.await_args_list[1].args[0] == "Один"
+
+
 def _services(
     *,
     access_error: str | None = None,
     api_result: ChatProcessResult | None = None,
     api_error: Exception | None = None,
     stickers=None,
+    message_delay_seconds: float = 0.7,
+    max_messages: int = 8,
 ) -> BotServices:
     chat_client = AsyncMock()
     if api_error is not None:
@@ -91,6 +130,8 @@ def _services(
         knowledge=knowledge,
         texts=get_content().bot,
         stickers=stickers,
+        message_delay_seconds=message_delay_seconds,
+        max_messages=max_messages,
     )
 
 
@@ -141,6 +182,49 @@ async def test_handle_text_sends_reply():
     # typing is shown while the pipeline runs (initial ping, plus refreshes)
     assert message.bot.send_chat_action.await_count >= 1
     message.reply.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_text_sends_multiple_reply_messages():
+    message = make_telegram_message(text="Vanessa?")
+    message.reply = AsyncMock()
+    message.answer = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="Первая мысль\nВторая мысль",
+            messages=["Первая мысль", "Вторая мысль"],
+            relevance_score=0.9,
+        ),
+        message_delay_seconds=0.0,
+    )
+    await _call_text_handler(services, message)
+    # the first block is a reply to the user, the rest are plain messages
+    message.reply.assert_awaited_once()
+    message.answer.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_text_caps_reply_messages():
+    message = make_telegram_message(text="Vanessa?")
+    message.reply = AsyncMock()
+    message.answer = AsyncMock()
+    services = _services(
+        api_result=ChatProcessResult(
+            action="reply",
+            reason="intent",
+            reply="1\n2\n3",
+            messages=["1", "2", "3"],
+            relevance_score=0.9,
+        ),
+        message_delay_seconds=0.0,
+        max_messages=1,
+    )
+    await _call_text_handler(services, message)
+    # the safety cap stops flooding: only the first block is delivered
+    message.reply.assert_awaited_once()
+    message.answer.assert_not_awaited()
 
 
 @pytest.mark.asyncio

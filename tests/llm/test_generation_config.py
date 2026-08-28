@@ -66,6 +66,6 @@ def test_conversation_config_from_content():
     from app.config.conversation_config import load_conversation_config
 
     config = load_conversation_config()
-    assert config.session_window_size == 10
+    assert config.session_window_size == 20
     assert config.session_idle_seconds == 300.0
     assert config.post_reply_listen_count == 4

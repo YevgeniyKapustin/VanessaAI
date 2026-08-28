@@ -3,7 +3,20 @@ from dataclasses import dataclass
 from app.core.messages import ContextMessage, stored_to_context
 from app.core.protocols import MessageRepositoryProtocol
 from app.core.session.session_trim import seconds_since_last_role, trim_session_by_idle_gap
-from app.decision.gate.reply_expectation import is_dismissal_request
+
+
+def _is_dismissal_request(text: str) -> bool:
+    """Lazy import that breaks the ``chat_session_state -> decision.gate`` cycle.
+
+    ``app.decision`` eagerly imports its whole gate chain (engine -> protocols ->
+    prefilter), which back-imports this module. A top-level import here would
+    deadlock when ``app.services`` is imported first (as the services tests do);
+    importing inside the call keeps this core session module free of the decision
+    dependency until a function actually runs.
+    """
+    from app.decision.gate.reply_expectation import is_dismissal_request
+
+    return is_dismissal_request(text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +49,7 @@ def in_post_reply_listen_window(
         if message.role == "assistant":
             return 0 < user_count <= max_messages
         if message.role == "user":
-            if is_dismissal_request(message.content):
+            if _is_dismissal_request(message.content):
                 return False
             user_count += 1
     return False
@@ -64,7 +77,7 @@ def build_chat_session_state(
         max_idle_seconds=max_idle_seconds,
     )
     has_dismissal = any(
-        message.role == "user" and is_dismissal_request(message.content)
+        message.role == "user" and _is_dismissal_request(message.content)
         for message in trimmed
     )
     return ChatSessionState(

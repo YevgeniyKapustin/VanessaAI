@@ -736,6 +736,44 @@ async def test_handle_photo_vision_disabled_uses_caption_text(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_handle_photo_media_group_buffers_into_one_turn(monkeypatch):
+    """Telegram delivers each album photo as a separate message; the bot must
+    merge the whole media group into ONE turn so the vision model sees every
+    photo at once (e.g. both paintings for "сравни картины")."""
+    monkeypatch.setattr(settings, "vision_media_group_debounce_seconds", 0.05)
+    services = _services()
+    router = create_messages_router(services)
+    handler = _find_handler(router, "handle_photo")
+
+    def _album_photo(file_id: str, caption: str | None) -> MagicMock:
+        message = make_telegram_message()
+        message.media_group_id = "album-1"
+        message.caption = caption
+        message.photo = [MagicMock(file_id=file_id, file_size=1000)]
+        message.bot.download = AsyncMock(
+            side_effect=lambda photo, destination=None: destination.write(
+                b"fakejpegbytes"
+            )
+        )
+        return message
+
+    await handler(_album_photo("p1", "Ванесса сравни картины кто красивее"))
+    await handler(_album_photo("p2", None))
+
+    # The whole album is flushed as ONE turn after the debounce window.
+    for _ in range(100):
+        if services.chat_client.process.await_count == 1:
+            break
+        await asyncio.sleep(0.01)
+    assert services.chat_client.process.await_count == 1
+    incoming = services.chat_client.process.await_args.args[0]
+    # The caption comes from the album's primary photo; both images are attached.
+    assert incoming.text == "Ванесса сравни картины кто красивее"
+    assert len(incoming.images) == 2
+    assert {image.telegram_file_id for image in incoming.images} == {"p1", "p2"}
+
+
+@pytest.mark.asyncio
 async def test_handle_text_sends_photo_when_requested():
     message = make_telegram_message(text="скинь фото с котом")
     message.reply = AsyncMock()

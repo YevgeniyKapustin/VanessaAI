@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, text
@@ -102,6 +103,22 @@ class UserRepository:
 class MessageRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    @asynccontextmanager
+    async def _savepoint(self):
+        """Run a fallible DB read inside a SAVEPOINT.
+
+        Pipeline stages treat some reads as optional/fail-open (the photo-album
+        search, the RAG helpers) and swallow their errors. Without a savepoint,
+        a swallowed read failure aborts the whole Postgres transaction, and the
+        next statement on the same request-scoped session — typically the
+        assistant-message INSERT — fails with ``InFailedSQLTransactionError``.
+        ``begin_nested`` rolls back to the savepoint on error, leaving the outer
+        transaction usable, then re-raises so the caller's fail-open handler
+        still decides what to do.
+        """
+        async with self._session.begin_nested():
+            yield
 
     async def create(
         self,
@@ -327,34 +344,39 @@ class MessageRepository:
         """FTS over messages that carry a photo (attachments non-empty).
 
         Used by the "RAG по смыслу" photo-album gathering: finds photo messages
-        whose content/caption matches the meaning of the current turn.
+        whose content/caption matches the meaning of the current turn. Runs
+        inside a SAVEPOINT: the compose stage treats this as an optional,
+        fail-open read, and a swallowed failure must not poison the shared
+        request transaction (see ``_savepoint``).
         """
-        result = await self._session.execute(
-            text(
-                """
-                SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
-                       m.role, m.content, m.qdrant_point_id, m.created_at,
-                       m.attachments, m.photo_caption,
-                       COALESCE(u.nickname, u.first_name, u.username) AS sender_name
-                FROM messages m
-                LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
-                WHERE m.role = 'user'
-                  AND m.attachments IS NOT NULL
-                  AND jsonb_array_length(m.attachments) > 0
-                  AND m.search_vector @@ plainto_tsquery('russian', :query)
-                ORDER BY ts_rank(
-                    m.search_vector,
-                    plainto_tsquery('russian', :query)
-                ) DESC, m.id DESC
-                LIMIT :limit
-                """
-            ),
-            {"query": query, "limit": limit},
-        )
-        return [
-            self._row_to_stored(row)
-            for row in result.mappings().all()
-        ]
+        async with self._savepoint():
+            result = await self._session.execute(
+                text(
+                    """
+                    SELECT m.id, m.sender_telegram_id, m.telegram_message_id,
+                           m.role, m.content, m.qdrant_point_id, m.created_at,
+                           m.attachments, m.photo_caption,
+                           COALESCE(u.nickname, u.first_name, u.username) AS sender_name
+                    FROM messages m
+                    LEFT JOIN users u ON u.telegram_id = m.sender_telegram_id
+                    WHERE m.role = 'user'
+                      AND m.attachments IS NOT NULL
+                      AND jsonb_typeof(m.attachments) = 'array'
+                      AND jsonb_array_length(m.attachments) > 0
+                      AND m.search_vector @@ plainto_tsquery('russian', :query)
+                    ORDER BY ts_rank(
+                        m.search_vector,
+                        plainto_tsquery('russian', :query)
+                    ) DESC, m.id DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"query": query, "limit": limit},
+            )
+            return [
+                self._row_to_stored(row)
+                for row in result.mappings().all()
+            ]
 
     async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
         if not message_ids:
@@ -508,7 +530,10 @@ class MessageRepository:
         message_id: int,
         point_id: str,
     ) -> None:
-        message = await self._session.get(Message, message_id)
-        if message is None:
-            return
-        message.qdrant_point_id = point_id
+        # Also guarded by a savepoint: ``index_now`` swallows failures here, and
+        # a poisoned transaction would silently break the later assistant INSERT.
+        async with self._savepoint():
+            message = await self._session.get(Message, message_id)
+            if message is None:
+                return
+            message.qdrant_point_id = point_id

@@ -55,6 +55,9 @@ def make_telegram_message(
     message.from_user.last_name = "User"
     message.bot = MagicMock()
     message.bot.send_chat_action = AsyncMock()
+    # A lone photo has no media group; set explicitly so the mock does not
+    # fabricate a truthy auto-attribute that would trigger album buffering.
+    message.media_group_id = None
     return message
 
 

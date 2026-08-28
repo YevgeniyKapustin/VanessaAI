@@ -18,6 +18,7 @@ from app.services.humor_pipeline import HumorPipeline
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
 from app.services.pipeline.stages import (
+    _collect_photo_candidates,
     ComposeStage,
     FinalizeStage,
     GateStage,
@@ -744,16 +745,69 @@ async def test_compose_stage_forwards_detail():
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_forces_reply_for_image_turn():
+async def test_orchestrator_ignores_bare_photo_not_listening_not_addressed():
+    """A bare caption-less photo that is neither actively listened to (no recent
+    bot reply) nor addressed to Vanessa is skipped: no reply, no vision analysis,
+    and the decision engine is never consulted."""
     messages = FakeMessageRepo()
     indexing = FakeIndexing()
-    # Even though the decision engine would IGNORE this bare-photo turn, the
-    # vision short-circuit forces a REPLY so the photo is always described.
+    llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     orchestrator = _build_orchestrator(
         messages=messages,
         indexing=indexing,
         decision=decision,
+        llm=llm,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    # The bare-photo gate is deterministic — neither the decision engine nor the
+    # compose (vision) model was invoked.
+    assert decision.decide_calls == 0
+    assert llm.last_images is None
+    # The user message is still indexed and its image persisted for follow-ups.
+    stored = messages._messages[1]
+    assert stored.attachments == [
+        {
+            "data_url": "data:image/jpeg;base64,AAAA",
+            "mime_type": "image/jpeg",
+            "telegram_file_id": "f1",
+            "description": None,
+        }
+    ]
+    assert stored in indexing.scheduled
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_replies_to_bare_photo_in_listen_window():
+    """Vanessa answers (and analyzes) a bare photo when she is actively listening
+    — i.e. she recently talked with the user (post-reply listen window)."""
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    llm = FakeLLM()
+    decision = FakeDecisionEngine(DecisionAction.IGNORE)
+    # A recent bot reply puts Vanessa into the post-reply listen window.
+    await messages.create(role="assistant", content="ну привет")
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=llm,
     )
 
     result = await orchestrator.handle_incoming(
@@ -772,18 +826,162 @@ async def test_orchestrator_forces_reply_for_image_turn():
     )
 
     assert result.action == DecisionAction.REPLY
-    # The decision engine was bypassed entirely (the forced path never consults it).
+    # The deterministic bare-photo gate still bypasses the decision engine.
     assert decision.decide_calls == 0
-    # The image is persisted so a follow-up turn can reload it from the session.
-    stored = messages._messages[1]
-    assert stored.attachments == [
-        {
-            "data_url": "data:image/jpeg;base64,AAAA",
-            "mime_type": "image/jpeg",
-            "telegram_file_id": "f1",
-            "description": None,
-        }
+    # The image reached the vision model.
+    assert llm.last_images == [
+        ImageAttachment(
+            data_url="data:image/jpeg;base64,AAAA",
+            mime_type="image/jpeg",
+            telegram_file_id="f1",
+        )
     ]
+    assert llm.last_current_images == llm.last_images
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_replies_to_bare_photo_reply_to_bot():
+    """A bare photo replying to Vanessa's own message is addressed to her → reply."""
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    llm = FakeLLM()
+    decision = FakeDecisionEngine(DecisionAction.IGNORE)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=llm,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            reply_to_bot=True,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert decision.decide_calls == 0
+    assert llm.last_images is not None
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_captioned_photo_addressed_uses_vision():
+    """A captioned photo addressed to Vanessa flows through the normal pipeline;
+    when it decides REPLY the image is attached for the vision model."""
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    llm = FakeLLM()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=llm,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="ванесса, а что на этом фото?",
+            sender_telegram_id=42,
+            mentions_bot=True,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    assert result.action == DecisionAction.REPLY
+    # The captioned photo went through the normal decision pipeline.
+    assert decision.decide_calls == 1
+    assert llm.last_images is not None
+    assert llm.last_images[0].telegram_file_id == "f1"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_captioned_photo_group_talk_ignored_no_vision():
+    """A captioned photo that is plain group talk (not addressed) is decided by
+    the normal pipeline; an IGNORE verdict means the image is never analyzed."""
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    llm = FakeLLM()
+    decision = FakeDecisionEngine(DecisionAction.IGNORE)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=llm,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="смотрите какой кот",
+            sender_telegram_id=42,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    assert result.action == DecisionAction.IGNORE
+    assert decision.decide_calls == 1
+    # The image was never sent to the vision model.
+    assert llm.last_images is None
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_reply_to_any_photo_rollback_toggle(monkeypatch):
+    """With the rollback toggle on, a bare photo is answered even when not
+    listening/addressed (the pre-change behavior)."""
+    monkeypatch.setattr(settings, "vision_reply_to_any_photo", True)
+    messages = FakeMessageRepo()
+    indexing = FakeIndexing()
+    llm = FakeLLM()
+    decision = FakeDecisionEngine(DecisionAction.IGNORE)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        indexing=indexing,
+        decision=decision,
+        llm=llm,
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            images=(
+                ImageAttachment(
+                    data_url="data:image/jpeg;base64,AAAA",
+                    mime_type="image/jpeg",
+                    telegram_file_id="f1",
+                ),
+            ),
+        )
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert decision.decide_calls == 0
+    assert llm.last_images is not None
 
 
 @pytest.mark.asyncio
@@ -1056,6 +1254,111 @@ async def test_compose_stage_searches_photos_by_meaning_not_literal_text():
 
 
 @pytest.mark.asyncio
+async def test_compose_builds_album_for_image_turn_excluding_current():
+    """The album ("Photos I can send") must still reach Vanessa even when the
+    current turn carries images — it is not suppressed. The current turn's own
+    photo is excluded so it does not appear twice (once as current_images, once
+    in the album)."""
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="cur-1",
+    )
+
+    class AlbumRepo(FakeMessageRepo):
+        def __init__(self) -> None:
+            super().__init__()
+            self.search_calls = 0
+
+        async def search_photo_messages(
+            self, query: str, limit: int = 30
+        ) -> list[StoredMessage]:
+            self.search_calls += 1
+            return [
+                StoredMessage(
+                    id=50,
+                    role="user",
+                    content="[фото]",
+                    sender_telegram_id=42,
+                    sender_name="Тест",
+                    created_at=None,
+                    attachments=[
+                        {
+                            "data_url": "data:image/jpeg;base64,BBBB",
+                            "mime_type": "image/jpeg",
+                            "telegram_file_id": "old-1",
+                            "description": None,
+                        }
+                    ],
+                    photo_caption="кот на диване",
+                )
+            ]
+
+    class AlbumLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            self.last_photo_candidates = kwargs.get("photo_candidates")
+            return "обе картины хороши"
+
+    llm = AlbumLLM()
+    messages = AlbumRepo()
+    compose = ComposeStage(llm, messages=messages)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="Ванесса сравни картины кто красивее",
+            sender_telegram_id=42,
+            images=(photo,),
+        ),
+        turn_plan=TurnPlan(
+            original="Ванесса сравни картины кто красивее",
+            text="Ванесса сравни картины кто красивее",
+            skip_search=False,
+            should_reply=True,
+        ),
+    )
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    # The album reaches Vanessa for image turns too; the current photo is excluded.
+    assert messages.search_calls == 1
+    assert llm.last_photo_candidates is not None
+    assert [c.telegram_file_id for c in llm.last_photo_candidates] == ["old-1"]
+
+
+def test_photo_candidates_exclude_current_turn_images():
+    """The current turn's own photos (already attached as current_images) must
+    never be re-offered in the re-sendable album."""
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="cur-1",
+    )
+    prior = ContextMessage(
+        id=10,
+        role="user",
+        content="[фото]",
+        sender_telegram_id=42,
+        sender_name="Тест",
+        attachments=(photo,),
+        photo_caption="кот на диване",
+    )
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="[фото]",
+            sender_telegram_id=42,
+            images=(photo,),
+        ),
+    )
+    ctx.recent = [prior]
+
+    candidates = _collect_photo_candidates(ctx, [prior])
+
+    assert candidates == []
+
+
+@pytest.mark.asyncio
 async def test_orchestrator_stores_photo_caption_in_background():
     messages = FakeMessageRepo()
     indexing = FakeIndexing()
@@ -1069,11 +1372,14 @@ async def test_orchestrator_stores_photo_caption_in_background():
         photo_captioner=captioner,
     )
 
+    # The bare photo is addressed to Vanessa (a reply to her message), so the
+    # gate lets it through and the reply triggers the background caption job.
     await orchestrator.handle_incoming(
         ChatTurnInput(
             telegram_chat_id=-1001,
             message="[фото]",
             sender_telegram_id=42,
+            reply_to_bot=True,
             images=(
                 ImageAttachment(
                     data_url="data:image/jpeg;base64,AAAA",

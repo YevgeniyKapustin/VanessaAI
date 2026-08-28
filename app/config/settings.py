@@ -86,6 +86,20 @@ class Settings(BaseSettings):
     # Text stored for a caption-less photo so the API schema (min_length=1), the
     # DB row and the session history stay consistent; the vision path ignores it.
     vision_photo_placeholder: str = "[фото]"
+    # Reply to ANY photo ("auto-answer every image") — the pre-change behavior.
+    # When False (default), Vanessa replies to a bare caption-less photo only
+    # when she is actively listening (recently talked with her) or the photo is
+    # addressed to her (reply to her message / a mention); otherwise the image
+    # is not even analyzed. Captioned photos always flow through the normal gate.
+    vision_reply_to_any_photo: bool = False
+    # Media-group (album) aggregation: Telegram delivers each album photo as a
+    # SEPARATE message sharing the same ``media_group_id``. To let Vanessa see
+    # the whole album at once (e.g. compare two paintings), the bot buffers the
+    # group and flushes ONE turn with all photos after the group has been quiet
+    # for this many seconds (restarted on every photo of the group).
+    vision_media_group_debounce_seconds: float = 1.5
+    # Safety cap on how many photos are merged into a single media-group turn.
+    vision_media_group_max_photos: int = 10
     # Photo album: max photos listed in the compose prompt that the bot could
     # re-send (selected by RAG "по смыслу" + recent session).
     vision_photo_candidates: int = 5

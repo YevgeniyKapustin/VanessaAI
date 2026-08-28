@@ -104,13 +104,40 @@ class GateStage:
     async def run(self, ctx: TurnPipelineContext) -> bool:
         await apply_owner_ignore_if_needed(self._ignore_registry, ctx)
 
-        # Vision turns ("reply to any photo"): the empty/placeholder caption must
-        # not be dropped by the prefilter/reaction-gate noise heuristics, and the
-        # text-based planner has nothing useful to classify. A forced plan + REPLY
-        # decision sends the turn straight to Retrieve/Compose for the vision model.
+        # Bare caption-less photo ("[фото]" placeholder): Vanessa is NOT obliged
+        # to reply to every photo, and a photo she does not answer is not even
+        # analyzed (never sent to the vision model). She responds to a bare photo
+        # only when she is actively listening (recently talked with her —
+        # ``in_listen_window``) or the photo is addressed to her (a reply to her
+        # message / a mention). Otherwise the turn is finalized as an IGNORE here,
+        # before any prefilter/planner/vision cost.
         if ctx.turn.has_image and settings.vision_enabled:
-            return await self._force_vision_turn(ctx)
+            # Rollback toggle: restore the old "reply to ANY photo" behavior.
+            if settings.vision_reply_to_any_photo:
+                return await self._force_vision_turn(ctx)
+            if ctx.turn.message.strip() == settings.vision_photo_placeholder:
+                assert ctx.session is not None
+                if (
+                    ctx.session.in_listen_window
+                    or ctx.turn.mentions_bot
+                    or ctx.turn.reply_to_bot
+                ):
+                    return await self._force_vision_turn(ctx)
+                await finish_ignore_turn(
+                    ctx,
+                    reason=DecisionReason.NOT_EXPECTED.value,
+                    metrics=self._metrics,
+                    indexing=self._indexing,
+                    config=self._config,
+                    planner_skipped=True,
+                    log_event="turn_stage bare_photo_not_addressed",
+                )
+                return False
 
+        # Captioned photos flow through the normal gate pipeline (prefilter,
+        # reaction gate, planner, decision engine) like any text message — the
+        # caption is real content. Only when the pipeline decides REPLY does the
+        # compose stage attach the image to the vision model.
         if (
             self._config.planner_prefilter_enabled
             and self._prefilter is not None
@@ -267,14 +294,16 @@ class GateStage:
         return True
 
     async def _force_vision_turn(self, ctx: TurnPipelineContext) -> bool:
-        """Auto-reply path for image turns ("reply to any photo").
+        """Vision reply path for a bare photo the gate decided to answer.
 
-        Skips the prefilter/reaction-gate noise short-circuits (a bare photo has
-        an empty/placeholder caption the heuristics would drop) and the text
-        planner (nothing useful to classify). Builds a forced ``TurnPlan`` and a
-        REPLY ``DecisionResult`` so the turn proceeds to Retrieve/Compose, where
-        the vision model describes the image. ``FinalizeStage`` asserts a
-        non-None decision, so the forced decision is required here.
+        Called only when Vanessa is actively listening (``in_listen_window``) or
+        the photo is addressed to her (a reply to her message / a mention), or
+        when the ``vision_reply_to_any_photo`` rollback toggle is on. Skips the
+        text planner (a bare photo has nothing useful to classify) and builds a
+        forced ``TurnPlan`` + REPLY ``DecisionResult`` so the turn proceeds to
+        Retrieve/Compose, where the vision model describes the image.
+        ``FinalizeStage`` asserts a non-None decision, so the forced decision is
+        required here.
         """
         if self._metrics_retriever is not None:
             try:
@@ -576,11 +605,18 @@ def _collect_photo_candidates(
     seen: set[str] = set()
     # (file_id, data_url, caption, sender, msg)
     collected: list[tuple[str, str, str, str, object]] = []
+    # The current turn's own images are already attached (``current_images`` /
+    # ``images``) — never offer them again as re-sendable album entries.
+    current_file_ids = {
+        attachment.telegram_file_id
+        for attachment in ctx.turn.images
+        if attachment.telegram_file_id
+    }
 
     def _add(message) -> None:
         for attachment in message.attachments:
             file_id = attachment.telegram_file_id
-            if not file_id or file_id in seen:
+            if not file_id or file_id in seen or file_id in current_file_ids:
                 continue
             seen.add(file_id)
             collected.append(
@@ -645,7 +681,15 @@ class ComposeStage:
         # vision forced-turn path) or could be bypassed in the future. Re-check
         # deterministically here, at the very moment of preparing the answer, so
         # the expensive LLM is not even invoked for an identical spam burst.
-        if self._refuse_enabled and is_repeated_message(
+        # A bare caption-less photo carries only the placeholder ("[фото]") — not
+        # real content — so two consecutive photos must never be mistaken for a
+        # repeated-message spam burst (they normalize to the same token). The
+        # repeat check still applies to captioned photos and text.
+        bare_photo = (
+            ctx.turn.has_image
+            and ctx.turn.message.strip() == settings.vision_photo_placeholder
+        )
+        if self._refuse_enabled and not bare_photo and is_repeated_message(
             ctx.turn.message,
             ctx.recent,
             sender_telegram_id=ctx.turn.sender_telegram_id,
@@ -685,13 +729,17 @@ class ComposeStage:
         # Vision: attach the current + recent-session images when enabled; the
         # provider routes the call to the vision model only when images are present.
         images = _collect_turn_images(ctx) if settings.vision_enabled else []
+        # Did the user explicitly ask for a photo? Drives the honesty directives
+        # (marker required / honest refusal) and the missed-request metric below.
+        photo_requested = is_photo_request(ctx.turn.message)
         # Photo album: photos the bot could re-send, matched to the context by
         # RAG "по смыслу" + the recent session. The dedicated meaning-search leg
         # (``search_photo_messages``) finds photo messages whose caption matches
         # the REWRITTEN query — so a bare photo is found by the MEANING of the
         # turn ("скинь то фото где кот" -> the caption "рыжий кот на диване"),
         # not by the literal words the user typed. Fail-open: a search error
-        # must never block the reply.
+        # must never block the reply. The current turn's own photos are excluded
+        # inside ``_collect_photo_candidates`` (they are already attached).
         photo_messages: list[ContextMessage] = []
         if (
             settings.vision_enabled
@@ -717,9 +765,6 @@ class ComposeStage:
             if settings.vision_enabled
             else []
         )
-        # Did the user explicitly ask for a photo? Drives the honesty directives
-        # (marker required / honest refusal) and the missed-request metric below.
-        photo_requested = is_photo_request(ctx.turn.message)
         ctx.reply = await self._llm.generate(
             user_message=ctx.turn.message,
             context_blocks=ctx.context_blocks,

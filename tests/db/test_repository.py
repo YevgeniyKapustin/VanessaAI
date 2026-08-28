@@ -27,6 +27,32 @@ def _mappings_result(rows):
     return result
 
 
+class _NestedCM:
+    """Async context manager returned by a mocked ``session.begin_nested()``."""
+
+    def __init__(self) -> None:
+        self.entered = False
+        self.exited = False
+
+    async def __aenter__(self):
+        self.entered = True
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        self.exited = True
+        return False
+
+
+def _enable_nested(session: AsyncMock) -> None:
+    """Make ``session.begin_nested()`` return an async context manager.
+
+    The real ``AsyncSession.begin_nested()`` is a synchronous method returning
+    an async context manager, so a plain ``MagicMock`` (not ``AsyncMock``) is
+    the faithful substitute.
+    """
+    session.begin_nested = MagicMock(return_value=_NestedCM())
+
+
 @pytest.mark.asyncio
 async def test_user_get_or_create_returns_existing():
     session = AsyncMock()
@@ -151,6 +177,7 @@ async def test_message_get_by_ids_preserves_order():
 @pytest.mark.asyncio
 async def test_message_update_qdrant_point_id_noop_when_missing():
     session = AsyncMock()
+    _enable_nested(session)
     session.get = AsyncMock(return_value=None)
     repo = MessageRepository(session)
     await repo.update_qdrant_point_id(1, "pt-1")
@@ -310,11 +337,39 @@ async def test_message_window_blocks_without_context():
 @pytest.mark.asyncio
 async def test_message_update_qdrant_point_id_updates():
     session = AsyncMock()
+    _enable_nested(session)
     message = Message(id=1, role="user", content="x")
     session.get = AsyncMock(return_value=message)
     repo = MessageRepository(session)
     await repo.update_qdrant_point_id(1, "pt-99")
     assert message.qdrant_point_id == "pt-99"
+    session.begin_nested.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_message_search_photo_messages_uses_savepoint_and_array_guard():
+    session = AsyncMock()
+    _enable_nested(session)
+    row = {
+        "id": 1,
+        "sender_telegram_id": 2,
+        "telegram_message_id": 3,
+        "role": "user",
+        "content": "фото кота",
+        "qdrant_point_id": None,
+        "created_at": datetime.now(timezone.utc),
+        "attachments": [],
+        "photo_caption": None,
+    }
+    session.execute = AsyncMock(return_value=_mappings_result([row]))
+    repo = MessageRepository(session)
+    hits = await repo.search_photo_messages("кот", limit=5)
+    assert len(hits) == 1
+    assert hits[0].content == "фото кота"
+    session.begin_nested.assert_called_once()
+    # The query must tolerate malformed attachments data (non-array JSON).
+    sql = session.execute.await_args.args[0].text
+    assert "jsonb_typeof(m.attachments) = 'array'" in sql
 
 
 def _window_row(msg_id: int, content: str) -> dict:

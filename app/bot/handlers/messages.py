@@ -13,6 +13,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import BufferedInputFile, Message as TelegramMessage, PhotoSize
 
 from app.bot.container import BotServices
+from app.bot.media_groups import MediaGroupBuffer
 from app.bot.messages import IncomingMessage
 from app.bot.stickers.heuristics import is_sticker_request
 from app.bot.telegram_format import markdown_to_telegram_html
@@ -355,6 +356,10 @@ async def _download_photo_images(
 
 def create_messages_router(services: BotServices) -> Router:
     router = Router()
+    # Media-group (album) aggregation: Telegram sends each album photo as a
+    # separate message sharing the same media_group_id; the buffer merges them
+    # into ONE vision turn so Vanessa sees the whole album at once.
+    media_group_buffer = MediaGroupBuffer()
 
     async def _reject_if_no_access(
         telegram_message: TelegramMessage,
@@ -542,6 +547,42 @@ def create_messages_router(services: BotServices) -> Router:
                 force=is_sticker_request(incoming.text),
             )
 
+    async def process_media_group(entry) -> None:
+        """Flush a buffered media group as ONE vision turn with all photos.
+
+        The primary message is the first one that carries a caption (Telegram
+        usually puts the album caption on a single photo); a caption-less album
+        falls back to the bare-photo placeholder. All group photos are attached,
+        so the vision model sees the whole album at once (e.g. both paintings
+        for "сравни картины").
+        """
+        messages = entry.messages
+        images = entry.images
+        primary = next(
+            (message for message in messages if (message.caption or "").strip()),
+            messages[0],
+        )
+        caption = (primary.caption or "").strip()
+        text = (caption or settings.vision_photo_placeholder)[:4096]
+        incoming = IncomingMessage.from_telegram(
+            primary,
+            images=tuple(images),
+            text=text,
+        )
+        logger.info(
+            "media_group_flush chat_id=%s media_group_id=%s photos=%s text=%r",
+            incoming.telegram_chat_id,
+            entry.media_group_id,
+            len(images),
+            _preview(text),
+        )
+        async with _typing_on_signal(
+            primary.bot,
+            incoming.telegram_chat_id,
+            interval=services.typing_interval_seconds,
+        ) as start_typing:
+            await _handle_text_core(primary, incoming, services, start_typing)
+
     @router.message(F.photo)
     async def handle_photo(telegram_message: TelegramMessage) -> None:
         """Handle photos (with or without a caption) via the vision pipeline.
@@ -593,6 +634,19 @@ def create_messages_router(services: BotServices) -> Router:
                 telegram_message,
                 text=caption[:4096],
             )
+        elif telegram_message.media_group_id:
+            # Media group / album: Telegram delivers each photo as a separate
+            # message sharing the same media_group_id. Buffer the photo and let
+            # the whole group flush as ONE turn (with every photo) once the
+            # album is complete — so e.g. "сравни картины" sees both paintings.
+            await media_group_buffer.add(
+                telegram_message.chat.id,
+                telegram_message.media_group_id,
+                telegram_message,
+                images,
+                on_flush=process_media_group,
+            )
+            return
         else:
             incoming = IncomingMessage.from_telegram(
                 telegram_message,

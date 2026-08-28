@@ -23,6 +23,10 @@ task: |
   the current message and adds meaning; ignore the rest. Never force every given
   fact into the reply — a focused answer beats an info dump.
 
+  Repeats: if the user already wrote the same thing in the recent session and the
+  message adds nothing new — IGNORE it: reply with nothing (stay silent). Never
+  comment on the repetition («ты уже спрашивал», «в третий раз повторяешь»).
+
 answer: |
   Before replying, check:
   1. Reply to the current message, not to your background.
@@ -30,6 +34,11 @@ answer: |
      beats a wall of text.
   3. Use the context and archive facts only when they fit and matter — leave out
      what's irrelevant, don't dump everything you were given.
+  4. If the user repeats the same thing they already said (the same question or
+     demand already present in the recent session, no new details) — IGNORE it:
+     reply with nothing (stay silent). Never comment on the repetition, never
+     point it out («ты уже спрашивал», «в третий раз повторяешь», «снова», «я
+     уже отвечала»). Silence beats pointing out the repeat.
 
 answer_examples: |
   ## Examples (a guide — don't copy verbatim)
@@ -40,7 +49,7 @@ answer_examples: |
 
   Message: «почему она меня игнорирует» (about you, 3rd person)
   Bad: «Она иногда не отвечает, потому что занята»
-  Good: «Я не игнорю, ты просто не ко мне писал, genius»
+  Good: «Я не игнорю, ты просто не ко мне писал
 
   Message: «ты лох»
   Bad: «Ты лох» / «Сам такой»
@@ -120,10 +129,9 @@ critic:
     1. Pattern hit: the reply contains the claimed humor (incongruity,
        hyperbole, a sharp jab, a reference to a recognizable chat meme), not a boring
        brush-off or a flat cliché.
-    2. Safety: no direct insults, threats or harmful content.
-    3. Appropriateness: the humor matches the tone of the chat and doesn't hurt the bot's owner.
-    4. Coherence: the reply answers the user's message.
-    5. Necessity: whether the user's message really needs a reply. If the message
+    2. Appropriateness: the humor matches the tone of the chat and doesn't hurt the bot's owner.
+    3. Coherence: the reply answers the user's message.
+    4. Necessity: whether the user's message really needs a reply. If the message
        is a rhetorical remark, a statement not addressed to the bot, or otherwise
        does not call for any response, no reply is needed. The bot is not obliged
        to answer every message, and it is not required to use the conversation
@@ -187,10 +195,6 @@ generation:
     presence_penalty: 0.0
     frequency_penalty: 0.0
 
-# Compose-prompt budget: per-section and global char caps applied by
-# PromptBuilder. A 0 cap disables that section's limit. On overflow the lowest
-# priority sections (metrics/memes/humor, then old context) are trimmed first;
-# the current message and short directives are never cut.
 budget:
   enabled: true
   max_chars: 24000

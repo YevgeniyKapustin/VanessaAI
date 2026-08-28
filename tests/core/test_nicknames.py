@@ -1,4 +1,4 @@
-    from pathlib import Path
+from pathlib import Path
 
 from app.core.users import nicknames
 

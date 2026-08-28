@@ -1,25 +1,7 @@
-# Curated meme catalog the bot may reference in dialogue.
-#
-# Gating (mirrors the sticker gate):
-#   - enabled: master switch.
-#   - probability: chance to actually offer a meme when it matches (anti-spam).
-#   - min_messages_between: per-chat cooldown in bot replies.
-#   - max_per_reply: how many memes may be offered in one turn.
-#
-# A meme is offered ONLY when:
-#   1. the turn planner says humor is appropriate (humor_ok), AND
-#   2. one of its keywords matches the user's message (whole-word match), AND
-#   3. the anti-spam gate allows it.
-#
-# The LLM sees `name`, `meaning` and `usage` and is told to paraphrase, never
-# dump the definition, use at most one meme per reply, and never force it.
-
 enabled: true
 probability: 0.4
 min_messages_between: 8
 max_per_reply: 1
-# Proactive mode: when humor_ok and no keyword matched, offer a compact menu
-# (up to `offer_max` memes) so Vanessa can pick one herself.
 offer_on_humor: true
 offer_max: 6
 

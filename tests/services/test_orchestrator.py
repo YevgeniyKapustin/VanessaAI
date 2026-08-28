@@ -205,6 +205,7 @@ class FakeLLM:
         self.last_uses_pro_model: bool = False
         self.last_images: list | None = None
         self.last_photo_candidates: list | None = None
+        self.last_current_images: list | None = None
         self.last_attitude_note: str | None = None
         self.last_sender_name: str | None = None
         self.last_web_blocks: list | None = None
@@ -234,6 +235,7 @@ class FakeLLM:
         reply_to_sender_name: str | None = None,
         images: list | None = None,
         photo_candidates: list | None = None,
+        current_images: list | None = None,
     ) -> str:
         self.last_metrics_block = metrics_block
         self.last_humor_quotes = humor_quotes
@@ -253,6 +255,7 @@ class FakeLLM:
         self.last_reply_to_sender_name = reply_to_sender_name
         self.last_images = images
         self.last_photo_candidates = photo_candidates
+        self.last_current_images = current_images
         return f"echo: {user_message}"
 
 
@@ -812,6 +815,9 @@ async def test_compose_stage_forwards_images_to_llm():
     await compose.run(ctx)
 
     assert llm.last_images == [image]
+    # The current message's OWN image is forwarded separately so it renders as
+    # an <attachment> child inside the same <msg> as the text.
+    assert llm.last_current_images == [image]
     assert ctx.reply == "echo: [фото]"
 
 
@@ -969,6 +975,84 @@ async def test_compose_stage_out_of_range_marker_resolves_nothing():
     assert ctx.photo_data_url is None
     # The marker is still stripped so it is never shown to the user.
     assert ctx.reply == "Держи"
+
+
+@pytest.mark.asyncio
+async def test_compose_stage_searches_photos_by_meaning_not_literal_text():
+    """The reported requirement: the bot must search for re-sendable photos by
+    the MEANING of the message, not by the literal text the user wrote. The
+    dedicated meaning search (search_photo_messages) runs against the REWRITTEN
+    query and its hits land in the album."""
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+
+    class MeaningSearchRepo(FakeMessageRepo):
+        def __init__(self) -> None:
+            super().__init__()
+            self.last_photo_query: str | None = None
+
+        async def search_photo_messages(
+            self, query: str, limit: int = 30
+        ) -> list[StoredMessage]:
+            self.last_photo_query = query
+            return [
+                StoredMessage(
+                    id=7,
+                    role="user",
+                    content="[фото]",
+                    sender_telegram_id=42,
+                    sender_name="Тест",
+                    created_at=None,
+                    attachments=[
+                        {
+                            "data_url": photo.data_url,
+                            "mime_type": photo.mime_type,
+                            "telegram_file_id": photo.telegram_file_id,
+                            "description": None,
+                        }
+                    ],
+                    photo_caption="рыжий кот на диване",
+                )
+            ]
+
+    class MeaningLLM(FakeLLM):
+        async def generate(self, *args, **kwargs):
+            self.last_photo_candidates = kwargs.get("photo_candidates")
+            return "Держи\n[photo:1]"
+
+    llm = MeaningLLM()
+    messages = MeaningSearchRepo()
+    compose = ComposeStage(llm, messages=messages)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="скинь то фото где кот",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="скинь то фото где кот",
+            # The planner's rewritten query carries the MEANING, not the raw
+            # request ("скинь то фото где") — that is what the photo search
+            # must run against.
+            text="рыжий кот",
+            skip_search=False,
+            should_reply=True,
+        ),
+    )
+    ctx.sender_name = "Евгений"
+
+    await compose.run(ctx)
+
+    # The meaning search was called with the REWRITTEN query, not the raw text.
+    assert messages.last_photo_query == "рыжий кот"
+    # The meaning-matched photo reached the album and the marker resolved.
+    assert llm.last_photo_candidates is not None
+    assert len(llm.last_photo_candidates) == 1
+    assert llm.last_photo_candidates[0].telegram_file_id == "file-1"
+    assert ctx.photo_file_id == "file-1"
 
 
 @pytest.mark.asyncio

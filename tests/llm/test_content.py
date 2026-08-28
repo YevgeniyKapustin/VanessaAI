@@ -1,5 +1,5 @@
 from app.config.content import get_content
-from app.core.messages import ContextBlock, ContextMessage
+from app.core.messages import ContextBlock, ContextMessage, ImageAttachment
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.prompts.prompt_builder import PromptBuilder
 
@@ -392,6 +392,60 @@ def test_prompt_builder_omits_empty_note_on_normal_message():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt("привет как дела", [])
     assert get_content().llm.photo_album_empty_note.strip() not in prompt
+
+
+def test_current_message_renders_attached_photos_in_same_msg():
+    """A person wrote a message AND sent a picture: the photo must appear in the
+    SAME <msg> as the text, so the bot never loses which photo goes with which
+    caption (the reported confusion). All photos of the message stay together."""
+    builder = PromptBuilder()
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+    prompt = builder.build_user_prompt(
+        "Ванесса что думаешь",
+        [],
+        sender_telegram_id=42,
+        sender_name="Котгаст",
+        current_images=[photo],
+    )
+    # The photo is rendered as an <attachment> child INSIDE the <msg> that
+    # carries the <text> — not as a detached album entry.
+    assert '<msg sender="Котгаст"' in prompt
+    assert "Ванесса что думаешь" in prompt
+    assert '<attachment type="photo"' in prompt
+    # The attachment sits inside the same <msg> block as the text.
+    msg_start = prompt.index("<msg")
+    text_index = prompt.index("Ванесса что думаешь")
+    attach_index = prompt.index('<attachment type="photo"')
+    assert msg_start < text_index < attach_index
+
+
+def test_current_message_renders_all_attached_photos():
+    """If a message carried several photos, ALL of them are rendered with the
+    message text (one <attachment> per photo inside the same <msg>)."""
+    builder = PromptBuilder()
+    photos = [
+        ImageAttachment(
+            data_url=f"data:image/jpeg;base64,{i}",
+            mime_type="image/jpeg",
+            telegram_file_id=f"file-{i}",
+        )
+        for i in range(2)
+    ]
+    prompt = builder.build_user_prompt("вот фото", [], current_images=photos)
+    assert prompt.count('<attachment type="photo"') == 2
+    # Both attachments appear after the text, inside the single current <msg>.
+    assert prompt.index("вот фото") < prompt.index('<attachment type="photo"')
+    assert prompt.count("<msg") == 1
+
+
+def test_current_message_omits_attachments_without_images():
+    builder = PromptBuilder()
+    prompt = builder.build_user_prompt("привет", [])
+    assert '<attachment type="photo"' not in prompt
 
 
 def test_system_prompt_block_order_role_constraints_examples():

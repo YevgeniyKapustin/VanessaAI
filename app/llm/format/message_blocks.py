@@ -59,19 +59,55 @@ def _map_outside_fences(text: str, mapper) -> str:
     return "".join(parts)
 
 
-def _drop_marker_lines(segment: str, marker: str) -> str:
-    lines = [
-        line
-        for line in segment.splitlines(keepends=True)
-        if not _is_marker_line(line, marker)
-    ]
-    return "".join(lines)
+def _marker_token_regexes(marker: str) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    """Regexes matching a complete ``[next]`` token and a truncated unclosed tail
+    (``[next`` / ``[Next `` left by an output cap), both whitespace/case tolerant.
+    Fenced code is handled by the caller, never matched here.
+    """
+    core = re.escape(marker.strip("[]"))
+    return (
+        re.compile(rf"\[\s*{core}\s*\]", re.IGNORECASE),
+        re.compile(rf"\[\s*{core}\s*$", re.IGNORECASE),
+    )
+
+
+def _strip_marker_tokens(text: str, marker: str = DEFAULT_BLOCK_MARKER) -> str:
+    """Remove ``[next]`` marker tokens from ``text``.
+
+    Handles standalone marker lines (the normal case), inline markers the model
+    put on a content line («блок [next] ещё») and truncated unclosed tails
+    («[next» left when the output cap hits mid-marker) — so a control marker
+    never reaches a delivered message or the stored history. Fenced code blocks
+    are left untouched.
+    """
+    complete, truncated = _marker_token_regexes(marker)
+
+    def clean(segment: str) -> str:
+        lines: list[str] = []
+        for raw_line in segment.splitlines(keepends=True):
+            if _is_marker_line(raw_line, marker):
+                continue
+            body = raw_line.rstrip("\r\n")
+            ending = raw_line[len(body):]
+            cleaned = complete.sub("", body)
+            cleaned = truncated.sub("", cleaned)
+            # Keep structural blank lines; drop a line ONLY when it was pure
+            # marker content (an inline `[next]` or a truncated `[next`).
+            if not body.strip() or cleaned.strip():
+                lines.append(re.sub(r" {2,}", " ", cleaned).rstrip() + ending)
+        return "".join(lines)
+
+    return _map_outside_fences(text, clean)
 
 
 def strip_block_markers(reply: str, *, marker: str = DEFAULT_BLOCK_MARKER) -> str:
-    """Remove the ``[next]`` marker lines from a reply, keeping content intact."""
+    """Remove the ``[next]`` marker tokens from a reply, keeping content intact.
+
+    Removes standalone marker lines, inline markers and truncated unclosed tails
+    (see ``_strip_marker_tokens``); fenced code blocks are left untouched.
+    """
     text = reply or ""
-    return _map_outside_fences(text, lambda s: _drop_marker_lines(s, marker)).strip()
+    return _strip_marker_tokens(text, marker).strip()
 
 
 def _split_on_markers(text: str, marker: str) -> list[str]:
@@ -237,15 +273,30 @@ def split_reply_into_blocks(
                 )
             else:
                 result.append(block)
-        return [block for block in result if block]
+        # Sanitize every delivered block so an inline or truncated `[next]` the
+        # model left behind (e.g. the output cap hit mid-marker) never reaches
+        # the chat as a literal control tag.
+        return [
+            block
+            for block in (_strip_marker_tokens(b, marker).strip() for b in result)
+            if block
+        ]
 
     # No explicit blocks (single reply or the model skipped markers): apply the
     # deterministic splitter so long replies still arrive as several messages.
-    # Marker lines are stripped FIRST: when the reply is cut off by the output
-    # limit right after emitting `[next]` (a dangling or standalone marker), the
-    # fallback must never deliver that control marker as a real chat message.
-    return _sentence_fallback(
-        strip_block_markers(text, marker=marker),
-        max_chars=max_chars,
-        target_chars=fallback_target_chars,
-    )
+    # Marker tokens are stripped FIRST: when the reply is cut off by the output
+    # limit right after emitting `[next]` (a dangling, truncated or inline
+    # marker), the fallback must never deliver that control marker as a real
+    # chat message. The post-sanitize below is a belt-and-braces guarantee.
+    return [
+        block
+        for block in (
+            _strip_marker_tokens(b, marker).strip()
+            for b in _sentence_fallback(
+                strip_block_markers(text, marker=marker),
+                max_chars=max_chars,
+                target_chars=fallback_target_chars,
+            )
+        )
+        if block
+    ]

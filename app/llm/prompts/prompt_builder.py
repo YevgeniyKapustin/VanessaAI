@@ -4,7 +4,13 @@ from app.config.content import AppContent, MemeDefContent, get_content
 from app.config.settings import settings
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.users.nicknames import format_aliases_for_prompt
-from app.core.messages import ContextBlock, ContextMessage, PhotoCandidate, WebResult
+from app.core.messages import (
+    ContextBlock,
+    ContextMessage,
+    ImageAttachment,
+    PhotoCandidate,
+    WebResult,
+)
 from app.knowledge.schema import KnowledgeBlock
 from app.llm.photo_request import is_photo_request
 from app.llm.prompts.budget import (
@@ -87,7 +93,17 @@ class PromptBuilder:
         sender_name: str | None = None,
         created_at: datetime | None = None,
         reply_to_text: str | None = None,
+        images: list[ImageAttachment] | None = None,
     ) -> str:
+        """Render the current message as a ``<msg>`` element.
+
+        ``images`` are the photos attached to THIS message (the current turn's
+        own images). They are rendered as ``<attachment>`` children in the SAME
+        ``<msg>`` as the ``<text>`` — the same convention as the session and
+        context blocks — so the model always sees a photo right next to its
+        caption instead of a detached album entry. Every attached photo is
+        rendered (a message that carried several keeps them all together).
+        """
         sender = resolve_sender_display_name(sender_telegram_id, sender_name)
         time_label = format_message_time(created_at or datetime.now())
         msg = render_msg(
@@ -95,6 +111,7 @@ class PromptBuilder:
             sender=sender,
             time=time_label,
             reply_text=reply_to_text,
+            attachments=message_attachment_blocks(images) if images else None,
         )
         return render_messages([msg])
 
@@ -122,6 +139,7 @@ class PromptBuilder:
         reply_to_sender_name: str | None = None,
         has_image: bool = False,
         photo_candidates: list[PhotoCandidate] | None = None,
+        current_images: list[ImageAttachment] | None = None,
     ) -> str:
         llm = self._content.llm
         # Recommended block order for the user prompt (blocks 4-5):
@@ -336,6 +354,7 @@ class PromptBuilder:
             sender_telegram_id=sender_telegram_id,
             sender_name=sender_name,
             reply_to_text=reply_to_text,
+            images=current_images,
         )
         current_header = llm.current_message_header
         if reply_to_text and llm.reply_message_header.strip():

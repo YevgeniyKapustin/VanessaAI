@@ -112,6 +112,7 @@ class DeepSeekLLMProvider:
         reply_to_sender_name: str | None = None,
         images: list[ImageAttachment] | None = None,
         photo_candidates: list[PhotoCandidate] | None = None,
+        current_images: list[ImageAttachment] | None = None,
     ) -> str:
         # Route complex turns (coding / deep synthesis, flagged by the gate)
         # to the upscaled model; a turn with images goes to the vision model;
@@ -144,6 +145,12 @@ class DeepSeekLLMProvider:
             reply_to_sender_name=reply_to_sender_name,
             has_image=uses_vision,
             photo_candidates=photo_candidates,
+            # The current turn's own images render as <attachment> children in
+            # the SAME <msg> as the message text (all photos of a message stay
+            # together), so the model never loses which photo goes with which
+            # caption. ``images`` (all vision images incl. prior session) is
+            # kept separate — it feeds the vision model, not the current <msg>.
+            current_images=current_images,
         )
         message_count = sum(len(block.messages) for block in context_blocks)
         knowledge_chars = sum(

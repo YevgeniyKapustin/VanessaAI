@@ -277,7 +277,13 @@ async def get_incoming_turn_handler(
         meme_decider=container.meme_decider,
         web_search=web_search,
     )
-    compose = ComposeStage(llm, refuse_enabled=config.compose_refuse_enabled)
+    compose = ComposeStage(
+        llm,
+        refuse_enabled=config.compose_refuse_enabled,
+        # Meaning-driven photo-album search (find photos "по смыслу" of the
+        # message, not by the literal words the user typed).
+        messages=messages,
+    )
     finalize = FinalizeStage(
         messages,
         indexing,

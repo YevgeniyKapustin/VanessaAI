@@ -24,12 +24,11 @@ def test_planner_generation_is_more_deterministic():
     params = get_content().llm.generation.planner.to_params()
     assert params.temperature == 0.1
     assert params.top_p == 0.85
-    # The planner runs on a reasoning (V4) model whose chain-of-thought counts
-    # against max_tokens — the budget must cover reasoning + the JSON object,
-    # not just the JSON itself (2048 is plenty, the JSON is ~300 tokens).
+    # The planner is a fast classification step (strict JSON, ~300 tokens) that
+    # deliberately runs WITHOUT reasoning — 2048 comfortably covers the JSON.
     assert params.max_tokens == 2048
-    assert params.reasoning_effort == "low"
-    assert params.to_llm_kwargs()["reasoning_effort"] == "low"
+    assert params.reasoning_effort is None
+    assert "reasoning_effort" not in params.to_llm_kwargs()
 
 
 def test_llm_kwargs_include_sampling_params():
@@ -44,15 +43,13 @@ def test_llm_kwargs_include_sampling_params():
     }
 
 
-def test_planner_reasoning_effort_low_and_forwarded():
-    # The planner runs a reasoning model: it thinks through the flag decision
-    # before emitting the JSON (see turn_planner_prompt "How to decide"), so
-    # reasoning_effort="low" is forwarded to the DeepSeek V4 API. The chain of
-    # thought lives in reasoning_content, separate from content — the JSON parse
-    # stays clean.
+def test_planner_does_not_configure_reasoning():
+    # The planner must NOT request a chain of thought: reasoning_effort stays
+    # unset (None → the API's default normal mode), so the flag-classification
+    # step does not eat response time and the parameter never reaches the API.
     params = get_content().llm.generation.planner.to_params()
-    assert params.reasoning_effort == "low"
-    assert params.to_llm_kwargs()["reasoning_effort"] == "low"
+    assert params.reasoning_effort is None
+    assert "reasoning_effort" not in params.to_llm_kwargs()
 
 
 def test_reasoning_effort_sent_when_configured():

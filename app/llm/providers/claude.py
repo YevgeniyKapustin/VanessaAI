@@ -89,14 +89,17 @@ class ClaudeLLMProvider:
         reply_to_sender_name: str | None = None,
         images: list | None = None,
         photo_candidates: list | None = None,
+        current_images: list | None = None,
     ) -> str:
-        # ``uses_pro_model`` (DeepSeek pro routing), ``images`` (vision) and
-        # ``photo_candidates`` (photo album) are routing signals; accepted
-        # (no-op) here for protocol compatibility so both providers share one
-        # signature. Vision is DeepSeek-only for now.
+        # ``uses_pro_model`` (DeepSeek pro routing), ``images`` (vision),
+        # ``photo_candidates`` (photo album) and ``current_images`` (photos on
+        # the current message) are routing signals; accepted (no-op) here for
+        # protocol compatibility so both providers share one signature. Vision
+        # is DeepSeek-only for now.
         del uses_pro_model
         del images
         del photo_candidates
+        del current_images
         system = system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(
             user_message,

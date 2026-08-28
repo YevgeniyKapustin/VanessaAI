@@ -321,15 +321,12 @@ generation:
   planner:
     temperature: 0.1
     top_p: 0.85
-    # The planner runs on a reasoning model: it thinks through the flag decision
-    # (see turn_planner_prompt "How to decide" / "Decision order") before
-    # emitting the JSON. On DeepSeek the chain of thought counts AGAINST
-    # max_tokens, so the budget must cover reasoning + the JSON object — 2048 is
-    # plenty for that (the JSON itself is ~300 tokens). "low" is enough: this is
-    # a classification task, not open-ended reasoning — raising it costs latency
-    # without a proportional gain in flag accuracy.
+    # The planner is a fast classification step (strict JSON output, ~300
+    # tokens) and deliberately runs WITHOUT reasoning: reasoning_effort is left
+    # unset (None → the API's default normal mode, the parameter is never sent).
+    # Forcing a chain of thought here (even "low") ate too much response time
+    # for a flag-classification task without a proportional gain in accuracy.
     max_tokens: 2048
-    reasoning_effort: low
     presence_penalty: 0.0
     frequency_penalty: 0.0
 

@@ -146,3 +146,34 @@ def test_split_does_not_leak_marker_inside_content():
     blocks = split_reply_into_blocks(reply)
     assert blocks == ["Один", "Два"]
     assert all("[next]" not in block for block in blocks)
+
+
+def test_split_does_not_leak_truncated_marker():
+    # The output cap cut the model mid-marker: a dangling `[next` with no closing
+    # bracket must not reach a delivered block (the marker regex never matches an
+    # unclosed tail, so the sanitizer has to drop it).
+    reply = "Первый блок\n[next]\nВторой блок обрезан\n[next"
+    blocks = split_reply_into_blocks(reply)
+    assert blocks == ["Первый блок", "Второй блок обрезан"]
+    assert all("[" not in block for block in blocks)
+
+
+def test_split_does_not_leak_inline_marker():
+    # The model put `[next]` on a content line instead of its own line — strip it
+    # from the delivered text, never send the control tag as a chat message.
+    reply = "Первый блок [next] Второй блок"
+    blocks = split_reply_into_blocks(reply)
+    assert blocks == ["Первый блок Второй блок"]
+    assert all("[next]" not in block for block in blocks)
+
+
+def test_strip_block_markers_removes_inline_and_truncated():
+    reply = "А [next] Б\n[next\nВ"
+    assert strip_block_markers(reply) == "А Б\nВ"
+
+
+def test_strip_block_markers_truncated_keeps_code_fences():
+    # A truncated `[next` inside a fenced code block is content, not a marker —
+    # it must survive, only the prose-level marker is removed.
+    reply = "текст [next\n```\n[next\n```\nконец"
+    assert strip_block_markers(reply) == "текст\n```\n[next\n```\nконец"

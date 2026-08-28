@@ -2,6 +2,7 @@ from app.llm.format.answer_tag import (
     extract_answer,
     extract_ignore_reason,
     has_ignore_marker,
+    strip_control_tags,
 )
 
 
@@ -131,3 +132,45 @@ def test_extract_ignore_reason_empty_without_marker():
     assert extract_ignore_reason("он написал [ignore] в чате") == ""
     assert extract_ignore_reason("") == ""
     assert extract_ignore_reason(None) == ""
+
+
+def test_extract_answer_angle_bracket_pair():
+    # A reasoning model emitted `<answer>...</answer>` markup instead of the
+    # bracket tag — the inner content is the reply, the tags must not leak.
+    raw = "тут надо ответить про крабера\n<answer>Крабер — местный, своя пещера</answer>"
+    reply, reasoning = extract_answer(raw)
+    assert reply == "Крабер — местный, своя пещера"
+    assert "<answer>" not in reply
+    assert "крабера" in reasoning
+
+
+def test_extract_answer_bracket_wins_over_stray_angle_markup():
+    # The bracket `[answer]` split takes priority: a stray `<answer>...</answer>`
+    # inside a properly tagged reply is residual markup stripped from the reply,
+    # never mistaken for the reply itself.
+    raw = "рассуждение\n[answer]\nКрабер — местный <answer>лишний тег</answer>"
+    reply, _ = extract_answer(raw)
+    assert reply == "Крабер — местный лишний тег"
+    assert "<answer>" not in reply
+
+
+def test_strip_control_tags_removes_residual_answer_tags():
+    text = "Привет [answer] мир <answer>ещё</answer> конец"
+    assert strip_control_tags(text) == "Привет  мир ещё конец"
+
+
+def test_strip_control_tags_preserves_inline_ignore_content():
+    # An `[ignore]` inside a sentence is CONTENT («он написал [ignore] в чате»),
+    # not a control signal — the refusal path handles real markers upstream,
+    # inline ones are preserved verbatim.
+    text = "он написал [ignore] в чате, я молчу"
+    assert strip_control_tags(text) == "он написал [ignore] в чате, я молчу"
+
+
+def test_strip_control_tags_case_insensitive():
+    assert strip_control_tags("[ANSWER] <ANSWER>x</ANSWER>") == "x"
+
+
+def test_strip_control_tags_keeps_code_fences():
+    text = "текст\n```\n[answer]\n<answer>x</answer>\n```\nконец"
+    assert strip_control_tags(text) == "текст\n```\n[answer]\n<answer>x</answer>\n```\nконец"

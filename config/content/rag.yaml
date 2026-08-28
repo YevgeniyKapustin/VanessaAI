@@ -51,14 +51,15 @@ turn_planner_prompt: |
     "reason": ""
   }}
 
-  ## How to decide (reason first)
-  You run with a reasoning model: use your chain of thought to work through the
-  decisions below BEFORE writing the JSON. Reason about the real intent of the
-  message and the recent context, not the surface wording. Your OUTPUT must be
-  ONLY the JSON object — never write the reasoning into the reply, no prose
-  around it («думаю», «итак», «в общем»), no markdown fences. If the right
-  answer is "stay silent", express it through the flags (skip=true,
-  should_reply=false), not through an explanation.
+  ## How to decide
+  Work through the decisions below and emit the JSON directly — no chain of
+  thought, no reasoning preamble (the planner runs in the API's default normal
+  mode, so just classify and output). Judge the real intent of the message and
+  the recent context, not the surface wording. Your OUTPUT must be ONLY the
+  JSON object — never any reasoning or prose around it («думаю», «итак»,
+  «в общем»), no markdown fences. If the right answer is "stay silent",
+  express it through the flags (skip=true, should_reply=false), not through an
+  explanation.
 
   Defaults-first principle: start from the conservative baseline —
   should_reply as the evidence dictates, skip=false, tone="neutral",

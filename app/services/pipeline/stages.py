@@ -3,7 +3,12 @@ import time
 
 from app.config.content import get_content
 from app.config.settings import settings
-from app.core.messages import ImageAttachment, PhotoCandidate
+from app.core.messages import (
+    ContextMessage,
+    ImageAttachment,
+    PhotoCandidate,
+    stored_to_context,
+)
 from app.core.protocols import (
     ContextRetrieverProtocol,
     LLMProviderProtocol,
@@ -31,7 +36,11 @@ from app.knowledge.metrics.feedback import (
 )
 from app.knowledge.metrics.retriever import MetricsRetriever
 from app.knowledge.retriever import KnowledgeRetriever
-from app.llm.format.answer_tag import extract_ignore_reason, has_ignore_marker
+from app.llm.format.answer_tag import (
+    extract_ignore_reason,
+    has_ignore_marker,
+    strip_control_tags,
+)
 from app.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
 from app.llm.format.photo_tag import extract_photo_index
 from app.llm.format.reply_format import strip_trailing_periods
@@ -546,10 +555,18 @@ def _photo_caption_for(message) -> str:
     return settings.vision_photo_placeholder
 
 
-def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
+def _collect_photo_candidates(
+    ctx: TurnPipelineContext,
+    photo_messages: list[ContextMessage] | None = None,
+) -> list[PhotoCandidate]:
     """Assemble the "photo album" — photos the bot could re-send.
 
-    Candidates come from two sources, both meaning-driven:
+    Candidates come from three sources, all meaning-driven:
+    - ``photo_messages`` — the dedicated photo-by-meaning search
+      (``search_photo_messages`` FTS over the caption-inclusive search_vector)
+      run against the REWRITTEN query, so a photo is found by the MEANING of
+      the turn ("скинь то фото где кот" -> the caption "рыжий кот на диване"),
+      not by the literal words the user typed;
     - messages the RAG retrieval surfaced for THIS turn (``ctx.context_blocks``) —
       the "по смыслу" leg (photo captions are folded into the FTS search_vector);
     - recent session messages with attachments (so "верни то фото" without a
@@ -576,7 +593,10 @@ def _collect_photo_candidates(ctx: TurnPipelineContext) -> list[PhotoCandidate]:
                 )
             )
 
-    # RAG context first (meaning match), then the recent session (recency).
+    # Meaning-search hits first (the strongest "по смыслу" match), then the RAG
+    # context (meaning match), then the recent session (recency).
+    for message in photo_messages or []:
+        _add(message)
     for block in ctx.context_blocks:
         for message in block.messages:
             _add(message)
@@ -609,10 +629,15 @@ class ComposeStage:
         *,
         refuse_enabled: bool = True,
         refuse_min_occurrences: int = 2,
+        messages: MessageRepositoryProtocol | None = None,
     ) -> None:
         self._llm = llm
         self._refuse_enabled = refuse_enabled
         self._refuse_min_occurrences = max(2, refuse_min_occurrences)
+        # Message repo used for the meaning-driven photo-album search
+        # (``search_photo_messages``): finds photo messages whose caption matches
+        # the MEANING of the turn, not the literal text the user typed.
+        self._messages = messages
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         # Compose-stage refusal, defense-in-depth for spam: the gate usually
@@ -661,8 +686,37 @@ class ComposeStage:
         # provider routes the call to the vision model only when images are present.
         images = _collect_turn_images(ctx) if settings.vision_enabled else []
         # Photo album: photos the bot could re-send, matched to the context by
-        # RAG "по смыслу" + the recent session.
-        photo_candidates = _collect_photo_candidates(ctx) if settings.vision_enabled else []
+        # RAG "по смыслу" + the recent session. The dedicated meaning-search leg
+        # (``search_photo_messages``) finds photo messages whose caption matches
+        # the REWRITTEN query — so a bare photo is found by the MEANING of the
+        # turn ("скинь то фото где кот" -> the caption "рыжий кот на диване"),
+        # not by the literal words the user typed. Fail-open: a search error
+        # must never block the reply.
+        photo_messages: list[ContextMessage] = []
+        if (
+            settings.vision_enabled
+            and self._messages is not None
+            and ctx.turn_plan is not None
+        ):
+            meaning_query = self._semantic_query(ctx.turn_plan, ctx.turn.message)
+            try:
+                stored = await self._messages.search_photo_messages(
+                    meaning_query,
+                    limit=settings.vision_photo_candidates * 2,
+                )
+                photo_messages = [stored_to_context(m) for m in stored]
+            except Exception:
+                logger.exception(
+                    "photo_meaning_search_failed request_id=%s query=%r",
+                    get_request_id(),
+                    meaning_query,
+                )
+                photo_messages = []
+        photo_candidates = (
+            _collect_photo_candidates(ctx, photo_messages)
+            if settings.vision_enabled
+            else []
+        )
         # Did the user explicitly ask for a photo? Drives the honesty directives
         # (marker required / honest refusal) and the missed-request metric below.
         photo_requested = is_photo_request(ctx.turn.message)
@@ -689,6 +743,12 @@ class ComposeStage:
             reply_to_sender_name=ctx.turn.reply_to_sender_name,
             images=images or None,
             photo_candidates=photo_candidates or None,
+            # The current message's OWN images render inside its <msg> as
+            # <attachment> children (all photos stay with the text), so the
+            # model never loses which photo goes with which caption. ``images``
+            # (incl. prior-session vision) stays separate — it feeds the vision
+            # model, not the current <msg>.
+            current_images=list(ctx.turn.images) or None,
         )
         # The compose model is instructed to output the tag `[ignore]` (plus an
         # optional short debug-only reason after it — never an `[answer]` or a
@@ -769,6 +829,20 @@ class ComposeStage:
             ctx.llm_ms,
         )
         return True
+
+    @staticmethod
+    def _semantic_query(turn_plan, message: str) -> str:
+        """Prefer the composed archive query, then the embedding query, then raw.
+
+        Shared with ``RetrieveStage``: the photo-by-meaning search must run on
+        the REWRITTEN query (the MEANING of the turn), not the literal message
+        the user typed — that is what makes a bare photo (whose caption carries
+        the meaning) findable "по смыслу".
+        """
+        for candidate in (turn_plan.knowledge_query, turn_plan.text):
+            if candidate and candidate.strip():
+                return candidate.strip()
+        return message.strip()
 
     def _refuse(
         self,
@@ -851,6 +925,11 @@ class FinalizeStage:
             await self._indexing.index_now(ctx.user_msg)
 
         clean_reply, sticker_tag = extract_sticker_tag(ctx.reply)
+        # Final control-tag safety net: a reasoning model may emit [answer] /
+        # <answer> / [ignore] in a form the provider's splitter missed — never
+        # let a control tag reach the chat. The [next] block marker is left for
+        # the block splitter below, which needs it to separate the messages.
+        clean_reply = strip_control_tags(clean_reply)
         # Split the reply into the individual Telegram messages to send (on the
         # marker-containing text, so the model's explicit `[next]` blocks drive
         # the split; a deterministic sentence-aware split is the fallback when

@@ -11,10 +11,10 @@ class LLMGenerationParams:
     frequency_penalty: float = 0.0
     # Reasoning mode for models that support it. ``None`` (default) = the API's
     # normal mode — the parameter is NOT sent. Configured per stage in
-    # config/content/llm.yaml (e.g. the planner uses "low" to reason through its
-    # flag decisions, the composer "high" for reply quality); stages that leave
-    # it unset stay in the default normal mode and the parameter never reaches
-    # the API.
+    # config/content/llm.yaml (only the composer uses it — "high" for reply
+    # quality); the planner deliberately leaves it unset so the gate stays fast,
+    # and any stage that leaves it unset stays in the default normal mode and
+    # the parameter never reaches the API.
     reasoning_effort: str | None = None
 
     def to_llm_kwargs(self) -> dict[str, Any]:

@@ -238,6 +238,7 @@ class LLMProviderProtocol(Protocol):
         reply_to_sender_name: str | None = None,
         images: list[ImageAttachment] | None = None,
         photo_candidates: list[PhotoCandidate] | None = None,
+        current_images: list[ImageAttachment] | None = None,
     ) -> str: ...
 
 

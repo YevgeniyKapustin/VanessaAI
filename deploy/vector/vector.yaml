@@ -1,0 +1,36 @@
+# Compose shipper: docker_logs → Loki. Kubernetes uses
+# deploy/k8s/logging/vector.yaml (kubernetes_logs from /var/log/pods).
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  docker_logs:
+    type: docker_logs
+    exclude_containers:
+      - vector
+      - loki
+
+transforms:
+  parse_json:
+    type: remap
+    inputs: [docker_logs]
+    source: |
+      .service = .label."com.docker.compose.service" ?? .container_name
+      parsed, err = parse_json(.message)
+      if err == null {
+        . = merge(., parsed)
+      }
+      del(.label)
+
+sinks:
+  loki:
+    type: loki
+    inputs: [parse_json]
+    endpoint: http://loki:3100
+    out_of_order_action: accept
+    encoding:
+      codec: json
+    labels:
+      service: "{{ service }}"
+      stream: "{{ stream }}"

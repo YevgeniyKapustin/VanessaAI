@@ -4,7 +4,6 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-import yaml
 
 from app.config.settings import settings
 from app.ingest.user_backfill import load_nicknames

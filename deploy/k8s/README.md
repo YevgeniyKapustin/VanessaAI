@@ -144,6 +144,18 @@ docker build -t vanessa-app:local .
   or a single `ClusterRole`-scoped prometheus. `prometheus/rules.yml` already
   contains the DLQ / consumer-lag / worker-backlog alerts.
 - Langfuse stays as-is (compose or managed). Not in these manifests.
+- Logs are cloud-native: apps write JSON to stdout (`LOG_JSON=true`, no files).
+  A Vector DaemonSet (`deploy/k8s/logging`) tails `/var/log/pods` and ships to
+  Loki. Grafana Explore uses the Loki datasource (compose: `http://loki:3100`;
+  cluster: `kubectl -n logging port-forward svc/loki 3100:3100`).
+
+```bash
+kubectl apply -k deploy/k8s/logging
+kubectl -n logging get pods
+kubectl -n logging port-forward svc/loki 3100:3100
+```
+
+`kubectl apply -k deploy/k8s/` and the desktop overlay already include logging.
 
 ## Applying (Docker Desktop)
 

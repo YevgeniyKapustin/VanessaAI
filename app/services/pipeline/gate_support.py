@@ -14,7 +14,7 @@ from app.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtoco
 from app.decision.gate.user_ignore import (
     apply_owner_ignore_command,
 )
-from app.decision.models import DecisionAction, DecisionReason
+from app.decision.models import DecisionAction
 from app.services.orchestrator.orchestrator_config import OrchestratorConfig
 from app.services.pipeline.context import TurnPipelineContext
 

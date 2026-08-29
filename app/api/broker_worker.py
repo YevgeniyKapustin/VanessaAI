@@ -10,7 +10,7 @@ private reply stream.
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from typing import Any
 
 from app.broker.backends import Delivery
@@ -37,7 +37,6 @@ def default_handler_builder(session) -> IncomingTurnHandlerProtocol:
     from app.config import settings
     from app.db.repository import MessageRepository, UserRepository
     from app.db.session import async_session_factory
-    from app.db.uow import SqlAlchemyUnitOfWork
     from app.services.indexing.message_indexing import MessageIndexingService
     from app.services.turn_metrics import turn_metrics
 

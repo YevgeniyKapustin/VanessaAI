@@ -78,7 +78,6 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 
 async def test_knowledge_vault_find_over_http(tmp_path) -> None:
     """MCP contract test: the knowledge server resolves a person alias over the wire."""
-    import json
 
     from app.mcp.client import StreamableHttpMcpClient
 

@@ -12,7 +12,6 @@ from __future__ import annotations
 import html
 import logging
 import re
-from typing import Any
 
 import httpx
 

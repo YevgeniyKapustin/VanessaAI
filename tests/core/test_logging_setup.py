@@ -1,8 +1,11 @@
+import json
 import logging
 import sys
 from pathlib import Path
 
+import app.core.logging_setup as logging_setup
 from app.core.logging_setup import (
+    JsonFormatter,
     LoguruStyleFormatter,
     RequestIdFilter,
     ServiceNameFilter,
@@ -154,3 +157,64 @@ def test_create_file_handler_rotates(tmp_path: Path) -> None:
         assert backups, "expected at least one rotated backup"
     finally:
         handler.close()
+
+
+def test_json_formatter_emits_one_object() -> None:
+    formatter = JsonFormatter()
+    record = _make_record()
+    record.service = "worker"
+    record.request_id = "req-1"
+    record.created = 1_700_000_000.0
+
+    payload = json.loads(formatter.format(record))
+
+    assert payload["service"] == "worker"
+    assert payload["request_id"] == "req-1"
+    assert payload["level"] == "INFO"
+    assert payload["message"] == "message_received chat_id=-100"
+    assert payload["logger"] == "app.bot.handlers.messages"
+    assert payload["timestamp"].endswith("Z")
+
+
+def test_json_formatter_includes_exception() -> None:
+    formatter = JsonFormatter()
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        record = logging.LogRecord(
+            name="app.worker.main",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=10,
+            msg="task_failed id=%s",
+            args=("abc",),
+            exc_info=sys.exc_info(),
+            func="handle",
+        )
+    record.service = "worker"
+    record.request_id = "-"
+
+    payload = json.loads(formatter.format(record))
+
+    assert payload["message"] == "task_failed id=abc"
+    assert "ValueError: boom" in payload["exception"]
+
+
+def test_configure_logging_json_to_stdout(monkeypatch, capsys) -> None:
+    logging_setup._configured_service = None
+    logging.getLogger().handlers.clear()
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "log_json", True)
+    monkeypatch.setattr(settings, "log_file_enabled", False)
+    try:
+        configure_logging("bot", level="INFO")
+        logging.getLogger("app.test_json").info("hello json %s", 7)
+        line = capsys.readouterr().out.strip().splitlines()[-1]
+        payload = json.loads(line)
+        assert payload["message"] == "hello json 7"
+        assert payload["service"] == "bot"
+        assert payload["level"] == "INFO"
+    finally:
+        logging_setup._configured_service = None
+        logging.getLogger().handlers.clear()

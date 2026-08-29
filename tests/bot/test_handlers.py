@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from aiogram.enums import ChatType, ParseMode
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
 from app.bot.container import BotServices, create_bot_services
@@ -19,6 +19,7 @@ from app.bot.handlers.messages import (
 )
 from app.bot.messages.response import ChatProcessResult
 from app.config.content import get_content, get_photo_placeholder
+from app.config.settings import settings
 from tests.bot.test_bot_message import make_telegram_message
 
 

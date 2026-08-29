@@ -54,7 +54,6 @@ def test_resolve_sender_uses_vault_telegram_username(monkeypatch, tmp_path):
     # The People card declares that the Telegram @username «nu_ya» (and the
     # display name «Ну я») are the same person as «Гриша» — the sender renders
     # consistently from the vault (the single source of truth).
-    from pathlib import Path
 
     from app.core.users import nicknames
 

@@ -1,6 +1,7 @@
 import pytest
 
 from app.core.messages import ContextMessage
+from app.decision.engine import DecisionEngine
 from app.decision.detectors.intent import IntentDetector
 from app.decision.models import DecisionAction, DecisionReason
 from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
@@ -129,9 +130,7 @@ def build_engine(
     relevance_score: float,
     *,
     block_consecutive: bool = False,
-) -> "DecisionEngine":
-    from app.decision.engine import DecisionEngine
-
+) -> DecisionEngine:
     return DecisionEngine(
         intent_detector=intent_detector,
         trigger_checker=trigger_checker,

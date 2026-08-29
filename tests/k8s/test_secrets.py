@@ -71,6 +71,7 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
         "REDIS_AUTH": "compose-only",
         "LANGFUSE_REDIS_AUTH": "langfuse-only",
         "LOG_LEVEL": "DEBUG",
+        "LOG_FILE_ENABLED": "true",
         "POSTGRES_HOST": "postgres",
     }
     selected = select_config_values(
@@ -85,6 +86,8 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
     assert selected["QDRANT_HOST"] == "host.docker.internal"
     assert selected["LANGFUSE_HOST"] == "http://host.docker.internal:3000"
     assert selected["TRANSPORT"] == CLUSTER_OVERRIDES["TRANSPORT"]
+    assert selected["LOG_JSON"] == "true"
+    assert selected["LOG_FILE_ENABLED"] == "false"
     assert "TELEGRAM_BOT_TOKEN" not in selected
     assert "REDIS_AUTH" not in selected
     assert "LANGFUSE_REDIS_AUTH" not in selected

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import json
 import logging
 import logging.handlers
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 from app.core.request_context import get_request_id
-
-ServiceName = Literal["api", "bot", "import"]
 
 _NOISY_LOGGERS = (
     "httpx",
@@ -20,7 +19,7 @@ _NOISY_LOGGERS = (
     "sentence_transformers",
 )
 
-_configured_service: ServiceName | None = None
+_configured_service: str | None = None
 
 
 class _Ansi:
@@ -48,7 +47,7 @@ class RequestIdFilter(logging.Filter):
 
 
 class ServiceNameFilter(logging.Filter):
-    def __init__(self, service: ServiceName) -> None:
+    def __init__(self, service: str) -> None:
         super().__init__()
         self._service = service
 
@@ -130,6 +129,36 @@ class LoguruStyleFormatter(logging.Formatter):
         )
 
 
+class JsonFormatter(logging.Formatter):
+    """One JSON object per line for Vector / Loki / Elasticsearch."""
+
+    def formatTime(
+        self,
+        record: logging.LogRecord,
+        datefmt: str | None = None,
+    ) -> str:
+        del datefmt
+        created = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        return created.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+    def format(self, record: logging.LogRecord) -> str:
+        if record.exc_info and not record.exc_text:
+            record.exc_text = self.formatException(record.exc_info)
+        payload = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "service": getattr(record, "service", "-"),
+            "request_id": getattr(record, "request_id", "-"),
+            "logger": record.name,
+            "func": record.funcName,
+            "line": record.lineno,
+            "message": record.getMessage(),
+        }
+        if record.exc_text:
+            payload["exception"] = record.exc_text
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+
 def _enable_windows_ansi() -> None:
     if sys.platform != "win32":
         return
@@ -146,12 +175,13 @@ def _enable_windows_ansi() -> None:
 
 
 def create_file_handler(
-    service: ServiceName,
+    service: str,
     level: str,
     log_dir: Path,
     *,
     max_bytes: int,
     backup_count: int,
+    formatter: logging.Formatter | None = None,
 ) -> logging.Handler:
     """Build a rotating file handler writing plain (uncolored) log lines."""
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -164,12 +194,12 @@ def create_file_handler(
     handler.setLevel(level)
     handler.addFilter(RequestIdFilter())
     handler.addFilter(ServiceNameFilter(service))
-    handler.setFormatter(LoguruStyleFormatter(colorize=False))
+    handler.setFormatter(formatter or LoguruStyleFormatter(colorize=False))
     return handler
 
 
 def configure_logging(
-    service: ServiceName,
+    service: str,
     level: str | None = None,
 ) -> None:
     global _configured_service
@@ -180,10 +210,15 @@ def configure_logging(
 
     _enable_windows_ansi()
     log_level = (level or settings.log_level).upper()
+    formatter: logging.Formatter
+    if settings.log_json:
+        formatter = JsonFormatter()
+    else:
+        formatter = LoguruStyleFormatter()
     handler = logging.StreamHandler(sys.stdout)
     handler.addFilter(RequestIdFilter())
     handler.addFilter(ServiceNameFilter(service))
-    handler.setFormatter(LoguruStyleFormatter())
+    handler.setFormatter(formatter)
 
     root = logging.getLogger()
     root.handlers.clear()
@@ -192,6 +227,10 @@ def configure_logging(
 
     if settings.log_file_enabled:
         file_level = (settings.log_file_level or settings.log_level).upper()
+        file_formatter: logging.Formatter = (
+            JsonFormatter() if settings.log_json
+            else LoguruStyleFormatter(colorize=False)
+        )
         try:
             root.addHandler(
                 create_file_handler(
@@ -200,6 +239,7 @@ def configure_logging(
                     Path(settings.log_dir),
                     max_bytes=settings.log_file_max_bytes,
                     backup_count=settings.log_file_backup_count,
+                    formatter=file_formatter,
                 )
             )
         except OSError:

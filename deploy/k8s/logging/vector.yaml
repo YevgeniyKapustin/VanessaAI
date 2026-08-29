@@ -1,0 +1,40 @@
+# Cluster agent: kubelet files under /var/log/pods → Loki.
+# extra_label_selector limits collection to Vanessa workloads.
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  kubernetes_logs:
+    type: kubernetes_logs
+    extra_label_selector: app=vanessa
+
+transforms:
+  parse_json:
+    type: remap
+    inputs: [kubernetes_logs]
+    source: |
+      .namespace = .kubernetes.pod_namespace
+      .pod = .kubernetes.pod_name
+      .container = .kubernetes.container_name
+      .service = .kubernetes.pod_labels.component || .container
+      parsed, err = parse_json(.message)
+      if err == null {
+        . = merge(., parsed)
+      }
+      del(.kubernetes)
+      del(.file)
+
+sinks:
+  loki:
+    type: loki
+    inputs: [parse_json]
+    endpoint: http://loki.logging.svc.cluster.local:3100
+    out_of_order_action: accept
+    encoding:
+      codec: json
+    labels:
+      namespace: "{{ namespace }}"
+      service: "{{ service }}"
+      container: "{{ container }}"
+      stream: "{{ stream }}"

@@ -40,6 +40,8 @@ CLUSTER_OVERRIDES: dict[str, str] = {
     "MCP_WEBSEARCH_URL": "http://mcp-websearch:8101/mcp",
     "MCP_KNOWLEDGE_URL": "http://mcp-knowledge:8102/mcp",
     "MCP_VISION_URL": "http://mcp-vision:8103/mcp",
+    "LOG_JSON": "true",
+    "LOG_FILE_ENABLED": "false",
 }
 
 

@@ -10,7 +10,6 @@ from app.contracts.messages import (
     TaskMessage,
     TurnReply,
     TurnRequest,
-    TurnStarted,
 )
 from app.core.request_context import get_planning_started_signal, get_request_id
 from app.core.turn import ConversationTurnResult

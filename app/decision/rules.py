@@ -7,7 +7,6 @@ from app.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
     is_third_party_about_bot,
-    is_unsolicited_remark,
     last_prior_role,
     listen_window_warrants_reply,
 )

@@ -1,7 +1,7 @@
 from app.core.messages import ContextMessage
 from app.decision.context import DecisionContext, DecisionRule
 from app.decision.metrics_rule import LowAttitudeRule, SenderMetricsRule
-from app.decision.models import DecisionAction, DecisionReason, DecisionResult
+from app.decision.models import DecisionReason, DecisionResult
 from app.knowledge.metrics.schema import PersonMetrics
 from app.decision.protocols import (
     IntentDetectorProtocol,

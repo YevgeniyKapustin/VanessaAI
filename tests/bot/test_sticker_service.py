@@ -119,7 +119,6 @@ async def test_send_if_any_swallows_telegram_error():
 
 @pytest.mark.asyncio
 async def test_register_reply_increments_counter():
-    message = make_telegram_message()
     service, decider = _service()
     before = decider.messages_since_sticker(-100123)
     service.register_reply(-100123)

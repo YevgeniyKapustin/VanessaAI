@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import settings
 from app.db.base import Base
-from app.db.models import Message, OutboxEvent, User
+from app.db.models import Message, OutboxEvent, User  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

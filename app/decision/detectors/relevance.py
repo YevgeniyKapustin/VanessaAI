@@ -1,5 +1,4 @@
 from app.core.protocols import EmbeddingProviderProtocol, VectorStoreProtocol
-from app.decision.protocols import RelevanceCheckerProtocol
 
 
 class QdrantRelevanceChecker:

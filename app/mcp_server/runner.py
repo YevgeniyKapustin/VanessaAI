@@ -19,6 +19,7 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 
+from app.core.logging_setup import configure_logging
 from app.mcp_server import knowledge, vision, websearch
 
 _SERVERS = {
@@ -57,6 +58,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--path", default="/mcp")
     args = parser.parse_args()
+    configure_logging(f"mcp-{args.server}")
 
     app = build_app(args.server, path=args.path)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

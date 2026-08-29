@@ -10,7 +10,6 @@ propagation.
 import asyncio
 
 import fakeredis.aioredis
-import pytest
 from aiogram import Bot
 
 from app.api import broker_worker as bw

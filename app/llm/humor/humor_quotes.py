@@ -72,7 +72,6 @@ def _theme_repeat_count(text: str, corpus: list[str]) -> int:
         return 0
 
     repeats = 0
-    normalized_text = _normalize(text)
     for other in corpus:
         if other == text:
             continue

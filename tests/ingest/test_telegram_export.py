@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 
-import pytest
 
 from app.ingest.telegram_export import (
     export_id_to_chat_id,

@@ -14,7 +14,7 @@ import contextlib
 import logging
 from uuid import uuid4
 
-from app.broker.redis_streams import RedisDedupGuard, RedisStreamBroker
+from app.broker.redis_streams import RedisStreamBroker
 from app.broker.streams import BrokerStreams
 from app.config import settings
 from app.core.logging_setup import configure_logging

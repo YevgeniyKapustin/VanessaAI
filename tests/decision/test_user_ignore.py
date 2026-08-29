@@ -1,4 +1,3 @@
-import pytest
 
 from app.core.messages import ContextMessage
 from app.decision.gate.bot_names import text_mentions_bot_name

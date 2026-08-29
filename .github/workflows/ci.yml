@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      REQUIRED_USER_TELEGRAM_ID: "123456789"
+      REQUIRED_USER_TELEGRAM_ID: ${{ secrets.REQUIRED_USER_TELEGRAM_ID || '123456789' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -20,8 +20,22 @@ jobs:
       - name: Install Poetry
         run: pip install poetry==2.1.1
 
+      - name: Set up Poetry Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+
       - name: Install dependencies
-        run: poetry install
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Run Ruff Linter
+        run: poetry run ruff check .
 
       - name: Run tests
         run: poetry run pytest tests/ -q

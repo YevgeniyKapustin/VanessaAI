@@ -273,7 +273,6 @@ async def _typing_on_signal(
     early-return paths. Telegram-side failures only drop the indicator, never
     the reply.
     """
-    trigger = asyncio.Event()
     typing_task: asyncio.Task | None = None
 
     async def _start() -> None:

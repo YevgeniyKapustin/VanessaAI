@@ -1,7 +1,4 @@
-import fakeredis.aioredis
-import pytest
 
-from app.broker.redis_streams import RedisStreamBroker
 from app.contracts.messages import TaskKind, TaskMessage
 from app.worker.handlers import (
     IndexMessageHandler,

@@ -6,15 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.container import get_app_container
 from app.config.settings import settings
 from app.core.protocols import (
-    ContextRetrieverProtocol,
     EmbeddingProviderProtocol,
     IncomingTurnHandlerProtocol,
     LLMProviderProtocol,
-    MessageIndexerProtocol,
     MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
     TurnMetricsProtocol,
-    TurnQueryProtocol,
     UnitOfWorkProtocol,
     UserRepositoryProtocol,
     VectorStoreProtocol,

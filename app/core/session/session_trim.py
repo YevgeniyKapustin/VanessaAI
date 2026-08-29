@@ -12,7 +12,6 @@ def trim_session_by_idle_gap(
     if not messages or max_idle_seconds <= 0:
         return messages
 
-    current = now or datetime.now(timezone.utc)
     result = [messages[-1]]
     for index in range(len(messages) - 2, -1, -1):
         older = messages[index]

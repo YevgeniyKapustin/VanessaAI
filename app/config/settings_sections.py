@@ -59,6 +59,7 @@ class SharedSettings(BaseSettings):
     # --- Logging -------------------------------------------------------------
     log_level: str = "INFO"
     log_dir: str = "logs"
+    log_json: bool = False
     log_file_enabled: bool = True
     log_file_max_bytes: int = 5_242_880  # 5 MiB per file before rotation
     log_file_backup_count: int = 5

@@ -1,0 +1,4 @@
+# ConfigMaps embed these files as-is; CRLF breaks Loki/Vector YAML in-cluster.
+deploy/k8s/logging/*.yaml text eol=lf
+deploy/loki/*.yaml text eol=lf
+deploy/vector/*.yaml text eol=lf

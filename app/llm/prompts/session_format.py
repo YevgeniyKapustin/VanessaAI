@@ -1,4 +1,4 @@
-from app.config.content import AppContent, get_content
+from app.config.content import AppContent
 from app.core.users.display_names import resolve_sender_display_name
 from app.core.messages import ContextMessage
 from app.llm.prompts.context_format import format_message_time

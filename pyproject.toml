@@ -42,6 +42,7 @@ priority = "explicit"
 pytest = ">=8.3.0"
 pytest-asyncio = ">=0.24.0"
 pytest-cov = "^7.1.0"
+ruff = ">=0.8.0"
 # In-memory Redis for broker tests (no server required).
 fakeredis = ">=2.23"
 
@@ -60,3 +61,11 @@ source = ["app"]
 show_missing = true
 precision = 0
 fail_under = 90
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["E402"]
+"alembic/env.py" = ["F401"]

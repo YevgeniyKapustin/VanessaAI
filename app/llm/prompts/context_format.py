@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.core.messages import ContextBlock, ContextMessage
+from app.core.messages import ContextMessage
 
 
 def format_message_time(value: datetime | None) -> str:

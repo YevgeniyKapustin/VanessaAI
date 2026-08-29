@@ -39,4 +39,6 @@ data:
   CONTENT_CONFIG_PATH: "config/content"
   NICKNAMES_CONFIG_PATH: "config/nicknames.yaml"
   LOG_LEVEL: "INFO"
+  LOG_JSON: "true"
+  LOG_FILE_ENABLED: "false"
   METRICS_ENABLED: "true"

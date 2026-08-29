@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from aiogram.types import Message as TelegramMessage
 
 from app.bot.addressing import _bot_username, extract_addressing
 
@@ -30,9 +29,7 @@ def test_bot_username_missing_me():
 
 
 def test_extract_addressing_reply_to_bot_without_bot_username():
-    bot_user = FakeUser(id=8294736159)
-    human = FakeUser(id=1)
-    reply = type("Reply", (), {"from_user": bot_user})()
+    reply = type("Reply", (), {"from_user": FakeUser(id=8294736159)})()
     message = type(
         "Message",
         (),
@@ -52,7 +49,6 @@ def test_extract_addressing_reply_to_bot_without_bot_username():
 
 
 def test_extract_addressing_reply_to_other_user():
-    bot_user = FakeUser(id=1)
     other = FakeUser(id=99)
     reply = type("Reply", (), {"from_user": other})()
     message = type(
@@ -73,7 +69,6 @@ def test_extract_addressing_reply_to_other_user():
 
 
 def test_extract_addressing_captures_replied_text_and_sender():
-    bot_user = FakeUser(id=1)
     other = FakeUser(id=99, username="lich")
     reply = type(
         "Reply",
@@ -104,7 +99,6 @@ def test_extract_addressing_captures_replied_text_and_sender():
 
 
 def test_extract_addressing_reply_without_text_is_none():
-    bot_user = FakeUser(id=1)
     other = FakeUser(id=99, username="lich")
     reply = type("Reply", (), {"from_user": other, "message_id": 556, "text": None})()
     message = type(

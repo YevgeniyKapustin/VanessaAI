@@ -6,6 +6,46 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-lint-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install lint dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --only dev --no-root --no-interaction --no-ansi
+
+      - name: Load cached Ruff
+        uses: actions/cache@v4
+        with:
+          path: .ruff_cache
+          key: ruff-${{ runner.os }}-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
+          restore-keys: |
+            ruff-${{ runner.os }}-
+
+      - name: Run Ruff Linter
+        run: poetry run ruff check .
+
   test:
     runs-on: ubuntu-latest
     env:
@@ -13,29 +53,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install Poetry
-        run: pip install poetry==2.1.1
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-      - name: Set up Poetry Cache
+      - name: Load cached venv
+        id: cached-poetry-dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-
-      - name: Configure Poetry
-        run: poetry config virtualenvs.create false
+          path: .venv
+          key: venv-test-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-ansi
-
-      - name: Run Ruff Linter
-        run: poetry run ruff check .
 
       - name: Run tests
         run: poetry run pytest tests/ -q

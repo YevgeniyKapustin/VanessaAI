@@ -46,7 +46,7 @@ def test_fill_broker_url_from_redis_auth():
     from app.k8s.secrets import fill_broker_url
 
     filled = fill_broker_url({"REDIS_AUTH": "s3cret"})
-    assert filled["BROKER_REDIS_URL"] == "redis://:s3cret@redis:6379/1"
+    assert filled["BROKER_REDIS_URL"] == "redis://:s3cret@redis:6379/0"
     existing = fill_broker_url(
         {
             "REDIS_AUTH": "s3cret",
@@ -69,6 +69,7 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
         "REQUIRED_USER_TELEGRAM_ID": "123456789",
         "ALLOWED_CHAT_TELEGRAM_ID": "-1001111111111",
         "REDIS_AUTH": "compose-only",
+        "LANGFUSE_REDIS_AUTH": "langfuse-only",
         "LOG_LEVEL": "DEBUG",
         "POSTGRES_HOST": "postgres",
     }
@@ -86,6 +87,7 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
     assert selected["TRANSPORT"] == CLUSTER_OVERRIDES["TRANSPORT"]
     assert "TELEGRAM_BOT_TOKEN" not in selected
     assert "REDIS_AUTH" not in selected
+    assert "LANGFUSE_REDIS_AUTH" not in selected
     manifest = build_configmap(namespace="vanessa", values=selected)
     assert manifest["metadata"]["name"] == CONFIGMAP_NAME
     assert "TELEGRAM_BOT_TOKEN" not in manifest["data"]

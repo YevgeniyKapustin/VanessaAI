@@ -9,15 +9,13 @@ mode, and merges (metrics live in the person cards) in apply mode.
 Usage:
     python scripts/merge_people.py --dry-run
     python scripts/merge_people.py --apply --yes
-    python scripts/merge_people.py --apply --yes --merge "мишась:michaś"
-    python scripts/merge_people.py --apply --yes --delete "ну-я"
+    python scripts/merge_people.py --apply --yes --merge "dup-slug:canonical-slug"
+    python scripts/merge_people.py --apply --yes --delete "junk-slug"
 
 Tiers shown by --dry-run:
     AUTO        high confidence (shared telegram_id, identical identity key,
-                long-prefix / single-edit-distance transliteration). Applied
-                automatically by --apply --yes.
-    REVIEW      plausible but needs your confirmation; apply with --merge SRC:TGT.
-    SUSPICIOUS  cards worth a manual look (LLM-invented, telegram conflicts).
+                similar transliteration). Applied by --apply --yes.
+    SUSPICIOUS  telegram_id vs identity conflicts; merge or delete by hand.
 """
 
 from __future__ import annotations
@@ -49,32 +47,6 @@ try:
     sys.stdout.reconfigure(encoding="utf-8")
 except AttributeError:  # pragma: no cover - Python < 3.7
     pass
-
-
-# REVIEW-only proposals: (source_id, target_id). Printed for confirmation; the
-# user applies them with --merge SRC:TGT. Never auto-applied.
-_REVIEW_PROPOSALS: list[tuple[str, str]] = [
-    ("василий-кимаковский", "вася-ким"),  # Василий = Вася Ким (roster 394536972)
-]
-
-# Cards that need a human decision: id -> why.
-_SUSPICIOUS: dict[str, str] = {
-    "ну-я": (
-        "LLM-invented pseudo-person from self-referential «ну я» (likely the owner). "
-        "Merge into евгений-капуста (--merge ну-я:евгений-капуста) or delete (--delete ну-я)."
-    ),
-    "владислав": (
-        "telegram_id 1801770759 is Зонов's but the identity is Владислав — the LLM "
-        "garbled the attribution. Decide: merge into турбовладислав-демид, зонов, or keep."
-    ),
-    "владимир": (
-        "No strong signal; the card self-identifies as Крабер. Merge into крабер "
-        "(--merge владимир:крабер) or keep."
-    ),
-    "гофр-оргазм": (
-        "Unusual name; referenced in the Михась card as a distinct person — verify it is real."
-    ),
-}
 
 
 @dataclass
@@ -291,22 +263,7 @@ def detect_groups(
     groups.sort(key=lambda group: (group.target, group.sources))
 
     reviews: list[Review] = []
-    for source, target in _REVIEW_PROPOSALS:
-        if source in people and target in people and source != target:
-            if not any(
-                source in group.sources and target == group.target for group in groups
-            ):
-                reviews.append(Review(target=target, sources=[source], reason="name variant"))
-
-    suspicious_map: dict[str, str] = {}
-    for card_id, conflict in conflicts.items():
-        suspicious_map.setdefault(card_id, conflict)
-    for card_id, note in _SUSPICIOUS.items():
-        if card_id not in people:
-            continue
-        existing = suspicious_map.get(card_id)
-        suspicious_map[card_id] = note if existing is None else f"{existing} {note}"
-    suspicious = sorted(suspicious_map.items())
+    suspicious = sorted(conflicts.items())
 
     return groups, reviews, suspicious
 
@@ -477,7 +434,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--reindex",
         action="store_true",
-        help="only rebuild the People/Metrics index manifests",
+        help="only rebuild People/_index.yaml",
     )
     return parser.parse_args(argv)
 

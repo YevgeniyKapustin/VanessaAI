@@ -216,6 +216,14 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+`.env.example` sets `COMPOSE_FILE` to app + infra + Langfuse + monitoring +
+dev override. Drop `docker-compose.langfuse.yml` and
+`docker-compose.monitoring.yml` from that list on a weak machine.
+
+If `up` fails because `migrate` exited non-zero, inspect
+`docker compose logs migrate` and re-run migrate — `api` waits on
+`service_completed_successfully` and will not start until migrate succeeds.
+
 Services: API `http://localhost:8000`, Qdrant `6333`, Postgres `5432`.
 
 ### Import chat history (optional)
@@ -248,7 +256,7 @@ config/
                 memory, metrics, rag, profanity (SRP)
   nicknames.yaml
 knowledge/      Vanessa's memory vault (runtime data)
-scripts/        import_telegram_history.py, backfill_users.py, reindex_knowledge_vectors.py
+scripts/        import, reindex, portraits, stickers, k8s secrets
 tests/          400 tests
 ```
 
@@ -324,7 +332,8 @@ Observability is layered across the two processes and correlated by
   per-stage latency, LLM tokens/requests/errors, RAG hits/empty/scores, Telegram
   errors and HTTP latency. The API serves `GET /metrics`; the bot runs a
   threaded endpoint on `BOT_METRICS_PORT`. Prometheus + Grafana are defined in
-  `docker-compose.yml` with a preloaded dashboard (`grafana/dashboards/vanessa.json`).
+  `docker-compose.monitoring.yml` with a preloaded dashboard
+  (`grafana/dashboards/vanessa.json`).
 - **LLM/RAG tracing (Langfuse)** — `app/observability/tracing.py` wraps the
   orchestrator, pipeline stages, LLM providers and completers in spans. User/chat
   ids are hashed with `LANGFUSE_ID_SALT` before leaving the process; sampling is
@@ -341,101 +350,29 @@ All observability features are **off by default** so the bot behaves exactly as
 before until explicitly enabled via `.env`. See [`plans/observability.md`](plans/observability.md)
 for the full design and metric catalog.
 
-## Zero-downtime deployment
+## Deploy (Kubernetes)
 
-The stack ships with the building blocks for zero-downtime deploys: health
-checks split into **liveness** and **readiness**, graceful shutdown, an Nginx
-load balancer, and a blue-green deploy script.
-
-### Health checks
-
-- `GET /health` and `GET /health/live` — liveness. Pure process-alive checks,
-  no I/O; used by the Docker `HEALTHCHECK` to decide the container is running.
-- `GET /health/ready` — readiness. Runs a `SELECT 1` against Postgres and
-  returns `200 {"status":"ready"}` only when the DB is reachable, otherwise
-  `503 {"status":"unavailable"}`. The proxy only routes traffic to a replica
-  after this returns 200, so a fresh container never receives requests before
-  its dependencies are up.
-
-The compose `api` service healthcheck targets `/health/ready`, so a container
-turns "healthy" (and only then gets traffic from Nginx) once it can actually
-serve requests.
-
-### Graceful shutdown
-
-- `api` runs uvicorn with `--timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}`:
-  on SIGTERM it stops accepting new connections, lets in-flight requests finish
-  within the window, then closes the DB pool (see the FastAPI `lifespan`).
-- Compose sets `stop_grace_period: 45s` on `api`/`bot` so Docker doesn't
-  SIGKILL the container before the drain window elapses.
-- The bot relies on aiogram's cooperative shutdown (stops polling, drains the
-  current update, closes the Telegram session).
-
-### Nginx load balancer
-
-Config lives in [`deploy/nginx/`](deploy/nginx/nginx.conf):
-
-- `upstream vanessa_api` with `max_fails=3 fail_timeout=30s` — a replica that
-  fails 3 times is marked down for 30s and traffic fails over to the healthy one.
-- `keepalive 32` — upstream connections are reused, which is what makes
-  `nginx -s reload` zero-downtime (no connection is dropped while the config is
-  re-read).
-- `conf.d/upstream.conf` holds the *active* upstream; the deploy script swaps it
-  and reloads (`docker compose exec nginx nginx -s reload`).
-
-### Production compose
-
-[`docker-compose.prod.yml`](docker-compose.prod.yml) is an override run with the
-base file:
+Production is Kubernetes. Rolling updates replace the compose blue-green
+script: `maxUnavailable: 0` + `maxSurge: 1` on agent-core / worker / MCP,
+plus `/health/live` and `/health/ready` as probes. See
+[`deploy/k8s/README.md`](deploy/k8s/README.md).
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+poetry run python scripts/k8s_secrets.py apply --ensure-namespace
+kubectl apply -k deploy/k8s/
+kubectl -n vanessa rollout restart deploy
 ```
 
-It drops the dev bind-mounts and `--reload`, runs `--workers`/graceful shutdown,
-does **not** publish the API to the host (Nginx is the only entry point), and
-adds the `nginx` service publishing `NGINX_HTTP_PORT` (default 80).
+- `GET /health` / `/health/live` — liveness (process only).
+- `GET /health/ready` — Postgres `SELECT 1`; kubelet keeps the pod out of
+  Service until this is 200.
+- API: uvicorn `--timeout-graceful-shutdown`; bot: aiogram drain on SIGTERM.
 
-> **Rebuild note:** `docker compose up -d` does **not** rebuild an image that
-> already exists locally (`vanessa-app:latest` is reused as-is). Always pass
-> `--build` (or run `docker compose build api`) to pick up code changes — the
-> deploy script below always runs `docker build`, so it never has this problem.
+Compose (`docker-compose.yml` + infra) is local/dev. Nginx under
+`deploy/nginx/` is only for that path.
 
-Scale API replicas for load balancing / rolling update:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build \
-    --no-deps --scale api=2
-```
-
-Reload Nginx config without dropping active connections:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec nginx nginx -s reload
-```
-
-### Blue-green deploy script
-
-[`scripts/zero_downtime_deploy.sh`](scripts/zero_downtime_deploy.sh) implements
-the standard CI/CD flow against the running compose project:
-
-1. Builds a new image tagged with the version (default: short git SHA).
-2. Starts the new container (`api-blue`/`api-green`) on the shared network.
-3. Polls `/health/ready` until the new container reports healthy.
-4. Swaps `deploy/nginx/conf.d/upstream.conf` to the new container and runs
-   `nginx -s reload` (no dropped keepalive connections).
-5. Sends SIGTERM to the old container, waits for the graceful drain, removes it.
-
-```bash
-scripts/zero_downtime_deploy.sh v1.2.3
-```
-
-### CI/CD
-
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs the script on
-tag pushes (`v*`) on a self-hosted runner that has the compose project running.
-The base CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the
-test suite on every push/PR.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs tests on
+push/PR. Image build + cluster apply is not in GitHub Actions yet.
 
 ## Limitations
 

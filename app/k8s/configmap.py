@@ -9,6 +9,8 @@ CONFIGMAP_NAME = "vanessa-config"
 COMPOSE_ONLY_KEYS: frozenset[str] = frozenset(
     {
         "REDIS_AUTH",
+        "LANGFUSE_REDIS_AUTH",
+        "COMPOSE_FILE",
         "LANGFUSE_DB_USER",
         "LANGFUSE_DB_PASSWORD",
         "LANGFUSE_DB_NAME",
@@ -38,7 +40,6 @@ CLUSTER_OVERRIDES: dict[str, str] = {
     "MCP_WEBSEARCH_URL": "http://mcp-websearch:8101/mcp",
     "MCP_KNOWLEDGE_URL": "http://mcp-knowledge:8102/mcp",
     "MCP_VISION_URL": "http://mcp-vision:8103/mcp",
-    "MCP_OBSIDIAN_URL": "http://mcp-obsidian:8104/mcp",
 }
 
 

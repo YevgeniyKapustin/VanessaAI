@@ -4,10 +4,9 @@ import threading
 
 import uvicorn
 
-from app.bot.services.obsidian_notes import ObsidianNoteService
 from app.core.messages import WebResult
 from app.knowledge.vault import KnowledgeVault
-from app.mcp_server import knowledge, obsidian, vision, websearch
+from app.mcp_server import knowledge, vision, websearch
 
 
 class _FakeSearch:
@@ -46,24 +45,14 @@ async def test_vision_server_registers_tool() -> None:
     assert "describe_photo" in await _names(server)
 
 
-async def test_obsidian_server_registers_tools() -> None:
-    server = obsidian.build_server(
-        service=ObsidianNoteService(vault_path="", git_enabled=False)
-    )
-    assert {"note_save", "note_status"} <= await _names(server)
-
-
 async def test_servers_have_distinct_names() -> None:
     servers = [
         websearch.build_server(provider=_FakeSearch()),
         knowledge.build_server(vault=KnowledgeVault(root_path="")),
         vision.build_server(),
-        obsidian.build_server(
-            service=ObsidianNoteService(vault_path="", git_enabled=False)
-        ),
     ]
     names = {server.name for server in servers}
-    assert len(names) == 4
+    assert len(names) == 3
 
 
 def _free_port() -> int:

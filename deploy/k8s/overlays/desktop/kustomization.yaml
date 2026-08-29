@@ -7,7 +7,6 @@ patches:
   - path: configmap-hosts.yaml
   - path: bot-replicas.yaml
   - path: delete-pvc-knowledge.yaml
-  - path: delete-pvc-hf.yaml
   - target:
       kind: Deployment
       name: agent-core

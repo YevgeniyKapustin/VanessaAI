@@ -1,60 +1,33 @@
-# Production override — zero-downtime deployment.
-#
-# Run together with the base file:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-#
-# Differences vs. the dev base file:
-#   * `api` runs WITHOUT --reload, uses N workers and a bounded graceful
-#     shutdown; the container is NOT published to the host — Nginx fronts it.
-#   * Dev bind-mounts (./app, ./config, ./alembic) are dropped — the image is
-#     the single source of truth (built in CI with a commit hash tag).
-#   * `nginx` terminates external HTTP on :80 and load-balances across API
-#     replicas (upstream max_fails/fail_timeout + keepalive).
-#
-# Scale API replicas (rolling update):
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
-#       --no-deps --scale api=2
+# Production override — zero-downtime deployment. Do not include
+# docker-compose.override.yml (dev bind-mounts).
+# Run: docker compose -f docker-compose.yml -f docker-compose.infra.yml
+#   -f docker-compose.langfuse.yml -f docker-compose.monitoring.yml
+#   -f docker-compose.prod.yml up -d
 
 services:
+  migrate:
+    volumes: !reset []
+    restart: "no"
+
   api:
-    # Do not publish 8000 to the host; Nginx is the only entry point.
     ports: !reset []
     command: >
-      sh -c "alembic upgrade head &&
       uvicorn app.api.main:app --host 0.0.0.0 --port 8000
       --workers ${API_WORKERS:-1}
-      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}"
-    # The image is built in CI (with a version tag); no host source mounts.
-    # NOTE: `docker compose up -d` does NOT rebuild an existing
-    # `vanessa-app:latest` — pass `--build` (or use the deploy script, which
-    # always runs `docker build`).
-    # EXCEPTION: the knowledge vault (./knowledge) is the bot's memory source of
-    # truth — curated on the host and written by the memory pipeline. It MUST be
-    # mounted, otherwise the container builds a fresh, mostly-empty vault from
-    # scratch (empty dossiers, empty «Цитатник»/«Хроника») and the bot falls
-    # back to raw chat-history search. Dev source mounts (app/config) stay out.
-    # NOTE: use !override, not !reset — !reset empties the list.
+      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     volumes: !override
       - ./knowledge:/app/knowledge
     restart: always
     stop_grace_period: 45s
 
   bot:
-    # Keep the shared knowledge vault + the Obsidian vault + SSH (runtime data)
-    # but drop the dev source bind-mounts so the built image is authoritative.
-    # ./knowledge must be shared so api and bot read/write the same vault (the
-    # bot's memory source of truth) instead of each building a private one.
-    # NOTE: use !override, not !reset — !reset empties the list.
     volumes: !override
       - ./knowledge:/app/knowledge
       - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
-      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
+      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/home/app/.ssh:ro
     restart: always
     stop_grace_period: 45s
 
-  # Prod overrides for the background worker and MCP servers: drop the dev
-  # source mounts so the built image is authoritative (keep the runtime data
-  # mounts each service actually needs).
   worker:
     volumes: !override
       - ./knowledge:/app/knowledge
@@ -74,32 +47,27 @@ services:
     volumes: !reset []
     restart: always
 
-  mcp-obsidian:
-    volumes: !override
-      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
-      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
-    restart: always
-
-  # --- Load balancer --------------------------------------------------------
   nginx:
     image: nginx:1.27-alpine
     restart: always
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      - frontend
+      - backend
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
     volumes:
       - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
     healthcheck:
-      # NB: use 127.0.0.1, not "localhost" — in the alpine image localhost
-      # resolves to ::1 (IPv6) first, but nginx only listens on IPv4 0.0.0.0:80,
-      # so wget gets "Connection refused" and the container stays unhealthy.
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-    # Reload without dropping active connections:
-    #   docker compose -f docker-compose.yml -f docker-compose.prod.yml exec nginx nginx -s reload
     stop_grace_period: 10s
+
+networks:
+  backend:
+  frontend:

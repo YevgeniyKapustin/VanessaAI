@@ -27,8 +27,7 @@ COPY pyproject.toml poetry.lock ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     poetry install --no-root --only main
 
-RUN --mount=type=cache,target=/root/.cache/huggingface \
-    python -c "from sentence_transformers import SentenceTransformer; \
+RUN python -c "from sentence_transformers import SentenceTransformer; \
 SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 
 COPY app/ ./app/
@@ -38,3 +37,10 @@ COPY alembic.ini .
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+
+RUN useradd --create-home --uid 1000 --user-group \
+        --shell /usr/sbin/nologin app \
+    && mkdir -p /app/logs /app/knowledge \
+    && chown -R app:app /app
+
+USER app

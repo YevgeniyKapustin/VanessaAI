@@ -39,12 +39,9 @@ spec:
             periodSeconds: 20
           volumeMounts:
             - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
-            - { name: hf-cache, mountPath: /app/.cache/huggingface }
       volumes:
         - name: knowledge
           persistentVolumeClaim: { claimName: vanessa-knowledge }
-        - name: hf-cache
-          persistentVolumeClaim: { claimName: vanessa-hf-cache }
 ---
 apiVersion: v1
 kind: Service

@@ -63,8 +63,7 @@ kubectl -n vanessa rollout restart deploy
         │ MCP over HTTP (SSE)
         ├──────────▶ mcp-websearch
         ├──────────▶ mcp-knowledge
-        ├──────────▶ mcp-vision
-        └──────────▶ mcp-obsidian
+        └──────────▶ mcp-vision
    agent-core ──▶ Postgres / Qdrant / Redis   (managed or StatefulSets)
    worker    ──▶ Postgres / Qdrant / knowledge vault PVC
 ```
@@ -107,7 +106,6 @@ Everything is env-driven (`app.config.settings`). Mapping is mechanical:
 | `mcp-websearch` | runner websearch | 50m / 128Mi | 500m / 512Mi | CPU |
 | `mcp-knowledge` | runner knowledge | 100m / 256Mi | 1 CPU / 1Gi | CPU |
 | `mcp-vision` | runner vision | 100m / 256Mi | 1 CPU / 2Gi | CPU |
-| `mcp-obsidian` | runner obsidian | 50m / 128Mi | 250m / 256Mi | no |
 
 Images are `vanessa-app:local` with `imagePullPolicy: IfNotPresent` so a
 locally built image is visible to Docker Desktop Kubernetes without a push
@@ -128,7 +126,8 @@ docker build -t vanessa-app:local .
 - Knowledge vault (writeable, git-backed) → `PersistentVolumeClaim`
   (`40-pvc.yaml`) shared by `worker` (writes) and `mcp-knowledge` (reads) via
   ReadWriteMany (e.g. NFS) — read-only for `agent-core` is acceptable.
-- HuggingFace model cache → shared PVC to avoid re-downloading embeddings.
+- HuggingFace embedding model is baked into the image at
+  `HF_HOME=/app/.cache/huggingface` (no PVC; an empty volume would hide it).
 
 ## Rollout & smoke
 
@@ -164,7 +163,7 @@ kubectl apply -k deploy/k8s/
 Docker Desktop (hybrid: Postgres/Qdrant/Redis stay in compose):
 
 ```bash
-docker compose stop api bot worker mcp-websearch mcp-knowledge mcp-vision mcp-obsidian
+docker compose stop api bot worker mcp-websearch mcp-knowledge mcp-vision
 docker tag vanessa-app:latest vanessa-app:local
 poetry run python scripts/k8s_secrets.py apply --ensure-namespace --broker-host host.docker.internal
 kubectl apply -k deploy/k8s/overlays/desktop

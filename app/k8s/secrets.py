@@ -77,7 +77,7 @@ def fill_broker_url(env: Mapping[str, str]) -> dict[str, str]:
     auth = merged.get("REDIS_AUTH", "").strip()
     if not auth:
         return merged
-    merged["BROKER_REDIS_URL"] = f"redis://:{auth}@redis:6379/1"
+    merged["BROKER_REDIS_URL"] = f"redis://:{auth}@redis:6379/0"
     return merged
 
 

@@ -2,10 +2,10 @@
 """Preflight check for Telegram history import — validates the export, Postgres
 and Qdrant state without writing anything. Safe to run any time.
 
-Run from the host with the Docker services up:
+Run from the host with Postgres/Qdrant up:
 
-    set POSTGRES_HOST=localhost&& set QDRANT_HOST=localhost&& ^
-    .venv\\Scripts\\python.exe scripts\\preflight_import.py --export "<result.json>" --check-model
+    POSTGRES_HOST=localhost QDRANT_HOST=localhost \\
+      poetry run python scripts/preflight_import.py --export result.json --check-model
 """
 from __future__ import annotations
 

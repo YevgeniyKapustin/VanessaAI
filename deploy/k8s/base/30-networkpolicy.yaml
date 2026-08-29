@@ -69,12 +69,12 @@ metadata:
 spec:
   podSelector:
     matchExpressions:
-      - { key: component, operator: In, values: [mcp-websearch, mcp-knowledge, mcp-vision, mcp-obsidian] }
+      - { key: component, operator: In, values: [mcp-websearch, mcp-knowledge, mcp-vision] }
   policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector: { matchLabels: { app: vanessa, component: agent-core } }
-      ports: [{ port: 8101 }, { port: 8102 }, { port: 8103 }, { port: 8104 }]
+      ports: [{ port: 8101 }, { port: 8102 }, { port: 8103 }]
 ---
 # agent-core HTTP: from the ingress controller / monitoring (and bot for the
 # legacy HTTP transport fallback).

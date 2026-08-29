@@ -32,7 +32,6 @@ data:
   MCP_WEBSEARCH_URL: "http://mcp-websearch:8101/mcp"
   MCP_KNOWLEDGE_URL: "http://mcp-knowledge:8102/mcp"
   MCP_VISION_URL: "http://mcp-vision:8103/mcp"
-  MCP_OBSIDIAN_URL: "http://mcp-obsidian:8104/mcp"
   MCP_TIMEOUT_SECONDS: "10"
   MCP_RETRIES: "2"
   MCP_FAIL_OPEN: "true"

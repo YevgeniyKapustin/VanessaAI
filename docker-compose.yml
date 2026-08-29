@@ -1,95 +1,32 @@
+# Always pull infra (postgres, qdrant, redis) so a bare `docker compose up`
+# still works if COMPOSE_FILE is unset. Langfuse/monitoring stay optional.
+include:
+  - docker-compose.infra.yml
+
 x-app-image: &app-image
   image: vanessa-app:latest
   build: .
 
-# Shared env for the Langfuse v4 web + worker services (both need the same
-# Postgres/ClickHouse/Redis/MinIO wiring so queue jobs round-trip correctly).
-x-langfuse-env: &langfuse-env
-  DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/${LANGFUSE_DB_NAME:-langfuse}
-  DIRECT_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/${LANGFUSE_DB_NAME:-langfuse}
-  NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
-  SALT: ${LANGFUSE_SALT:-vanessa-salt-change-me}
-  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
-  # App reads/writes ClickHouse over HTTP (8123); the bundled golang-migrate
-  # only ships the native `clickhouse://` driver (TCP 9000) — an http:// URL
-  # here fails with "database driver: unknown driver http".
-  CLICKHOUSE_URL: http://${CLICKHOUSE_USER:-langfuse}:${CLICKHOUSE_PASSWORD:-langfuse}@clickhouse:8123
-  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
-  CLICKHOUSE_USER: ${CLICKHOUSE_USER:-langfuse}
-  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langfuse}
-  CLICKHOUSE_DB: ${CLICKHOUSE_DB:-langfuse}
-  CLICKHOUSE_CLUSTER_ENABLED: "false"
-  # S3 (MinIO) config for OTEL ingestion events + media uploads. Required by the
-  # env schema and the ingestion queue (fails with "Region is missing" otherwise).
-  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-  LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
-  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse-events
-  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
-  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-  LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
-  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse-media
-  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-  # BullMQ queues (incl. OTEL ingestion) build their Redis client from
-  # REDIS_CONNECTION_STRING / REDIS_HOST — REDIS_URL alone is ignored.
-  REDIS_HOST: redis
-  REDIS_PORT: "6379"
-  REDIS_AUTH: ${REDIS_AUTH:-langfuse-redis-pass}
-  REDIS_CONNECTION_STRING: redis://:${REDIS_AUTH:-langfuse-redis-pass}@redis:6379
-  REDIS_URL: redis://:${REDIS_AUTH:-langfuse-redis-pass}@redis:6379
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    command:
-      - postgres
-      - -c
-      - shared_buffers=64MB
-      - -c
-      - effective_cache_size=128MB
-      - -c
-      - work_mem=4MB
-      - -c
-      - maintenance_work_mem=32MB
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-vanessa}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vanessa}
-      POSTGRES_DB: ${POSTGRES_DB:-vanessa}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vanessa}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    environment:
-      QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD: 20000
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/6333"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+  # One-shot schema migration. API replicas must not run `alembic upgrade`
+  # themselves — `--scale api=N` would race N upgrades at once.
+  migrate:
+    <<: *app-image
+    command: alembic upgrade head
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
 
   api:
     <<: *app-image
     command: >
-      sh -c "alembic upgrade head &&
       uvicorn app.api.main:app --host 0.0.0.0 --port 8000
-      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}"
+      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     ports:
       - "${API_PORT:-8000}:8000"
     env_file:
@@ -102,6 +39,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       # /health/ready returns 503 until Postgres is reachable, so the container
       # only turns "healthy" once it can actually serve traffic — the proxy
@@ -110,19 +49,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      # The lifespan cold start (sentence-transformers model download into the
-      # empty huggingface_cache volume + full knowledge vector reindex + first
-      # sweep) routinely takes 60-90s+, so a 30s grace would mark the container
+      # The lifespan cold start (knowledge vector reindex + first sweep)
+      # routinely takes 60-90s+, so a 30s grace would mark the container
       # "unhealthy" and abort `docker compose up` (bot depends on api healthy).
       start_period: 300s
-    volumes:
-      - ./app:/app/app
-      - ./config:/app/config
-      - ./alembic:/app/alembic
-      - ./alembic.ini:/app/alembic.ini
-      - ./knowledge:/app/knowledge
-      - ./data/logs:/app/logs
-      - huggingface_cache:/app/.cache/huggingface
+    networks:
+      - backend
+      - frontend
 
   bot:
     <<: *app-image
@@ -135,13 +68,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    volumes:
-      - ./app:/app/app
-      - ./config:/app/config
-      - ./knowledge:/app/knowledge
-      - ./data/logs:/app/logs
-      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
-      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
+    networks:
+      - backend
 
   # --- Background worker -----------------------------------------------------
   # Consumes TaskMessage jobs from the broker (message indexing, sweep,
@@ -164,12 +92,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./app:/app/app
-      - ./config:/app/config
-      - ./knowledge:/app/knowledge
-      - ./data/logs:/app/logs
-      - huggingface_cache:/app/.cache/huggingface
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - backend
     # Isolate the heavy CPU/RAM background work from the reply path.
     deploy:
       resources:
@@ -191,6 +117,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
     deploy:
       resources:
         limits:
@@ -203,13 +131,13 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    volumes:
-      - ./knowledge:/app/knowledge
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
     deploy:
       resources:
         limits:
@@ -227,179 +155,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
     deploy:
       resources:
         limits:
           cpus: "0.5"
           memory: 1G
 
-  mcp-obsidian:
-    <<: *app-image
-    command: python -m app.mcp_server.runner obsidian --port 8104
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
-      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8104/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 256M
-
-  # --- Observability ---------------------------------------------------------
-  langfuse-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: ${LANGFUSE_DB_USER:-langfuse}
-      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
-      POSTGRES_DB: ${LANGFUSE_DB_NAME:-langfuse}
-    volumes:
-      - langfuse_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${LANGFUSE_DB_USER:-langfuse}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Langfuse v3/v4 requires ClickHouse (trace storage) + Redis (queue) + an
-  # S3-compatible store (MinIO below — the OTEL ingestion buffers events to S3
-  # and media uploads need it) alongside Postgres (users/projects/keys). The
-  # langfuse SDK v4 (pyproject.toml resolves to 4.x) talks to this server via
-  # the OTLP ingestion endpoint — it is NOT compatible with the v2 server that
-  # ran on Postgres alone (v2 export 404s). Server pinned to v4.21.0 to match
-  # SDK 4.14.5. Set a real NEXTAUTH_SECRET / SALT / ENCRYPTION_KEY (32 random
-  # bytes as 64 hex chars) in production.
-  clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    restart: unless-stopped
-    environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-langfuse}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-langfuse}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langfuse}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-    ports:
-      - "8123:8123"
-    healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_AUTH:-langfuse-redis-pass} --maxmemory-policy noeviction
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_AUTH:-langfuse-redis-pass}", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # S3-compatible object storage for Langfuse (OTEL ingestion events + media).
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    volumes:
-      - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  langfuse:
-    image: ghcr.io/langfuse/langfuse:4.21.0
-    restart: unless-stopped
-    depends_on:
-      langfuse-db:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      <<: *langfuse-env
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-vanessa-nextauth-secret-change-me}
-      PORT: "3000"
-    ports:
-      - "3000:3000"
-
-  # Queue consumer — Langfuse v4 requires a separate worker process to process
-  # the BullMQ jobs (OTEL ingestion, evals, ...). Without it, ingested spans are
-  # uploaded to S3 + queued in Redis but never written to ClickHouse.
-  langfuse-worker:
-    image: ghcr.io/langfuse/langfuse-worker:4.21.0
-    restart: unless-stopped
-    depends_on:
-      langfuse-db:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      <<: *langfuse-env
-      PORT: "3030"
-    ports:
-      - "3030:3030"
-
-  prometheus:
-    image: prom/prometheus:latest
-    restart: unless-stopped
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana:latest
-    restart: unless-stopped
-    depends_on:
-      - prometheus
-    environment:
-      GF_SERVER_HTTP_PORT: "3001"
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3001:3001"
-
-volumes:
-  postgres_data:
-  qdrant_data:
-  huggingface_cache:
-  langfuse_db_data:
-  clickhouse_data:
-  redis_data:
-  minio_data:
-  prometheus_data:
-  grafana_data:
+networks:
+  backend:
+  frontend:

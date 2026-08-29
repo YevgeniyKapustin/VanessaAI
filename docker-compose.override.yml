@@ -1,0 +1,37 @@
+# Local development bind-mounts. Auto-included via COMPOSE_FILE in .env.example.
+# Do not pass this file in production (-f list without override).
+services:
+  migrate:
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+
+  api:
+    volumes:
+      - ./app:/app/app
+      - ./config:/app/config
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./knowledge:/app/knowledge
+      - ./data/logs:/app/logs
+
+  bot:
+    volumes:
+      - ./app:/app/app
+      - ./config:/app/config
+      - ./knowledge:/app/knowledge
+      - ./data/logs:/app/logs
+      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
+      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/home/app/.ssh:ro
+
+  worker:
+    volumes:
+      - ./app:/app/app
+      - ./config:/app/config
+      - ./knowledge:/app/knowledge
+      - ./data/logs:/app/logs
+
+  mcp-knowledge:
+    volumes:
+      - ./knowledge:/app/knowledge

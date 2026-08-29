@@ -369,7 +369,6 @@ class McpMixin:
     mcp_knowledge_url: str = ""
     mcp_websearch_url: str = ""
     mcp_vision_url: str = ""
-    mcp_obsidian_url: str = ""
     mcp_timeout_seconds: float = 10.0
     mcp_retries: int = 2
     # Fail open: an unreachable MCP server degrades the turn instead of blocking

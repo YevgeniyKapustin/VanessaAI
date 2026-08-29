@@ -7,7 +7,6 @@ Usage:
     python -m app.mcp_server.runner websearch --port 8101
     python -m app.mcp_server.runner knowledge --port 8102
     python -m app.mcp_server.runner vision --port 8103
-    python -m app.mcp_server.runner obsidian --port 8104
 """
 
 from __future__ import annotations
@@ -20,13 +19,12 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 
-from app.mcp_server import knowledge, obsidian, vision, websearch
+from app.mcp_server import knowledge, vision, websearch
 
 _SERVERS = {
     "websearch": websearch.build_server,
     "knowledge": knowledge.build_server,
     "vision": vision.build_server,
-    "obsidian": obsidian.build_server,
 }
 
 

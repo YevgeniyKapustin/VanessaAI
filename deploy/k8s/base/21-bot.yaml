@@ -28,7 +28,7 @@ spec:
             limits: { cpu: "500m", memory: "1Gi" }
           volumeMounts:
             - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
-            - { name: obsidian-ssh, mountPath: /root/.ssh, readOnly: true }
+            - { name: obsidian-ssh, mountPath: /home/app/.ssh, readOnly: true }
       volumes:
         - name: knowledge
           persistentVolumeClaim: { claimName: vanessa-knowledge }

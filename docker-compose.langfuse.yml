@@ -1,0 +1,182 @@
+# Shared env for the Langfuse v4 web + worker services (both need the same
+# Postgres/ClickHouse/Redis/MinIO wiring so queue jobs round-trip correctly).
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/${LANGFUSE_DB_NAME:-langfuse}
+  DIRECT_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/${LANGFUSE_DB_NAME:-langfuse}
+  NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+  SALT: ${LANGFUSE_SALT:-vanessa-salt-change-me}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+  # App reads/writes ClickHouse over HTTP (8123); the bundled golang-migrate
+  # only ships the native `clickhouse://` driver (TCP 9000) — an http:// URL
+  # here fails with "database driver: unknown driver http".
+  CLICKHOUSE_URL: http://${CLICKHOUSE_USER:-langfuse}:${CLICKHOUSE_PASSWORD:-langfuse}@clickhouse:8123
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_USER: ${CLICKHOUSE_USER:-langfuse}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langfuse}
+  CLICKHOUSE_DB: ${CLICKHOUSE_DB:-langfuse}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  # S3 (MinIO) config for OTEL ingestion events + media uploads. Required by the
+  # env schema and the ingestion queue (fails with "Region is missing" otherwise).
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse-events
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse-media
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  # BullMQ queues (incl. OTEL ingestion) build their Redis client from
+  # REDIS_CONNECTION_STRING / REDIS_HOST — REDIS_URL alone is ignored.
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-langfuse-redis-pass}
+  REDIS_CONNECTION_STRING: redis://:${LANGFUSE_REDIS_AUTH:-langfuse-redis-pass}@langfuse-redis:6379
+  REDIS_URL: redis://:${LANGFUSE_REDIS_AUTH:-langfuse-redis-pass}@langfuse-redis:6379
+
+services:
+  langfuse-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${LANGFUSE_DB_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
+      POSTGRES_DB: ${LANGFUSE_DB_NAME:-langfuse}
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LANGFUSE_DB_USER:-langfuse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  # Langfuse v3/v4 requires ClickHouse (trace storage) + Redis (queue) + an
+  # S3-compatible store (MinIO below — the OTEL ingestion buffers events to S3
+  # and media uploads need it) alongside Postgres (users/projects/keys). The
+  # langfuse SDK v4 (pyproject.toml resolves to 4.x) talks to this server via
+  # the OTLP ingestion endpoint — it is NOT compatible with the v2 server that
+  # ran on Postgres alone (v2 export 404s). Server pinned to v4.21.0 to match
+  # SDK 4.14.5. Set a real NEXTAUTH_SECRET / SALT / ENCRYPTION_KEY (32 random
+  # bytes as 64 hex chars) in production.
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-langfuse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-langfuse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langfuse}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  langfuse-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >-
+      redis-server --requirepass ${LANGFUSE_REDIS_AUTH:-langfuse-redis-pass}
+      --maxmemory-policy noeviction
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${LANGFUSE_REDIS_AUTH:-langfuse-redis-pass}",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  # S3-compatible object storage for Langfuse (OTEL ingestion events + media).
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:4.21.0
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-vanessa-nextauth-secret-change-me}
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    networks:
+      - backend
+      - frontend
+
+  # Queue consumer — Langfuse v4 requires a separate worker process to process
+  # the BullMQ jobs (OTEL ingestion, evals, ...). Without it, ingested spans are
+  # uploaded to S3 + queued in Redis but never written to ClickHouse.
+  langfuse-worker:
+    image: ghcr.io/langfuse/langfuse-worker:4.21.0
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      <<: *langfuse-env
+      PORT: "3030"
+    ports:
+      - "3030:3030"
+    networks:
+      - backend
+
+volumes:
+  langfuse_db_data:
+  clickhouse_data:
+  langfuse_redis_data:
+  minio_data:
+
+networks:
+  backend:
+  frontend:

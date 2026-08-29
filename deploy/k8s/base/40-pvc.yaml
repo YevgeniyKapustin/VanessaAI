@@ -9,13 +9,3 @@ spec:
   accessModes: [ReadWriteMany]
   resources:
     requests: { storage: 10Gi }
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: vanessa-hf-cache
-  namespace: vanessa
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests: { storage: 20Gi }

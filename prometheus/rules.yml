@@ -5,7 +5,7 @@ groups:
     rules:
       - alert: VanessaBrokerDLQGrowth
         expr: increase(vanessa_broker_dlq_total[5m]) > 0
-        for: 5m
+        for: 0m
         labels:
           severity: warning
         annotations:

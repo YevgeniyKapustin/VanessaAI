@@ -1,6 +1,9 @@
 # Prometheus scrape config for VanessaAI.
+# Alerting rules live in rules.yml (rule_files), never inline here.
 # Targets: api (FastAPI /metrics), bot (threaded /metrics on 9101),
 # worker (threaded /metrics on 9102) and the MCP servers.
+# Compose uses static_configs. Kubernetes/Swarm should replace this
+# with service discovery and __meta_* relabel_configs.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -11,20 +14,35 @@ rule_files:
 scrape_configs:
   - job_name: vanessa-api
     metrics_path: /metrics
+    scrape_timeout: 10s
     static_configs:
       - targets: ["api:8000"]
+        labels:
+          environment: production
 
   - job_name: vanessa-bot
+    metrics_path: /metrics
+    scrape_timeout: 10s
     static_configs:
       - targets: ["bot:9101"]
+        labels:
+          environment: production
 
   - job_name: vanessa-worker
+    metrics_path: /metrics
+    scrape_timeout: 10s
     static_configs:
       - targets: ["worker:9102"]
+        labels:
+          environment: production
 
   - job_name: vanessa-mcp
+    metrics_path: /metrics
+    scrape_timeout: 10s
     static_configs:
       - targets:
           - "mcp-websearch:8101"
           - "mcp-knowledge:8102"
           - "mcp-vision:8103"
+        labels:
+          environment: production

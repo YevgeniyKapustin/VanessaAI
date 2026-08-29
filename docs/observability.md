@@ -18,7 +18,9 @@ The API serves `GET /metrics`. The bot runs a threaded endpoint on
 `BOT_METRICS_PORT` (typically `:9101`). Product counters also exist at
 `GET /api/v1/metrics`.
 
-Compose stack: `docker-compose.monitoring.yml`. Dashboards:
+Compose stack: `docker-compose.monitoring.yml`. Prometheus loads
+`prometheus/prometheus.yml` and evaluates alerts from
+`prometheus/rules.yml` (`rule_files`). Dashboards:
 
 - `grafana/dashboards/vanessa.json`
 - `grafana/dashboards/vanessa-broker.json`

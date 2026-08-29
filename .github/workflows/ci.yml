@@ -11,42 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        id: setup-python
-        uses: actions/setup-python@v5
+      - name: Run Ruff
+        uses: astral-sh/ruff-action@v3
         with:
-          python-version: "3.12"
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 2.1.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-lint-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}
-
-      - name: Install lint dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --only dev --no-root --no-interaction --no-ansi
-
-      - name: Load cached Ruff
-        uses: actions/cache@v4
-        with:
-          path: .ruff_cache
-          key: ruff-${{ runner.os }}-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
-          restore-keys: |
-            ruff-${{ runner.os }}-
-
-      - name: Run Ruff Linter
-        run: poetry run ruff check .
+          version-file: pyproject.toml
+          args: check
 
   test:
+    needs: lint
     runs-on: ubuntu-latest
     env:
       REQUIRED_USER_TELEGRAM_ID: ${{ secrets.REQUIRED_USER_TELEGRAM_ID || '123456789' }}
@@ -75,7 +47,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-ansi
+        run: poetry install --no-interaction --no-ansi --no-root
 
       - name: Run tests
         run: poetry run pytest tests/ -q

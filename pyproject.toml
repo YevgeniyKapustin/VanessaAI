@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Telegram bot Vanessa with RAG and DeepSeek"
 authors = ["Vanessa Team"]
 packages = [{ include = "app" }]
+requires-poetry = "==2.1.1"
 
 [tool.poetry.dependencies]
 python = "^3.12"

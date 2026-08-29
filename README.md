@@ -17,19 +17,41 @@ flowchart LR
   telegram --> bot --> api --> ingress --> gate --> retrieve --> compose --> post
 ```
 
-**Gate**:
+Most group messages never get a reply. Silence is a first-class outcome:
+the bot only types after the gate has already decided to speak.
 
-| Layer | Role |
-|-------|------|
-| Prefilter | No LLM: noise, dismissal, off-topic remarks |
-| Turn Planner | LLM: should reply, search query, humor, deep_search |
-| Decision Engine | Rule chain: rate limit, addressing, listen window, relevance |
+1. **Telegram → bot.** The bot checks chat access. Photos are downloaded
+   (albums become one turn). It forwards the turn to the API over HTTP
+   SSE or Redis Streams — same pipeline either way.
+2. **Ingress.** The sender is upserted, the message is written to
+   Postgres, and the session window is loaded (idle timeout + listen
+   window, not just last-N).
+3. **Gate** — cheap filters first, then a planner suggestion, then
+   rules that can still say no:
 
-The planner suggests `should_reply`; the rule engine makes the final call
-using addressing, session state, and a relevance threshold.
+   | Layer | Role |
+   |-------|------|
+   | Prefilter | No LLM: noise, dismissal, off-topic remarks |
+   | Reaction gate | Cheap YES/NO: people talking among themselves |
+   | Turn Planner | LLM: should reply, search query, humor, deep_search |
+   | Decision Engine | Rule chain: rate limit, addressing, listen window, relevance |
 
-Retrieve is semantic vault RAG first, raw-message RAG as fallback, optional
-ReAct, then humor RAG + reflexion. Compose uses DeepSeek (or Claude).
+   The planner suggests `should_reply`. The engine makes the final call.
+   Ignore → index the message and stop. Reply → start "typing...".
+4. **Retrieve.** Semantic vault RAG first (People / Lore / Culture /
+   Logs). Raw-message RAG only if the vault is empty, or as an extra
+   ReAct pass when `deep_search` is on. Then optional web search, humor
+   RAG + reflexion, and a meme pick behind an anti-spam gate.
+5. **Compose.** DeepSeek (or Claude) writes the reply from that
+   context. Repeat spam, an `[ignore]` marker, or an empty answer still
+   become silence. Stickers and re-sent photos are tags on the same
+   reply, not a second model call.
+6. **Finalize + post.** Control tags are stripped, the reply is split
+   into Telegram messages, the assistant row is stored. Memory extract,
+   mood metrics, photo captions, and sampled RAG-Triad eval run in the
+   background so they do not block delivery.
+7. **Send.** The bot posts the text blocks, then any photo, then a
+   sticker if tagged.
 
 Details: [Architecture guide](docs/architecture.md).
 

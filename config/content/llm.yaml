@@ -311,11 +311,11 @@ generation:
     # 1024 was too tight (a long CoT left too little for a multi-block reply and
     # the model truncated right after `[next]`); 2048 keeps real headroom.
     max_tokens: 2048
-    # DeepSeek V4 accepts reasoning_effort: low/medium/high. Forcing high makes
-    # the composer run a chain of thought on every reply (not only when it feels
-    # like it) — fewer logical errors, at the cost of a bit more latency/tokens.
-    # Drop to medium if latency or cost matters more than correctness.
-    reasoning_effort: high
+    # DeepSeek V4 accepts reasoning_effort: low/medium/high. "low" keeps the
+    # composer's chain of thought short and cheap (weak reasoning) — faster
+    # replies at a slight cost in carefulness. Raise to medium/high if
+    # correctness matters more than latency/cost.
+    reasoning_effort: low
     presence_penalty: 0.4
     frequency_penalty: 0.35
   planner:
@@ -339,7 +339,7 @@ detailed_max_tokens: 4096
 budget:
   enabled: true
   max_chars: 24000
-  context_blocks: 12000
+  context_blocks: 16000
   knowledge_blocks: 6000
   web_blocks: 2000
   session_messages: 6000

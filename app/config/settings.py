@@ -114,11 +114,11 @@ class Settings(BaseSettings):
 
     rag_context_min: int = 20
     rag_context_max: int = 50
-    rag_anchor_max: int = 10
+    rag_anchor_max: int = 16
     rag_context_window_before: int = 10
     rag_context_window_after: int = 10
-    rag_context_window_max_total: int = 220
-    rag_hybrid_top_k: int = 20
+    rag_context_window_max_total: int = 360
+    rag_hybrid_top_k: int = 40
     rag_humor_top_k: int = 15
     rag_humor_anchor_max: int = 5
     rag_humor_max_quotes: int = 2

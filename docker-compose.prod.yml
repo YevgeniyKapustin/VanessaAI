@@ -28,14 +28,25 @@ services:
     # NOTE: `docker compose up -d` does NOT rebuild an existing
     # `vanessa-app:latest` — pass `--build` (or use the deploy script, which
     # always runs `docker build`).
-    volumes: !reset []
+    # EXCEPTION: the knowledge vault (./knowledge) is the bot's memory source of
+    # truth — curated on the host and written by the memory pipeline. It MUST be
+    # mounted, otherwise the container builds a fresh, mostly-empty vault from
+    # scratch (empty dossiers, empty «Цитатник»/«Хроника») and the bot falls
+    # back to raw chat-history search. Dev source mounts (app/config) stay out.
+    # NOTE: use !override, not !reset — !reset empties the list.
+    volumes: !override
+      - ./knowledge:/app/knowledge
     restart: always
     stop_grace_period: 45s
 
   bot:
-    # Keep the Obsidian vault + SSH (runtime data) but drop the dev source
-    # bind-mounts so the built image is authoritative.
-    volumes: !reset
+    # Keep the shared knowledge vault + the Obsidian vault + SSH (runtime data)
+    # but drop the dev source bind-mounts so the built image is authoritative.
+    # ./knowledge must be shared so api and bot read/write the same vault (the
+    # bot's memory source of truth) instead of each building a private one.
+    # NOTE: use !override, not !reset — !reset empties the list.
+    volumes: !override
+      - ./knowledge:/app/knowledge
       - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
       - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
     restart: always

@@ -14,10 +14,11 @@ def test_composer_generation_loaded_from_content():
     assert params.max_tokens == 2048
     assert params.presence_penalty == 0.4
     assert params.frequency_penalty == 0.35
-    # The composer forces a deep chain of thought on every reply (fewer logical
-    # errors) — reasoning_effort is forwarded to the DeepSeek V4 API.
-    assert params.reasoning_effort == "high"
-    assert params.to_llm_kwargs()["reasoning_effort"] == "high"
+    # The composer runs a weak (low) chain of thought on every reply — faster
+    # and cheaper than high, at a slight cost in carefulness. reasoning_effort
+    # is forwarded to the DeepSeek V4 API.
+    assert params.reasoning_effort == "low"
+    assert params.to_llm_kwargs()["reasoning_effort"] == "low"
 
 
 def test_planner_generation_is_more_deterministic():

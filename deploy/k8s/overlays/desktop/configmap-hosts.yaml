@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vanessa-config
+  namespace: vanessa
+data:
+  POSTGRES_HOST: host.docker.internal
+  QDRANT_HOST: host.docker.internal

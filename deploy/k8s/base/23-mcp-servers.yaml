@@ -1,0 +1,174 @@
+# MCP servers: isolated tool services, each with its own resources.
+# Only the agent-core may call them (see 30-networkpolicy.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-websearch
+  namespace: vanessa
+  labels: { app: vanessa, component: mcp-websearch }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vanessa, component: mcp-websearch }
+  template:
+    metadata:
+      labels: { app: vanessa, component: mcp-websearch }
+    spec:
+      containers:
+        - name: server
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.mcp_server.runner", "websearch", "--port", "8101"]
+          ports: [{ containerPort: 8101, name: mcp }]
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-websearch
+  namespace: vanessa
+spec:
+  selector: { app: vanessa, component: mcp-websearch }
+  ports: [{ port: 8101, targetPort: mcp, name: mcp }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-knowledge
+  namespace: vanessa
+  labels: { app: vanessa, component: mcp-knowledge }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vanessa, component: mcp-knowledge }
+  template:
+    metadata:
+      labels: { app: vanessa, component: mcp-knowledge }
+    spec:
+      containers:
+        - name: server
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.mcp_server.runner", "knowledge", "--port", "8102"]
+          ports: [{ containerPort: 8102, name: mcp }]
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          readinessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
+      volumes:
+        - name: knowledge
+          persistentVolumeClaim: { claimName: vanessa-knowledge }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-knowledge
+  namespace: vanessa
+spec:
+  selector: { app: vanessa, component: mcp-knowledge }
+  ports: [{ port: 8102, targetPort: mcp, name: mcp }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-vision
+  namespace: vanessa
+  labels: { app: vanessa, component: mcp-vision }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vanessa, component: mcp-vision }
+  template:
+    metadata:
+      labels: { app: vanessa, component: mcp-vision }
+    spec:
+      containers:
+        - name: server
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.mcp_server.runner", "vision", "--port", "8103"]
+          ports: [{ containerPort: 8103, name: mcp }]
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+          readinessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-vision
+  namespace: vanessa
+spec:
+  selector: { app: vanessa, component: mcp-vision }
+  ports: [{ port: 8103, targetPort: mcp, name: mcp }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-obsidian
+  namespace: vanessa
+  labels: { app: vanessa, component: mcp-obsidian }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vanessa, component: mcp-obsidian }
+  template:
+    metadata:
+      labels: { app: vanessa, component: mcp-obsidian }
+    spec:
+      containers:
+        - name: server
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.mcp_server.runner", "obsidian", "--port", "8104"]
+          ports: [{ containerPort: 8104, name: mcp }]
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "250m", memory: "256Mi" }
+          readinessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - { name: obsidian-ssh, mountPath: /root/.ssh, readOnly: true }
+      volumes:
+        - name: obsidian-ssh
+          secret:
+            secretName: vanessa-obsidian-ssh
+            defaultMode: 0600
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-obsidian
+  namespace: vanessa
+spec:
+  selector: { app: vanessa, component: mcp-obsidian }
+  ports: [{ port: 8104, targetPort: mcp, name: mcp }]

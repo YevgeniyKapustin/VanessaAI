@@ -14,10 +14,16 @@ sqlalchemy = { version = ">=2.0.36", extras = ["asyncio"] }
 asyncpg = ">=0.30.0"
 alembic = ">=1.14.0"
 qdrant-client = ">=1.12.0"
+# Async message broker for cross-service transport (Redis Streams).
+redis = ">=5.0"
 sentence-transformers = ">=3.3.0"
 torch = { version = ">=2.4,<3", source = "pytorch-cpu" }
 anthropic = ">=0.40.0"
 openai = ">=1.0.0"
+# Model Context Protocol — servers (FastMCP) + client (streamable HTTP / stdio).
+# Pinned to 1.x: aiogram 3.x requires pydantic <2.12, while mcp 2.x requires
+# pydantic >=2.12 — only mcp 1.x coexists with the bot in one environment.
+mcp = ">=1.5.0,<2"
 pydantic-settings = ">=2.6.0"
 httpx = ">=0.28.0"
 python-dotenv = ">=1.0.1"
@@ -36,6 +42,8 @@ priority = "explicit"
 pytest = ">=8.3.0"
 pytest-asyncio = ">=0.24.0"
 pytest-cov = "^7.1.0"
+# In-memory Redis for broker tests (no server required).
+fakeredis = ">=2.23"
 
 [build-system]
 requires = ["poetry-core>=1.9.0"]

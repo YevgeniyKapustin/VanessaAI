@@ -1,0 +1,10 @@
+{
+  "plugins": {
+    "langfuse": {
+      "enabled": true
+    },
+    "grafana-assistant": {
+      "enabled": true
+    }
+  }
+}

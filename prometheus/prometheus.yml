@@ -1,8 +1,12 @@
 # Prometheus scrape config for VanessaAI.
-# Targets: api (FastAPI /metrics) and bot (threaded /metrics on 9101).
+# Targets: api (FastAPI /metrics), bot (threaded /metrics on 9101),
+# worker (threaded /metrics on 9102) and the MCP servers.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules.yml
 
 scrape_configs:
   - job_name: vanessa-api
@@ -13,3 +17,15 @@ scrape_configs:
   - job_name: vanessa-bot
     static_configs:
       - targets: ["bot:9101"]
+
+  - job_name: vanessa-worker
+    static_configs:
+      - targets: ["worker:9102"]
+
+  - job_name: vanessa-mcp
+    static_configs:
+      - targets:
+          - "mcp-websearch:8101"
+          - "mcp-knowledge:8102"
+          - "mcp-vision:8103"
+          - "mcp-obsidian:8104"

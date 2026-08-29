@@ -1,5 +1,7 @@
 .env
 .ssh/
+deploy/k8s/secrets.env
+deploy/k8s/*.secrets.yaml
 data/
 knowledge/
 .venv/

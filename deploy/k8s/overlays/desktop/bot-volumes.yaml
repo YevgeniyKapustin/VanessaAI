@@ -1,0 +1,11 @@
+- op: replace
+  path: /spec/template/spec/volumes/0
+  value:
+    name: knowledge
+    emptyDir: {}
+- op: replace
+  path: /spec/template/spec/containers/0/volumeMounts/0
+  value:
+    name: knowledge
+    mountPath: /app/knowledge
+    readOnly: false

@@ -1,0 +1,21 @@
+# Shared state for Vanessa. Postgres/Qdrant/Redis data is managed by the
+# backing store; these PVCs cover the file-backed state.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vanessa-knowledge
+  namespace: vanessa
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests: { storage: 10Gi }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vanessa-hf-cache
+  namespace: vanessa
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 20Gi }

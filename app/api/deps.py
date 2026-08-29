@@ -179,6 +179,34 @@ def get_decision_engine(
     return create_decision_engine(embeddings, vector_store)
 
 
+_task_dispatcher = None
+
+
+def get_task_dispatcher():
+    """Lazy singleton broker task dispatcher (worker mode) shared across requests.
+
+    Created only when ``settings.worker_enabled`` — the heavy embedding work is
+    then handed to the dedicated worker container via the broker instead of the
+    in-process executor.
+    """
+    global _task_dispatcher
+    if _task_dispatcher is None and settings.worker_enabled:
+        from app.broker.redis_streams import RedisStreamBroker
+        from app.broker.streams import BrokerStreams
+        from app.worker.dispatcher import BrokerTaskDispatcher
+
+        streams = BrokerStreams.from_settings(settings)
+        _task_dispatcher = BrokerTaskDispatcher(
+            RedisStreamBroker(
+                settings.broker_redis_url,
+                stream_maxlen=settings.broker_stream_maxlen,
+                dlq_enabled=settings.broker_dlq_enabled,
+            ),
+            tasks_stream=streams.tasks,
+        )
+    return _task_dispatcher
+
+
 def get_message_indexing(
     messages: MessageRepository = Depends(get_message_repository),
     hybrid_search: HybridSearchService = Depends(get_hybrid_search),
@@ -189,6 +217,7 @@ def get_message_indexing(
         session_factory=async_session_factory,
         max_retries=settings.indexing_max_retries,
         background=get_app_container().background,
+        dispatcher=get_task_dispatcher(),
     )
 
 
@@ -196,18 +225,23 @@ def get_turn_metrics() -> TurnMetricsProtocol:
     return turn_metrics
 
 
-async def get_incoming_turn_handler(
-    messages: MessageRepository = Depends(get_message_repository),
-    users: UserRepositoryProtocol = Depends(get_user_repository),
-    hybrid_search: HybridSearchService = Depends(get_hybrid_search),
-    indexing: MessageIndexingSchedulerProtocol = Depends(get_message_indexing),
-    llm: LLMProviderProtocol = Depends(get_llm_provider),
-    decision_engine: DecisionEngineProtocol = Depends(get_decision_engine),
-    query_rewriter: QueryRewriter = Depends(get_query_rewriter),
-    uow: UnitOfWorkProtocol = Depends(get_unit_of_work),
-    metrics: TurnMetricsProtocol = Depends(get_turn_metrics),
-    web_search: WebSearchService | None = Depends(get_web_search),
+def build_orchestrator(
+    messages: MessageRepositoryProtocol,
+    users: UserRepositoryProtocol,
+    hybrid_search: HybridSearchService,
+    indexing: MessageIndexingSchedulerProtocol,
+    llm: LLMProviderProtocol,
+    decision_engine: DecisionEngineProtocol,
+    query_rewriter: QueryRewriter,
+    uow: UnitOfWorkProtocol,
+    metrics: TurnMetricsProtocol,
+    web_search: WebSearchService | None,
 ) -> IncomingTurnHandlerProtocol:
+    """Assemble the full Gate → RAG → Compose → Critique → Finalize pipeline.
+
+    Shared by the HTTP request dependency (``get_incoming_turn_handler``) and
+    the broker turn worker, so both transports run the identical pipeline.
+    """
     config = OrchestratorConfig.from_settings()
     container = get_app_container()
     humor = HumorPipeline(hybrid_search, hybrid_search, config)
@@ -308,4 +342,30 @@ async def get_incoming_turn_handler(
         eval=RagTriadEvaluator(),
         # Background one-line captions for photos (RAG-by-meaning enrichment).
         photo_captioner=PhotoCaptioner(),
+    )
+
+
+async def get_incoming_turn_handler(
+    messages: MessageRepository = Depends(get_message_repository),
+    users: UserRepositoryProtocol = Depends(get_user_repository),
+    hybrid_search: HybridSearchService = Depends(get_hybrid_search),
+    indexing: MessageIndexingSchedulerProtocol = Depends(get_message_indexing),
+    llm: LLMProviderProtocol = Depends(get_llm_provider),
+    decision_engine: DecisionEngineProtocol = Depends(get_decision_engine),
+    query_rewriter: QueryRewriter = Depends(get_query_rewriter),
+    uow: UnitOfWorkProtocol = Depends(get_unit_of_work),
+    metrics: TurnMetricsProtocol = Depends(get_turn_metrics),
+    web_search: WebSearchService | None = Depends(get_web_search),
+) -> IncomingTurnHandlerProtocol:
+    return build_orchestrator(
+        messages,
+        users,
+        hybrid_search,
+        indexing,
+        llm,
+        decision_engine,
+        query_rewriter,
+        uow,
+        metrics,
+        web_search,
     )

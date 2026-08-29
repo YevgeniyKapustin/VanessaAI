@@ -1,0 +1,31 @@
+# VanessaAI alerting rules (evaluated by Prometheus).
+# Reference in prometheus.yml via rule_files.
+groups:
+  - name: vanessa-broker
+    rules:
+      - alert: VanessaBrokerDLQGrowth
+        expr: increase(vanessa_broker_dlq_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Messages are landing in a broker DLQ ({{ $labels.stream }})"
+          description: "Increase of {{ $value }} dead-lettered messages on stream {{ $labels.stream }} over 5m — a handler is failing."
+
+      - alert: VanessaBrokerConsumerLag
+        expr: vanessa_broker_consumer_lag > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Broker consumer group is falling behind ({{ $labels.stream }}/{{ $labels.group }})"
+          description: "{{ $value }} pending messages for group {{ $labels.group }} on {{ $labels.stream }} — consumers are not keeping up."
+
+      - alert: VanessaWorkerDLQBacklog
+        expr: vanessa_broker_dlq_depth{stream=~".*tasks.*"} > 50
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker task DLQ is accumulating"
+          description: "{{ $value }} unprocessed worker tasks in the DLQ — the worker may be down or failing."

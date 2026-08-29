@@ -143,6 +143,116 @@ services:
       - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
       - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
 
+  # --- Background worker -----------------------------------------------------
+  # Consumes TaskMessage jobs from the broker (message indexing, sweep,
+  # portraits, knowledge reindex) in an isolated process/container so heavy
+  # CPU/RAM work never stalls the reply path. Enabled by setting WORKER_ENABLED
+  # (routing indexing through the broker) and pointing the bot at the broker
+  # (TRANSPORT=redis). Safe to run even without those: the polling loops only
+  # start in worker mode, and an empty task stream is a no-op.
+  worker:
+    <<: *app-image
+    command: python -m app.worker.main
+    restart: unless-stopped
+    stop_grace_period: 45s
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./config:/app/config
+      - ./knowledge:/app/knowledge
+      - ./data/logs:/app/logs
+      - huggingface_cache:/app/.cache/huggingface
+    # Isolate the heavy CPU/RAM background work from the reply path.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  # --- MCP servers (external tools over SSE) ---------------------------------
+  # Each is an isolated process/container exposing its own /health, /metrics
+  # and /mcp endpoint; the agent core calls them over the wire (never imports).
+  mcp-websearch:
+    <<: *app-image
+    command: python -m app.mcp_server.runner websearch --port 8101
+    restart: unless-stopped
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  mcp-knowledge:
+    <<: *app-image
+    command: python -m app.mcp_server.runner knowledge --port 8102
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./knowledge:/app/knowledge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  mcp-vision:
+    <<: *app-image
+    command: python -m app.mcp_server.runner vision --port 8103
+    restart: unless-stopped
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+
+  mcp-obsidian:
+    <<: *app-image
+    command: python -m app.mcp_server.runner obsidian --port 8104
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
+      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
   # --- Observability ---------------------------------------------------------
   langfuse-db:
     image: postgres:16-alpine

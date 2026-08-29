@@ -58,7 +58,9 @@ async def lifespan(app: FastAPI):
 
     sweep_task: asyncio.Task | None = None
     portrait_task: asyncio.Task | None = None
-    if settings.knowledge_sweep_enabled:
+    # In worker mode the sweep/portrait loops run in the dedicated worker
+    # container (isolated CPU/RAM); the API does not start them here.
+    if settings.knowledge_sweep_enabled and not settings.worker_enabled:
         metrics_pipeline = MetricsPipeline(
             MetricsStore(vault, vault_index),
             MetricsPlanner(),
@@ -91,7 +93,7 @@ async def lifespan(app: FastAPI):
     # Hierarchical dossier summarization: periodically compress each People card
     # into a compact portrait so the compose prompt never dumps a 100+ line
     # dossier as background context.
-    if settings.knowledge_portrait_enabled:
+    if settings.knowledge_portrait_enabled and not settings.worker_enabled:
         portrait_worker = PortraitWorker(
             PortraitBuilder(vault),
             poll_seconds=settings.knowledge_portrait_poll_seconds,
@@ -113,6 +115,64 @@ async def lifespan(app: FastAPI):
         alert_task = asyncio.create_task(alert_manager.run_forever())
         logger.info("AlertManager started (chat_id=%s)", settings.alerting_dev_chat_id)
 
+    # Broker transport (Redis Streams): consume turns in-process and relay
+    # outbox rows. Only started when the bot is configured to use the broker.
+    broker_task: asyncio.Task | None = None
+    outbox_task: asyncio.Task | None = None
+    broker_metrics_task: asyncio.Task | None = None
+    broker = None
+    if settings.transport == "redis":
+        from uuid import uuid4
+
+        from app.api.broker_worker import BrokerTurnWorker
+        from app.broker.metrics_collector import BrokerMetricsCollector
+        from app.broker.redis_streams import RedisStreamBroker
+        from app.broker.streams import BrokerStreams
+        from app.outbox.relay import OutboxRelay
+
+        streams = BrokerStreams.from_settings(settings)
+        broker = RedisStreamBroker(
+            settings.broker_redis_url,
+            stream_maxlen=settings.broker_stream_maxlen,
+            dlq_enabled=settings.broker_dlq_enabled,
+        )
+        consumer_suffix = settings.broker_consumer_id or uuid4().hex[:6]
+        turn_worker = BrokerTurnWorker(
+            broker,
+            stream=streams.turns,
+            group=settings.broker_group_agent_core,
+            consumer=f"{settings.broker_group_agent_core}-{consumer_suffix}",
+            dedup=broker.dedup_guard(),
+        )
+        broker_task = asyncio.create_task(turn_worker.run_forever())
+        logger.info(
+            "broker_turn_worker_started stream=%s group=%s",
+            streams.turns,
+            settings.broker_group_agent_core,
+        )
+        if settings.outbox_enabled:
+            outbox_relay = OutboxRelay(
+                broker,
+                async_session_factory,
+                poll_seconds=settings.outbox_poll_seconds,
+                batch_size=settings.outbox_batch_size,
+                max_attempts=settings.outbox_max_attempts,
+            )
+            outbox_task = asyncio.create_task(outbox_relay.run_forever())
+            logger.info("outbox_relay_started")
+        broker_metrics_collector = BrokerMetricsCollector(
+            broker,
+            streams,
+            groups=[
+                (streams.turns, settings.broker_group_agent_core),
+                (streams.tasks, settings.broker_group_worker),
+            ],
+            poll_seconds=15.0,
+        )
+        broker_metrics_task = asyncio.create_task(
+            broker_metrics_collector.run_forever()
+        )
+
     yield
 
     if alert_task is not None:
@@ -133,6 +193,20 @@ async def lifespan(app: FastAPI):
             await portrait_task
         except asyncio.CancelledError:
             pass
+    for task, name in (
+        (broker_task, "broker_turn_worker"),
+        (outbox_task, "outbox_relay"),
+        (broker_metrics_task, "broker_metrics"),
+    ):
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            logger.info("%s stopped", name)
+    if broker is not None:
+        await broker.close()
     await get_app_container().background.shutdown()
     await engine.dispose()
 

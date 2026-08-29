@@ -52,6 +52,34 @@ services:
     restart: always
     stop_grace_period: 45s
 
+  # Prod overrides for the background worker and MCP servers: drop the dev
+  # source mounts so the built image is authoritative (keep the runtime data
+  # mounts each service actually needs).
+  worker:
+    volumes: !override
+      - ./knowledge:/app/knowledge
+    restart: always
+    stop_grace_period: 45s
+
+  mcp-websearch:
+    volumes: !reset []
+    restart: always
+
+  mcp-knowledge:
+    volumes: !override
+      - ./knowledge:/app/knowledge
+    restart: always
+
+  mcp-vision:
+    volumes: !reset []
+    restart: always
+
+  mcp-obsidian:
+    volumes: !override
+      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
+      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/root/.ssh:ro
+    restart: always
+
   # --- Load balancer --------------------------------------------------------
   nginx:
     image: nginx:1.27-alpine

@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 
 from app.config import settings
@@ -7,6 +8,8 @@ from app.bot.services.chat_access import ChatAccessGuard
 from app.bot.services.protocols import ChatApiClientProtocol
 from app.bot.stickers import StickerDecider, StickerService, build_catalog
 from app.knowledge.vault import KnowledgeVault
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,11 +41,32 @@ def create_bot_services() -> BotServices:
         min_messages_between=stickers_config.min_messages_between,
         tag_probability=stickers_config.tag_probability,
     )
-    return BotServices(
-        chat_client=HttpChatApiClient(
+    # Transport selection: HTTP (legacy /api/v1/chat) or the broker (Redis
+    # Streams RPC). The handler code is identical either way — both implement
+    # ChatApiClientProtocol.
+    if settings.transport == "redis":
+        from app.bot.services.broker_client import BrokerTurnClient
+        from app.broker.redis_streams import RedisStreamBroker
+        from app.broker.streams import BrokerStreams
+
+        chat_client: ChatApiClientProtocol = BrokerTurnClient(
+            RedisStreamBroker(
+                settings.broker_redis_url,
+                stream_maxlen=settings.broker_stream_maxlen,
+                dlq_enabled=settings.broker_dlq_enabled,
+            ),
+            streams=BrokerStreams.from_settings(settings),
+            timeout=settings.broker_rpc_timeout_seconds,
+        )
+        logger.info("bot_transport=redis streams=%s", settings.broker_streams_prefix)
+    else:
+        chat_client = HttpChatApiClient(
             timeout=settings.api_client_read_timeout,
             connect_timeout=settings.api_client_connect_timeout,
-        ),
+        )
+
+    return BotServices(
+        chat_client=chat_client,
         access_guard=ChatAccessGuard(),
         knowledge=KnowledgeVault(),
         texts=content.bot,

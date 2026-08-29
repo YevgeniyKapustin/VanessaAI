@@ -1,0 +1,39 @@
+# bot: Telegram transport (long polling). Thin; no DB/Qdrant access.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot
+  namespace: vanessa
+  labels: { app: vanessa, component: bot }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: vanessa, component: bot }
+  template:
+    metadata:
+      labels: { app: vanessa, component: bot }
+    spec:
+      containers:
+        - name: bot
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.bot.main"]
+          ports:
+            - { containerPort: 9101, name: metrics }
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "1Gi" }
+          volumeMounts:
+            - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
+            - { name: obsidian-ssh, mountPath: /root/.ssh, readOnly: true }
+      volumes:
+        - name: knowledge
+          persistentVolumeClaim: { claimName: vanessa-knowledge }
+        - name: obsidian-ssh
+          secret:
+            secretName: vanessa-obsidian-ssh
+            defaultMode: 0600
+            optional: true

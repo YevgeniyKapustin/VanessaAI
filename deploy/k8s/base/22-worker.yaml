@@ -1,0 +1,56 @@
+# worker: consumes task jobs from the broker; owns sweep/portraits/indexing.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: vanessa
+  labels: { app: vanessa, component: worker }
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: vanessa, component: worker }
+  template:
+    metadata:
+      labels: { app: vanessa, component: worker }
+    spec:
+      containers:
+        - name: worker
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.worker.main"]
+          ports:
+            - { containerPort: 9102, name: metrics }
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits: { cpu: "4", memory: "6Gi" }
+          volumeMounts:
+            - { name: knowledge, mountPath: /app/knowledge }
+            - { name: hf-cache, mountPath: /app/.cache/huggingface }
+      volumes:
+        - name: knowledge
+          persistentVolumeClaim: { claimName: vanessa-knowledge }
+        - name: hf-cache
+          persistentVolumeClaim: { claimName: vanessa-hf-cache }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker
+  namespace: vanessa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 75 }

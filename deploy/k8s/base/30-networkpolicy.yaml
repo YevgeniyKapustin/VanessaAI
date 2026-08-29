@@ -1,0 +1,94 @@
+# Default-deny ingress + explicit allow rules. Backing stores
+# (redis / postgres / qdrant) must carry the component labels referenced here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: vanessa
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Broker (Redis): bot / agent-core / worker may publish & consume.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-redis
+  namespace: vanessa
+spec:
+  podSelector:
+    matchLabels: { component: redis }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: vanessa } }
+      ports: [{ port: 6379 }]
+---
+# Postgres: only agent-core and worker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-postgres
+  namespace: vanessa
+spec:
+  podSelector:
+    matchLabels: { component: postgres }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: component, operator: In, values: [agent-core, worker] }
+      ports: [{ port: 5432 }]
+---
+# Qdrant: only agent-core and worker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-qdrant
+  namespace: vanessa
+spec:
+  podSelector:
+    matchLabels: { component: qdrant }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: component, operator: In, values: [agent-core, worker] }
+      ports:
+        - { port: 6333 }
+        - { port: 6334 }
+---
+# MCP servers: ONLY agent-core may call them (no cross-MCP, no bot).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-agent-core-to-mcp
+  namespace: vanessa
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: component, operator: In, values: [mcp-websearch, mcp-knowledge, mcp-vision, mcp-obsidian] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: vanessa, component: agent-core } }
+      ports: [{ port: 8101 }, { port: 8102 }, { port: 8103 }, { port: 8104 }]
+---
+# agent-core HTTP: from the ingress controller / monitoring (and bot for the
+# legacy HTTP transport fallback).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-agent-core-http
+  namespace: vanessa
+spec:
+  podSelector:
+    matchLabels: { app: vanessa, component: agent-core }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: vanessa, component: bot } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+      ports: [{ port: 8000 }]

@@ -1,0 +1,76 @@
+# agent-core: the orchestrator (Gate → RAG → Compose → …) + broker turn worker.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-core
+  namespace: vanessa
+  labels: { app: vanessa, component: agent-core }
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: vanessa, component: agent-core }
+  template:
+    metadata:
+      labels: { app: vanessa, component: agent-core }
+    spec:
+      containers:
+        - name: api
+          image: vanessa-app:local
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "alembic upgrade head && uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30"]
+          ports:
+            - { containerPort: 8000, name: http }
+            - { containerPort: 9100, name: metrics }
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+            - secretRef: { name: vanessa-secrets }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "2", memory: "4Gi" }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
+            - { name: hf-cache, mountPath: /app/.cache/huggingface }
+      volumes:
+        - name: knowledge
+          persistentVolumeClaim: { claimName: vanessa-knowledge }
+        - name: hf-cache
+          persistentVolumeClaim: { claimName: vanessa-hf-cache }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-core
+  namespace: vanessa
+spec:
+  selector: { app: vanessa, component: agent-core }
+  ports:
+    - { port: 8000, targetPort: http, name: http }
+    - { port: 9100, targetPort: metrics, name: metrics }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agent-core
+  namespace: vanessa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agent-core
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

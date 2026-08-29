@@ -166,6 +166,52 @@ http_client_duration_seconds = Histogram(
     registry=registry,
 )
 
+# --- Broker (Redis Streams transport) ----------------------------------------
+broker_published_total = Counter(
+    "vanessa_broker_published_total",
+    "Messages published to broker streams",
+    ["stream", "kind"],
+    registry=registry,
+)
+broker_consumed_total = Counter(
+    "vanessa_broker_consumed_total",
+    "Messages consumed from broker streams",
+    ["stream", "kind"],
+    registry=registry,
+)
+broker_dlq_total = Counter(
+    "vanessa_broker_dlq_total",
+    "Messages moved to a dead-letter stream",
+    ["stream"],
+    registry=registry,
+)
+broker_rpc_duration_seconds = Histogram(
+    "vanessa_broker_rpc_duration_seconds",
+    "Broker RPC round-trip latency in seconds",
+    ["kind"],
+    buckets=_TURN_BUCKETS,
+    registry=registry,
+)
+# Queue health gauges refreshed by BrokerMetricsCollector.
+broker_stream_length = Gauge(
+    "vanessa_broker_stream_length",
+    "Number of entries in a broker stream",
+    ["stream"],
+    registry=registry,
+)
+broker_consumer_lag = Gauge(
+    "vanessa_broker_consumer_lag",
+    "Pending (unacked) entries for a consumer group",
+    ["stream", "group"],
+    registry=registry,
+)
+broker_dlq_depth = Gauge(
+    "vanessa_broker_dlq_depth",
+    "Number of entries in a dead-letter stream",
+    ["stream"],
+    registry=registry,
+)
+
 # --- LLM ---------------------------------------------------------------------
 llm_requests_total = Counter(
     "vanessa_llm_requests_total",
@@ -505,6 +551,22 @@ def record_http_client(service: str, status: int | None, seconds: float) -> None
     code = str(status) if status is not None else "error"
     http_client_requests_total.labels(service=service, status=code).inc()
     http_client_duration_seconds.labels(service=service).observe(seconds)
+
+
+def record_broker_publish(stream: str, kind: str) -> None:
+    broker_published_total.labels(stream=stream, kind=kind).inc()
+
+
+def record_broker_consume(stream: str, kind: str) -> None:
+    broker_consumed_total.labels(stream=stream, kind=kind).inc()
+
+
+def record_broker_dlq(stream: str) -> None:
+    broker_dlq_total.labels(stream=stream).inc()
+
+
+def record_broker_rpc(kind: str, seconds: float) -> None:
+    broker_rpc_duration_seconds.labels(kind=kind).observe(seconds)
 
 
 def record_llm_request(

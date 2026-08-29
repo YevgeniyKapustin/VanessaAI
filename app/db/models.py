@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Index, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -57,4 +57,40 @@ class Message(Base):
         Index("ix_messages_search_vector", "search_vector", postgresql_using="gin"),
         Index("ix_messages_created_at", "created_at"),
         Index("ix_messages_telegram_message_id", "telegram_message_id"),
+    )
+
+
+class OutboxEvent(Base):
+    """Transactional outbox: broker publish that is atomic with a DB write.
+
+    A producer inserts a row in the SAME transaction as its domain writes; the
+    relay worker later publishes it to the broker and marks it delivered. This
+    eliminates the dual-write inconsistency (DB updated but event never sent).
+    """
+
+    __tablename__ = "outbox_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    # Target stream (e.g. "tasks").
+    stream: Mapped[str] = mapped_column(String(128), nullable=False)
+    # Broker message kind, for observability / debugging.
+    kind: Mapped[str] = mapped_column(String(64), nullable=False)
+    message_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    correlation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Serialized stream-field map (see app.broker.serialization.encode).
+    fields: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    # pending → delivered | failed
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="pending"
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index("ix_outbox_events_status_id", "status", "id"),
     )

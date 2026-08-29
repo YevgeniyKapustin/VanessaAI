@@ -626,7 +626,7 @@ async def test_decision_engine_ignores_noise(
 @pytest.mark.asyncio
 async def test_decision_engine_does_not_hard_drop_short_maybe(
     intent_detector: IntentDetector,
-    trigger_checker: TriggerCheckerKeyword,
+    trigger_checker: TriggerKeywordChecker,
 ):
     engine = build_engine(intent_detector, trigger_checker, 0.9)
 
@@ -646,7 +646,7 @@ async def test_decision_engine_does_not_hard_drop_short_maybe(
 @pytest.mark.asyncio
 async def test_decision_engine_listen_window_short_maybe_replies_when_planner_affirms(
     intent_detector: IntentDetector,
-    trigger_checker: TriggerCheckerKeyword,
+    trigger_checker: TriggerKeywordChecker,
 ):
     engine = build_engine(intent_detector, trigger_checker, 0.1)
     recent = [

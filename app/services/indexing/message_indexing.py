@@ -3,6 +3,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.contracts.messages import TaskKind
 from app.core.messages import StoredMessage, RAG_SOURCE_ROLE
 from app.core.protocols import (
     MessageIndexerProtocol,
@@ -11,6 +12,7 @@ from app.core.protocols import (
 )
 from app.db.repository import MessageRepository
 from app.services.background import BackgroundExecutor
+from app.worker.dispatcher import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +25,14 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
         session_factory: async_sessionmaker[AsyncSession],
         max_retries: int = 2,
         background: BackgroundExecutor | None = None,
+        dispatcher: TaskDispatcher | None = None,
     ) -> None:
         self._indexer = indexer
         self._messages = messages
         self._session_factory = session_factory
         self._max_retries = max_retries
         self._background = background
+        self._dispatcher = dispatcher
 
     async def _embed_with_retry(self, record: StoredMessage) -> str:
         if record.role != RAG_SOURCE_ROLE:
@@ -71,6 +75,20 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
 
     def schedule(self, record: StoredMessage) -> None:
         if record.role != RAG_SOURCE_ROLE:
+            return
+        if self._dispatcher is not None:
+            # Worker mode: hand the embedding off to the dedicated worker
+            # container via the broker (at-least-once on the consumer side).
+            self._dispatcher.submit(
+                TaskKind.INDEX_MESSAGE,
+                {
+                    "message_id": record.id,
+                    "role": record.role,
+                    "content": record.content,
+                    "point_id": record.qdrant_point_id,
+                },
+                dedup_key=f"index:{record.id}",
+            )
             return
         if self._background is not None:
             # Bounded background queue: never lets indexing tasks pile up

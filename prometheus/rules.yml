@@ -29,3 +29,23 @@ groups:
         annotations:
           summary: "Worker task DLQ is accumulating"
           description: "{{ $value }} unprocessed worker tasks in the DLQ — the worker may be down or failing."
+
+  - name: nginx
+    rules:
+      - alert: NginxExporterDown
+        expr: up{job="nginx"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "nginx-prometheus-exporter is down"
+          description: "Prometheus cannot scrape nginx-exporter:9113."
+
+      - alert: NginxHighActiveConnections
+        expr: nginx_connections_active > 800
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx active connections are high"
+          description: "{{ $value }} active connections (worker_connections is 1024)."

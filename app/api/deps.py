@@ -237,7 +237,7 @@ def build_orchestrator(
     metrics: TurnMetricsProtocol,
     web_search: WebSearchService | None,
 ) -> IncomingTurnHandlerProtocol:
-    """Assemble the full Gate → RAG → Compose → Critique → Finalize pipeline.
+    """Assemble the Gate → Retrieve → Compose → Finalize pipeline.
 
     Shared by the HTTP request dependency (``get_incoming_turn_handler``) and
     the broker turn worker, so both transports run the identical pipeline.

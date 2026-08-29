@@ -22,7 +22,7 @@ class HttpChatApiClient:
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = (base_url or settings.api_base_url).rstrip("/")
-        # The pipeline (Gate -> Retrieve -> Compose -> Critique) can take 2-6s+,
+        # The pipeline (Gate -> Retrieve -> Compose) can take 2-6s+,
         # so the read/write timeout must be generous; the connect timeout stays
         # short so an unreachable API fails fast instead of hanging the handler.
         self._timeout = (

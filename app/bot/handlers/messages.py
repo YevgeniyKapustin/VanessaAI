@@ -224,8 +224,8 @@ async def _typing_loop(
     """Re-send the Telegram "typing" action while the pipeline runs.
 
     Telegram's typing state expires after ~5s, so it must be refreshed in a
-    loop for the whole duration of a slow Gate -> Retrieve -> Compose ->
-    Critique request (2-6s+). Each ping is guarded individually: a single
+    loop for the whole duration of a slow Gate -> Retrieve -> Compose
+    request (2-6s+). Each ping is guarded individually: a single
     failed ping (e.g. Telegram 429 flood control or a transient network error)
     must NOT stop the indicator for the rest of the turn, so this loop only
     exits via cancellation from _typing_on_signal. After consecutive failures

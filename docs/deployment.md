@@ -1,0 +1,95 @@
+# Deployment
+
+Local Docker Compose is the default runtime. Production is Kubernetes.
+CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs tests
+on push/PR; image build and cluster apply are not in GitHub Actions yet.
+
+## Repository layout
+
+```
+app/
+  bot/          Telegram handlers, formatting, API client
+  api/          FastAPI, DI, routes
+  decision/     Gate: prefilter, rules, intent, rate limit
+  llm/          Providers, prompts, planner, humor
+  knowledge/    Vault: format, indexes, retriever, writer, sweep
+  rag/          Hybrid search, Qdrant, ReAct, query rewriter
+  services/     Orchestrator, pipeline stages, metrics
+  ingest/       Telegram export import
+config/content/ Per-section YAML (persona, conversation, llm, …)
+knowledge/      Runtime vault data
+scripts/        import, reindex, portraits, stickers, k8s secrets
+tests/          Automated tests
+deploy/k8s/     Kubernetes manifests
+```
+
+## Local Compose
+
+Copy [`.env.example`](../.env.example) to `.env.local` and fill it. That
+file is the overlay recipe (secrets, flags, `COMPOSE_FILE`). Defaults:
+[`.env.defaults`](../.env.defaults).
+
+```bash
+python scripts/prepare_env.py
+# python scripts/prepare_env.py --from .env --dry-run
+
+docker compose --env-file .env.defaults --env-file .env.local up -d --build
+```
+
+`prepare_env.py` copies secrets and non-default knobs from `.env` into
+`.env.local`. If `up` fails because `migrate` exited non-zero, inspect
+`docker compose logs migrate` and re-run migrate. `api` waits on
+`service_completed_successfully`.
+
+Services: API `http://localhost:8000`, Qdrant `6333`, Postgres `5432`.
+Nginx under `deploy/nginx/` is only for the Compose prod path.
+
+## Production Compose
+
+No bind-mounts, API unpublished, Nginx. Copy `.env.example` to
+`.env.production` (gitignored; host or CI). Uncomment the production
+block in that file. Then:
+
+```bash
+docker compose --env-file .env.defaults --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.infra.yml \
+  -f docker-compose.langfuse.yml -f docker-compose.monitoring.yml \
+  -f docker-compose.prod.yml up -d --build
+```
+
+YAML content (not env): [Configuration](configuration.md).
+
+## Import history (optional)
+
+```bash
+poetry install
+poetry run python scripts/import_telegram_history.py --export path/to/result.json
+```
+
+## Tests
+
+```bash
+poetry run pytest
+```
+
+## Kubernetes
+
+Rolling updates: `maxUnavailable: 0` + `maxSurge: 1` on agent-core /
+worker / MCP; probes on `/health/live` and `/health/ready`. Design,
+topology, NetworkPolicy, and secrets CLI: **[deploy/k8s/README.md](../deploy/k8s/README.md)**.
+Do not duplicate that doc here.
+
+```bash
+poetry run python scripts/k8s_secrets.py apply --ensure-namespace
+kubectl apply -k deploy/k8s/
+kubectl -n vanessa rollout restart deploy
+```
+
+- `GET /health` / `/health/live` — liveness (process only).
+- `GET /health/ready` — Postgres `SELECT 1`; kubelet keeps the pod out of
+  Service until 200.
+- API: uvicorn `--timeout-graceful-shutdown`; bot: aiogram drain on
+  SIGTERM.
+
+`scripts/k8s_secrets.py` reads a host overlay (not git) and applies
+`vanessa-secrets`.

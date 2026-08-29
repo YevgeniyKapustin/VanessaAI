@@ -16,7 +16,7 @@ class LLMChatCompleter(Protocol):
     """Single-turn chat completion shared by the turn planner across providers.
 
     ``kind`` labels the caller so token usage and latency are attributable to
-    the right stage (planner / critic / memory / metrics / sweep).
+    the right stage (planner / memory / metrics / sweep).
     """
 
     async def complete(

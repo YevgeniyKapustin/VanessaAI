@@ -1,8 +1,8 @@
 """Agent-core broker worker.
 
 Active when ``settings.transport == "redis"``: consumes ``TurnRequest``
-messages from the broker, runs the exact same Gate → RAG → Compose →
-Critique → Finalize pipeline as the HTTP path (via ``build_orchestrator``),
+messages from the broker, runs the exact same Gate → Retrieve → Compose →
+Finalize pipeline as the HTTP path (via ``build_orchestrator``),
 and publishes ``TurnStarted`` (typing) + ``TurnReply`` to the request's
 private reply stream.
 """

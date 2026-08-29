@@ -17,7 +17,7 @@ Incremental migration of the VanessaAI monolith toward:
 | Package | Single `vanessa` Poetry package, `app/` |
 | Deploy units | 2 containers, one image: `bot` (aiogram) + `api` (FastAPI) |
 | Bot to core | Synchronous HTTP `POST /api/v1/chat`, 2–6s+ wait |
-| Agent core | Gate → RAG → Compose → Critique → Finalize, inside the API |
+| Agent core | Gate → Retrieve → Compose → Finalize, inside the API |
 | Background | In-process `BackgroundExecutor` (sweep, portrait, memory, indexing) |
 | Embeddings | `sentence-transformers`, loaded in the API process |
 | Data | Postgres, Qdrant |
@@ -65,7 +65,7 @@ flowchart LR
 | Service | Responsibility | Deploys as | Talks to |
 |---|---|---|---|
 | `bot` | Telegram polling, formatting, media groups, typing | container | broker only |
-| `agent-core` | Gate → RAG → Compose → Critique → Finalize | container (scalable) | broker, Postgres, MCP servers |
+| `agent-core` | Gate → Retrieve → Compose → Finalize | container (scalable) | broker, Postgres, MCP servers |
 | `worker` | sweep, portraits, memory, message indexing, vector reindex | container | broker, Postgres, Qdrant, MCP-knowledge |
 | `mcp-knowledge` | vault read/search + RAG retrieval as MCP tools | container, SSE | Qdrant, Postgres, vault |
 | `mcp-websearch` | web search tools (DDG / Serper / Tavily) | container, SSE | external search APIs |

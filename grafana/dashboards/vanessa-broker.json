@@ -5,21 +5,66 @@
   "graphTooltip": 1,
   "title": "Vanessa — Broker & Worker",
   "uid": "vanessa-broker",
-  "version": 1,
+  "version": 2,
   "time": { "from": "now-1h", "to": "now" },
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["vanessa"],
+  "tags": ["vanessa", "broker"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(up, environment)",
+        "includeAll": true,
+        "label": "Environment",
+        "multi": true,
+        "name": "env",
+        "options": [],
+        "query": { "query": "label_values(up, environment)", "refId": "StandardVariableQuery" },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(up{environment=~\"$env\"}, instance)",
+        "includeAll": true,
+        "label": "Instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": { "query": "label_values(up{environment=~\"$env\"}, instance)", "refId": "StandardVariableQuery" },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
   "panels": [
+    {
+      "id": 100,
+      "title": "Pub / Sub",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
     {
       "id": 1,
       "title": "Broker publish rate",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "targets": [
         {
-          "expr": "sum by (stream) (rate(vanessa_broker_published_total[5m]))",
+          "expr": "sum by (stream) (rate(vanessa_broker_published_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))",
           "legendFormat": "{{stream}}",
           "refId": "A"
         }
@@ -30,24 +75,46 @@
       "title": "Broker consume rate",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "sum by (stream) (rate(vanessa_broker_consumed_total[5m]))",
+          "expr": "sum by (stream) (rate(vanessa_broker_consumed_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))",
           "legendFormat": "{{stream}}",
           "refId": "A"
         }
       ]
     },
     {
+      "id": 101,
+      "title": "Dead letter & lag",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
       "id": 3,
       "title": "DLQ growth",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": false },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
       "targets": [
         {
-          "expr": "sum by (stream) (increase(vanessa_broker_dlq_total[5m]))",
+          "expr": "sum by (stream) (increase(vanessa_broker_dlq_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))",
           "legendFormat": "{{stream}}",
           "refId": "A"
         }
@@ -58,15 +125,30 @@
       "title": "Stream length & DLQ depth",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": false },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
       "targets": [
         {
-          "expr": "vanessa_broker_stream_length",
+          "expr": "vanessa_broker_stream_length{environment=~\"$env\",instance=~\"$instance\"}",
           "legendFormat": "len {{stream}}",
           "refId": "A"
         },
         {
-          "expr": "vanessa_broker_dlq_depth",
+          "expr": "vanessa_broker_dlq_depth{environment=~\"$env\",instance=~\"$instance\"}",
           "legendFormat": "dlq {{stream}}",
           "refId": "B"
         }
@@ -77,24 +159,46 @@
       "title": "Consumer lag (pending)",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never", "spanNulls": false },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
       "targets": [
         {
-          "expr": "vanessa_broker_consumer_lag",
+          "expr": "vanessa_broker_consumer_lag{environment=~\"$env\",instance=~\"$instance\"}",
           "legendFormat": "{{stream}}/{{group}}",
           "refId": "A"
         }
       ]
     },
     {
+      "id": 102,
+      "title": "MCP RPC",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
       "id": 6,
       "title": "MCP RPC latency p95",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 19 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(vanessa_broker_rpc_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(vanessa_broker_rpc_duration_seconds_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])))",
           "legendFormat": "{{kind}}",
           "refId": "A"
         }

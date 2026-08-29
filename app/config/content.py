@@ -256,6 +256,7 @@ class BotNotesMessages(BaseModel):
 
 class BotMessagesContent(BaseModel):
     welcome: str
+    photo_placeholder: str = "[фото]"
     access: BotAccessMessages
     notes: BotNotesMessages
 
@@ -544,6 +545,10 @@ def _load_content_dict(source: Path) -> dict:
 def get_content() -> AppContent:
     source = resolve_content_source()
     return AppContent.model_validate(_load_content_dict(source))
+
+
+def get_photo_placeholder() -> str:
+    return get_content().bot.photo_placeholder
 
 
 def get_bot_name_aliases() -> tuple[str, ...]:

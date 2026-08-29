@@ -199,7 +199,8 @@ and a relevance threshold.
 ### Requirements
 
 - Docker and Docker Compose
-- Keys: `TELEGRAM_BOT_TOKEN`, `DEEPSEEK_API_KEY` (or `ANTHROPIC_API_KEY` if
+- Overlay secrets (copy `.env.example` → `.env.local`, never commit):
+  `TELEGRAM_BOT_TOKEN`, `DEEPSEEK_API_KEY` (or `ANTHROPIC_API_KEY` if
   `LLM_PROVIDER=claude`)
 - `REQUIRED_USER_TELEGRAM_ID` — owner user ID (the bot only works in chats
   where that user is present)
@@ -210,15 +211,38 @@ and a relevance threshold.
 ### Run
 
 ```bash
-cp .env.example .env
-# fill in .env
+python scripts/prepare_env.py
+# or: python scripts/prepare_env.py --from .env --dry-run
 
-docker compose up -d --build
+docker compose --env-file .env.defaults --env-file .env.local up -d --build
 ```
 
-`.env.example` sets `COMPOSE_FILE` to app + infra + Langfuse + monitoring +
+The script copies secrets and non-default knobs from the current `.env`
+into `.env.local`. Manual path: `cp .env.example .env.local` and fill keys.
+
+`.env.defaults` sets `COMPOSE_FILE` to app + infra + Langfuse + monitoring +
 dev override. Drop `docker-compose.langfuse.yml` and
-`docker-compose.monitoring.yml` from that list on a weak machine.
+`docker-compose.monitoring.yml` from that list on a weak machine (put the
+shorter `COMPOSE_FILE` in `.env.local`). On Windows Compose, use `;` instead
+of `:` in `COMPOSE_FILE`.
+
+Production compose (no bind-mounts, API unpublished, Nginx):
+
+```bash
+cp .env.example .env.production
+# set secrets, TRANSPORT=redis, WORKER_ENABLED=true, METRICS_REQUIRE_TOKEN=true
+# and COMPOSE_FILE without override.yml (see comments in .env.example)
+
+docker compose --env-file .env.defaults --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.infra.yml \
+  -f docker-compose.langfuse.yml -f docker-compose.monitoring.yml \
+  -f docker-compose.prod.yml up -d --build
+```
+
+Secrets stay in gitignored overlays (`.env.local`, `.env.production`, `.env`).
+On Kubernetes they are applied with `scripts/k8s_secrets.py` from a host env
+file, not from git. Compose prod should get `.env.production` from the host
+or CI at deploy time.
 
 If `up` fails because `migrate` exited non-zero, inspect
 `docker compose logs migrate` and re-run migrate — `api` waits on
@@ -263,8 +287,13 @@ tests/          400 tests
 ## Configuration (essentials)
 
 Behavior tuning lives in **`config/content/`** — one YAML file per concern
-(persona, conversation window, LLM sampling). Environment variables cover
-secrets and infrastructure.
+(persona, conversation window, LLM sampling, bot copy such as
+`bot.photo_placeholder`). Environment files cover infrastructure and secrets:
+
+- [`.env.defaults`](.env.defaults) — committed non-secret defaults (five
+  sections: system, LLM, memory/RAG, broker, observability)
+- [`.env.example`](.env.example) — overlay template (empty secrets + local/prod
+  flags); copy to `.env.local` or `.env.production`
 
 | `content/` key | Purpose |
 |--------------------|---------|
@@ -285,43 +314,16 @@ does not apply them today.
 | Env variable | Purpose |
 |--------------|---------|
 | `LLM_PROVIDER` | LLM backend: `deepseek` (default) or `claude` |
-| `DEEPSEEK_PLANNER_MODEL` | Separate DeepSeek planner model (optional) |
-| `ANTHROPIC_PLANNER_MODEL` | Separate Claude planner model (optional) |
-| `VISION_ENABLED` | Image understanding on/off (photos auto-described via vision model) |
-| `DEEPSEEK_VISION_MODEL` | Vision compose model (default `deepseek-v4-flash-vision-exp`) |
-| `VISION_MAX_IMAGE_BYTES` | Largest Telegram photo size (bytes) used per image |
-| `VISION_SESSION_IMAGES` | Max prior session images attached for follow-ups |
-| `VISION_MAX_IMAGES_PER_TURN` | Hard cap on images sent per vision turn |
-| `VISION_PHOTO_CANDIDATES` | Max photos in the "photo album" the bot can re-send |
-| `VISION_PHOTO_CAPTION_ENABLED` | Generate one-line photo captions (RAG-by-meaning) in background |
-| `VISION_PHOTO_CAPTION_MODEL` | Caption model; empty = the vision model |
-| `VISION_PHOTO_CAPTION_MAX_CHARS` | Max length of a generated photo caption |
-| `CRITIC_ENABLED` | Enable the humor critic loop (humor turns only) |
-| `CRITIC_MAX_ITERATIONS` | Max regeneration rounds after a REJECTED draft |
-| `CRITIC_MODEL` | Optional separate model for the critic |
-| `CRITIC_APPLY_TO_ALL` | Critique all replies instead of humor-only |
-| `DECISION_RELEVANCE_THRESHOLD` | Semantic relevance threshold |
-| `DECISION_METRICS_RULE_ENABLED` | Enable the metrics-based toxicity/trust gate |
-| `DECISION_TOXICITY_IGNORE_THRESHOLD` | Toxicity at/above which a low-trust sender may be ignored |
-| `DECISION_TRUST_IGNORE_THRESHOLD` | Trust at/below which a toxic sender may be ignored |
-| `KNOWLEDGE_METRICS_ENABLED` | Enable per-participant mood & relationship metrics |
-| `QDRANT_KNOWLEDGE_COLLECTION` | Qdrant collection for the semantic vault notes |
-| `KNOWLEDGE_VECTOR_TOP_K` | Top-K for the semantic vault vector search |
-| `KNOWLEDGE_VECTOR_MIN_SCORE` | Min cosine score for a vault note to be used |
-| `KNOWLEDGE_PARTICIPANT_MAX_PEOPLE` | Max people in the planner's participants digest |
-| `KNOWLEDGE_PARTICIPANT_MAX_FACTS` | Max recent facts per person in the digest |
-| `RAG_REACT_MAX_STEPS` | ReAct steps for deep search |
-| `EMBEDDING_THREADS` | Dedicated thread pool size for local embedding inference (default 1) |
-| `BACKGROUND_QUEUE_SIZE` | Bounded queue size for post-reply background work (memory/metrics/indexing) |
-| `BACKGROUND_WORKERS` | Worker tasks consuming the background queue |
-| `CONTENT_CONFIG_PATH` | Path to content dir (one YAML per section) or a single file |
-| `METRICS_ENABLED` | Expose Prometheus metrics (`/metrics` on API, `:9101` on bot) |
-| `LANGFUSE_ENABLED` | Enable Langfuse LLM/RAG tracing (off by default) |
-| `LANGFUSE_SAMPLE_RATE` | Fraction of turns traced (0..1) |
-| `RAG_EVAL_ENABLED` | Enable sampled LLM-as-judge RAG Triad evaluation |
-| `ALERTING_ENABLED` | Enable in-process alerting to a Telegram dev channel |
+| `TRANSPORT` | `http` (local) or `redis` (prod broker RPC) |
+| `WORKER_ENABLED` | Route indexing/sweep to the worker container |
+| `WEB_SEARCH_ENABLED` | Live search inject into compose |
+| `VISION_ENABLED` | Image understanding on/off |
+| `LANGFUSE_ENABLED` | Langfuse tracing (off by default) |
+| `METRICS_ENABLED` | Prometheus `/metrics` |
 
-See `.env.example` for the full list.
+Ops knobs (models, RAG sizes, pools) live in `.env.defaults`. Secrets and
+per-machine flags go in the overlay. Claude keys are optional and stay out of
+defaults; set them only with `LLM_PROVIDER=claude`.
 
 ## Observability
 
@@ -347,7 +349,8 @@ Observability is layered across the two processes and correlated by
   alerts on provider HTTP 402.
 
 All observability features are **off by default** so the bot behaves exactly as
-before until explicitly enabled via `.env`. See [`plans/observability.md`](plans/observability.md)
+before until explicitly enabled via the overlay env file. See
+[`plans/observability.md`](plans/observability.md)
 for the full design and metric catalog.
 
 ## Deploy (Kubernetes)

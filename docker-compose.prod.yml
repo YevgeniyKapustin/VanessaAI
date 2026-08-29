@@ -1,15 +1,22 @@
 # Production override — zero-downtime deployment. Do not include
 # docker-compose.override.yml (dev bind-mounts).
-# Run: docker compose -f docker-compose.yml -f docker-compose.infra.yml
+# Run: docker compose --env-file .env.defaults --env-file .env.production
+#   -f docker-compose.yml -f docker-compose.infra.yml
 #   -f docker-compose.langfuse.yml -f docker-compose.monitoring.yml
 #   -f docker-compose.prod.yml up -d
 
+x-prod-env-files: &prod-env-files
+  - .env.defaults
+  - .env.production
+
 services:
   migrate:
+    env_file: *prod-env-files
     volumes: !reset []
     restart: "no"
 
   api:
+    env_file: *prod-env-files
     ports: !reset []
     command: >
       uvicorn app.api.main:app --host 0.0.0.0 --port 8000
@@ -21,6 +28,7 @@ services:
     stop_grace_period: 45s
 
   bot:
+    env_file: *prod-env-files
     volumes: !override
       - ./knowledge:/app/knowledge
       - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
@@ -29,21 +37,25 @@ services:
     stop_grace_period: 45s
 
   worker:
+    env_file: *prod-env-files
     volumes: !override
       - ./knowledge:/app/knowledge
     restart: always
     stop_grace_period: 45s
 
   mcp-websearch:
+    env_file: *prod-env-files
     volumes: !reset []
     restart: always
 
   mcp-knowledge:
+    env_file: *prod-env-files
     volumes: !override
       - ./knowledge:/app/knowledge
     restart: always
 
   mcp-vision:
+    env_file: *prod-env-files
     volumes: !reset []
     restart: always
 

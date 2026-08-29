@@ -17,6 +17,7 @@ from app.bot.media_groups import MediaGroupBuffer
 from app.bot.messages import IncomingMessage
 from app.bot.stickers.heuristics import is_sticker_request
 from app.bot.telegram_format import markdown_to_telegram_html
+from app.config.content import get_photo_placeholder
 from app.config.settings import settings
 from app.core.messages import ImageAttachment
 from app.decision.models import DecisionAction
@@ -563,7 +564,7 @@ def create_messages_router(services: BotServices) -> Router:
             messages[0],
         )
         caption = (primary.caption or "").strip()
-        text = (caption or settings.vision_photo_placeholder)[:4096]
+        text = (caption or get_photo_placeholder())[:4096]
         incoming = IncomingMessage.from_telegram(
             primary,
             images=tuple(images),
@@ -651,7 +652,7 @@ def create_messages_router(services: BotServices) -> Router:
             incoming = IncomingMessage.from_telegram(
                 telegram_message,
                 images=tuple(images),
-                text=(caption or settings.vision_photo_placeholder)[:4096],
+                text=(caption or get_photo_placeholder())[:4096],
             )
 
         async with _typing_on_signal(

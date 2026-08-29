@@ -20,8 +20,9 @@ poetry run python scripts/k8s_secrets.py apply --ensure-namespace
 
 What it does:
 
-1. Reads the project `.env` (same file docker-compose uses). `--from-env`
-   points at another file if you keep a dedicated secrets env.
+1. Reads a host env overlay (default: project `.env`; pass `--from-env`
+   `.env.local` or `.env.production`). Non-secret defaults live in
+   `.env.defaults`.
 2. Keeps **only** the secret-key catalog (`app/k8s/secrets.py` /
    `deploy/k8s/secrets.env.example`). Hosts, ports, feature flags stay in
    the ConfigMap — they never leak into the Secret.
@@ -149,7 +150,7 @@ docker build -t vanessa-app:local .
 1. Settings → Kubernetes → Enable Kubernetes → wait for "Kubernetes running".
 2. `kubectl config get-contexts` should list `docker-desktop`.
 3. Build the image: `docker build -t vanessa-app:local .`
-4. Put real values in `.env` (never in git).
+4. Put real values in `.env.local` / `.env` (never in git).
 5. Apply secrets, then workloads:
 
 ```bash

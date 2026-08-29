@@ -1,7 +1,7 @@
 import logging
 import time
 
-from app.config.content import get_content
+from app.config.content import get_content, get_photo_placeholder
 from app.config.settings import settings
 from app.core.messages import (
     ContextMessage,
@@ -115,7 +115,7 @@ class GateStage:
             # Rollback toggle: restore the old "reply to ANY photo" behavior.
             if settings.vision_reply_to_any_photo:
                 return await self._force_vision_turn(ctx)
-            if ctx.turn.message.strip() == settings.vision_photo_placeholder:
+            if ctx.turn.message.strip() == get_photo_placeholder():
                 assert ctx.session is not None
                 if (
                     ctx.session.in_listen_window
@@ -579,9 +579,9 @@ def _photo_caption_for(message) -> str:
     if message.photo_caption and message.photo_caption.strip():
         return message.photo_caption.strip()
     content = (message.content or "").strip()
-    if content and content != settings.vision_photo_placeholder:
+    if content and content != get_photo_placeholder():
         return content
-    return settings.vision_photo_placeholder
+    return get_photo_placeholder()
 
 
 def _collect_photo_candidates(
@@ -687,7 +687,7 @@ class ComposeStage:
         # repeat check still applies to captioned photos and text.
         bare_photo = (
             ctx.turn.has_image
-            and ctx.turn.message.strip() == settings.vision_photo_placeholder
+            and ctx.turn.message.strip() == get_photo_placeholder()
         )
         if self._refuse_enabled and not bare_photo and is_repeated_message(
             ctx.turn.message,

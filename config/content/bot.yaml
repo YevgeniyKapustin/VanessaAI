@@ -1,5 +1,6 @@
 welcome: |
   О, снова ты. Ну привет
+photo_placeholder: "[фото]"
 access:
   private_chat: |
     Я работаю только в групповых беседах.

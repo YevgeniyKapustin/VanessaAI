@@ -7,6 +7,13 @@ x-app-image: &app-image
   image: vanessa-app:latest
   build: .
 
+x-env-files: &env-files
+  - .env.defaults
+  - path: .env.local
+    required: false
+  - path: .env
+    required: false
+
 services:
   # One-shot schema migration. API replicas must not run `alembic upgrade`
   # themselves — `--scale api=N` would race N upgrades at once.
@@ -14,8 +21,7 @@ services:
     <<: *app-image
     command: alembic upgrade head
     restart: "no"
-    env_file:
-      - .env
+    env_file: *env-files
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,8 +35,7 @@ services:
       --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     ports:
       - "${API_PORT:-8000}:8000"
-    env_file:
-      - .env
+    env_file: *env-files
     restart: unless-stopped
     # Give in-flight requests time to finish after SIGTERM (see /health/ready).
     stop_grace_period: 45s
@@ -63,8 +68,7 @@ services:
     restart: unless-stopped
     # aiogram stops polling on SIGTERM and lets in-flight updates drain.
     stop_grace_period: 45s
-    env_file:
-      - .env
+    env_file: *env-files
     depends_on:
       api:
         condition: service_healthy
@@ -83,8 +87,7 @@ services:
     command: python -m app.worker.main
     restart: unless-stopped
     stop_grace_period: 45s
-    env_file:
-      - .env
+    env_file: *env-files
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,8 +113,7 @@ services:
     <<: *app-image
     command: python -m app.mcp_server.runner websearch --port 8101
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: *env-files
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
       interval: 10s
@@ -129,8 +131,7 @@ services:
     <<: *app-image
     command: python -m app.mcp_server.runner knowledge --port 8102
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: *env-files
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
       interval: 10s
@@ -148,8 +149,7 @@ services:
     <<: *app-image
     command: python -m app.mcp_server.runner vision --port 8103
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: *env-files
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
       interval: 10s

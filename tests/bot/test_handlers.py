@@ -18,8 +18,7 @@ from app.bot.handlers.messages import (
     create_messages_router,
 )
 from app.bot.messages.response import ChatProcessResult
-from app.config.content import get_content
-from app.config.settings import settings
+from app.config.content import get_content, get_photo_placeholder
 from tests.bot.test_bot_message import make_telegram_message
 
 
@@ -658,7 +657,7 @@ async def test_handle_photo_downloads_and_sends_image_to_api():
     # The API received a bare photo as the placeholder text + one base64 image.
     call = services.chat_client.process.await_args
     incoming = call.args[0]
-    assert incoming.text == settings.vision_photo_placeholder
+    assert incoming.text == get_photo_placeholder()
     assert len(incoming.images) == 1
     assert incoming.images[0].data_url.startswith("data:image/jpeg;base64,")
     assert incoming.images[0].telegram_file_id == "large"

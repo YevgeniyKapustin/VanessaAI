@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Single entry point for Vanessa Kubernetes secrets.
 
-Reads the project .env (same file docker-compose uses), keeps only the
+Reads a host env overlay (default: project `.env`), keeps only the
 secret-key catalog, validates required keys, and applies one Opaque Secret
 (`vanessa-secrets`) plus an optional SSH Secret (`vanessa-obsidian-ssh`).
 

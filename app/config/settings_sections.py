@@ -16,7 +16,7 @@ class SharedSettings(BaseSettings):
     """Common infrastructure settings every service needs."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env.defaults", ".env.local", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -165,7 +165,6 @@ class CoreMixin:
     vision_max_image_bytes: int = 1_500_000
     vision_session_images: int = 2
     vision_max_images_per_turn: int = 2
-    vision_photo_placeholder: str = "[фото]"
     vision_reply_to_any_photo: bool = False
     vision_media_group_debounce_seconds: float = 1.5
     vision_media_group_max_photos: int = 10

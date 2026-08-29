@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!.env.defaults
 .ssh/
 *.pem
 *.key

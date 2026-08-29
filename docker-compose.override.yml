@@ -1,4 +1,4 @@
-# Local development bind-mounts. Auto-included via COMPOSE_FILE in .env.example.
+# Local development bind-mounts. Auto-included via COMPOSE_FILE in .env.defaults.
 # Do not pass this file in production (-f list without override).
 services:
   migrate:

@@ -18,8 +18,6 @@ project: knowing when not to speak.
 She also remembers people. There are cards (who is who, lore, memes, old fights).
 Search hits those first. Raw chat history only if the cards are empty.
 
-I built this as a pet project for one Telegram group.
-
 <br clear="right"/>
 
 ## How a message gets handled

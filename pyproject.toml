@@ -74,7 +74,7 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/**" = ["E402", "BLE001"]
+"scripts/**" = ["E402", "BLE001", "I001", "EXE001"]
 "alembic/env.py" = ["F401"]
 "services/bot/handlers/**" = ["BLE001"]
 "services/worker/**" = ["BLE001"]

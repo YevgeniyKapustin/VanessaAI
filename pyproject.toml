@@ -70,6 +70,9 @@ fail_under = 90
 target-version = "py312"
 line-length = 100
 
+[tool.ruff.lint.isort]
+known-first-party = ["vanessa", "services"]
+
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
 

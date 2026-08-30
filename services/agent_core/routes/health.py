@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, Response
 from sqlalchemy import text
 
-from vanessa.db.session import engine
+from vanessa.infrastructure.db.session import engine
 
 router = APIRouter()
 

@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 
 from vanessa.core.request_context import get_request_id, new_request_id, request_id_var
-from vanessa.observability.metrics import record_http
+from vanessa.infrastructure.observability.metrics import record_http
 
 
 def register_request_id_middleware(app: FastAPI) -> None:

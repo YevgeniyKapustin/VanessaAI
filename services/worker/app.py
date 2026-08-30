@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from vanessa.broker.backends import Delivery
+from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.contracts.messages import TaskMessage
 
 logger = logging.getLogger(__name__)

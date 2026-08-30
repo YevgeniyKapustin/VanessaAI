@@ -30,7 +30,7 @@ modal_verbs:
 # another one"). Combined with sender awareness (the message must come from the
 # same user the bot just answered), these make terse continuations explicit
 # requests even when the post-reply listen window has expired. Empty = built-in
-# fallback set in vanessa/decision/gate/continuation.py.
+# fallback set in vanessa/pipeline/decision/gate/continuation.py.
 continuation_phrases:
   - а ещё
   - и ещё

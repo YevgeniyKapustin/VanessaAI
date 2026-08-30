@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from vanessa.core.users import nicknames
+from vanessa.knowledge.users import nicknames
 
 
 def test_format_nicknames_for_planner_dedupes_repeated_display_names(monkeypatch):

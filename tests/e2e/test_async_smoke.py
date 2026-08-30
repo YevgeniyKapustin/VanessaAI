@@ -15,8 +15,8 @@ from aiogram import Bot
 from services.agent_core import broker_worker as bw
 from services.bot.messages import IncomingMessage
 from services.bot.services.broker_client import BrokerTurnClient
-from vanessa.broker.redis_streams import RedisStreamBroker
-from vanessa.broker.streams import BrokerStreams
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.streams import BrokerStreams
 from vanessa.core.request_context import get_request_id, get_planning_started_signal
 from vanessa.core.turn import ConversationTurnResult
 

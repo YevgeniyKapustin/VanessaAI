@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict
+from typing import Any, NotRequired, Protocol, TypedDict
 
 from vanessa.config.content import MemeDefContent
+from vanessa.core.knowledge_dto import KnowledgeBlock
 from vanessa.core.messages import (
     ContextBlock,
     ContextMessage,
@@ -11,10 +12,8 @@ from vanessa.core.messages import (
     WebResult,
 )
 from vanessa.core.turn import ChatTurnInput, ConversationTurnResult
-from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.core.turn_metrics import TurnMetricsSnapshot
 
-if TYPE_CHECKING:
-    from vanessa.services.turn_metrics import TurnMetricsSnapshot
 
 class VectorSearchHit(TypedDict):
     message_id: int
@@ -211,6 +210,23 @@ class MessageIndexingSchedulerProtocol(Protocol):
     def schedule(self, record: StoredMessage) -> None: ...
 
 
+class LLMChatCompleter(Protocol):
+    """Single-turn chat completion shared by planner / gate / eval.
+
+    ``kind`` labels the caller so token usage and latency are attributable to
+    the right stage (planner / memory / metrics / sweep / reaction_gate).
+    """
+
+    async def complete(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        kind: str = "completion",
+        **kwargs: Any,
+    ) -> str: ...
+
+
 class LLMProviderProtocol(Protocol):
     async def generate(
         self,
@@ -281,6 +297,6 @@ class TurnMetricsProtocol(Protocol):
         deep_search: bool = False,
     ) -> None: ...
 
-    def snapshot(self) -> "TurnMetricsSnapshot": ...
+    def snapshot(self) -> TurnMetricsSnapshot: ...
 
     def reset(self) -> None: ...

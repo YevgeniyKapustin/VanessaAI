@@ -13,7 +13,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from vanessa.broker.backends import Delivery
+from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.contracts.messages import TurnReply, TurnRequest, TurnStarted
 from vanessa.core.messages import ImageAttachment
 from vanessa.core.protocols import IncomingTurnHandlerProtocol
@@ -22,7 +22,7 @@ from vanessa.core.request_context import (
     set_planning_started_signal,
 )
 from vanessa.core.turn import ChatTurnInput, ConversationTurnResult
-from vanessa.db.session import async_session_factory
+from vanessa.infrastructure.db.session import async_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,10 @@ def default_handler_builder(session) -> IncomingTurnHandlerProtocol:
     from services.agent_core import deps
     from services.agent_core.container import get_app_container
     from vanessa.config import settings
-    from vanessa.db.repository import MessageRepository, UserRepository
-    from vanessa.db.session import async_session_factory
-    from vanessa.services.indexing.message_indexing import MessageIndexingService
-    from vanessa.services.turn_metrics import turn_metrics
+    from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
+    from vanessa.infrastructure.db.session import async_session_factory
+    from vanessa.pipeline.indexing.message_indexing import MessageIndexingService
+    from vanessa.pipeline.turn_metrics import turn_metrics
 
     messages = MessageRepository(session)
     users = UserRepository(session)

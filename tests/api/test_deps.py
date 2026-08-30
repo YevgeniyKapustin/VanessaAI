@@ -14,13 +14,13 @@ from services.agent_core.deps import (
     get_unit_of_work,
     get_user_repository,
 )
-from vanessa.db.repository import MessageRepository, UserRepository
-from vanessa.db.uow import SqlAlchemyUnitOfWork
-from vanessa.decision import DecisionEngine
-from vanessa.rag.search.hybrid_search import HybridSearchService
-from vanessa.services.indexing.message_indexing import MessageIndexingService
-from vanessa.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
-from vanessa.services.turn_metrics import TurnMetrics
+from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
+from vanessa.infrastructure.db.uow import SqlAlchemyUnitOfWork
+from vanessa.pipeline.decision import DecisionEngine
+from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
+from vanessa.pipeline.indexing.message_indexing import MessageIndexingService
+from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
+from vanessa.pipeline.turn_metrics import TurnMetrics
 
 
 def test_get_turn_metrics_returns_singleton():

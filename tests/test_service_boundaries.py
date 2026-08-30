@@ -10,10 +10,8 @@ def _python_sources(package: str) -> list[Path]:
 def test_bot_does_not_import_data_plane_or_siblings() -> None:
     forbidden = (
         "vanessa.knowledge",
-        "vanessa.db",
-        "vanessa.llm",
-        "vanessa.rag",
-        "vanessa.decision",
+        "vanessa.pipeline",
+        "vanessa.infrastructure.db",
         "services.agent_core",
         "services.worker",
         "services.mcp",

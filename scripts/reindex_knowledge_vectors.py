@@ -23,8 +23,8 @@ if str(_PROJECT_ROOT) not in sys.path:
 from vanessa.config.settings import settings
 from vanessa.knowledge.vault import KnowledgeVault
 from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
-from vanessa.rag.embeddings.local_embeddings import LocalEmbeddingProvider
-from vanessa.rag.qdrant_client import KnowledgeQdrantStore
+from vanessa.pipeline.rag.embeddings.local_embeddings import LocalEmbeddingProvider
+from vanessa.pipeline.rag.qdrant_client import KnowledgeQdrantStore
 
 
 async def main() -> int:

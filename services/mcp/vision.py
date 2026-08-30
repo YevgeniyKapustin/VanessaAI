@@ -9,7 +9,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from vanessa.core.messages import ImageAttachment
-from vanessa.llm.photo_captioner import PhotoCaptioner
+from vanessa.pipeline.llm.photo_captioner import PhotoCaptioner
 
 
 def build_server(captioner: PhotoCaptioner | None = None) -> FastMCP:

@@ -1,0 +1,224 @@
+import pytest
+
+from vanessa.core.messages import ContextMessage
+from vanessa.pipeline.decision.detectors.intent import IntentDetector
+from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
+from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
+from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
+
+
+@pytest.fixture
+def prefilter() -> PlannerPrefilter:
+    intent = IntentDetector()
+    triggers = TriggerKeywordChecker(("помоги", "объясни", "найди", "расскажи"))
+    noise = NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12))
+    eligibility = ReplyEligibility(
+        intent,
+        triggers,
+        noise,
+        ChatIgnoreRegistry(),
+    )
+    return PlannerPrefilter(eligibility)
+
+
+def test_prefilter_skips_side_talk(prefilter: PlannerPrefilter):
+    result = prefilter.evaluate(
+        "Гриша меш гексы поле боя генерация",
+        [],
+    )
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
+def test_prefilter_defers_question_to_reaction_gate(prefilter: PlannerPrefilter):
+    # A non-addressed question is no longer hard-dropped as side talk: it is
+    # deferred to the reaction gate so the bot actually "considers" it.
+    result = prefilter.evaluate(
+        "что думаешь про тик така",
+        [],
+    )
+
+    assert result.run_planner is True
+    assert result.reason == "question"
+
+
+def test_prefilter_runs_on_bot_name(prefilter: PlannerPrefilter):
+    result = prefilter.evaluate(
+        "Vanessa, что нового?",
+        [],
+    )
+
+    assert result.run_planner is True
+    assert result.reason == "bot_name"
+
+
+def test_prefilter_runs_on_reply_to_bot(prefilter: PlannerPrefilter):
+    result = prefilter.evaluate(
+        "да именно",
+        [],
+        reply_to_bot=True,
+    )
+
+    assert result.run_planner is True
+    assert result.reason == "direct_address"
+
+
+def test_prefilter_skips_reply_to_other_user(prefilter: PlannerPrefilter):
+    result = prefilter.evaluate(
+        "Личь не делает карты по героям",
+        [],
+        reply_to_other_user=True,
+    )
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_noise(prefilter: PlannerPrefilter):
+    result = prefilter.evaluate("ок", [])
+
+    assert result.run_planner is False
+    assert result.reason == "noise"
+
+
+def test_prefilter_defers_short_maybe_message(prefilter: PlannerPrefilter):
+    # A short but possibly meaningful message ("го" = "let's go") is no longer
+    # hard-dropped as noise: it is deferred to the reaction gate so the neural
+    # network decides when there is doubt.
+    result = prefilter.evaluate("го", [])
+
+    assert result.run_planner is True
+    assert result.reason == "short_maybe"
+
+
+def test_prefilter_runs_follow_up_question(prefilter: PlannerPrefilter):
+    recent = [
+        ContextMessage(id=1, role="user", content="Vanessa, расскажи"),
+        ContextMessage(id=2, role="assistant", content="Кратко"),
+        ContextMessage(id=3, role="user", content="а про токены?"),
+    ]
+
+    result = prefilter.evaluate("а про токены?", recent)
+
+    assert result.run_planner is True
+    assert result.reason == "listen_window"
+
+
+def test_prefilter_listen_window_covers_side_talk_after_bot_reply(
+    prefilter: PlannerPrefilter,
+):
+    recent = [
+        ContextMessage(id=1, role="user", content="Vanessa, привет"),
+        ContextMessage(id=2, role="assistant", content="Привет"),
+        ContextMessage(id=3, role="user", content="что думаешь про тик така"),
+    ]
+
+    result = prefilter.evaluate("что думаешь про тик така", recent)
+
+    assert result.run_planner is True
+    assert result.reason == "listen_window"
+
+
+def test_prefilter_listen_window_covers_up_to_four_user_messages(
+    prefilter: PlannerPrefilter,
+):
+    # With the widened 4-message window, three interleaved user messages after
+    # the bot's reply are still "considered" (listen window).
+    recent = [
+        ContextMessage(id=1, role="assistant", content="Ответ бота"),
+        ContextMessage(id=2, role="user", content="один"),
+        ContextMessage(id=3, role="user", content="два"),
+        ContextMessage(id=4, role="user", content="три"),
+        ContextMessage(id=5, role="user", content="Гриша меш гексы поле боя генерация"),
+    ]
+
+    result = prefilter.evaluate("Гриша меш гексы поле боя генерация", recent)
+
+    assert result.run_planner is True
+    assert result.reason == "listen_window"
+
+
+def test_prefilter_listen_window_expires_after_four_user_messages(
+    prefilter: PlannerPrefilter,
+):
+    # Five user messages after the bot's reply exceed the 4-message window.
+    recent = [
+        ContextMessage(id=1, role="assistant", content="Ответ бота"),
+        ContextMessage(id=2, role="user", content="один"),
+        ContextMessage(id=3, role="user", content="два"),
+        ContextMessage(id=4, role="user", content="три"),
+        ContextMessage(id=5, role="user", content="четыре"),
+        ContextMessage(id=6, role="user", content="Гриша меш гексы поле боя генерация"),
+    ]
+
+    result = prefilter.evaluate("Гриша меш гексы поле боя генерация", recent)
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_dismissal_go_away(prefilter: PlannerPrefilter):
+    assert prefilter.evaluate("да всё сгинь", []).reason == "dismissal"
+    assert prefilter.evaluate("уйди, закрой сессию", []).reason == "dismissal"
+
+
+def test_prefilter_closes_listen_window_after_dismissal(prefilter: PlannerPrefilter):
+    recent = [
+        ContextMessage(id=1, role="user", content="Vanessa, расскажи"),
+        ContextMessage(id=2, role="assistant", content="Кратко"),
+        ContextMessage(id=3, role="user", content="хватит"),
+        ContextMessage(id=4, role="user", content="а про токены?"),
+    ]
+
+    result = prefilter.evaluate("а про токены?", recent)
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_status_remark_in_listen_window(
+    prefilter: PlannerPrefilter,
+):
+    recent = [
+        ContextMessage(id=1, role="user", content="Vanessa, привет"),
+        ContextMessage(id=2, role="assistant", content="Привет"),
+        ContextMessage(id=3, role="user", content="гомункул работает"),
+    ]
+
+    result = prefilter.evaluate("гомункул работает", recent)
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_third_party_gossip(prefilter: PlannerPrefilter):
+    recent = [
+        ContextMessage(id=1, role="assistant", content="Ответ"),
+        ContextMessage(id=2, role="user", content="почему она меня игнорирует"),
+    ]
+
+    result = prefilter.evaluate("почему она меня игнорирует", recent)
+
+    assert result.run_planner is False
+    assert result.reason == "side_talk"
+
+
+def test_prefilter_skips_quote_echo_reply_to_bot(prefilter: PlannerPrefilter):
+    bot_line = (
+        "Котгаст, ты уже третий круг, скоро Данте тебя запишет в отдельный котёл"
+    )
+    recent = [
+        ContextMessage(id=1, role="assistant", content=bot_line),
+    ]
+
+    result = prefilter.evaluate(
+        bot_line,
+        recent,
+        reply_to_bot=True,
+    )
+
+    assert result.run_planner is False
+    assert result.reason == "quote_echo"

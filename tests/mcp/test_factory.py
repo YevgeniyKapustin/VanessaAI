@@ -1,6 +1,6 @@
-from vanessa.mcp.websearch import McpWebSearch
-from vanessa.services.websearch.factory import create_web_search
-from vanessa.services.websearch.tavily import TavilySearch
+from vanessa.infrastructure.mcp.websearch import McpWebSearch
+from vanessa.infrastructure.websearch.factory import create_web_search
+from vanessa.infrastructure.websearch.tavily import TavilySearch
 
 
 def test_factory_uses_mcp_when_url_set(monkeypatch) -> None:

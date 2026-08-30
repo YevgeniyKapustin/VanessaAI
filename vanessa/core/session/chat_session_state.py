@@ -8,13 +8,13 @@ from vanessa.core.session.session_trim import seconds_since_last_role, trim_sess
 def _is_dismissal_request(text: str) -> bool:
     """Lazy import that breaks the ``chat_session_state -> decision.gate`` cycle.
 
-    ``vanessa.decision`` eagerly imports its whole gate chain (engine -> protocols ->
+    ``vanessa.pipeline.decision`` eagerly imports its whole gate chain (engine -> protocols ->
     prefilter), which back-imports this module. A top-level import here would
-    deadlock when ``vanessa.services`` is imported first (as the services tests do);
+    deadlock when ``vanessa.pipeline`` is imported first (as the services tests do);
     importing inside the call keeps this core session module free of the decision
     dependency until a function actually runs.
     """
-    from vanessa.decision.gate.reply_expectation import is_dismissal_request
+    from vanessa.pipeline.decision.gate.reply_expectation import is_dismissal_request
 
     return is_dismissal_request(text)
 

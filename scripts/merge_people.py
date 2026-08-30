@@ -31,7 +31,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from vanessa.config.settings import settings
-from vanessa.ingest.user_backfill import load_nicknames
+from vanessa.infrastructure.ingest.user_backfill import load_nicknames
 from vanessa.knowledge.format import (
     PEOPLE,
     parse_frontmatter,

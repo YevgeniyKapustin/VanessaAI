@@ -45,8 +45,8 @@ def create_bot_services() -> BotServices:
     # ChatApiClientProtocol.
     if settings.transport == "redis":
         from services.bot.services.broker_client import BrokerTurnClient
-        from vanessa.broker.redis_streams import RedisStreamBroker
-        from vanessa.broker.streams import BrokerStreams
+        from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+        from vanessa.infrastructure.broker.streams import BrokerStreams
 
         chat_client: ChatApiClientProtocol = BrokerTurnClient(
             RedisStreamBroker(

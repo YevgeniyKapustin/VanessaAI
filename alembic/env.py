@@ -7,8 +7,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from vanessa.config import settings
-from vanessa.db.base import Base
-from vanessa.db.models import (  # noqa: F401
+from vanessa.infrastructure.db.base import Base
+from vanessa.infrastructure.db.models import (  # noqa: F401
     KnowledgeDocument,
     KnowledgeNodeRow,
     Message,

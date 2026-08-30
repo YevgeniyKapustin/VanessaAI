@@ -29,7 +29,7 @@ services:
   # run upgrade in the serving process.
   migrate:
     <<: *app-image
-    command: python -m vanessa.db.locked_upgrade
+    command: python -m vanessa.infrastructure.db.locked_upgrade
     restart: "no"
     env_file: *env-files
     depends_on:

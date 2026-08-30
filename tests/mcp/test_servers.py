@@ -79,7 +79,7 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 async def test_knowledge_vault_find_over_http(tmp_path) -> None:
     """MCP contract test: the knowledge server resolves a person alias over the wire."""
 
-    from vanessa.mcp.client import StreamableHttpMcpClient
+    from vanessa.infrastructure.mcp.client import StreamableHttpMcpClient
 
     vault = KnowledgeVault(root_path=str(tmp_path))
     await vault.ensure_structure()

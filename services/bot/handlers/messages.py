@@ -20,7 +20,7 @@ from services.bot.telegram_format import markdown_to_telegram_html
 from vanessa.config.content import get_photo_placeholder
 from vanessa.config.settings import settings
 from vanessa.core.messages import ImageAttachment
-from vanessa.observability.metrics import (
+from vanessa.infrastructure.observability.metrics import (
     record_photo_send,
     record_telegram,
     record_telegram_error,

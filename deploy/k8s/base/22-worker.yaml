@@ -27,7 +27,7 @@ spec:
         - name: migrate
           image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "vanessa.db.locked_upgrade"]
+          command: ["python", "-m", "vanessa.infrastructure.db.locked_upgrade"]
           envFrom:
             - configMapRef: { name: vanessa-config }
           env:

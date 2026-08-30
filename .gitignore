@@ -13,7 +13,7 @@ deploy/k8s/secrets.env
 
 plans/
 data/
-knowledge/
+/knowledge/
 logs/
 *.log
 tmp/

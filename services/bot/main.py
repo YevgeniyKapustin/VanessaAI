@@ -9,14 +9,14 @@ from services.bot.handlers import create_router
 from services.bot.middleware import BotLoggingMiddleware
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
-from vanessa.observability.alerting import create_alert_manager
+from vanessa.infrastructure.observability.alerting import create_alert_manager
 
 configure_logging("bot")
 logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    from vanessa.observability.metrics import start_metrics_http_server
+    from vanessa.infrastructure.observability.metrics import start_metrics_http_server
 
     start_metrics_http_server(settings.bot_metrics_port)
     logger.info(

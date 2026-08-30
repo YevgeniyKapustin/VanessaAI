@@ -6,7 +6,7 @@ from aiogram.enums import ChatType
 
 from services.bot.messages import IncomingMessage
 from services.bot.services.api_client import HttpChatApiClient
-from vanessa.decision.models import DecisionAction
+from vanessa.pipeline.decision.models import DecisionAction
 
 
 def _stream_ctx(

@@ -2,9 +2,9 @@ import fakeredis.aioredis
 import pytest
 
 from services.agent_core import broker_worker as bw
-from vanessa.broker.backends import Delivery
-from vanessa.broker.redis_streams import RedisStreamBroker
-from vanessa.broker.serialization import decode
+from vanessa.infrastructure.broker.backends import Delivery
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.serialization import decode
 from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,

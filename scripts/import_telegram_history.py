@@ -13,14 +13,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from vanessa.core.logging_setup import configure_logging
 from vanessa.config import settings
-from vanessa.db.repository import MessageRepository, UserRepository
-from vanessa.db.session import async_session_factory
-from vanessa.db.uow import SqlAlchemyUnitOfWork
-from vanessa.ingest.importer import HistoryImporter
-from vanessa.ingest.telegram_export import parse_telegram_export
-from vanessa.rag.embeddings.embeddings import LocalEmbeddingProvider
-from vanessa.rag.embeddings.local_embeddings import preload_embedding_model
-from vanessa.rag.qdrant_client import QdrantVectorStore
+from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
+from vanessa.infrastructure.db.session import async_session_factory
+from vanessa.infrastructure.db.uow import SqlAlchemyUnitOfWork
+from vanessa.infrastructure.ingest.importer import HistoryImporter
+from vanessa.infrastructure.ingest.telegram_export import parse_telegram_export
+from vanessa.pipeline.rag.embeddings.embeddings import LocalEmbeddingProvider
+from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
+from vanessa.pipeline.rag.qdrant_client import QdrantVectorStore
 
 configure_logging("import")
 logger = logging.getLogger(__name__)

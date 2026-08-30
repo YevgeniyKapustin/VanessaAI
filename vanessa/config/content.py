@@ -39,7 +39,7 @@ class LLMGenerationProfile(BaseModel):
     reasoning_effort: str | None = None
 
     def to_params(self):
-        from vanessa.llm.planner.generation_config import LLMGenerationParams
+        from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
 
         return LLMGenerationParams(
             temperature=self.temperature,

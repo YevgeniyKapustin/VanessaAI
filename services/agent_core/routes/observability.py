@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from vanessa.observability.metrics import (
+from vanessa.infrastructure.observability.metrics import (
     CONTENT_TYPE_LATEST,
     metrics_token_allowed,
     render_metrics,

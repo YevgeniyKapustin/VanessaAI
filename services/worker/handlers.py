@@ -66,7 +66,7 @@ class IndexMessageHandler:
             return
         try:
             async with self._session_factory() as session:
-                from vanessa.db.repository import MessageRepository
+                from vanessa.infrastructure.db.repository import MessageRepository
 
                 await MessageRepository(session).update_qdrant_point_id(
                     message_id, point
@@ -113,7 +113,7 @@ class SweepHandler:
 
     async def handle(self, task: TaskMessage) -> None:
         async with self._session_factory() as session:
-            from vanessa.db.repository import MessageRepository
+            from vanessa.infrastructure.db.repository import MessageRepository
 
             processed = await self._sweep.run(MessageRepository(session))
             logger.info("worker_sweep processed=%s", processed)
@@ -170,7 +170,7 @@ class MetricsSnapshotHandler:
         self._session_factory = session_factory
 
     async def handle(self, task: TaskMessage) -> None:
-        from vanessa.db.repository import MessageRepository
+        from vanessa.infrastructure.db.repository import MessageRepository
 
         sender = task.payload.get("sender_telegram_id")
         only = {int(sender)} if sender is not None else None
@@ -189,7 +189,7 @@ class PhotoCaptionHandler:
 
     async def handle(self, task: TaskMessage) -> None:
         from vanessa.core.messages import ImageAttachment
-        from vanessa.db.repository import MessageRepository
+        from vanessa.infrastructure.db.repository import MessageRepository
 
         message_id = int(task.payload.get("message_id") or 0)
         if not message_id:
@@ -211,7 +211,7 @@ class PhotoCaptionHandler:
 async def build_worker_handlers() -> WorkerAssembly:
     """Assemble the real handlers + polling loops (worker process)."""
     from vanessa.config import settings
-    from vanessa.db.session import async_session_factory
+    from vanessa.infrastructure.db.session import async_session_factory
     from vanessa.knowledge.index import KnowledgeIndex
     from vanessa.knowledge.memory_planner import MemoryPlanner
     from vanessa.knowledge.metrics.deterministic import DeterministicMetricsCalculator
@@ -224,8 +224,8 @@ async def build_worker_handlers() -> WorkerAssembly:
     from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
     from vanessa.knowledge.writer import KnowledgeVaultWriter
     from vanessa.knowledge.memory_stage import MemoryStage
-    from vanessa.llm.photo_captioner import PhotoCaptioner
-    from vanessa.runtime.vector_stores import (
+    from vanessa.pipeline.llm.photo_captioner import PhotoCaptioner
+    from vanessa.infrastructure.runtime.vector_stores import (
         create_embedding_provider,
         create_knowledge_vector_store,
         create_message_vector_store,

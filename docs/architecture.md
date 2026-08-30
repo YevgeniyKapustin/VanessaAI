@@ -28,11 +28,12 @@ flowchart LR
 - **Compose** — DeepSeek (default) or Claude via the provider adapter.
 - **Post** — Telegram formatting, profanity filter.
 
-Orchestrator stages live in `vanessa/services/pipeline/`; dependencies are
-wired through protocols (`vanessa/core/protocols.py`) so stages stay
+Orchestrator stages live in `vanessa/pipeline/`; gate / retrieve / compose
+code is under `vanessa/pipeline/decision`, `rag`, and `llm`. Dependencies
+are wired through protocols (`vanessa/core/protocols.py`) so stages stay
 testable. Process entrypoints live under `services/` (`bot`, `agent_core`,
 `worker`, `mcp`). Wire contracts are `vanessa/contracts/`; Redis transport
-is `vanessa/broker/`.
+is `vanessa/infrastructure/broker/`. Postgres is `vanessa/infrastructure/db/`.
 
 ## Gate
 

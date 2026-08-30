@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from services.bot.messages import IncomingMessage
 from services.bot.messages.response import ChatProcessResult
-from vanessa.broker.streams import BrokerStreams
+from vanessa.infrastructure.broker.streams import BrokerStreams
 from vanessa.contracts.messages import TurnImage, TurnReply, TurnRequest, TurnStarted
 
 logger = logging.getLogger(__name__)

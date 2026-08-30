@@ -20,7 +20,7 @@ from starlette.routing import Mount, Route
 
 from vanessa.core.logging_setup import configure_logging
 from services.mcp import knowledge, vision, websearch
-from vanessa.observability.metrics import (
+from vanessa.infrastructure.observability.metrics import (
     CONTENT_TYPE_LATEST,
     metrics_token_allowed,
     render_metrics,

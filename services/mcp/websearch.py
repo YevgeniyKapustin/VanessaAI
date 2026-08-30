@@ -12,8 +12,8 @@ from dataclasses import asdict
 
 from mcp.server.fastmcp import FastMCP
 
-from vanessa.services.websearch.factory import create_web_search
-from vanessa.services.websearch.protocols import WebSearchService
+from vanessa.infrastructure.websearch.factory import create_web_search
+from vanessa.infrastructure.websearch.protocols import WebSearchService
 
 logger = logging.getLogger(__name__)
 

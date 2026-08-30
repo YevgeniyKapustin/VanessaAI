@@ -15,7 +15,13 @@ services/
   agent_core/   FastAPI + turn pipeline
   worker/       Indexing, sweep, memory jobs
   mcp/          Tool servers
-vanessa/        Shared libraries (db, llm, rag, decision, contracts, broker)
+vanessa/
+  core/             DTOs, ports, session
+  pipeline/         Gate, retrieve, compose, orchestrator
+  knowledge/        Vault, memory, nicknames
+  infrastructure/   db, broker, ingest, observability
+  config/ contracts/
+  k8s/              Deploy helpers
 config/content/ Per-section YAML (persona, conversation, llm, …)
 knowledge/      Runtime vault data
 scripts/        import, reindex, portraits, stickers, k8s secrets

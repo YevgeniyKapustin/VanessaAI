@@ -74,15 +74,15 @@ def test_loguru_formatter_plain_output():
 
 def test_loguru_formatter_shortens_app_prefix():
     formatter = LoguruStyleFormatter(colorize=False)
-    record = _make_record(name="vanessa.services.conversation_orchestrator")
+    record = _make_record(name="vanessa.pipeline.conversation_orchestrator")
     record.service = "api"
     record.request_id = "-"
     record.funcName = "handle_incoming"
 
     line = formatter.format(record)
 
-    assert "services.conversation_orchestrator:handle_incoming:42" in line
-    assert "vanessa.services" not in line
+    assert "pipeline.conversation_orchestrator:handle_incoming:42" in line
+    assert "vanessa.pipeline" not in line
 
 
 def test_loguru_formatter_includes_exception_traceback():

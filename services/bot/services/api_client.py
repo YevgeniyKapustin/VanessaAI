@@ -8,7 +8,7 @@ import httpx
 from services.bot.messages import IncomingMessage
 from services.bot.messages.response import ChatProcessResult
 from vanessa.config import settings
-from vanessa.observability.metrics import record_http_client
+from vanessa.infrastructure.observability.metrics import record_http_client
 
 logger = logging.getLogger(__name__)
 

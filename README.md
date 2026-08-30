@@ -76,6 +76,9 @@ Details: [Architecture guide](docs/architecture.md).
   with retries.
 - REST API (`POST /api/v1/chat`) separate from the bot; automated tests
   under `tests/`.
+- **Package layout** — `services/` is transport (bot, API, worker, MCP).
+  `vanessa/pipeline/` is the turn use-case; `vanessa/infrastructure/` is
+  Postgres, Redis, ingest; `vanessa/knowledge/` is the vault.
 
 ## Tech stack
 

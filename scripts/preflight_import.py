@@ -21,8 +21,8 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from vanessa.core.logging_setup import configure_logging
 from vanessa.config import settings
-from vanessa.db.session import async_session_factory
-from vanessa.ingest.telegram_export import parse_telegram_export
+from vanessa.infrastructure.db.session import async_session_factory
+from vanessa.infrastructure.ingest.telegram_export import parse_telegram_export
 
 configure_logging("preflight")
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def check_model() -> None:
-    from vanessa.rag.embeddings.local_embeddings import preload_embedding_model
+    from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
 
     logger.info("Preloading embedding model %r ...", settings.embedding_model_name)
     await asyncio.to_thread(preload_embedding_model)
@@ -60,7 +60,7 @@ async def check_model() -> None:
 async def check_db(telegram_ids: set[int]) -> None:
     from sqlalchemy import func, select
 
-    from vanessa.db.models import Message
+    from vanessa.infrastructure.db.models import Message
 
     async with async_session_factory() as session:
         total = (

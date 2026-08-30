@@ -2,11 +2,11 @@
 
 Bot and API share a `request_id` via `X-Request-ID`. Features stay
 **off** until you set flags in [`.env.defaults`](../.env.defaults) /
-[`.env.example`](../.env.example). Code lives under `vanessa/observability/`.
+[`.env.example`](../.env.example). Code lives under `vanessa/infrastructure/observability/`.
 
 ## Prometheus and Grafana
 
-`vanessa/observability/metrics.py` exports:
+`vanessa/infrastructure/observability/metrics.py` exports:
 
 - turns (reply vs ignore by reason)
 - per-stage latency (gate, retrieve, compose)
@@ -62,7 +62,7 @@ Flags and defaults: [`.env.defaults`](../.env.defaults) /
 
 ## Langfuse
 
-`vanessa/observability/tracing.py` wraps the orchestrator, pipeline stages,
+`vanessa/infrastructure/observability/tracing.py` wraps the orchestrator, pipeline stages,
 LLM providers, and completers. You see gate → retrieve → compose as
 spans plus per-call token usage.
 
@@ -74,7 +74,7 @@ keys are set — see [`.env.example`](../.env.example).
 ## RAG Triad evaluation
 
 Deterministic signals are always collected on replied turns. A sampled
-LLM-as-judge in `vanessa/observability/eval.py` scores:
+LLM-as-judge in `vanessa/infrastructure/observability/eval.py` scores:
 
 - context relevance
 - groundedness
@@ -85,7 +85,7 @@ running a second expensive model on every turn.
 
 ## Alerting
 
-`vanessa/observability/alerting.py` watches local rolling windows:
+`vanessa/infrastructure/observability/alerting.py` watches local rolling windows:
 
 - LLM error rate
 - turn p95 latency

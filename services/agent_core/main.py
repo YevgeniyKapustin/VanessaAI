@@ -10,9 +10,9 @@ from services.agent_core.middleware import register_request_id_middleware
 from services.agent_core.routes import chat, health, metrics, notes, observability
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
-from vanessa.observability.alerting import create_alert_manager
-from vanessa.db.base import Base
-from vanessa.db.session import async_session_factory, engine
+from vanessa.infrastructure.observability.alerting import create_alert_manager
+from vanessa.infrastructure.db.base import Base
+from vanessa.infrastructure.db.session import async_session_factory, engine
 from vanessa.knowledge.compaction import compact_all_person_cards
 from vanessa.knowledge.index import KnowledgeIndex
 from vanessa.knowledge.memory_planner import MemoryPlanner
@@ -25,7 +25,7 @@ from vanessa.knowledge.sweep import SweepAnalyzer, SweepWorker
 from vanessa.knowledge.vault import KnowledgeVault
 from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
 from vanessa.knowledge.writer import KnowledgeVaultWriter
-from vanessa.rag.embeddings.local_embeddings import preload_embedding_model
+from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
 
 configure_logging("api")
 logger = logging.getLogger(__name__)
@@ -119,10 +119,10 @@ async def lifespan(app: FastAPI):
         from uuid import uuid4
 
         from services.agent_core.broker_worker import BrokerTurnWorker
-        from vanessa.broker.metrics_collector import BrokerMetricsCollector
-        from vanessa.broker.redis_streams import RedisStreamBroker
-        from vanessa.broker.streams import BrokerStreams
-        from vanessa.outbox.relay import OutboxRelay
+        from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
+        from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+        from vanessa.infrastructure.broker.streams import BrokerStreams
+        from vanessa.infrastructure.outbox.relay import OutboxRelay
 
         streams = BrokerStreams.from_settings(settings)
         broker = RedisStreamBroker(

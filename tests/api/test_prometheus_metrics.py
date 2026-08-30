@@ -3,7 +3,7 @@ from httpx import ASGITransport, AsyncClient
 
 from services.agent_core.main import app
 from vanessa.config import settings
-from vanessa.observability.metrics import record_turn
+from vanessa.infrastructure.observability.metrics import record_turn
 
 
 @pytest.mark.asyncio

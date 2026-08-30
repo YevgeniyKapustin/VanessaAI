@@ -2,9 +2,9 @@ import asyncio
 
 import fakeredis.aioredis
 
-from vanessa.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.contracts.messages import TaskKind
-from vanessa.broker.dispatcher import BrokerTaskDispatcher
+from vanessa.infrastructure.broker.dispatcher import BrokerTaskDispatcher
 
 
 async def test_broker_dispatcher_publishes_task() -> None:

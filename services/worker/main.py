@@ -14,11 +14,11 @@ import contextlib
 import logging
 from uuid import uuid4
 
-from vanessa.broker.redis_streams import RedisStreamBroker
-from vanessa.broker.streams import BrokerStreams
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.streams import BrokerStreams
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
-from vanessa.db.session import async_session_factory
+from vanessa.infrastructure.db.session import async_session_factory
 from vanessa.knowledge.portraits import PortraitWorker
 from vanessa.knowledge.sweep import SweepWorker
 from services.worker.app import WorkerApp
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    from vanessa.observability.metrics import start_metrics_http_server
+    from vanessa.infrastructure.observability.metrics import start_metrics_http_server
 
     start_metrics_http_server(settings.worker_metrics_port)
     logger.info(
@@ -43,7 +43,7 @@ async def main() -> None:
         stream_maxlen=settings.broker_stream_maxlen,
         dlq_enabled=settings.broker_dlq_enabled,
     )
-    from vanessa.broker.metrics_collector import BrokerMetricsCollector
+    from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
 
     broker_metrics = BrokerMetricsCollector(
         broker,

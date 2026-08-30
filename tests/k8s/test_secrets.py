@@ -243,7 +243,7 @@ def test_workloads_pin_local_image_and_secretref():
         assert "readOnlyRootFilesystem: true" in text
     agent = Path("deploy/k8s/base/20-agent-core.yaml").read_text(encoding="utf-8")
     assert "containerPort: 9100" not in agent
-    assert "vanessa.db.locked_upgrade" in agent
+    assert "vanessa.infrastructure.db.locked_upgrade" in agent
     bot = Path("deploy/k8s/base/21-bot.yaml").read_text(encoding="utf-8")
     assert "replicas: 1" in bot
     assert "path: /health" in bot

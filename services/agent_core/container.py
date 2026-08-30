@@ -5,18 +5,19 @@ from dataclasses import dataclass
 from vanessa.config.content import get_bot_name_aliases, get_content, get_trigger_keywords
 from vanessa.config.conversation_config import load_conversation_config
 from vanessa.config.settings import settings
-from vanessa.decision import (
+from vanessa.pipeline.decision import (
     IntentDetector,
     NoiseFilter,
     RateLimiter,
     SessionWindowAnalyzer,
     TriggerKeywordChecker,
 )
-from vanessa.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.decision.gate.user_ignore import ChatIgnoreRegistry
-from vanessa.decision.gate.prefilter import PlannerPrefilter
-from vanessa.decision.gate.reaction_gate import ReactionGate
-from vanessa.llm.memes import MemeCatalog, MemeDecider
+from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
+from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
+from vanessa.pipeline.decision.gate.reaction_gate import ReactionGate
+from vanessa.pipeline.llm.providers.protocols import create_chat_completer
+from vanessa.pipeline.llm.memes import MemeCatalog, MemeDecider
 
 
 from vanessa.core.protocols import (
@@ -24,12 +25,12 @@ from vanessa.core.protocols import (
     KnowledgeVectorStoreProtocol,
     VectorStoreProtocol,
 )
-from vanessa.runtime.vector_stores import (
+from vanessa.infrastructure.runtime.vector_stores import (
     create_embedding_provider,
     create_knowledge_vector_store,
     create_message_vector_store,
 )
-from vanessa.services.background import BackgroundExecutor
+from vanessa.pipeline.background import BackgroundExecutor
 
 
 @dataclass
@@ -93,7 +94,7 @@ def build_app_container() -> AppContainer:
         ),
         reply_eligibility=eligibility,
         planner_prefilter=PlannerPrefilter(eligibility),
-        reaction_gate=ReactionGate(content),
+        reaction_gate=ReactionGate(content, llm_client=create_chat_completer()),
         block_consecutive_replies=content.decision.block_consecutive_replies,
         embedding_provider=create_embedding_provider(),
         vector_store=create_message_vector_store(),

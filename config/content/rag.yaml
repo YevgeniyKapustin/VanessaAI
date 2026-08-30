@@ -88,8 +88,9 @@ turn_planner_prompt: |
   4. Fill tone, humor_ok / humor_query, detail — always.
   5. Escalate to uses_pro_model ONLY for coding / super-complex synthesis /
      deep technical reasoning (## uses_pro_model).
-  6. Detect repeated_topic / loop_level when the same sender re-asks the same
-     topic (## should_reply, loop rules).
+  6. Detect repeated_topic / loop_level only for anti-spam (identical or
+     near-identical re-asks with no new substance — ## should_reply, loop
+     rules). A deep dive on one theme is NOT a loop.
   7. Re-check the consistency rules before emitting the JSON.
 
   ## should_reply
@@ -137,19 +138,20 @@ turn_planner_prompt: |
   - if the user adds new details, narrows the question or asks a follow-up
     («а подробнее?», «и что с X?») → not a repeat, reply normally.
 
-  Repeated topic loop (the same topic «по кругу»):
-  - the SAME sender keeps asking about the SAME TOPIC in the recent context,
-    rephrased again and again (different words, same meaning — a loop) →
-    repeated_topic=true;
-  - loop_level: 0 — no loop; 1 — the topic was re-asked once with new words;
-    2 — re-asked several times; 3 — the sender is stuck in a constant loop on
-    the same topic, ignoring the answers;
+  Repeated topic loop (anti-spam only, not anti deep-dive):
+  - this flag is for spam: the SAME sender keeps pushing the SAME ask with
+    no new substance — copy-paste, near-identical re-asks, or the same demand
+    after it was already answered («по кругу» as junk, not as a conversation);
+  - staying on one theme IS allowed: follow-ups, narrower questions, extra
+    details, «а подробнее», «и что с X», going deeper into the same topic
+    → repeated_topic=false, loop_level=0;
+  - loop_level: 0 — no spam; 1 — the same ask was pushed once more with no
+    new content; 2 — several empty re-asks; 3 — a spam burst, ignoring answers;
   - repeated_topic=true does NOT force should_reply=false by itself: a direct
     question still gets a reply (the loop is how Vanessa notices she is being
     pestered — her attitude drops, her ignore tendency rises and her replies
     turn cold);
-  - a genuine follow-up that narrows the question or adds new detail is NOT a
-    loop → repeated_topic=false.
+  - if there is any new angle, constraint, or follow-up detail → not spam.
 
   ## needs_clarification
   true — the user addresses the bot, but the message references something you cannot
@@ -395,15 +397,24 @@ turn_planner_prompt: |
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false,
   "detail": "detailed"}}
 
-  «ну так что там с мешем?» / «а меш?» / «дай нормальный меш» — the same sender
-  keeps re-asking the SAME topic with new words | loop «по кругу» → still a direct
-  question (reply, but Vanessa is annoyed): repeated_topic=true, loop_level=2
-  → {{"should_reply": true, "search_query": "меш", "skip": false, "tone": "neutral",
+  «ванесса отвечай» / «ванесса отвечай» / «ванесса отвечай» — same sender, same
+  ask, no new substance | spam loop «по кругу» → still addressed (reply, but
+  Vanessa is annoyed): repeated_topic=true, loop_level=2
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral",
   "humor_ok": false, "humor_query": "", "deep_search": false,
   "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
   "web_search": false, "web_query": "",
   "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false,
   "repeated_topic": true, "loop_level": 2}}
+
+  «ну так что там с мешем?» / «а как бейк нормалей?» / «дай порядок шагов» —
+  same theme, NEW substance each time | deep dive, NOT spam → repeated_topic=false
+  → {{"should_reply": true, "search_query": "меш бейк нормалей", "skip": false,
+  "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false,
+  "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false,
+  "web_search": false, "web_query": "",
+  "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false,
+  "repeated_topic": false, "loop_level": 0}}
 
   «ванесса, а какая сейчас цена на биткоин?» | fresh live data the archive cannot
   hold → web search

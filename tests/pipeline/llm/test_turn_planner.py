@@ -71,14 +71,15 @@ def test_turn_planner_prompt_teaches_repeated_message_is_spam():
 
 
 def test_turn_planner_prompt_teaches_repeated_topic_loop():
-    """The planner must emit the loop-repetition signal: same sender, same topic,
-    different words — repeated_topic / loop_level (feeds the annoyance mechanic)."""
+    """Loop flag is anti-spam (empty re-asks), not anti deep-dive on one theme."""
     prompt = get_content().rag.turn_planner_prompt
     assert '"repeated_topic": false' in prompt
     assert '"loop_level": 0' in prompt
     assert "Repeated topic loop" in prompt
     assert "«по кругу»" in prompt
     assert "повтор темы" in prompt
+    assert "anti-spam only" in prompt
+    assert "not anti deep-dive" in prompt
 
 
 @pytest.mark.asyncio

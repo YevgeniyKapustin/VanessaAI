@@ -55,10 +55,11 @@ task: |
   the current message and adds meaning; ignore the rest. Never force every given
   fact into the reply — a focused answer beats an info dump.
 
-  Repeats: only ignore a repeat when it is literally the same message you already
-  answered properly in the recent session and nothing new was added. A question is
-  NEVER ignored just because it was asked before — a repeated question usually
-  means the user still wants the answer, so answer it again. When in doubt, answer.
+  Repeats (anti-spam, not anti deep-dive): ignore only a spam repeat — the
+  literally same message you already answered properly, with nothing new added.
+  Staying on one theme is fine: follow-ups, narrower questions, extra details,
+  going deeper. A question is NEVER ignored just because the topic came up
+  before — that usually means they still want the answer. When in doubt, answer.
   If you do ignore, output the tag [ignore] followed by a short internal reason on
   the same line (e.g. [ignore] повтор того же вопроса). No [answer], no message.
   The reason after the tag is only for debugging — it is never shown to anyone.
@@ -77,9 +78,9 @@ answer: |
   «я подумала», «итак», «в общем», no meta about the reasoning itself), never
   quote the tag, and the final message must read as a natural standalone reply.
 
-  Only ignore a repeat you already answered (the identical question/request, no
-  new details). A real question — even one asked before — always gets an answer;
-  when in doubt, answer. If you do ignore, output the tag [ignore] followed by a
+  Only ignore spam: the identical question/request you already answered, with
+  no new details. A real follow-up or a deeper question on the same theme always
+  gets an answer; when in doubt, answer. If you do ignore, output the tag [ignore] followed by a
   short internal reason on the same line (e.g. [ignore] повтор) — no [answer], no
   message, nothing else. The reason after the tag is only for debugging, it is
   never shown to anyone.
@@ -99,10 +100,10 @@ answer: |
      compress a real answer into a stub.
   3. Use the context and archive facts only when they fit and matter — leave out
      what's irrelevant, don't dump everything you were given.
-  4. A repeat (the same question/demand already in the recent session) is ignored
-     ONLY when you already answered it and nothing new was added. A question is
-     never ignored just because it was asked before — a repeated question usually
-     means the user still wants the answer, so answer it. When in doubt, answer.
+  4. A spam repeat (the identical question/demand already answered, nothing new)
+     is ignored. A deep dive on the same theme — new details, a narrower ask,
+     «а подробнее» — is not spam: answer it. A question is never ignored just
+     because the topic came up before. When in doubt, answer.
      If you do ignore, output the tag [ignore] followed by a short internal reason
      on the same line (e.g. [ignore] тот же вопрос, уже отвечала) — no [answer],
      no message. The reason after the tag is only for debugging, it is never shown
@@ -311,11 +312,10 @@ generation:
     # 1024 was too tight (a long CoT left too little for a multi-block reply and
     # the model truncated right after `[next]`); 2048 keeps real headroom.
     max_tokens: 2048
-    # DeepSeek V4 accepts reasoning_effort: low/medium/high. "low" keeps the
-    # composer's chain of thought short and cheap (weak reasoning) — faster
-    # replies at a slight cost in carefulness. Raise to medium/high if
-    # correctness matters more than latency/cost.
-    reasoning_effort: low
+    # DeepSeek V4 accepts reasoning_effort: low/medium/high. "medium" is the
+    # default tradeoff: enough chain of thought for careful replies without
+    # the latency/cost of high.
+    reasoning_effort: medium
     presence_penalty: 0.4
     frequency_penalty: 0.35
   planner:

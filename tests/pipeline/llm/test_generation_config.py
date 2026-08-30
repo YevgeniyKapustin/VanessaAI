@@ -14,11 +14,11 @@ def test_composer_generation_loaded_from_content():
     assert params.max_tokens == 2048
     assert params.presence_penalty == 0.4
     assert params.frequency_penalty == 0.35
-    # The composer runs a weak (low) chain of thought on every reply — faster
-    # and cheaper than high, at a slight cost in carefulness. reasoning_effort
+    # The composer runs a medium chain of thought on every reply — the default
+    # tradeoff vs low (faster) and high (more careful, slower). reasoning_effort
     # is forwarded to the DeepSeek V4 API.
-    assert params.reasoning_effort == "low"
-    assert params.to_llm_kwargs()["reasoning_effort"] == "low"
+    assert params.reasoning_effort == "medium"
+    assert params.to_llm_kwargs()["reasoning_effort"] == "medium"
 
 
 def test_planner_generation_is_more_deterministic():

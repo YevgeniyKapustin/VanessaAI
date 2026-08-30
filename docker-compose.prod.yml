@@ -18,10 +18,7 @@ services:
   agent:
     env_file: *prod-env-files
     ports: !reset []
-    command: >
-      uvicorn services.agent.main:app --host 0.0.0.0 --port 8000
-      --workers ${API_WORKERS:-1}
-      --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
+    command: python -m services.agent.main
     volumes: !override
       - ./knowledge:/app/knowledge
     restart: always

@@ -46,6 +46,17 @@ def test_agent_has_no_http_notes_route() -> None:
     assert not notes_route.exists()
 
 
+def test_agent_does_not_import_fastapi() -> None:
+    for path in _python_sources("agent"):
+        text = path.read_text(encoding="utf-8")
+        assert "fastapi" not in text, path
+
+
+def test_agent_core_package_is_gone() -> None:
+    assert not (ROOT / "services" / "agent_core").exists()
+    assert not (ROOT / "services" / "bot" / "services" / "api_client.py").exists()
+
+
 def test_knowledge_does_not_import_pipeline() -> None:
     root = ROOT / "vanessa" / "knowledge"
     for path in root.rglob("*.py"):

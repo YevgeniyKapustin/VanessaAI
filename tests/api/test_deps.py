@@ -52,6 +52,10 @@ def test_get_turn_metrics_returns_singleton():
     second = get_turn_metrics(request)
     assert isinstance(first, TurnMetrics)
     assert first is second
+    first.record_turn(action="reply", reason="intent")
+    assert first.snapshot().total == 1
+    first.reset()
+    assert first.snapshot().total == 0
 
 
 def test_decision_engine_builds_from_graph():
@@ -82,16 +86,9 @@ def test_embedding_provider_is_singleton():
     assert first is second
 
 
-def test_vector_store_is_singleton():
-    container = AppContainer()
-    first = container.graph.retrieval.indexes.messages
-    second = container.graph.retrieval.indexes.messages
-    assert first is second
-
-
-def test_persistence_builds_repos():
-    session = AsyncMock()
+def test_repositories_from_persistence():
     persistence = Persistence()
+    session = MagicMock()
     assert isinstance(persistence.messages(session), MessageRepository)
     assert isinstance(persistence.users(session), UserRepository)
 

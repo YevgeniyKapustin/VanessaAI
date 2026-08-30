@@ -562,54 +562,61 @@ def metrics_token_allowed(headers: Mapping[str, str]) -> bool:
     return header == expected or bearer == expected
 
 
+class ProcessMetricsServer(ThreadingHTTPServer):
+    ready_check: Callable[[], bool] | None = None
+
+
 class _ProcessHttpHandler(BaseHTTPRequestHandler):
     """Serve /health for probes and /metrics for Prometheus."""
+
+    server: ProcessMetricsServer
 
     def log_message(self, format: str, *args: object) -> None:
         del format, args
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path.rstrip("/") or "/"
-        if path in ("/health", "/health/live", "/health/ready"):
-            body = b"ok\n"
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+        if path in ("/health", "/health/live"):
+            self._plain(200, b"ok\n")
+            return
+        if path == "/health/ready":
+            check = self.server.ready_check
+            if check is not None and not check():
+                self._plain(503, b"unavailable\n")
+                return
+            self._plain(200, b"ok\n")
             return
         if path == "/metrics":
             if not metrics_token_allowed(self.headers):
-                body = b"unauthorized\n"
-                self.send_response(401)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                self._plain(401, b"unauthorized\n")
                 return
             if settings.metrics_enabled:
                 body = render_metrics()
             else:
                 body = b"# metrics disabled\n"
-            self.send_response(200)
-            self.send_header("Content-Type", CONTENT_TYPE_LATEST)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._send(200, body, CONTENT_TYPE_LATEST)
             return
-        body = b"not found\n"
-        self.send_response(404)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self._plain(404, b"not found\n")
+
+    def _plain(self, status: int, body: bytes) -> None:
+        self._send(status, body, "text/plain; charset=utf-8")
+
+    def _send(self, status: int, body: bytes, content_type: str) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
 
 def start_metrics_http_server(
-    port: int, addr: str = "0.0.0.0"
-) -> ThreadingHTTPServer:
+    port: int,
+    addr: str = "0.0.0.0",
+    ready_check: Callable[[], bool] | None = None,
+) -> ProcessMetricsServer:
     """Always serve /health. /metrics is empty when metrics are off."""
-    server = ThreadingHTTPServer((addr, int(port)), _ProcessHttpHandler)
+    server = ProcessMetricsServer((addr, int(port)), _ProcessHttpHandler)
+    server.ready_check = ready_check
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
@@ -892,4 +899,5 @@ __all__ = [
     "registry",
     "render_metrics",
     "start_metrics_http_server",
+    "ProcessMetricsServer",
 ]

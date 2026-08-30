@@ -95,7 +95,7 @@ kubectl -n vanessa rollout restart deploy
   serve `/health` on the metrics port even when metrics are off.
 - `GET /health/ready` — Postgres `SELECT 1`; kubelet keeps the pod out of
   Service until 200.
-- API: uvicorn `--timeout-graceful-shutdown`; bot: aiogram drain on
+- Agent: SIGTERM cancels broker consume; bot: aiogram drain on
   SIGTERM.
 
 `scripts/k8s_secrets.py apply` reads a host overlay (not git) and applies

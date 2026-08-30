@@ -1,50 +1,50 @@
-from fastapi import FastAPI
+"""Agent process: broker turns + health/metrics HTTP.
 
-from services.agent.app_spec import AppSpec
+    python -m services.agent.main
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+
+from sqlalchemy import text
+
 from services.agent.container import AppContainer
 from services.agent.lifespan import lifespan
-from services.agent.middleware import register_middleware
-from services.agent.routes import register_routes
-from vanessa.core.package import package_info
+from vanessa.config import settings
+from vanessa.core.logging_setup import configure_logging
+from vanessa.infrastructure.db.session import engine
+from vanessa.infrastructure.observability.metrics import start_metrics_http_server
+
+logger = logging.getLogger(__name__)
 
 
-class AppFactory:
-    def __init__(
-        self,
-        spec: AppSpec | None = None,
-        container: AppContainer | None = None,
-    ) -> None:
-        self._spec = spec or AppSpec()
-        self._container = container
-
-    def build(self) -> FastAPI:
-        self._configure_logging()
-        application = self._create_application()
-        self._register_middleware(application)
-        self._register_routes(application)
-        return application
-
-    def _configure_logging(self) -> None:
-        logging = self._spec.logging
-        if logging.configure is not None:
-            logging.configure(logging.service_name)
-
-    def _create_application(self) -> FastAPI:
-        openapi = self._spec.openapi.resolve(package_info())
-        application = FastAPI(
-            title=openapi.title,
-            description=openapi.description,
-            version=openapi.version,
-            lifespan=lifespan,
-        )
-        application.state.container = self._container or AppContainer()
-        return application
-
-    def _register_middleware(self, application: FastAPI) -> None:
-        register_middleware(application, self._spec.middleware)
-
-    def _register_routes(self, application: FastAPI) -> None:
-        register_routes(application)
+def postgres_ready() -> bool:
+    try:
+        with engine.sync_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
-app = AppFactory().build()
+async def run(*, container: AppContainer | None = None) -> None:
+    configure_logging("agent")
+    owned = container or AppContainer()
+    start_metrics_http_server(
+        settings.api_port,
+        addr=settings.api_host,
+        ready_check=postgres_ready,
+    )
+    logger.info("agent health/metrics on :%s", settings.api_port)
+    async with lifespan(owned):
+        await asyncio.Event().wait()
+
+
+def main() -> None:
+    asyncio.run(run())
+
+
+if __name__ == "__main__":
+    main()

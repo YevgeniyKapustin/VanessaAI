@@ -49,10 +49,9 @@ class SharedSettings(BaseSettings):
     content_config_path: str = "config/content"
     nicknames_config_path: str = "config/nicknames.yaml"
 
-    # --- API ----------------------------------------------------------------
+    # --- HTTP (health / metrics on the agent process) ------------------------
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    api_base_url: str = "http://agent:8000"
     api_internal_token: str = ""
     api_auto_create_schema: bool = False
 

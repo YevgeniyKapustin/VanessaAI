@@ -104,7 +104,7 @@ secret catalog is the allow-list in `vanessa/k8s/secrets.py`.
 | Service | Image/command | requests | limits | HPA |
 |---|---|---|---|---|
 | `bot` | `vanessa-agent:local` / `python -m services.bot.main` | 100m / 256Mi | 500m / 1Gi | no (1 replica; long poll) |
-| `agent` | `vanessa-agent:local` / uvicorn | 250m / 512Mi | 2 CPU / 4Gi | CPU |
+| `agent` | `vanessa-agent:local` / python -m services.agent.main | 250m / 512Mi | 2 CPU / 4Gi | CPU |
 | `worker` | `vanessa-agent:local` / `python -m services.worker.main` | 500m / 1Gi | 4 CPU / 6Gi | CPU |
 | `mcp-websearch` | runner websearch | 50m / 128Mi | 500m / 512Mi | no |
 | `mcp-knowledge` | runner knowledge | 100m / 256Mi | 1 CPU / 1Gi | no |

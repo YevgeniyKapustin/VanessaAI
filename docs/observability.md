@@ -14,13 +14,13 @@ Bot and API share a `request_id` via `X-Request-ID`. Features stay
 - RAG hits, empty retrieval, scores
 - Telegram errors and HTTP latency
 
-The API serves `GET /metrics`. The bot runs a threaded endpoint on
+The agent serves `GET /metrics` on `API_PORT` (typically `:8000`), same
+threaded probe server as bot/worker. The bot runs a threaded endpoint on
 `BOT_METRICS_PORT` (typically `:9101`); the worker on
 `WORKER_METRICS_PORT` (`:9102`). MCP processes expose `/metrics` on
 `:8101`–`:8103`. All four gate `/metrics` with `METRICS_REQUIRE_TOKEN`
 + `API_INTERNAL_TOKEN` (`Authorization: Bearer` or `X-Internal-Token`).
-Probes stay on `/health`. Product counters also exist at
-`GET /api/v1/metrics`.
+Probes stay on `/health` and `/health/ready`.
 
 Compose stack: include `docker-compose.monitoring.yml` (Prometheus,
 Grafana, Alertmanager) in the **same** project as the app so Prometheus
@@ -32,7 +32,7 @@ bind `127.0.0.1` so they are not on the LAN. Compose Loki is Cluster-network
 only (no host port).
 
 Scrape targets in `prometheus/prometheus.yml` are Compose DNS names
-(`api:8000`, `bot:9101`, `worker:9102`, `mcp-websearch:8101`, …), not
+(`agent:8000`, `bot:9101`, `worker:9102`, `mcp-websearch:8101`, …), not
 `host.docker.internal`. Kubernetes pods: `prometheus.k8s.yml`. After a
 reload, check Prometheus **Status → Targets**. The `nginx` job is DOWN
 unless `docker-compose.prod.yml` (nginx-exporter) is in the stack.

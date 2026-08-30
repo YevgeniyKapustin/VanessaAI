@@ -37,7 +37,7 @@ class TurnMetrics:
             self._by_reason[reason] += 1
             self._by_action_reason[f"{action}:{reason}"] += 1
         # Mirror into Prometheus so dashboards and the AlertManager can use the
-        # same counts as the /api/v1/metrics snapshot.
+        # same counts as the Prometheus turn series.
         record_turn_metric(action=action, reason=reason)
 
     def snapshot(self) -> TurnMetricsSnapshot:

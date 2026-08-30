@@ -22,10 +22,11 @@ import re
 
 from vanessa.config.content import AppContent, get_content
 from vanessa.config.settings import settings
+from vanessa.core.protocols import LLMChatCompleter
 from vanessa.knowledge.format import PEOPLE, today
 from vanessa.knowledge.vault import KnowledgeVault
-from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
-from vanessa.pipeline.llm.providers.protocols import LLMChatCompleter, create_chat_completer
+from vanessa.llm.completers import create_chat_completer
+from vanessa.llm.generation import LLMGenerationParams
 
 logger = logging.getLogger(__name__)
 

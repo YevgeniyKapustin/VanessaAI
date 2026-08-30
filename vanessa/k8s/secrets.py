@@ -52,7 +52,7 @@ OPTIONAL_SECRET_KEYS: frozenset[str] = frozenset(
 # Keys injected per workload. Missing optional keys use secretKeyRef.optional.
 WORKLOAD_SECRET_KEYS: dict[str, frozenset[str]] = {
     "migrate": frozenset({"POSTGRES_PASSWORD"}),
-    "agent-core": frozenset(
+    "agent": frozenset(
         {
             "TELEGRAM_BOT_TOKEN",
             "POSTGRES_PASSWORD",

@@ -33,7 +33,6 @@ COMPOSE_ONLY_KEYS: frozenset[str] = frozenset(
 )
 
 CLUSTER_OVERRIDES: dict[str, str] = {
-    "TRANSPORT": "redis",
     "WORKER_ENABLED": "true",
     "MCP_WEBSEARCH_URL": "http://mcp-websearch:8101/mcp",
     "MCP_KNOWLEDGE_URL": "http://mcp-knowledge:8102/mcp",

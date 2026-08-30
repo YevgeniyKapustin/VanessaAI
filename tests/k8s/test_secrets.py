@@ -4,7 +4,6 @@ import pytest
 import yaml
 
 from vanessa.k8s.configmap import (
-    CLUSTER_OVERRIDES,
     CONFIGMAP_NAME,
     build_configmap,
     select_config_values,
@@ -90,7 +89,7 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
     assert selected["POSTGRES_HOST"] == "host.docker.internal"
     assert selected["QDRANT_HOST"] == "host.docker.internal"
     assert selected["LANGFUSE_HOST"] == "http://host.docker.internal:3000"
-    assert selected["TRANSPORT"] == CLUSTER_OVERRIDES["TRANSPORT"]
+    assert "TRANSPORT" not in selected
     assert selected["LOG_JSON"] == "true"
     assert selected["LOG_FILE_ENABLED"] == "false"
     assert selected["MCP_FAIL_OPEN"] == "false"
@@ -227,7 +226,7 @@ def test_workloads_pin_local_image_and_secretref():
     from vanessa.k8s.secrets import IMAGE
 
     for name in (
-        "20-agent-core.yaml",
+        "20-agent.yaml",
         "21-bot.yaml",
         "22-worker.yaml",
         "23-mcp-servers.yaml",
@@ -241,7 +240,7 @@ def test_workloads_pin_local_image_and_secretref():
         assert "secretRef:" not in text
         assert "automountServiceAccountToken: false" in text
         assert "readOnlyRootFilesystem: true" in text
-    agent = Path("deploy/k8s/base/20-agent-core.yaml").read_text(encoding="utf-8")
+    agent = Path("deploy/k8s/base/20-agent.yaml").read_text(encoding="utf-8")
     assert "containerPort: 9100" not in agent
     assert "vanessa.infrastructure.db.locked_upgrade" in agent
     bot = Path("deploy/k8s/base/21-bot.yaml").read_text(encoding="utf-8")

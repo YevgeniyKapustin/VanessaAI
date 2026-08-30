@@ -12,6 +12,7 @@ from collections.abc import Mapping
 
 from vanessa.contracts.messages import (
     BrokerMessage,
+    InboxNoteReply,
     TaskMessage,
     TurnReply,
     TurnRequest,
@@ -21,7 +22,13 @@ from vanessa.infrastructure.broker.errors import UnknownMessageKind
 
 _KIND_TO_MODEL: dict[str, type[BrokerMessage]] = {
     model.message_kind(): model
-    for model in (TurnRequest, TurnStarted, TurnReply, TaskMessage)
+    for model in (
+        TurnRequest,
+        TurnStarted,
+        TurnReply,
+        TaskMessage,
+        InboxNoteReply,
+    )
 }
 
 

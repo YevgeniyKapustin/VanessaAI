@@ -2,9 +2,9 @@
 
 Stream layout
 -------------
-``turns``                bot → agent-core   (consumer group ``agent-core``)
-``replies:<id>``         agent-core → one bot instance/request (private RPC channel)
-``tasks``                agent-core → worker (consumer group ``worker``)
+``turns``                bot → agent   (consumer group ``agent``)
+``replies:<id>``         agent → one bot instance/request (private RPC channel)
+``tasks``                agent → worker (consumer group ``worker``)
 ``<stream>:dlq``         dead-letter for failed deliveries
 
 Delivery guarantees
@@ -287,6 +287,9 @@ class RedisStreamBroker(StreamBackend):
         )
 
     # -- Lifecycle ---------------------------------------------------------------
+
+    async def ping(self) -> None:
+        await self._client.ping()
 
     async def close(self) -> None:
         if self._owns_client:

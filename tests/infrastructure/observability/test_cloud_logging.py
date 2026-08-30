@@ -192,7 +192,7 @@ def test_nginx_latency_uses_prometheus_histogram() -> None:
     assert "event: \"{{ event }}\"" not in cluster.split("sinks:")[1]
     prometheus = Path("prometheus/prometheus.yml").read_text(encoding="utf-8")
     assert "vector:9598" in prometheus
-    assert "api:8000" in prometheus
+    assert "agent:8000" in prometheus
     assert "bot:9101" in prometheus
     assert "worker:9102" in prometheus
     assert "mcp-websearch:8101" in prometheus

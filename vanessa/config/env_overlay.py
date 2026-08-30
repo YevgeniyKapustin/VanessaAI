@@ -18,8 +18,7 @@ PLACEHOLDER_MARKERS = (
 LOCAL_PROFILE: dict[str, str] = {
     "WEB_SEARCH_ENABLED": "true",
     "LANGFUSE_ENABLED": "false",
-    "TRANSPORT": "http",
-    "WORKER_ENABLED": "false",
+    "WORKER_ENABLED": "true",
 }
 
 

@@ -1,7 +1,7 @@
 """Broker stream naming.
 
 Centralizing the stream names keeps the transport wiring consistent between
-producers and consumers (bot ↔ agent-core ↔ worker).
+producers and consumers (bot ↔ agent ↔ worker).
 """
 
 from __future__ import annotations
@@ -23,5 +23,5 @@ class BrokerStreams:
         return cls(prefix=prefix, turns=f"{prefix}:turns", tasks=f"{prefix}:tasks")
 
     def reply(self, bot_id: str, correlation_id: str) -> str:
-        """Private per-request reply channel for RPC (agent-core → this bot)."""
+        """Private per-request reply channel for RPC (agent → this bot)."""
         return f"{self.prefix}:replies:{bot_id}:{correlation_id}"

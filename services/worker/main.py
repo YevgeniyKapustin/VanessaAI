@@ -49,28 +49,21 @@ async def main() -> None:
         broker,
         streams,
         groups=[
-            (streams.turns, settings.broker_group_agent_core),
+            (streams.turns, settings.broker_group_agent),
             (streams.tasks, settings.broker_group_worker),
         ],
         poll_seconds=15.0,
     )
     metrics_task = asyncio.create_task(broker_metrics.run_forever())
-    assembly = await build_worker_handlers()
+    assembly = await build_worker_handlers(broker)
     consumer_suffix = settings.broker_consumer_id or uuid4().hex[:6]
-    # The polling loops only run when the deployment is explicitly in worker
-    # mode — otherwise the API process still owns them and starting them here
-    # too would duplicate the work. Task consumption runs regardless.
     sweep_worker = (
         SweepWorker(
             assembly.sweep,
             async_session_factory,
             poll_seconds=settings.knowledge_sweep_poll_seconds,
         )
-        if (
-            assembly.sweep is not None
-            and settings.knowledge_sweep_enabled
-            and settings.worker_enabled
-        )
+        if assembly.sweep is not None and settings.knowledge_sweep_enabled
         else None
     )
     portrait_worker = (
@@ -78,11 +71,7 @@ async def main() -> None:
             assembly.portrait,
             poll_seconds=settings.knowledge_portrait_poll_seconds,
         )
-        if (
-            assembly.portrait is not None
-            and settings.knowledge_portrait_enabled
-            and settings.worker_enabled
-        )
+        if assembly.portrait is not None and settings.knowledge_portrait_enabled
         else None
     )
     app = WorkerApp(

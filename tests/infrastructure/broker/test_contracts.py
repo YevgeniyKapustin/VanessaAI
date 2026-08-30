@@ -1,6 +1,7 @@
 from vanessa.contracts.messages import (
     SCHEMA_VERSION,
     BrokerMessage,
+    InboxNoteReply,
     TaskKind,
     TaskMessage,
     TurnImage,
@@ -56,7 +57,7 @@ def test_task_message_kind() -> None:
 
 
 def test_every_kind_registers() -> None:
-    for model in (TurnRequest, TurnStarted, TurnReply, TaskMessage):
+    for model in (TurnRequest, TurnStarted, TurnReply, TaskMessage, InboxNoteReply):
         assert model.message_kind()  # non-empty stable kind
 
 

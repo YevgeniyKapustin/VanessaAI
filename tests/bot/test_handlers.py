@@ -7,6 +7,7 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
 from services.bot.container import BotServices, create_bot_services
+from services.bot.services.broker_client import BrokerTurnClient
 from services.bot.handlers.messages import (
     _pick_photo_size,
     _preview,
@@ -32,7 +33,7 @@ async def test_preview_truncates_long_text():
 
 def test_create_bot_services_wires_dependencies():
     services = create_bot_services()
-    assert services.chat_client is not None
+    assert isinstance(services.chat_client, BrokerTurnClient)
     assert services.access_guard is not None
     assert services.texts.welcome == get_content().bot.welcome
 

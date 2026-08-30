@@ -7,11 +7,12 @@ import logging
 
 from vanessa.config.content import AppContent, get_content
 from vanessa.config.settings import settings
+from vanessa.core.protocols import LLMChatCompleter
 from vanessa.knowledge.metrics.schema import MetricsSnapshot, PersonMetrics
 from vanessa.knowledge.users.nicknames import format_nicknames_for_planner
-from vanessa.pipeline.llm.format.llm_json import normalize_llm_json
-from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
-from vanessa.pipeline.llm.providers.protocols import LLMChatCompleter, create_chat_completer
+from vanessa.llm.completers import create_chat_completer
+from vanessa.llm.generation import LLMGenerationParams
+from vanessa.llm.json_text import normalize_llm_json
 
 logger = logging.getLogger(__name__)
 

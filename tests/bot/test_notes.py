@@ -1,12 +1,12 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 from aiogram.enums import ChatType
 from aiogram.filters import CommandObject
 
 from services.bot.container import BotServices
 from services.bot.handlers.notes import create_notes_router
+from services.bot.services.broker_client import NotesError
 from tests.bot.test_bot_message import make_telegram_message
 from vanessa.config.content import get_content
 
@@ -36,7 +36,7 @@ async def test_cmd_note_rejects_non_owner_dm():
 
 
 @pytest.mark.asyncio
-async def test_cmd_note_saves_via_agent_core_for_owner():
+async def test_cmd_note_saves_via_broker_for_owner():
     message = make_telegram_message(text="/note buy milk", chat_type=ChatType.PRIVATE)
     message.from_user.id = 42
     message.answer = AsyncMock()
@@ -65,17 +65,15 @@ async def test_cmd_note_saves_via_agent_core_for_owner():
 
 
 @pytest.mark.asyncio
-async def test_cmd_note_maps_503_to_not_configured():
+async def test_cmd_note_maps_not_configured():
     message = make_telegram_message(text="/note hi", chat_type=ChatType.PRIVATE)
     message.answer = AsyncMock()
     message.photo = None
     access_guard = MagicMock()
     access_guard.ensure_owner_dm = MagicMock(return_value=None)
-    request = httpx.Request("POST", "http://api/api/v1/notes")
-    response = httpx.Response(503, request=request)
     notes_client = AsyncMock()
     notes_client.save_inbox_note = AsyncMock(
-        side_effect=httpx.HTTPStatusError("no", request=request, response=response)
+        side_effect=NotesError("knowledge_not_configured")
     )
     services = BotServices(
         chat_client=AsyncMock(),

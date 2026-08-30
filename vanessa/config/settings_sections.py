@@ -52,7 +52,7 @@ class SharedSettings(BaseSettings):
     # --- API ----------------------------------------------------------------
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    api_base_url: str = "http://api:8000"
+    api_base_url: str = "http://agent:8000"
     api_internal_token: str = ""
     api_auto_create_schema: bool = False
 
@@ -69,22 +69,19 @@ class SharedSettings(BaseSettings):
     metrics_enabled: bool = True
     metrics_require_token: bool = False
 
-    # --- Transport / broker (async service decoupling) ------------------------
-    # How the bot talks to the agent core: "http" (legacy /api/v1/chat) or
-    # "redis" (Redis Streams RPC over the broker).
-    transport: str = "http"
+    # --- Broker (Redis Streams RPC for turns) --------------------------------
     # Dedicated Redis DB index for broker streams (DB 0 is used by Langfuse).
     broker_redis_url: str = "redis://localhost:6379/1"
     # Prefix for stream names (turns / replies / tasks / dlq).
     broker_streams_prefix: str = "vanessa"
-    # RPC reply timeout for the bot → agent-core turn round-trip.
+    # RPC reply timeout for the bot → agent turn round-trip.
     broker_rpc_timeout_seconds: float = 120.0
     # Poll interval (s) for non-blocking consumer loops.
     broker_poll_seconds: float = 0.05
     broker_dlq_enabled: bool = True
     broker_stream_maxlen: int = 100_000
     # Consumer group names (one group per logical consumer service).
-    broker_group_agent_core: str = "agent-core"
+    broker_group_agent: str = "agent"
     broker_group_worker: str = "worker"
     # Stable consumer id suffix; empty → a per-process uuid is generated.
     broker_consumer_id: str = ""
@@ -114,10 +111,6 @@ class BotMixin:
     required_user_telegram_id: int = 0
     # If set (> 0), the bot only works in this single Telegram chat.
     allowed_chat_telegram_id: int = 0
-
-    # HTTP timeouts for the legacy bot → API /api/v1/chat call (2-6s+ pipeline).
-    api_client_read_timeout: float = 120.0
-    api_client_connect_timeout: float = 10.0
 
     bot_typing_interval_seconds: float = 4.0
     bot_message_delay_seconds: float = 0.7
@@ -316,10 +309,8 @@ class WorkerMixin:
     background_queue_size: int = 200
     background_workers: int = 2
 
-    # Route post-reply background work (message indexing) and the sweep/portrait
-    # loops through the broker to the dedicated worker container instead of the
-    # in-process executor. Default off → everything stays in-process as before.
-    worker_enabled: bool = False
+    # Route post-reply work and sweep/portrait loops to the worker process.
+    worker_enabled: bool = True
     # Prometheus endpoint port for the worker process.
     worker_metrics_port: int = 9102
 

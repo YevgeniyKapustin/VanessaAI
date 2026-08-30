@@ -29,7 +29,7 @@ scrape_configs:
     relabel_configs:
       - source_labels: [__meta_kubernetes_service_name]
         action: keep
-        regex: agent-core|bot|worker|mcp-websearch|mcp-knowledge|mcp-vision|vector
+        regex: agent|bot|worker|mcp-websearch|mcp-knowledge|mcp-vision|vector
       - source_labels: [__meta_kubernetes_endpoint_port_name]
         action: keep
         regex: http|metrics|mcp

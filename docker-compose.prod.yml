@@ -15,11 +15,11 @@ services:
     volumes: !reset []
     restart: "no"
 
-  api:
+  agent:
     env_file: *prod-env-files
     ports: !reset []
     command: >
-      uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000
+      uvicorn services.agent.main:app --host 0.0.0.0 --port 8000
       --workers ${API_WORKERS:-1}
       --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     volumes: !override
@@ -60,7 +60,7 @@ services:
     image: nginx:1.27-alpine
     restart: always
     depends_on:
-      api:
+      agent:
         condition: service_healthy
     networks:
       - frontend

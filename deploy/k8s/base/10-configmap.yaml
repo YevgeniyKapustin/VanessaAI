@@ -7,9 +7,8 @@ metadata:
   name: vanessa-config
   namespace: vanessa
 data:
-  TRANSPORT: "redis"
   BROKER_STREAMS_PREFIX: "vanessa"
-  BROKER_GROUP_AGENT_CORE: "agent-core"
+  BROKER_GROUP_AGENT: "agent"
   BROKER_GROUP_WORKER: "worker"
   BROKER_RPC_TIMEOUT_SECONDS: "120"
   BROKER_POLL_SECONDS: "0.05"

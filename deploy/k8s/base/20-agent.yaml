@@ -1,0 +1,179 @@
+# agent: orchestrator + broker turn worker.
+# Schema: init container vanessa.infrastructure.db.locked_upgrade
+# (advisory lock).
+# ConfigMap/Secret values: scripts/k8s_secrets.py apply (not this kustomization).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  namespace: vanessa
+  labels: { app: vanessa, component: agent }
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: vanessa, component: agent }
+  template:
+    metadata:
+      labels: { app: vanessa, component: agent }
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: migrate
+          image: vanessa-agent:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "vanessa.infrastructure.db.locked_upgrade"]
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+      containers:
+        - name: agent
+          image: vanessa-agent:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - uvicorn
+            - services.agent.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --timeout-graceful-shutdown
+            - "30"
+          ports:
+            - { containerPort: 8000, name: http }
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+          env:
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: TELEGRAM_BOT_TOKEN }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+            - name: BROKER_REDIS_URL
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: BROKER_REDIS_URL }
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: DEEPSEEK_API_KEY
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: API_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: API_INTERNAL_TOKEN
+                  optional: true
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: HF_TOKEN
+                  optional: true
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_PUBLIC_KEY
+                  optional: true
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_SECRET_KEY
+                  optional: true
+            - name: LANGFUSE_ID_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_ID_SALT
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "2", memory: "4Gi" }
+          startupProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 2
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  namespace: vanessa
+spec:
+  selector: { app: vanessa, component: agent }
+  ports:
+    - { port: 8000, targetPort: http, name: http }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agent
+  namespace: vanessa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agent
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agent
+  namespace: vanessa
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: vanessa, component: agent }

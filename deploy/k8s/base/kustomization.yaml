@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
   - 00-namespace.yaml
   # ConfigMap is scripts/k8s_secrets.py apply — not this list.
-  - 20-agent-core.yaml
+  - 20-agent.yaml
   - 21-bot.yaml
   - 22-worker.yaml
   - 23-mcp-servers.yaml

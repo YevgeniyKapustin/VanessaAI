@@ -1,9 +1,11 @@
 from typing import Self
+from unittest.mock import MagicMock
 
 import fakeredis.aioredis
 import pytest
 
-from services.agent_core import broker_worker as bw
+from services.agent import broker_worker as bw
+from services.agent.broker_worker import TurnHandlerFactory, TurnMapper
 from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,
@@ -15,6 +17,27 @@ from vanessa.core.turn import ConversationTurnResult
 from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.serialization import decode
+
+
+def test_turn_handler_factory_uses_turn_wiring() -> None:
+    container = MagicMock()
+    session = MagicMock()
+    factory = TurnHandlerFactory(container)
+    factory.build(session)
+    container.turns.handler.assert_called_once_with(session)
+
+
+def test_turn_mapper_copies_request_fields() -> None:
+    request = TurnRequest(
+        correlation_id="c",
+        telegram_chat_id=9,
+        message="hi",
+        sender_telegram_id=3,
+    )
+    turn = TurnMapper().to_turn(request)
+    assert turn.telegram_chat_id == 9
+    assert turn.message == "hi"
+    assert turn.sender_telegram_id == 3
 
 
 class _FakeSessionCM:
@@ -64,19 +87,15 @@ async def _publish_worker(broker, message) -> _FakeHandler:
         def __call__(self):
             return _FakeSessionCM()
 
-    original = bw.async_session_factory
-    bw.async_session_factory = FakeFactory()
-    try:
-        worker = bw.BrokerTurnWorker(
-            broker,
-            stream="turns",
-            group="agent-core",
-            consumer="agent-core-test",
-            handler_builder=lambda s: fake_handler,
-        )
-        await worker._handle(Delivery(stream="turns", stream_id="1-0", message=message))
-    finally:
-        bw.async_session_factory = original
+    worker = bw.BrokerTurnWorker(
+        broker,
+        stream="turns",
+        group="agent",
+        consumer="agent-test",
+        handler_builder=lambda s: fake_handler,
+        session_factory=FakeFactory(),
+    )
+    await worker._handle(Delivery(stream="turns", stream_id="1-0", message=message))
     return fake_handler
 
 

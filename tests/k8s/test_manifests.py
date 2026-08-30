@@ -42,7 +42,7 @@ def _init_container(doc: dict, name: str) -> dict:
 def test_workload_secret_keys_match_catalog() -> None:
     agent = next(
         doc
-        for doc in _docs(Path("deploy/k8s/base/20-agent-core.yaml"))
+        for doc in _docs(Path("deploy/k8s/base/20-agent.yaml"))
         if doc.get("kind") == "Deployment"
     )
     bot = next(
@@ -61,8 +61,8 @@ def test_workload_secret_keys_match_catalog() -> None:
         if doc.get("kind") == "Deployment"
     ]
     by_name = {doc["metadata"]["name"]: doc for doc in mcps}
-    assert _secret_keys(_container(agent, "api")) == WORKLOAD_SECRET_KEYS[
-        "agent-core"
+    assert _secret_keys(_container(agent, "agent")) == WORKLOAD_SECRET_KEYS[
+        "agent"
     ]
     assert _secret_keys(_init_container(agent, "migrate")) == (
         WORKLOAD_SECRET_KEYS["migrate"]
@@ -117,7 +117,7 @@ def test_desktop_overlay_does_not_patch_configmap() -> None:
 
 def test_workloads_use_readonly_rootfs() -> None:
     for name in (
-        "20-agent-core.yaml",
+        "20-agent.yaml",
         "21-bot.yaml",
         "22-worker.yaml",
         "23-mcp-servers.yaml",
@@ -147,5 +147,5 @@ def test_postgres_networkpolicy_allows_mcp_knowledge() -> None:
         "matchExpressions"
     ][0]
     assert "mcp-knowledge" in expr["values"]
-    assert "agent-core" in expr["values"]
+    assert "agent" in expr["values"]
     assert "worker" in expr["values"]

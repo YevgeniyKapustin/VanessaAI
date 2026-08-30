@@ -1,4 +1,4 @@
-"""Producer-side task dispatch: agent-core publishes work for the worker."""
+"""Producer-side task dispatch: agent publishes work for the worker."""
 
 from __future__ import annotations
 

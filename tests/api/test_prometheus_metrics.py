@@ -1,7 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from services.agent_core.main import app
+from services.agent.main import app
 from vanessa.config import settings
 from vanessa.infrastructure.observability.metrics import record_turn
 

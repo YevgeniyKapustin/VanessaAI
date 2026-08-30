@@ -208,7 +208,42 @@ class PhotoCaptionHandler:
                 await session.commit()
 
 
-async def build_worker_handlers() -> WorkerAssembly:
+class InboxNoteHandler:
+    def __init__(self, vault, broker) -> None:
+        self._vault = vault
+        self._broker = broker
+
+    async def handle(self, task: TaskMessage) -> None:
+        from vanessa.contracts.messages import InboxNoteReply
+        from vanessa.knowledge.inbox import InboxNoteError, save_inbox_note
+
+        payload = task.payload
+        raw_attachment = payload.get("attachment_base64")
+        try:
+            path = await save_inbox_note(
+                self._vault,
+                text=str(payload.get("text") or ""),
+                attachment_base64=(
+                    str(raw_attachment) if raw_attachment else None
+                ),
+                attachment_suffix=str(payload.get("attachment_suffix") or ".jpg"),
+            )
+            reply = InboxNoteReply(
+                correlation_id=task.correlation_id,
+                ok=True,
+                path=path,
+            )
+        except InboxNoteError as exc:
+            reply = InboxNoteReply(
+                correlation_id=task.correlation_id,
+                ok=False,
+                error=exc.code,
+            )
+        if task.reply_to and self._broker is not None:
+            await self._broker.publish(task.reply_to, reply)
+
+
+async def build_worker_handlers(broker=None) -> WorkerAssembly:
     """Assemble the real handlers + polling loops (worker process)."""
     from vanessa.config import settings
     from vanessa.infrastructure.db.session import async_session_factory
@@ -233,6 +268,12 @@ async def build_worker_handlers() -> WorkerAssembly:
 
     vault = KnowledgeVault()
     await vault.ensure_structure()
+    try:
+        from vanessa.knowledge.compaction import compact_all_person_cards
+
+        await compact_all_person_cards(vault)
+    except Exception:
+        logger.exception("knowledge_compaction_failed at worker startup")
     index = KnowledgeIndex(vault)
     embeddings = create_embedding_provider()
     knowledge_vector_store = create_knowledge_vector_store()
@@ -240,6 +281,10 @@ async def build_worker_handlers() -> WorkerAssembly:
     knowledge_vector_indexer = KnowledgeVectorIndexer(
         vault, embeddings, knowledge_vector_store
     )
+    try:
+        await knowledge_vector_indexer.index_all()
+    except Exception:
+        logger.exception("knowledge_vector_index_all_failed at worker startup")
     writer = KnowledgeVaultWriter(
         vault, index, vector_indexer=knowledge_vector_indexer
     )
@@ -300,6 +345,7 @@ async def build_worker_handlers() -> WorkerAssembly:
             TaskKind.PHOTO_CAPTION: PhotoCaptionHandler(
                 PhotoCaptioner(), async_session_factory
             ),
+            TaskKind.INBOX_NOTE: InboxNoteHandler(vault, broker),
         },
         sweep=sweep,
         portrait=portrait,

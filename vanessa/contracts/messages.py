@@ -70,11 +70,7 @@ class TurnImage(BaseModel):
 
 
 class TurnRequest(BrokerMessage):
-    """A user message forwarded from the transport (bot) to the agent core.
-
-    Mirrors the HTTP ``ChatRequest`` payload so both transports are
-    interchangeable.
-    """
+    """A user message forwarded from the bot to the agent over Redis Streams."""
 
     kind: ClassVar[str] = "turn_request"
 
@@ -133,6 +129,7 @@ class TaskKind(StrEnum):
     PHOTO_CAPTION = "photo_caption"
     VECTOR_INDEX = "vector_index"
     REINDEX_KNOWLEDGE = "reindex_knowledge"
+    INBOX_NOTE = "inbox_note"
 
 
 class TaskMessage(BrokerMessage):
@@ -145,3 +142,13 @@ class TaskMessage(BrokerMessage):
     payload: dict[str, Any] = Field(default_factory=dict)
     #: Optional explicit dedup key (e.g. the message id for indexing).
     dedup_key: str | None = None
+
+
+class InboxNoteReply(BrokerMessage):
+    """Worker response after saving an owner inbox note."""
+
+    kind: ClassVar[str] = "inbox_note_reply"
+
+    ok: bool
+    path: str | None = None
+    error: str | None = None

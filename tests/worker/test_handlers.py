@@ -121,3 +121,33 @@ async def test_reindex_knowledge_handler() -> None:
         TaskMessage(task=TaskKind.REINDEX_KNOWLEDGE, payload={})
     )
     assert indexer.runs == 1
+
+
+async def test_inbox_note_handler_replies(monkeypatch) -> None:
+    from services.worker.handlers import InboxNoteHandler
+    from vanessa.contracts.messages import InboxNoteReply
+
+    async def fake_save(vault, **kwargs):
+        return "inbox/saved.md"
+
+    monkeypatch.setattr("vanessa.knowledge.inbox.save_inbox_note", fake_save)
+
+    published: list = []
+
+    class _Broker:
+        async def publish(self, stream, message) -> None:
+            published.append((stream, message))
+
+    handler = InboxNoteHandler(object(), _Broker())
+    task = TaskMessage(
+        task=TaskKind.INBOX_NOTE,
+        correlation_id="n1",
+        payload={"text": "hi"},
+        reply_to="replies:n1",
+    )
+    await handler.handle(task)
+    assert published[0][0] == "replies:n1"
+    reply = published[0][1]
+    assert isinstance(reply, InboxNoteReply)
+    assert reply.ok is True
+    assert reply.path == "inbox/saved.md"

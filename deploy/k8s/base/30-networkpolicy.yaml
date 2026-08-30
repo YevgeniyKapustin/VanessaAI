@@ -9,7 +9,7 @@ spec:
   podSelector: {}
   policyTypes: [Ingress]
 ---
-# Broker (Redis): bot / agent-core / worker may publish & consume.
+# Broker (Redis): bot / agent / worker may publish & consume.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -24,7 +24,7 @@ spec:
         - podSelector: { matchLabels: { app: vanessa } }
       ports: [{ port: 6379 }]
 ---
-# Postgres: agent-core, worker, and mcp-knowledge (vault reads).
+# Postgres: agent, worker, and mcp-knowledge (vault reads).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -41,11 +41,11 @@ spec:
               - {
                   key: component,
                   operator: In,
-                  values: [agent-core, worker, mcp-knowledge],
+                  values: [agent, worker, mcp-knowledge],
                 }
       ports: [{ port: 5432 }]
 ---
-# Qdrant: only agent-core and worker.
+# Qdrant: only agent and worker.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -59,16 +59,16 @@ spec:
     - from:
         - podSelector:
             matchExpressions:
-              - { key: component, operator: In, values: [agent-core, worker] }
+              - { key: component, operator: In, values: [agent, worker] }
       ports:
         - { port: 6333 }
         - { port: 6334 }
 ---
-# MCP servers: ONLY agent-core may call them (no cross-MCP, no bot).
+# MCP servers: ONLY agent may call them (no cross-MCP, no bot).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-agent-core-to-mcp
+  name: allow-agent-to-mcp
   namespace: vanessa
 spec:
   podSelector:
@@ -77,18 +77,18 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - podSelector: { matchLabels: { app: vanessa, component: agent-core } }
+        - podSelector: { matchLabels: { app: vanessa, component: agent } }
       ports: [{ port: 8101 }, { port: 8102 }, { port: 8103 }]
 ---
-# agent-core HTTP: bot (legacy HTTP fallback) + in-cluster Prometheus.
+# agent HTTP: bot + in-cluster Prometheus.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-to-agent-core-http
+  name: allow-to-agent-http
   namespace: vanessa
 spec:
   podSelector:
-    matchLabels: { app: vanessa, component: agent-core }
+    matchLabels: { app: vanessa, component: agent }
   policyTypes: [Ingress]
   ingress:
     - from:

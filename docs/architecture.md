@@ -11,7 +11,7 @@ flowchart LR
   telegram[Telegram]
   bot[Bot]
   broker[Redis Streams]
-  core[agent-core]
+  core[agent]
   ingress[Ingress]
   gate[Gate]
   retrieve[Retrieve]
@@ -31,7 +31,7 @@ flowchart LR
 Orchestrator stages live in `vanessa/pipeline/`; gate / retrieve / compose
 code is under `vanessa/pipeline/decision`, `rag`, and `llm`. Dependencies
 are wired through protocols (`vanessa/core/protocols.py`) so stages stay
-testable. Process entrypoints live under `services/` (`bot`, `agent_core`,
+testable. Process entrypoints live under `services/` (`bot`, `agent`,
 `worker`, `mcp`). Wire contracts are `vanessa/contracts/`; Redis transport
 is `vanessa/infrastructure/broker/`. Postgres is `vanessa/infrastructure/db/`.
 

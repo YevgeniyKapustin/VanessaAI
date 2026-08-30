@@ -10,6 +10,8 @@ from typing import ClassVar
 
 from vanessa.core.request_context import get_request_id
 
+type ServiceName = str
+
 _NOISY_LOGGERS = (
     "httpx",
     "httpcore",
@@ -19,7 +21,7 @@ _NOISY_LOGGERS = (
     "sentence_transformers",
 )
 
-_configured_service: str | None = None
+_configured_service_name: ServiceName | None = None
 
 
 class _Ansi:
@@ -47,12 +49,12 @@ class RequestIdFilter(logging.Filter):
 
 
 class ServiceNameFilter(logging.Filter):
-    def __init__(self, service: str) -> None:
+    def __init__(self, service_name: ServiceName) -> None:
         super().__init__()
-        self._service = service
+        self._service_name = service_name
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.service = self._service
+        record.service = self._service_name
         return True
 
 
@@ -208,7 +210,7 @@ def _enable_windows_ansi() -> None:
 
 
 def create_file_handler(
-    service: str,
+    service_name: ServiceName,
     level: str,
     log_dir: Path,
     *,
@@ -219,24 +221,24 @@ def create_file_handler(
     """Build a rotating file handler writing plain (uncolored) log lines."""
     log_dir.mkdir(parents=True, exist_ok=True)
     handler = logging.handlers.RotatingFileHandler(
-        log_dir / f"{service}.log",
+        log_dir / f"{service_name}.log",
         maxBytes=max_bytes,
         backupCount=backup_count,
         encoding="utf-8",
     )
     handler.setLevel(level)
     handler.addFilter(RequestIdFilter())
-    handler.addFilter(ServiceNameFilter(service))
+    handler.addFilter(ServiceNameFilter(service_name))
     handler.setFormatter(formatter or LoguruStyleFormatter(colorize=False))
     return handler
 
 
 def configure_logging(
-    service: str,
+    service_name: ServiceName,
     level: str | None = None,
 ) -> None:
-    global _configured_service
-    if _configured_service is not None:
+    global _configured_service_name
+    if _configured_service_name is not None:
         return
 
     from vanessa.config import settings
@@ -250,7 +252,7 @@ def configure_logging(
         formatter = LoguruStyleFormatter()
     handler = logging.StreamHandler(sys.stdout)
     handler.addFilter(RequestIdFilter())
-    handler.addFilter(ServiceNameFilter(service))
+    handler.addFilter(ServiceNameFilter(service_name))
     handler.setFormatter(formatter)
 
     root = logging.getLogger()
@@ -267,7 +269,7 @@ def configure_logging(
         try:
             root.addHandler(
                 create_file_handler(
-                    service,
+                    service_name,
                     file_level,
                     Path(settings.log_dir),
                     max_bytes=settings.log_file_max_bytes,
@@ -284,4 +286,4 @@ def configure_logging(
     for logger_name in _NOISY_LOGGERS:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
-    _configured_service = service
+    _configured_service_name = service_name

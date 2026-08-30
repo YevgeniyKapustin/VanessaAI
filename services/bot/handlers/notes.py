@@ -1,13 +1,13 @@
 import io
 import logging
 
-import httpx
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message as TelegramMessage
 
 from services.bot.container import BotServices
 from services.bot.messages import IncomingMessage
+from services.bot.services.broker_client import NotesError
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ def create_notes_router(services: BotServices) -> Router:
                 attachment_bytes=attachment_bytes,
                 attachment_suffix=attachment_suffix,
             )
-        except httpx.HTTPStatusError as exc:
-            if exc.response is not None and exc.response.status_code == 503:
+        except NotesError as exc:
+            if exc.code == "knowledge_not_configured":
                 await telegram_message.answer(
                     services.texts.notes.not_configured.strip()
                 )
@@ -58,7 +58,7 @@ def create_notes_router(services: BotServices) -> Router:
                 incoming.sender_telegram_id,
             )
             await telegram_message.answer(
-                services.texts.notes.error.format(detail=str(exc)).strip()
+                services.texts.notes.error.format(detail=exc.code).strip()
             )
             return
         except Exception as exc:

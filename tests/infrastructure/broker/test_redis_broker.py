@@ -25,6 +25,10 @@ def broker():
     asyncio.run(instance.close())
 
 
+async def test_ping(broker: RedisStreamBroker) -> None:
+    await broker.ping()
+
+
 async def test_publish_consume_ack(broker: RedisStreamBroker) -> None:
     request = TurnRequest(
         correlation_id="c1",
@@ -39,7 +43,7 @@ async def test_publish_consume_ack(broker: RedisStreamBroker) -> None:
 
     consumer_task = asyncio.create_task(
         broker.consume_forever(
-            "turns", "agent-core", "worker-1", handler, poll_seconds=0.01, count=10
+            "turns", "agent", "worker-1", handler, poll_seconds=0.01, count=10
         )
     )
     await asyncio.sleep(0)
@@ -80,7 +84,7 @@ async def test_rpc_request_reply_with_started(
 
     agent_task = asyncio.create_task(
         broker.consume_forever(
-            "turns", "agent-core", "worker-1", agent_side, poll_seconds=0.01, count=10
+            "turns", "agent", "worker-1", agent_side, poll_seconds=0.01, count=10
         )
     )
     await asyncio.sleep(0)
@@ -123,7 +127,7 @@ async def test_dedup_skips_redelivery(broker: RedisStreamBroker) -> None:
     consumer_task = asyncio.create_task(
         broker.consume_forever(
             "turns",
-            "agent-core",
+            "agent",
             "worker-1",
             handler,
             dedup=guard,
@@ -147,7 +151,7 @@ async def test_failing_handler_goes_to_dlq(broker: RedisStreamBroker) -> None:
 
     consumer_task = asyncio.create_task(
         broker.consume_forever(
-            "turns", "agent-core", "worker-1", handler, poll_seconds=0.01, count=10
+            "turns", "agent", "worker-1", handler, poll_seconds=0.01, count=10
         )
     )
     await asyncio.sleep(0)

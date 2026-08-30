@@ -1,4 +1,4 @@
-# MCP servers: isolated tool services. Only agent-core may call them
+# MCP servers: isolated tool services. Only agent may call them
 # (see 30-networkpolicy.yaml) except metrics scrape from monitoring.
 apiVersion: apps/v1
 kind: Deployment

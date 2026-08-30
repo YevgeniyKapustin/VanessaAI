@@ -1,8 +1,8 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from services.agent_core.deps import get_turn_metrics
-from services.agent_core.main import app
+from services.agent.deps import get_turn_metrics
+from services.agent.main import app
 from vanessa.config import settings
 from vanessa.pipeline.turn_metrics import TurnMetrics
 

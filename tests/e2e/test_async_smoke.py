@@ -1,7 +1,7 @@
-"""End-to-end async smoke test: bot → broker → agent-core → broker → bot.
+"""End-to-end async smoke test: bot → broker → agent → broker → bot.
 
 Wires the REAL ``BrokerTurnClient`` (bot transport) and the REAL
-``BrokerTurnWorker`` (agent-core consumer) over a fakeredis broker, with a
+``BrokerTurnWorker`` (agent consumer) over a fakeredis broker, with a
 fake pipeline handler standing in for the orchestrator. Exercises the full
 RPC round-trip incl. the ``TurnStarted`` (typing) event and request-id
 propagation.
@@ -13,7 +13,7 @@ from typing import Self
 import fakeredis.aioredis
 from aiogram import Bot
 
-from services.agent_core import broker_worker as bw
+from services.agent import broker_worker as bw
 from services.bot.messages import IncomingMessage
 from services.bot.services.broker_client import BrokerTurnClient
 from vanessa.core.request_context import get_planning_started_signal, get_request_id
@@ -61,14 +61,13 @@ async def test_full_async_round_trip() -> None:
         def __call__(self):
             return _FakeSessionCM()
 
-    original = bw.async_session_factory
-    bw.async_session_factory = FakeFactory()
     worker = bw.BrokerTurnWorker(
         broker,
         stream=streams.turns,
-        group="agent-core",
-        consumer="agent-core-smoke",
+        group="agent",
+        consumer="agent-smoke",
         handler_builder=lambda session: _FakePipeline(),
+        session_factory=FakeFactory(),
         dedup=broker.dedup_guard(),
     )
     try:
@@ -99,6 +98,5 @@ async def test_full_async_round_trip() -> None:
         assert result.reason == "intent"
         assert result.reply.startswith("echo привет")
     finally:
-        bw.async_session_factory = original
         worker_task.cancel()
         await asyncio.gather(worker_task, return_exceptions=True)

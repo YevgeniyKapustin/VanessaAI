@@ -18,12 +18,12 @@ import logging
 import time
 from typing import ClassVar
 
+from vanessa.core.message_time import format_message_time
 from vanessa.core.messages import ContextMessage
 from vanessa.knowledge.memory_planner import MemoryPlanner
 from vanessa.knowledge.memory_prefilter import should_extract_memory
 from vanessa.knowledge.people import canonical_name_for_telegram_id
 from vanessa.knowledge.writer import KnowledgeVaultWriter
-from vanessa.pipeline.llm.prompts.context_format import format_message_time
 
 logger = logging.getLogger(__name__)
 

@@ -25,7 +25,7 @@ x-env-files: &env-files
     required: false
 
 services:
-  # One-shot schema migration (advisory lock). API/worker replicas must not
+  # One-shot schema migration (advisory lock). Agent/worker replicas must not
   # run upgrade in the serving process.
   migrate:
     <<: *app-image
@@ -38,10 +38,10 @@ services:
     networks:
       - backend
 
-  api:
+  agent:
     <<: *app-image
     command: >
-      uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000
+      uvicorn services.agent.main:app --host 0.0.0.0 --port 8000
       --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
@@ -53,6 +53,8 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -66,7 +68,7 @@ services:
       retries: 5
       # The lifespan cold start (knowledge vector reindex + first sweep)
       # routinely takes 60-90s+, so a 30s grace would mark the container
-      # "unhealthy" and abort `docker compose up` (bot depends on api healthy).
+      # "unhealthy" and abort `docker compose up` (bot depends on agent).
       start_period: 300s
     networks:
       - backend
@@ -80,7 +82,7 @@ services:
     stop_grace_period: 45s
     env_file: *env-files
     depends_on:
-      api:
+      agent:
         condition: service_healthy
     networks:
       - backend
@@ -88,10 +90,8 @@ services:
   # --- Background worker -----------------------------------------------------
   # Consumes TaskMessage jobs from the broker (message indexing, sweep,
   # portraits, knowledge reindex) in an isolated process/container so heavy
-  # CPU/RAM work never stalls the reply path. Enabled by setting WORKER_ENABLED
-  # (routing indexing through the broker) and pointing the bot at the broker
-  # (TRANSPORT=redis). Safe to run even without those: the polling loops only
-  # start in worker mode, and an empty task stream is a no-op.
+  # CPU/RAM work never stalls the reply path. Turns and inbox notes go bot →
+  # Redis → agent/worker. WORKER_ENABLED (default true) routes indexing here.
   worker:
     <<: *app-image
     command: python -m services.worker.main
@@ -118,7 +118,7 @@ services:
 
   # --- MCP servers (external tools over SSE) ---------------------------------
   # Each is an isolated process/container exposing its own /health, /metrics
-  # and /mcp endpoint; the agent core calls them over the wire (never imports).
+  # and /mcp endpoint; the agent calls them over the wire (never imports).
   mcp-websearch:
     <<: *lite-image
     command: python -m services.mcp.runner websearch --port 8101

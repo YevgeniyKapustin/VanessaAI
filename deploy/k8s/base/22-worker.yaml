@@ -1,4 +1,4 @@
-# worker: task jobs; migrate init shares the agent-core advisory lock.
+# worker: task jobs; migrate init shares the agent advisory lock.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

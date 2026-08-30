@@ -1,22 +1,31 @@
-"""Redis Streams RPC transport for the bot.
-
-Implements ``ChatApiClientProtocol`` so the handler code is identical to the
-HTTP path — the bot publishes a ``TurnRequest`` and blocks on its private
-reply stream until the agent core answers (with ``TurnStarted`` fired through
-``on_started`` so the "typing..." indicator behaves exactly as over HTTP).
-"""
+"""Redis Streams RPC for bot turns and inbox notes."""
 
 from __future__ import annotations
 
+import base64
 import logging
 from uuid import uuid4
 
 from services.bot.messages import IncomingMessage
 from services.bot.messages.response import ChatProcessResult
-from vanessa.contracts.messages import TurnImage, TurnReply, TurnRequest, TurnStarted
+from vanessa.contracts.messages import (
+    InboxNoteReply,
+    TaskKind,
+    TaskMessage,
+    TurnImage,
+    TurnReply,
+    TurnRequest,
+    TurnStarted,
+)
 from vanessa.infrastructure.broker.streams import BrokerStreams
 
 logger = logging.getLogger(__name__)
+
+
+class NotesError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 class BrokerTurnClient:
@@ -91,3 +100,36 @@ class BrokerTurnClient:
             photo_file_id=reply.photo_file_id,
             photo_data_url=reply.photo_data_url,
         )
+
+    async def save_inbox_note(
+        self,
+        *,
+        text: str,
+        attachment_bytes: bytes | None = None,
+        attachment_suffix: str = ".jpg",
+    ) -> str:
+        correlation_id = f"note:{uuid4().hex}"
+        payload: dict[str, str] = {
+            "text": text,
+            "attachment_suffix": attachment_suffix,
+        }
+        if attachment_bytes:
+            payload["attachment_base64"] = base64.b64encode(
+                attachment_bytes
+            ).decode()
+        request = TaskMessage(
+            correlation_id=correlation_id,
+            task=TaskKind.INBOX_NOTE,
+            payload=payload,
+            reply_to=self._streams.reply(self._bot_id, correlation_id),
+        )
+        reply = await self._broker.request(
+            self._streams.tasks,
+            request,
+            timeout=self._timeout,
+            expect=InboxNoteReply,
+        )
+        if not isinstance(reply, InboxNoteReply) or not reply.ok:
+            code = reply.error if isinstance(reply, InboxNoteReply) else "error"
+            raise NotesError(code or "error")
+        return str(reply.path or "")

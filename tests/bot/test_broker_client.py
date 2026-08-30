@@ -6,7 +6,7 @@ from aiogram import Bot
 
 from services.bot.messages import IncomingMessage
 from services.bot.services.broker_client import BrokerTurnClient
-from vanessa.contracts.messages import TurnReply, TurnStarted
+from vanessa.contracts.messages import InboxNoteReply, TurnReply, TurnStarted
 from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
@@ -55,7 +55,7 @@ async def test_client_process_roundtrip(broker) -> None:
 
     agent_task = asyncio.create_task(
         broker.consume_forever(
-            streams.turns, "agent-core", "w1", agent_side, poll_seconds=0.01
+            streams.turns, "agent", "w1", agent_side, poll_seconds=0.01
         )
     )
     await asyncio.sleep(0.05)
@@ -93,7 +93,7 @@ async def test_client_uses_correlation_id_from_message(broker) -> None:
 
     agent_task = asyncio.create_task(
         broker.consume_forever(
-            streams.turns, "agent-core", "w1", agent_side, poll_seconds=0.01
+            streams.turns, "agent", "w1", agent_side, poll_seconds=0.01
         )
     )
     await asyncio.sleep(0.05)
@@ -104,3 +104,34 @@ async def test_client_uses_correlation_id_from_message(broker) -> None:
 
     assert captured == ["42:99"]
     assert result.action == "ignore"
+
+
+async def test_client_saves_inbox_note(broker) -> None:
+    streams = BrokerStreams(
+        prefix="vanessa", turns="vanessa:turns", tasks="vanessa:tasks"
+    )
+    client = BrokerTurnClient(
+        broker, streams=streams, timeout=3.0, bot_id="bot-note"
+    )
+
+    async def worker_side(delivery: Delivery) -> None:
+        req = delivery.message
+        await broker.publish(
+            req.reply_to,
+            InboxNoteReply(
+                correlation_id=req.correlation_id,
+                ok=True,
+                path="inbox/note.md",
+            ),
+        )
+
+    worker_task = asyncio.create_task(
+        broker.consume_forever(
+            streams.tasks, "worker", "w1", worker_side, poll_seconds=0.01
+        )
+    )
+    await asyncio.sleep(0.05)
+    path = await client.save_inbox_note(text="buy milk")
+    worker_task.cancel()
+    await asyncio.gather(worker_task, return_exceptions=True)
+    assert path == "inbox/note.md"

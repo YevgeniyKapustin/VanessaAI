@@ -1,13 +1,7 @@
-from datetime import datetime
-
+from vanessa.core.message_time import format_message_time
 from vanessa.core.messages import ContextMessage
 
-
-def format_message_time(value: datetime | None) -> str:
-    if value is None:
-        return "??.??.???? ??:??"
-    local = value.astimezone() if value.tzinfo is not None else value
-    return local.strftime("%d.%m.%Y %H:%M")
+__all__ = ["block_time_range", "format_message_time"]
 
 
 def block_time_range(messages: tuple[ContextMessage, ...]) -> tuple[str, str]:

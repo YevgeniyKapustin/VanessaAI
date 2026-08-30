@@ -64,7 +64,7 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
     on exit) dropped the planner's output — the final compose request showed
     output in the trace but the planner did not.
     """
-    from vanessa.pipeline.llm.providers.protocols import _InstrumentedCompleterMixin
+    from vanessa.llm.completers import _InstrumentedCompleterMixin
 
     class _FakeCompleter(_InstrumentedCompleterMixin):
         @property
@@ -79,7 +79,7 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
         }, ""
 
     tracer = _RecordingTracer()
-    monkeypatch.setattr("vanessa.pipeline.llm.providers.protocols.get_tracer", lambda: tracer)
+    monkeypatch.setattr("vanessa.llm.completers.get_tracer", lambda: tracer)
 
     text = await _FakeCompleter()._run_completion(
         "deepseek-chat",
@@ -100,7 +100,7 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
 async def test_completer_records_reasoning_content(monkeypatch) -> None:
     """The completer (planner) must surface DeepSeek V4's chain of thought on the
     observation so it is debuggable in Langfuse, mirroring the composer provider."""
-    from vanessa.pipeline.llm.providers.protocols import _InstrumentedCompleterMixin
+    from vanessa.llm.completers import _InstrumentedCompleterMixin
 
     class _FakeCompleter(_InstrumentedCompleterMixin):
         @property
@@ -115,7 +115,7 @@ async def test_completer_records_reasoning_content(monkeypatch) -> None:
         }, "похоже, это адрес к боту -> should_reply=true"
 
     tracer = _RecordingTracer()
-    monkeypatch.setattr("vanessa.pipeline.llm.providers.protocols.get_tracer", lambda: tracer)
+    monkeypatch.setattr("vanessa.llm.completers.get_tracer", lambda: tracer)
 
     text = await _FakeCompleter()._run_completion(
         "deepseek-chat",

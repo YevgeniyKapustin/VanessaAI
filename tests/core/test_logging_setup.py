@@ -223,7 +223,7 @@ def test_json_formatter_includes_exception() -> None:
 
 
 def test_configure_logging_json_to_stdout(monkeypatch, capsys) -> None:
-    logging_setup._configured_service = None
+    logging_setup._configured_service_name = None
     logging.getLogger().handlers.clear()
     from vanessa.config import settings
 
@@ -238,5 +238,5 @@ def test_configure_logging_json_to_stdout(monkeypatch, capsys) -> None:
         assert payload["service"] == "bot"
         assert payload["level"] == "INFO"
     finally:
-        logging_setup._configured_service = None
+        logging_setup._configured_service_name = None
         logging.getLogger().handlers.clear()

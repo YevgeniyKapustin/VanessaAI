@@ -10,13 +10,11 @@ from vanessa.config.env_overlay import (
 def test_build_local_overlay_keeps_secrets_and_diffs():
     defaults = {
         "POSTGRES_PASSWORD": "vanessa",
-        "TRANSPORT": "http",
         "COMPOSE_FILE": "a.yml:b.yml",
     }
     legacy = {
         "TELEGRAM_BOT_TOKEN": "123:abc",
         "POSTGRES_PASSWORD": "vanessa",
-        "TRANSPORT": "http",
         "WEB_SEARCH_ENABLED": "false",
         "VISION_PHOTO_PLACEHOLDER": "[фото]",
         "ANTHROPIC_API_KEY": "sk-ant",
@@ -31,8 +29,7 @@ def test_build_local_overlay_keeps_secrets_and_diffs():
     assert "VISION_PHOTO_PLACEHOLDER" not in overlay
     assert "ANTHROPIC_API_KEY" not in overlay
     assert "DEEPSEEK_API_KEY" not in overlay
-    assert overlay["TRANSPORT"] == "http"
-    assert overlay["WORKER_ENABLED"] == "false"
+    assert overlay["WORKER_ENABLED"] == "true"
     assert "COMPOSE_FILE" not in overlay
 
 

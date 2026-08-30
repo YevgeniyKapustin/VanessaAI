@@ -1,4 +1,4 @@
-"""Shared embedding + Qdrant stores for agent-core and worker.
+"""Shared embedding + Qdrant stores for agent and worker.
 
 Neither process should import the other's container to get these.
 """

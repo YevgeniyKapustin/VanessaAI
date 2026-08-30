@@ -18,7 +18,7 @@ async def test_collector_reports_stream_and_lag() -> None:
     collector = BrokerMetricsCollector(
         broker,
         streams,
-        groups=[("vanessa:turns", "agent-core"), ("vanessa:tasks", "worker")],
+        groups=[("vanessa:turns", "agent"), ("vanessa:tasks", "worker")],
     )
     await collector.update_once()
 

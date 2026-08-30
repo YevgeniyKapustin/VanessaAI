@@ -12,7 +12,7 @@ on push/PR; image build and cluster apply are not in GitHub Actions yet.
 ```
 services/
   bot/          Telegram transport
-  agent_core/   FastAPI + turn pipeline
+  agent/        Turn pipeline + notes/health HTTP
   worker/       Indexing, sweep, memory jobs
   mcp/          Tool servers
 vanessa/
@@ -44,15 +44,15 @@ docker compose --env-file .env.defaults --env-file .env.local up -d --build
 
 `prepare_env.py` copies secrets and non-default knobs from `.env` into
 `.env.local`. If `up` fails because `migrate` exited non-zero, inspect
-`docker compose logs migrate` and re-run migrate. `api` waits on
+`docker compose logs migrate` and re-run migrate. `agent` waits on
 `service_completed_successfully`.
 
-Services: API `http://localhost:8000`, Qdrant `6333`, Postgres `5432`.
+Services: agent `http://localhost:8000`, Qdrant `6333`, Postgres `5432`.
 Nginx under `deploy/nginx/` is only for the Compose prod path.
 
 ## Production Compose
 
-No bind-mounts, API unpublished, Nginx. Copy `.env.example` to
+No bind-mounts, agent unpublished, Nginx. Copy `.env.example` to
 `.env.production` (gitignored; host or CI). Uncomment the production
 block in that file. Then:
 
@@ -80,7 +80,7 @@ poetry run pytest
 
 ## Kubernetes
 
-Rolling updates: `maxUnavailable: 0` + `maxSurge: 1` on agent-core /
+Rolling updates: `maxUnavailable: 0` + `maxSurge: 1` on agent /
 worker / MCP; probes on `/health/live` and `/health/ready`. Design,
 topology, NetworkPolicy, and secrets CLI: **[deploy/k8s/README.md](../deploy/k8s/README.md)**.
 Do not duplicate that doc here.

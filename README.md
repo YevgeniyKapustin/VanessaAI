@@ -1,14 +1,22 @@
 # VanessaAI
 
+<p>
+  <img src="Vanessa.png" align="right" width="300" alt="Vanessa"
+       style="margin-left: 20px; margin-bottom: 10px;" />
+
 A Telegram bot with long-term chat memory, RAG over message history, and
 controlled group-chat behavior. A pet project showcasing production-minded AI
 system design — not just an LLM wrapper, but a pipeline with gating, retrieval,
 and observability.
 
+</p>
+
 In a group chat the bot should not reply to everything. VanessaAI is built
 around **memory** (relevant history, not a dump), **discipline** (when to
 speak or stay quiet), and **character** (persona from config, not hardcoded
 jokes).
+
+<br clear="right"/>
 
 ## How a message is processed
 

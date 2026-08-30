@@ -5,6 +5,14 @@ import pytest
 from services.bot import main as bot_main
 
 
+@pytest.fixture(autouse=True)
+def _stub_metrics_http_server(monkeypatch):
+    monkeypatch.setattr(
+        "vanessa.infrastructure.observability.metrics.start_metrics_http_server",
+        lambda port, addr="0.0.0.0": MagicMock(),
+    )
+
+
 @pytest.mark.asyncio
 async def test_main_starts_polling(monkeypatch):
     mock_bot = AsyncMock()

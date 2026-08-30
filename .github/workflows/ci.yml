@@ -17,8 +17,26 @@ jobs:
           version-file: pyproject.toml
           args: check
 
+  k8s:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Kubernetes manifests
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/kubeconform.tgz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tgz -C /tmp kubeconform
+          kubectl kustomize deploy/k8s/base \
+            | /tmp/kubeconform -strict -ignore-missing-schemas
+          kubectl kustomize deploy/k8s/logging \
+            | /tmp/kubeconform -strict -ignore-missing-schemas
+          kubectl kustomize deploy/k8s/overlays/desktop \
+            | /tmp/kubeconform -strict -ignore-missing-schemas
+
   test:
-    needs: lint
+    needs: [lint, k8s]
     runs-on: ubuntu-latest
     env:
       REQUIRED_USER_TELEGRAM_ID: ${{ secrets.REQUIRED_USER_TELEGRAM_ID || '123456789' }}

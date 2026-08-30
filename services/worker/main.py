@@ -29,11 +29,13 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    if settings.metrics_enabled:
-        from vanessa.observability.metrics import start_metrics_http_server
+    from vanessa.observability.metrics import start_metrics_http_server
 
-        start_metrics_http_server(settings.worker_metrics_port)
-        logger.info("worker metrics endpoint started on :%s", settings.worker_metrics_port)
+    start_metrics_http_server(settings.worker_metrics_port)
+    logger.info(
+        "worker health/metrics endpoint started on :%s",
+        settings.worker_metrics_port,
+    )
 
     streams = BrokerStreams.from_settings(settings)
     broker = RedisStreamBroker(

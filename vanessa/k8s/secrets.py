@@ -10,6 +10,7 @@ from dotenv import dotenv_values
 
 SECRET_NAME = "vanessa-secrets"
 DEFAULT_NAMESPACE = "vanessa"
+IMAGE = "vanessa-agent:local"
 
 SECRET_KEYS: frozenset[str] = frozenset(
     {
@@ -34,6 +35,60 @@ ALWAYS_REQUIRED: frozenset[str] = frozenset(
         "BROKER_REDIS_URL",
     }
 )
+
+OPTIONAL_SECRET_KEYS: frozenset[str] = frozenset(
+    {
+        "DEEPSEEK_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "WEB_SEARCH_API_KEY",
+        "API_INTERNAL_TOKEN",
+        "HF_TOKEN",
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_ID_SALT",
+    }
+)
+
+# Keys injected per workload. Missing optional keys use secretKeyRef.optional.
+WORKLOAD_SECRET_KEYS: dict[str, frozenset[str]] = {
+    "migrate": frozenset({"POSTGRES_PASSWORD"}),
+    "agent-core": frozenset(
+        {
+            "TELEGRAM_BOT_TOKEN",
+            "POSTGRES_PASSWORD",
+            "BROKER_REDIS_URL",
+            "DEEPSEEK_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "API_INTERNAL_TOKEN",
+            "HF_TOKEN",
+            "LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_SECRET_KEY",
+            "LANGFUSE_ID_SALT",
+        }
+    ),
+    "bot": frozenset(
+        {
+            "TELEGRAM_BOT_TOKEN",
+            "BROKER_REDIS_URL",
+            "API_INTERNAL_TOKEN",
+        }
+    ),
+    "worker": frozenset(
+        {
+            "POSTGRES_PASSWORD",
+            "BROKER_REDIS_URL",
+            "DEEPSEEK_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "HF_TOKEN",
+            "LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_SECRET_KEY",
+            "LANGFUSE_ID_SALT",
+        }
+    ),
+    "mcp-websearch": frozenset({"WEB_SEARCH_API_KEY"}),
+    "mcp-knowledge": frozenset({"POSTGRES_PASSWORD"}),
+    "mcp-vision": frozenset({"DEEPSEEK_API_KEY"}),
+}
 
 _TRUE = frozenset({"1", "true", "yes", "on"})
 

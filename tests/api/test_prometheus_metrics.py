@@ -30,8 +30,12 @@ async def test_prometheus_metrics_endpoint_requires_token_when_enabled(monkeypat
     ) as client:
         denied = await client.get("/metrics")
         allowed = await client.get("/metrics", headers={"X-Internal-Token": "secret"})
+        bearer = await client.get(
+            "/metrics", headers={"Authorization": "Bearer secret"}
+        )
     assert denied.status_code == 401
     assert allowed.status_code == 200
+    assert bearer.status_code == 200
 
 
 @pytest.mark.asyncio

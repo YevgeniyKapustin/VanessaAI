@@ -20,7 +20,11 @@ from starlette.routing import Mount, Route
 
 from vanessa.core.logging_setup import configure_logging
 from services.mcp import knowledge, vision, websearch
-from vanessa.observability.metrics import CONTENT_TYPE_LATEST, render_metrics
+from vanessa.observability.metrics import (
+    CONTENT_TYPE_LATEST,
+    metrics_token_allowed,
+    render_metrics,
+)
 
 _SERVERS = {
     "websearch": websearch.build_server,
@@ -39,7 +43,9 @@ def build_app(name: str, *, path: str = "/mcp"):
     async def health(_request):
         return JSONResponse({"status": "ok", "server": name})
 
-    async def metrics(_request):
+    async def metrics(request):
+        if not metrics_token_allowed(request.headers):
+            return Response(b"unauthorized\n", status_code=401)
         return Response(render_metrics(), media_type=CONTENT_TYPE_LATEST)
 
     return Starlette(

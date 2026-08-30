@@ -65,21 +65,74 @@ def test_classify_llm_error_network_and_unknown() -> None:
     assert metrics.classify_llm_error(ValueError("boom")) == "unknown"
 
 
-def test_start_metrics_http_server_uses_app_registry(monkeypatch) -> None:
-    seen: dict[str, object] = {}
+def test_start_metrics_http_server_serves_health(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "metrics_enabled", True)
+    monkeypatch.setattr(settings, "metrics_require_token", False)
+    server = metrics.start_metrics_http_server(0, addr="127.0.0.1")
+    try:
+        host, port = server.server_address
+        from urllib.request import urlopen
 
-    def fake_serve(port, addr="", registry=None):
-        seen["port"] = port
-        seen["addr"] = addr
-        seen["registry"] = registry
+        with urlopen(f"http://{host}:{port}/health", timeout=2) as response:
+            assert response.status == 200
+            assert response.read() == b"ok\n"
+        with urlopen(f"http://{host}:{port}/metrics", timeout=2) as response:
+            assert response.status == 200
+            body = response.read()
+            assert b"vanessa_" in body or b"#" in body
+    finally:
+        server.shutdown()
+        server.server_close()
 
-    monkeypatch.setattr("prometheus_client.start_http_server", fake_serve)
-    metrics.start_metrics_http_server(9101, addr="127.0.0.1")
-    assert seen["port"] == 9101
-    assert seen["addr"] == "127.0.0.1"
-    assert seen["registry"] is metrics.registry
-    metrics.start_metrics_http_server(9102)
-    assert seen["addr"] == "0.0.0.0"
+
+def test_start_metrics_http_server_requires_token(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "metrics_enabled", True)
+    monkeypatch.setattr(settings, "metrics_require_token", True)
+    monkeypatch.setattr(settings, "api_internal_token", "secret")
+    server = metrics.start_metrics_http_server(0, addr="127.0.0.1")
+    try:
+        host, port = server.server_address
+        from urllib.error import HTTPError
+        from urllib.request import Request, urlopen
+
+        with urlopen(f"http://{host}:{port}/health", timeout=2) as response:
+            assert response.status == 200
+        try:
+            urlopen(f"http://{host}:{port}/metrics", timeout=2)
+            raise AssertionError("expected 401")
+        except HTTPError as exc:
+            assert exc.code == 401
+        req = Request(
+            f"http://{host}:{port}/metrics",
+            headers={"X-Internal-Token": "secret"},
+        )
+        with urlopen(req, timeout=2) as response:
+            assert response.status == 200
+        bearer = Request(
+            f"http://{host}:{port}/metrics",
+            headers={"Authorization": "Bearer secret"},
+        )
+        with urlopen(bearer, timeout=2) as response:
+            assert response.status == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_metrics_token_allowed_respects_flag(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "metrics_require_token", False)
+    assert metrics.metrics_token_allowed({}) is True
+    monkeypatch.setattr(settings, "metrics_require_token", True)
+    monkeypatch.setattr(settings, "api_internal_token", "")
+    assert metrics.metrics_token_allowed({}) is True
+    monkeypatch.setattr(settings, "api_internal_token", "secret")
+    assert metrics.metrics_token_allowed({}) is False
+    assert metrics.metrics_token_allowed({"X-Internal-Token": "secret"}) is True
+    assert metrics.metrics_token_allowed(
+        {"Authorization": "Bearer secret"}
+    ) is True
 
 
 def test_render_metrics_contains_metric_families() -> None:

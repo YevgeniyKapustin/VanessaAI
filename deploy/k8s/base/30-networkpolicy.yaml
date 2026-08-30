@@ -24,7 +24,7 @@ spec:
         - podSelector: { matchLabels: { app: vanessa } }
       ports: [{ port: 6379 }]
 ---
-# Postgres: only agent-core and worker.
+# Postgres: agent-core, worker, and mcp-knowledge (vault reads).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -38,7 +38,11 @@ spec:
     - from:
         - podSelector:
             matchExpressions:
-              - { key: component, operator: In, values: [agent-core, worker] }
+              - {
+                  key: component,
+                  operator: In,
+                  values: [agent-core, worker, mcp-knowledge],
+                }
       ports: [{ port: 5432 }]
 ---
 # Qdrant: only agent-core and worker.
@@ -76,8 +80,7 @@ spec:
         - podSelector: { matchLabels: { app: vanessa, component: agent-core } }
       ports: [{ port: 8101 }, { port: 8102 }, { port: 8103 }]
 ---
-# agent-core HTTP: from the ingress controller / monitoring (and bot for the
-# legacy HTTP transport fallback).
+# agent-core HTTP: bot (legacy HTTP fallback) + in-cluster Prometheus.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -92,3 +95,29 @@ spec:
         - podSelector: { matchLabels: { app: vanessa, component: bot } }
         - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
       ports: [{ port: 8000 }]
+---
+# Prometheus in namespace monitoring. Hybrid Compose Prometheus is outside
+# the cluster — leave these policies unapplied on Docker Desktop.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-scrape
+  namespace: vanessa
+spec:
+  podSelector:
+    matchExpressions:
+      - {
+          key: component,
+          operator: In,
+          values: [bot, worker, mcp-websearch, mcp-knowledge, mcp-vision],
+        }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+      ports:
+        - { port: 9101 }
+        - { port: 9102 }
+        - { port: 8101 }
+        - { port: 8102 }
+        - { port: 8103 }

@@ -55,28 +55,11 @@ transforms:
         .event = "none"
       }
 
-  nginx_access:
-    type: filter
-    inputs: [parse_json]
-    condition: '.service == "nginx" && is_float(.request_time)'
-
-  nginx_metrics:
-    type: log_to_metric
-    inputs: [nginx_access]
-    metrics:
-      - type: histogram
-        field: request_time
-        name: request_duration_seconds
-        namespace: nginx
-        tags:
-          status: "{{ status }}"
-          method: "{{ method }}"
-
 sinks:
   loki:
     type: loki
     inputs: [parse_json]
-    endpoint: http://loki:3100
+    endpoint: http://loki.logging.svc.cluster.local:3100
     out_of_order_action: accept
     encoding:
       codec: json
@@ -86,9 +69,3 @@ sinks:
       container: "{{ container }}"
       stream: "{{ stream }}"
       level: "{{ level }}"
-      event: "{{ event }}"
-
-  prometheus:
-    type: prometheus_exporter
-    inputs: [nginx_metrics]
-    address: 0.0.0.0:9598

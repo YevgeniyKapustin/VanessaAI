@@ -49,9 +49,10 @@ def test_cli_apply_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         seen.append(document)
         assert kubectl == "kubectl"
         assert dry_run is True
-        assert "tg-token" in document
-        assert "LOG_LEVEL" not in document
-        assert "kind: Secret" in document
+        assert "tg-token" not in document or "kind: Secret" in document
+        if "kind: Secret" in document:
+            assert "tg-token" in document
+            assert "LOG_LEVEL" not in document
 
     monkeypatch.setattr("scripts.k8s_secrets._run_kubectl", fake_kubectl)
     code = main(
@@ -65,9 +66,12 @@ def test_cli_apply_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         ]
     )
     assert code == 0
-    assert len(seen) == 1
+    assert len(seen) == 2
     assert "host.docker.internal" in seen[0]
     assert "@redis:" not in seen[0]
+    assert "kind: Secret" in seen[0]
+    assert "kind: ConfigMap" in seen[1]
+    assert "LOG_LEVEL" in seen[1]
 
 
 def test_cli_apply_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -125,9 +129,29 @@ def test_cli_apply_ensures_namespace(
         ]
     )
     assert code == 0
-    assert len(seen) == 2
+    assert len(seen) == 3
     assert "kind: Namespace" in seen[0]
     assert "name: vanessa-secrets" in seen[1]
+    assert "kind: ConfigMap" in seen[2]
+
+
+def test_cli_apply_skip_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    env = _write_env(tmp_path / ".env")
+    seen: list[str] = []
+
+    def fake_kubectl(kubectl: str, document: str, *, dry_run: bool) -> None:
+        seen.append(document)
+
+    monkeypatch.setattr("scripts.k8s_secrets._run_kubectl", fake_kubectl)
+    code = main(
+        ["--from-env", str(env), "apply", "--dry-run", "--skip-config"]
+    )
+    assert code == 0
+    assert len(seen) == 1
+    assert "kind: Secret" in seen[0]
+    assert "kind: ConfigMap" not in seen[0]
 
 
 def test_cli_apply_refuses_missing_required(

@@ -25,11 +25,11 @@ x-env-files: &env-files
     required: false
 
 services:
-  # One-shot schema migration. API replicas must not run `alembic upgrade`
-  # themselves — `--scale api=N` would race N upgrades at once.
+  # One-shot schema migration (advisory lock). API/worker replicas must not
+  # run upgrade in the serving process.
   migrate:
     <<: *app-image
-    command: alembic upgrade head
+    command: python -m vanessa.db.locked_upgrade
     restart: "no"
     env_file: *env-files
     depends_on:
@@ -44,7 +44,7 @@ services:
       uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000
       --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     env_file: *env-files
     restart: unless-stopped
     # Give in-flight requests time to finish after SIGTERM (see /health/ready).

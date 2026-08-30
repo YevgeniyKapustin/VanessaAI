@@ -1,0 +1,31 @@
+# Compose Loki + Vector. Omit this file on Docker Desktop Kubernetes
+# (cluster logging stack + LOKI_URL=http://host.docker.internal:3100).
+services:
+  loki:
+    image: grafana/loki:3.4.2
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./deploy/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - backend
+      - frontend
+
+  vector:
+    image: timberio/vector:0.45.0-debian
+    restart: unless-stopped
+    depends_on:
+      - loki
+    volumes:
+      - ./deploy/vector/vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - backend
+
+volumes:
+  loki_data:
+
+networks:
+  backend:
+  frontend:

@@ -41,6 +41,7 @@ CLUSTER_OVERRIDES: dict[str, str] = {
     "LOG_JSON": "true",
     "LOG_FILE_ENABLED": "false",
     "KNOWLEDGE_STORE": "postgres",
+    "MCP_FAIL_OPEN": "false",
 }
 
 

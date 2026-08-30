@@ -1,7 +1,8 @@
 # VanessaAI — Kubernetes design (Phase 5)
 
-> Design + local apply path. docker-compose (Phases 1–4) stays the default
-> runtime. These manifests are the K8s mapping of the same topology.
+> Docker Desktop hybrid lab. docker-compose (Phases 1–4) is the default
+> runtime and the honest hosted path. These manifests map the same
+> topology; they are not a production cluster by themselves.
 
 This maps the async, MCP-compliant topology onto Kubernetes: every service is
 an isolated pod with its own CPU/RAM limits, config comes from ConfigMaps
@@ -11,7 +12,8 @@ and NetworkPolicies restrict who can talk to the broker and the MCP servers.
 ## Secrets — one entry point
 
 Do not `kubectl apply` a Secret YAML. There is no committed `11-secrets.yaml`.
-The only supported way to put secrets into the cluster is:
+The only supported way to put secrets **and** the live ConfigMap into the
+cluster is:
 
 ```bash
 poetry run python scripts/k8s_secrets.py check
@@ -28,8 +30,9 @@ What it does:
    the ConfigMap — they never leak into the Secret.
 3. Validates required keys (token, DB password, broker URL, plus the active
    LLM key; web-search key if that feature is on).
-4. `kubectl apply`s one Opaque Secret: `vanessa-secrets`. Pods load it via
-   `envFrom.secretRef`.
+4. `kubectl apply`s Opaque Secret `vanessa-secrets` and ConfigMap
+   `vanessa-config`. Pods load the ConfigMap via `envFrom` and secrets via
+   per-workload `secretKeyRef` (MCP servers do not get the Telegram token).
 
 `check` / apply logs **key names only**, never values. `--dry-run` is
 `kubectl --dry-run=client`.
@@ -64,7 +67,7 @@ kubectl -n vanessa rollout restart deploy
         ├──────────▶ mcp-knowledge
         └──────────▶ mcp-vision
    agent-core ──▶ Postgres / Qdrant / Redis   (managed or StatefulSets)
-   worker    ──▶ Postgres / Qdrant / knowledge vault PVC
+   worker    ──▶ Postgres / Qdrant
 ```
 
 ## Namespace & network
@@ -78,7 +81,8 @@ kubectl -n vanessa rollout restart deploy
 - When applied, isolation is:
   - `bot` → broker (Redis 6379) only; never to Postgres/Qdrant/MCP.
   - `agent-core` → broker, Postgres, Qdrant, MCP servers, (observability).
-  - `worker` → broker, Postgres, Qdrant, knowledge-vault PVC.
+  - `worker` → broker, Postgres, Qdrant.
+  - `mcp-knowledge` → Postgres (vault reads).
   - MCP servers: only accept traffic from `agent-core`.
   - default-deny ingress per namespace (except monitoring + ingress-controller).
 
@@ -91,27 +95,28 @@ Everything is env-driven (`vanessa.config.settings`). Mapping is mechanical:
 | `ConfigMap` | `TRANSPORT`, `BROKER_STREAMS_PREFIX`, `BROKER_GROUP_*`, `BROKER_RPC_TIMEOUT_SECONDS`, `WORKER_ENABLED`, `WORKER_METRICS_PORT`, `MCP_*_URL`, `POSTGRES_HOST/PORT/USER/DB`, `QDRANT_*`, `RAG_*`, `DECISION_*`, `KNOWLEDGE_*`, `VISION_*`, `LOG_*`, `METRICS_*` |
 | `Secret` (`scripts/k8s_secrets.py`) | `TELEGRAM_BOT_TOKEN`, `POSTGRES_PASSWORD`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `WEB_SEARCH_API_KEY`, `API_INTERNAL_TOKEN`, `HF_TOKEN`, `BROKER_REDIS_URL`, `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_ID_SALT` |
 
-`10-configmap.yaml` is representative; the full non-secret key set mirrors
-`vanessa/config/settings_sections.py`. The secret catalog is the allow-list in
-`vanessa/k8s/secrets.py` — not a dump of `.env`.
+`10-configmap.yaml` is an example only — kustomize does not apply it.
+`kubectl apply -k` would otherwise clobber the generated ConfigMap. The
+secret catalog is the allow-list in `vanessa/k8s/secrets.py`.
 
 ## Workloads, resources & HPA
 
 | Service | Image/command | requests | limits | HPA |
 |---|---|---|---|---|
-| `bot` | `vanessa-app:local` / `python -m services.bot.main` | 100m / 256Mi | 500m / 1Gi | no (2 replicas fixed) |
-| `agent-core` | `vanessa-app:local` / uvicorn | 250m / 512Mi | 2 CPU / 4Gi | CPU |
-| `worker` | `vanessa-app:local` / `python -m services.worker.main` | 500m / 1Gi | 4 CPU / 6Gi | CPU |
-| `mcp-websearch` | runner websearch | 50m / 128Mi | 500m / 512Mi | CPU |
-| `mcp-knowledge` | runner knowledge | 100m / 256Mi | 1 CPU / 1Gi | CPU |
-| `mcp-vision` | runner vision | 100m / 256Mi | 1 CPU / 2Gi | CPU |
+| `bot` | `vanessa-agent:local` / `python -m services.bot.main` | 100m / 256Mi | 500m / 1Gi | no (1 replica; long poll) |
+| `agent-core` | `vanessa-agent:local` / uvicorn | 250m / 512Mi | 2 CPU / 4Gi | CPU |
+| `worker` | `vanessa-agent:local` / `python -m services.worker.main` | 500m / 1Gi | 4 CPU / 6Gi | CPU |
+| `mcp-websearch` | runner websearch | 50m / 128Mi | 500m / 512Mi | no |
+| `mcp-knowledge` | runner knowledge | 100m / 256Mi | 1 CPU / 1Gi | no |
+| `mcp-vision` | runner vision | 100m / 256Mi | 1 CPU / 2Gi | no |
 
-Images are `vanessa-app:local` with `imagePullPolicy: IfNotPresent` so a
-locally built image is visible to Docker Desktop Kubernetes without a push
-(and without Docker Hub pulling `:latest`).
+Images are `vanessa-agent:local` with `imagePullPolicy: IfNotPresent` so a
+locally built Compose image is visible to Docker Desktop Kubernetes without a
+push (and without Docker Hub pulling `:latest`).
 
 ```bash
-docker build -t vanessa-app:local .
+docker compose build api
+docker tag vanessa-agent:latest vanessa-agent:local
 ```
 
 ## State
@@ -122,9 +127,8 @@ docker build -t vanessa-app:local .
   `QDRANT_HOST` / `BROKER_REDIS_URL` to `host.docker.internal` in the
   ConfigMap / `.env` (then re-run `k8s_secrets.py apply` so the broker URL
   in the Secret matches).
-- Knowledge vault (writeable, git-backed) → `PersistentVolumeClaim`
-  (`40-pvc.yaml`) shared by `worker` (writes) and `mcp-knowledge` (reads) via
-  ReadWriteMany (e.g. NFS) — read-only for `agent-core` is acceptable.
+- Knowledge vault is Postgres (`KNOWLEDGE_STORE=postgres`). There is no
+  shared knowledge PVC.
 - HuggingFace embedding model is baked into the image at
   `HF_HOME=/app/.cache/huggingface` (no PVC; an empty volume would hide it).
 
@@ -138,57 +142,67 @@ docker build -t vanessa-app:local .
 
 ## Observability
 
-- Each pod exposes `/metrics`; scrape via a ServiceMonitor (Prometheus Operator)
-  or a single `ClusterRole`-scoped prometheus. `prometheus/rules.yml` already
-  contains the DLQ / consumer-lag / worker-backlog alerts.
-- Langfuse stays as-is (compose or managed). Not in these manifests.
-- Logs are cloud-native: apps write JSON to stdout (`LOG_JSON=true`, no files).
-  A Vector DaemonSet (`deploy/k8s/logging`) tails `/var/log/pods` and ships to
-  Loki. Grafana Explore uses the Loki datasource (compose: `http://loki:3100`;
-  cluster: `kubectl -n logging port-forward svc/loki 3100:3100`).
+- `GET /metrics` on agent-core `:8000`, bot `:9101`, worker `:9102`, MCP
+  tool ports. All four honor `METRICS_REQUIRE_TOKEN`. Compose Prometheus
+  (`prometheus.yml` or `prometheus.k8s.yml`) scrapes them. Rules in
+  `prometheus/rules.yml` go to Compose Alertmanager (`:9093`). There is
+  no in-cluster Prometheus Operator / ServiceMonitor.
+- Langfuse stays compose or managed. Not in these manifests.
+- Logs: JSON stdout (`LOG_JSON=true`). Vector DaemonSet in
+  `deploy/k8s/logging` tails `/var/log/pods` into Loki (PVC `loki-data`).
+  `kubectl apply -k deploy/k8s/` is **apps only**. Logging is
+  `kubectl apply -k deploy/k8s/logging` or the desktop overlay.
+- Hybrid: omit `docker-compose.logging.yml`, set
+  `LOKI_URL=http://host.docker.internal:3100` (desktop overlay hostPort 3100).
+  Grafana stays in Compose.
 
 ```bash
 kubectl apply -k deploy/k8s/logging
 kubectl -n logging get pods
-kubectl -n logging port-forward svc/loki 3100:3100
 ```
-
-`kubectl apply -k deploy/k8s/` and the desktop overlay already include logging.
 
 ## Applying (Docker Desktop)
 
 1. Settings → Kubernetes → Enable Kubernetes → wait for "Kubernetes running".
 2. `kubectl config get-contexts` should list `docker-desktop`.
-3. Build the image: `docker build -t vanessa-app:local .`
+3. Build the image: `docker compose build api && docker tag vanessa-agent:latest vanessa-agent:local`
 4. Put real values in `.env.local` / `.env` (never in git).
-5. Apply secrets, then workloads:
+5. Apply Secret + ConfigMap, then workloads:
 
 ```bash
 poetry run python scripts/k8s_secrets.py apply --ensure-namespace
 kubectl apply -k deploy/k8s/
 ```
 
-`kubectl apply -k deploy/k8s/`  (base: includes PVCs, no NetworkPolicy)
+`kubectl apply -k deploy/k8s/`  (apps only, no ConfigMap, no NetworkPolicy)
 `kubectl apply -k deploy/k8s/overlays/desktop`  (Docker Desktop hybrid)
 
 Docker Desktop (hybrid: Postgres/Qdrant/Redis stay in compose):
 
 ```bash
 docker compose stop api bot worker mcp-websearch mcp-knowledge mcp-vision
-docker compose --env-file .env.defaults --env-file .env.local -f docker-compose.infra.yml up -d
-docker tag vanessa-app:latest vanessa-app:local
-python scripts/k8s_secrets.py apply --ensure-namespace --broker-host host.docker.internal
+# Keep Compose Prometheus/Grafana; omit docker-compose.logging.yml
+# (cluster Loki). Set LOKI_URL=http://host.docker.internal:3100
+docker compose --env-file .env.defaults --env-file .env.local \
+  -f docker-compose.infra.yml -f docker-compose.monitoring.yml up -d
+docker tag vanessa-agent:latest vanessa-agent:local
+python scripts/k8s_secrets.py apply --ensure-namespace \
+  --broker-host host.docker.internal \
+  --postgres-host host.docker.internal \
+  --qdrant-host host.docker.internal \
+  --langfuse-host http://host.docker.internal:3000
 kubectl apply -k deploy/k8s/overlays/desktop
 kubectl -n vanessa port-forward svc/agent-core 8000:8000
 ```
 
-The desktop overlay points DB/Qdrant at `host.docker.internal`, uses
-`emptyDir` for the knowledge vault (Pod Security baseline forbids hostPath),
-relaxes enforce to `baseline`, and runs a single bot replica.
+The desktop overlay publishes Loki hostPort 3100 so Compose Grafana can
+reach it. That port binds every host interface — Desktop only. Hosts
+come from the CLI flags above, not from kustomize. Vanessa stays
+restricted PSS; logging stays privileged for Vector.
 
 ```bash
 kubectl -n vanessa get pods
-kubectl -n vanessa get deploy,svc,hpa,pvc
+kubectl -n vanessa get deploy,svc,hpa
 kubectl -n vanessa logs deploy/agent-core
 kubectl -n vanessa port-forward svc/agent-core 8000:8000
 ```
@@ -196,5 +210,5 @@ kubectl -n vanessa port-forward svc/agent-core 8000:8000
 Opt-in NetworkPolicy (in-cluster backends only):
 
 ```bash
-kubectl apply -f deploy/k8s/30-networkpolicy.yaml
+kubectl apply -f deploy/k8s/base/30-networkpolicy.yaml
 ```

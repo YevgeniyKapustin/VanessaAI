@@ -1,5 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# Apps only. Logging is a separate lifecycle:
+#   kubectl apply -k deploy/k8s/logging
+# Desktop overlay includes logging for the hybrid path.
 resources:
   - base
-  - logging

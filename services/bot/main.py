@@ -16,11 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    if settings.metrics_enabled:
-        from vanessa.observability.metrics import start_metrics_http_server
+    from vanessa.observability.metrics import start_metrics_http_server
 
-        start_metrics_http_server(settings.bot_metrics_port)
-        logger.info("Prometheus metrics endpoint started on :%s", settings.bot_metrics_port)
+    start_metrics_http_server(settings.bot_metrics_port)
+    logger.info(
+        "bot health/metrics endpoint started on :%s",
+        settings.bot_metrics_port,
+    )
 
     alert_task: asyncio.Task | None = None
     alert_manager = create_alert_manager()

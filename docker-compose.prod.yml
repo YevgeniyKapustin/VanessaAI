@@ -3,7 +3,7 @@
 # Run: docker compose --env-file .env.defaults --env-file .env.production
 #   -f docker-compose.yml -f docker-compose.infra.yml
 #   -f docker-compose.langfuse.yml -f docker-compose.monitoring.yml
-#   -f docker-compose.prod.yml up -d
+#   -f docker-compose.logging.yml -f docker-compose.prod.yml up -d
 
 x-prod-env-files: &prod-env-files
   - .env.defaults

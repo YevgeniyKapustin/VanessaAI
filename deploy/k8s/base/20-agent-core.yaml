@@ -1,4 +1,6 @@
-# agent-core: the orchestrator (Gate → RAG → Compose → …) + broker turn worker.
+# agent-core: orchestrator + broker turn worker.
+# Schema: init container vanessa.db.locked_upgrade (advisory lock).
+# ConfigMap/Secret values: scripts/k8s_secrets.py apply (not this kustomization).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,22 +17,112 @@ spec:
     metadata:
       labels: { app: vanessa, component: agent-core }
     spec:
-      containers:
-        - name: api
-          image: vanessa-app:local
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: migrate
+          image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "alembic upgrade head && uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30"]
-          ports:
-            - { containerPort: 8000, name: http }
-            - { containerPort: 9100, name: metrics }
+          command: ["python", "-m", "vanessa.db.locked_upgrade"]
           envFrom:
             - configMapRef: { name: vanessa-config }
-            - secretRef: { name: vanessa-secrets }
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+      containers:
+        - name: api
+          image: vanessa-agent:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - uvicorn
+            - services.agent_core.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --timeout-graceful-shutdown
+            - "30"
+          ports:
+            - { containerPort: 8000, name: http }
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+          env:
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: TELEGRAM_BOT_TOKEN }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+            - name: BROKER_REDIS_URL
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: BROKER_REDIS_URL }
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: DEEPSEEK_API_KEY
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: API_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: API_INTERNAL_TOKEN
+                  optional: true
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: HF_TOKEN
+                  optional: true
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_PUBLIC_KEY
+                  optional: true
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_SECRET_KEY
+                  optional: true
+            - name: LANGFUSE_ID_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_ID_SALT
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
           resources:
             requests: { cpu: "250m", memory: "512Mi" }
             limits: { cpu: "2", memory: "4Gi" }
-          # Uvicorn does not bind :8000 until lifespan finishes (embeddings +
-          # vault index). startupProbe holds off liveness for that window.
           startupProbe:
             httpGet: { path: /health/live, port: http }
             periodSeconds: 10
@@ -44,11 +136,8 @@ spec:
             httpGet: { path: /health/live, port: http }
             periodSeconds: 20
             timeoutSeconds: 2
-          volumeMounts:
-            - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
       volumes:
-        - name: knowledge
-          persistentVolumeClaim: { claimName: vanessa-knowledge }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -59,7 +148,6 @@ spec:
   selector: { app: vanessa, component: agent-core }
   ports:
     - { port: 8000, targetPort: http, name: http }
-    - { port: 9100, targetPort: metrics, name: metrics }
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -78,3 +166,13 @@ spec:
       resource:
         name: cpu
         target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agent-core
+  namespace: vanessa
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: vanessa, component: agent-core }

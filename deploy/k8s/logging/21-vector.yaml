@@ -55,8 +55,7 @@ spec:
             - name: VECTOR_SELF_POD_NAMESPACE
               valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
           ports:
-            - { containerPort: 8686, name: api }
-            - { containerPort: 9598, name: metrics }
+            - { containerPort: 8686, name: metrics }
           resources:
             requests: { cpu: "50m", memory: "64Mi" }
             limits: { cpu: "500m", memory: "256Mi" }
@@ -65,7 +64,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
           readinessProbe:
-            httpGet: { path: /health, port: api }
+            httpGet: { path: /health, port: metrics }
             initialDelaySeconds: 5
             periodSeconds: 10
           volumeMounts:
@@ -92,5 +91,4 @@ spec:
   clusterIP: None
   selector: { app: vector }
   ports:
-    - { port: 9598, targetPort: metrics, name: metrics }
-    - { port: 8686, targetPort: api, name: api }
+    - { port: 8686, targetPort: metrics, name: metrics }

@@ -1,6 +1,9 @@
+# Prometheus + Grafana + Alertmanager.
+# Loki/Vector: docker-compose.logging.yml (Compose) or deploy/k8s/logging
+# (Kubernetes). Do not run both.
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.55.1
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -11,59 +14,51 @@ services:
       - prometheus_data:/prometheus
       - ${KUBECONFIG_HOST:-./prometheus/kubeconfig.unused}:/etc/prometheus/kubeconfig:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
     networks:
       - backend
       - frontend
-
-  loki:
-    image: grafana/loki:3.4.2
-    restart: unless-stopped
-    command: ["-config.file=/etc/loki/local-config.yaml"]
-    volumes:
-      - ./deploy/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-    networks:
-      - backend
-      - frontend
-
-  vector:
-    image: timberio/vector:0.45.0-debian
-    restart: unless-stopped
     depends_on:
-      - loki
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
     volumes:
-      - ./deploy/vector/vector.yaml:/etc/vector/vector.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
     networks:
       - backend
+      - frontend
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.6.3
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - prometheus
-      - loki
     environment:
       GF_SERVER_HTTP_PORT: "3001"
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      # Compose Loki: http://loki:3100. Hybrid k8s: host.docker.internal
-      # (cluster Loki hostPort / port-forward --address 0.0.0.0).
+      # Compose Loki: http://loki:3100
+      # Hybrid k8s (desktop overlay hostPort): http://host.docker.internal:3100
       LOKI_URL: ${LOKI_URL:-http://loki:3100}
     volumes:
-      # Named volume first; bind-mount dashboards onto the provisioner path
-      # so both JSON files land in /var/lib/grafana/dashboards.
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     networks:
       - backend
       - frontend
@@ -71,7 +66,6 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
-  loki_data:
 
 networks:
   backend:

@@ -4,19 +4,9 @@ resources:
   - ../../base
   - ../../logging
 patches:
-  - path: namespace-pss.yaml
-  - path: configmap-hosts.yaml
   - path: bot-replicas.yaml
-  - path: delete-pvc-knowledge.yaml
   - target:
-      kind: Deployment
-      name: agent-core
-    path: agent-core-volumes.yaml
-  - target:
-      kind: Deployment
-      name: worker
-    path: worker-volumes.yaml
-  - target:
-      kind: Deployment
-      name: mcp-knowledge
-    path: mcp-knowledge-volumes.yaml
+      kind: StatefulSet
+      name: loki
+      namespace: logging
+    path: loki-hostport.yaml

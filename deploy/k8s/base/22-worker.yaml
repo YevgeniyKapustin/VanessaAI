@@ -1,4 +1,4 @@
-# worker: consumes task jobs from the broker; owns sweep/portraits/indexing.
+# worker: task jobs; migrate init shares the agent-core advisory lock.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,24 +15,107 @@ spec:
     metadata:
       labels: { app: vanessa, component: worker }
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: migrate
+          image: vanessa-agent:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "vanessa.db.locked_upgrade"]
+          envFrom:
+            - configMapRef: { name: vanessa-config }
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
       containers:
         - name: worker
-          image: vanessa-app:local
+          image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "services.worker.main"]
           ports:
             - { containerPort: 9102, name: metrics }
           envFrom:
             - configMapRef: { name: vanessa-config }
-            - secretRef: { name: vanessa-secrets }
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+            - name: BROKER_REDIS_URL
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: BROKER_REDIS_URL }
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: DEEPSEEK_API_KEY
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: HF_TOKEN
+                  optional: true
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_PUBLIC_KEY
+                  optional: true
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_SECRET_KEY
+                  optional: true
+            - name: LANGFUSE_ID_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: LANGFUSE_ID_SALT
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
           resources:
             requests: { cpu: "500m", memory: "1Gi" }
             limits: { cpu: "4", memory: "6Gi" }
-          volumeMounts:
-            - { name: knowledge, mountPath: /app/knowledge }
+          readinessProbe:
+            httpGet: { path: /health, port: metrics }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /health, port: metrics }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 2
       volumes:
-        - name: knowledge
-          persistentVolumeClaim: { claimName: vanessa-knowledge }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -51,3 +134,13 @@ spec:
       resource:
         name: cpu
         target: { type: Utilization, averageUtilization: 75 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: worker
+  namespace: vanessa
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: vanessa, component: worker }

@@ -90,7 +90,6 @@ sinks:
       service: "{{ service }}"
       stream: "{{ stream }}"
       level: "{{ level }}"
-      event: "{{ event }}"
 
   prometheus:
     type: prometheus_exporter

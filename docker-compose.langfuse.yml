@@ -63,7 +63,7 @@ services:
   # SDK 4.14.5. Set a real NEXTAUTH_SECRET / SALT / ENCRYPTION_KEY (32 random
   # bytes as 64 hex chars) in production.
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:25.12
     restart: unless-stopped
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-langfuse}
@@ -73,7 +73,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     ports:
-      - "8123:8123"
+      - "127.0.0.1:8123:8123"
     healthcheck:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
@@ -107,7 +107,7 @@ services:
 
   # S3-compatible object storage for Langfuse (OTEL ingestion events + media).
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -116,8 +116,8 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
@@ -144,7 +144,7 @@ services:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     networks:
       - backend
       - frontend
@@ -168,7 +168,7 @@ services:
       <<: *langfuse-env
       PORT: "3030"
     ports:
-      - "3030:3030"
+      - "127.0.0.1:3030:3030"
     networks:
       - backend
 

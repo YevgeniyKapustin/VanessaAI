@@ -1,13 +1,12 @@
-# Representative ConfigMap for the shared non-secret settings.
-# The full key set mirrors vanessa/config/settings_sections.py (env-driven).
-# Placeholders must be adjusted for the target cluster.
+# Example ConfigMap — NOT applied by kustomize.
+# Live values: poetry run python scripts/k8s_secrets.py apply
+# kubectl apply -k must not ship this file or it will clobber the CLI output.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: vanessa-config
   namespace: vanessa
 data:
-  # Transport / broker
   TRANSPORT: "redis"
   BROKER_STREAMS_PREFIX: "vanessa"
   BROKER_GROUP_AGENT_CORE: "agent-core"
@@ -16,10 +15,9 @@ data:
   BROKER_POLL_SECONDS: "0.05"
   BROKER_DLQ_ENABLED: "true"
   BROKER_STREAM_MAXLEN: "100000"
-  # Worker
   WORKER_ENABLED: "true"
   WORKER_METRICS_PORT: "9102"
-  # Postgres / Qdrant (hosts/ports/names — credentials live in the Secret)
+  BOT_METRICS_PORT: "9101"
   POSTGRES_HOST: "postgres"
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "vanessa"
@@ -29,17 +27,16 @@ data:
   QDRANT_COLLECTION: "messages"
   QDRANT_KNOWLEDGE_COLLECTION: "knowledge"
   KNOWLEDGE_STORE: "postgres"
-  # MCP server endpoints
   MCP_WEBSEARCH_URL: "http://mcp-websearch:8101/mcp"
   MCP_KNOWLEDGE_URL: "http://mcp-knowledge:8102/mcp"
   MCP_VISION_URL: "http://mcp-vision:8103/mcp"
   MCP_TIMEOUT_SECONDS: "10"
   MCP_RETRIES: "2"
-  MCP_FAIL_OPEN: "true"
-  # Content / logging / metrics
+  MCP_FAIL_OPEN: "false"
   CONTENT_CONFIG_PATH: "config/content"
   NICKNAMES_CONFIG_PATH: "config/nicknames.yaml"
   LOG_LEVEL: "INFO"
   LOG_JSON: "true"
   LOG_FILE_ENABLED: "false"
   METRICS_ENABLED: "true"
+  METRICS_REQUIRE_TOKEN: "false"

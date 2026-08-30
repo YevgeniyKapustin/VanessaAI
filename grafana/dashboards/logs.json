@@ -1,6 +1,6 @@
 {
   "annotations": { "list": [] },
-  "description": "Triage for Vanessa services. Empty search applies no line filter (label matchers only). Non-JSON lines are kept. event is a Loki label.",
+  "description": "Triage for Vanessa services. Empty search applies no line filter (label matchers only). Non-JSON lines are kept. event is a JSON field, not a Loki label.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -84,7 +84,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "${loki}" },
-      "description": "Uses indexed label event (Vector), not | json | event=.",
+      "description": "JSON field event after | json. High-cardinality events are not Loki labels.",
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 25 },
       "id": 4,
       "maxDataPoints": 100,
@@ -97,7 +97,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${loki}" },
-          "expr": "{service=~\"${service:pipe}\", level=~\"${level:pipe}\", event=\"knowledge_node_updated\"}",
+          "expr": "{service=~\"${service:pipe}\", level=~\"${level:pipe}\"} | json | event=\"knowledge_node_updated\"",
           "maxLines": 100,
           "queryType": "range",
           "refId": "A"

@@ -1,5 +1,5 @@
-# MCP servers: isolated tool services, each with its own resources.
-# Only the agent-core may call them (see 30-networkpolicy.yaml).
+# MCP servers: isolated tool services. Only agent-core may call them
+# (see 30-networkpolicy.yaml) except metrics scrape from monitoring.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,24 +8,45 @@ metadata:
   labels: { app: vanessa, component: mcp-websearch }
 spec:
   replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: vanessa, component: mcp-websearch }
   template:
     metadata:
       labels: { app: vanessa, component: mcp-websearch }
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: server
-          image: vanessa-app:local
+          image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "services.mcp.runner", "websearch", "--port", "8101"]
           ports: [{ containerPort: 8101, name: mcp }]
           envFrom:
             - configMapRef: { name: vanessa-config }
-            - secretRef: { name: vanessa-secrets }
           env:
             - name: MCP_WEBSEARCH_URL
               value: ""
+            - name: WEB_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: WEB_SEARCH_API_KEY
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
           resources:
             requests: { cpu: "50m", memory: "128Mi" }
             limits: { cpu: "500m", memory: "512Mi" }
@@ -33,6 +54,12 @@ spec:
             httpGet: { path: /health, port: mcp }
             initialDelaySeconds: 5
             periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -51,21 +78,40 @@ metadata:
   labels: { app: vanessa, component: mcp-knowledge }
 spec:
   replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: vanessa, component: mcp-knowledge }
   template:
     metadata:
       labels: { app: vanessa, component: mcp-knowledge }
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: server
-          image: vanessa-app:local
+          image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "services.mcp.runner", "knowledge", "--port", "8102"]
           ports: [{ containerPort: 8102, name: mcp }]
           envFrom:
             - configMapRef: { name: vanessa-config }
-            - secretRef: { name: vanessa-secrets }
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: POSTGRES_PASSWORD }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "1", memory: "1Gi" }
@@ -73,11 +119,12 @@ spec:
             httpGet: { path: /health, port: mcp }
             initialDelaySeconds: 5
             periodSeconds: 10
-          volumeMounts:
-            - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
+          livenessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 20
+            periodSeconds: 20
       volumes:
-        - name: knowledge
-          persistentVolumeClaim: { claimName: vanessa-knowledge }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -96,21 +143,43 @@ metadata:
   labels: { app: vanessa, component: mcp-vision }
 spec:
   replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: vanessa, component: mcp-vision }
   template:
     metadata:
       labels: { app: vanessa, component: mcp-vision }
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: server
-          image: vanessa-app:local
+          image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "services.mcp.runner", "vision", "--port", "8103"]
           ports: [{ containerPort: 8103, name: mcp }]
           envFrom:
             - configMapRef: { name: vanessa-config }
-            - secretRef: { name: vanessa-secrets }
+          env:
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: DEEPSEEK_API_KEY
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "1", memory: "2Gi" }
@@ -118,6 +187,12 @@ spec:
             httpGet: { path: /health, port: mcp }
             initialDelaySeconds: 5
             periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: mcp }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service

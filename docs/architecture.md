@@ -10,13 +10,15 @@ pipeline, vault, mood metrics, and retrieval tracks.
 flowchart LR
   telegram[Telegram]
   bot[Bot]
-  api[API]
+  broker[Redis Streams]
+  core[agent-core]
   ingress[Ingress]
   gate[Gate]
   retrieve[Retrieve]
   compose[Compose]
   post[Post]
-  telegram --> bot --> api --> ingress --> gate --> retrieve --> compose --> post
+  telegram --> bot --> broker --> core
+  core --> ingress --> gate --> retrieve --> compose --> post
 ```
 
 - **Ingress** — persist the message, load session, apply nicknames.

@@ -17,15 +17,25 @@ Bot and API share a `request_id` via `X-Request-ID`. Features stay
 The API serves `GET /metrics`. The bot runs a threaded endpoint on
 `BOT_METRICS_PORT` (typically `:9101`); the worker on
 `WORKER_METRICS_PORT` (`:9102`). MCP processes expose `/metrics` on
-`:8101`–`:8103`. Product counters also exist at `GET /api/v1/metrics`.
+`:8101`–`:8103`. All four gate `/metrics` with `METRICS_REQUIRE_TOKEN`
++ `API_INTERNAL_TOKEN` (`Authorization: Bearer` or `X-Internal-Token`).
+Probes stay on `/health`. Product counters also exist at
+`GET /api/v1/metrics`.
 
-Compose stack: include `docker-compose.monitoring.yml` in the **same**
-Compose project as the app so Prometheus shares the `backend` network.
+Compose stack: include `docker-compose.monitoring.yml` (Prometheus,
+Grafana, Alertmanager) in the **same** project as the app so Prometheus
+shares the `backend` network. Include `docker-compose.logging.yml` for
+Compose Loki/Vector. Do **not** also apply `deploy/k8s/logging` — one
+Loki only. Hybrid: omit the logging compose file and set
+`LOKI_URL=http://host.docker.internal:3100`. Grafana/Prometheus/Alertmanager
+bind `127.0.0.1` so they are not on the LAN. Compose Loki is Cluster-network
+only (no host port).
+
 Scrape targets in `prometheus/prometheus.yml` are Compose DNS names
 (`api:8000`, `bot:9101`, `worker:9102`, `mcp-websearch:8101`, …), not
-`host.docker.internal`. After a reload, check Prometheus
-**Status → Targets**. The `nginx` job is DOWN unless
-`docker-compose.prod.yml` (nginx-exporter) is in the stack.
+`host.docker.internal`. Kubernetes pods: `prometheus.k8s.yml`. After a
+reload, check Prometheus **Status → Targets**. The `nginx` job is DOWN
+unless `docker-compose.prod.yml` (nginx-exporter) is in the stack.
 
 Labeled counters and histograms appear only after the first event, so
 turn / LLM / RAG Grafana panels stay empty until live traffic. Nginx
@@ -37,12 +47,16 @@ If processes bind on the Docker host instead, mount
 job.
 
 Prometheus loads `prometheus/prometheus.yml` and evaluates alerts from
-`prometheus/rules.yml` (`rule_files`). Dashboards:
+`prometheus/rules.yml`. Alertmanager is `alertmanager:9093` (default
+receiver is a no-op until you add Slack/Telegram). Dashboards:
 
 - `grafana/dashboards/vanessa.json`
 - `grafana/dashboards/vanessa-broker.json`
+- `grafana/dashboards/logs.json`
 
-Enable with `METRICS_ENABLED` (and `METRICS_REQUIRE_TOKEN` in prod).
+Enable with `METRICS_ENABLED` (and `METRICS_REQUIRE_TOKEN` in prod, with
+Prometheus `authorization.credentials` / `bearer_token` or
+`X-Internal-Token` on every scrape job).
 Flags and defaults: [`.env.defaults`](../.env.defaults) /
 [`.env.example`](../.env.example).
 

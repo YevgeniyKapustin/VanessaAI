@@ -93,6 +93,8 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
     assert selected["TRANSPORT"] == CLUSTER_OVERRIDES["TRANSPORT"]
     assert selected["LOG_JSON"] == "true"
     assert selected["LOG_FILE_ENABLED"] == "false"
+    assert selected["MCP_FAIL_OPEN"] == "false"
+    assert selected["KNOWLEDGE_STORE"] == "postgres"
     assert "TELEGRAM_BOT_TOKEN" not in selected
     assert "REDIS_AUTH" not in selected
     assert "LANGFUSE_REDIS_AUTH" not in selected
@@ -211,13 +213,19 @@ def test_example_env_matches_committed_file():
 
 def test_kustomization_does_not_include_secrets():
     text = Path("deploy/k8s/kustomization.yaml").read_text(encoding="utf-8")
+    base = Path("deploy/k8s/base/kustomization.yaml").read_text(encoding="utf-8")
     assert "11-secrets" not in text
     assert "secrets.env" not in text
     assert "30-networkpolicy" not in text
+    assert "10-configmap.yaml" not in base
+    assert "40-pvc.yaml" not in base
     assert not Path("deploy/k8s/11-secrets.yaml").exists()
+    assert not Path("deploy/k8s/base/40-pvc.yaml").exists()
 
 
 def test_workloads_pin_local_image_and_secretref():
+    from vanessa.k8s.secrets import IMAGE
+
     for name in (
         "20-agent-core.yaml",
         "21-bot.yaml",
@@ -226,7 +234,16 @@ def test_workloads_pin_local_image_and_secretref():
     ):
         raw = Path("deploy/k8s/base") / name
         text = raw.read_text(encoding="utf-8")
-        assert "vanessa-app:local" in text
+        assert IMAGE in text
         assert "imagePullPolicy: IfNotPresent" in text
-        assert "vanessa-app:latest" not in text
+        assert "vanessa-agent:latest" not in text
         assert "name: vanessa-secrets" in text
+        assert "secretRef:" not in text
+        assert "automountServiceAccountToken: false" in text
+        assert "readOnlyRootFilesystem: true" in text
+    agent = Path("deploy/k8s/base/20-agent-core.yaml").read_text(encoding="utf-8")
+    assert "containerPort: 9100" not in agent
+    assert "vanessa.db.locked_upgrade" in agent
+    bot = Path("deploy/k8s/base/21-bot.yaml").read_text(encoding="utf-8")
+    assert "replicas: 1" in bot
+    assert "path: /health" in bot

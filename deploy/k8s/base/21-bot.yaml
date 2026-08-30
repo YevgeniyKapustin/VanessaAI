@@ -1,4 +1,4 @@
-# bot: Telegram transport (long polling). Thin; no DB/Qdrant access.
+# bot: Telegram long polling. One replica until webhooks exist.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,23 +6,73 @@ metadata:
   namespace: vanessa
   labels: { app: vanessa, component: bot }
 spec:
-  replicas: 2
+  replicas: 1
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: vanessa, component: bot }
   template:
     metadata:
       labels: { app: vanessa, component: bot }
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: bot
-          image: vanessa-app:local
+          image: vanessa-agent:local
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "services.bot.main"]
           ports:
             - { containerPort: 9101, name: metrics }
           envFrom:
             - configMapRef: { name: vanessa-config }
-            - secretRef: { name: vanessa-secrets }
+          env:
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: TELEGRAM_BOT_TOKEN }
+            - name: BROKER_REDIS_URL
+              valueFrom:
+                secretKeyRef: { name: vanessa-secrets, key: BROKER_REDIS_URL }
+            - name: API_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vanessa-secrets
+                  key: API_INTERNAL_TOKEN
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "500m", memory: "1Gi" }
+          readinessProbe:
+            httpGet: { path: /health, port: metrics }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /health, port: metrics }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 2
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bot
+  namespace: vanessa
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: vanessa, component: bot }

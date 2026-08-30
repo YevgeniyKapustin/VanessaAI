@@ -1,27 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from vanessa.config.settings import settings
-from vanessa.observability.metrics import CONTENT_TYPE_LATEST, render_metrics
+from vanessa.observability.metrics import (
+    CONTENT_TYPE_LATEST,
+    metrics_token_allowed,
+    render_metrics,
+)
 
 router = APIRouter(tags=["observability"])
 
 
 async def _metrics_guard(request: Request) -> None:
-    """Optionally protect GET /metrics with the internal token.
-
-    Prometheus can be configured to send it via ``scrape_configs`` →
-    ``bearer_token``. Disabled by default so a stock Prometheus scrape works.
-    """
-    if not settings.metrics_require_token:
+    """Protect GET /metrics when METRICS_REQUIRE_TOKEN is on."""
+    if metrics_token_allowed(request.headers):
         return
-    expected = settings.api_internal_token.strip()
-    if not expected:
-        return
-    if request.headers.get("X-Internal-Token") != expected:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid internal API token",
-        )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid internal API token",
+    )
 
 
 @router.get(

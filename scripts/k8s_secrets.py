@@ -2,8 +2,8 @@
 """Single entry point for Vanessa Kubernetes secrets.
 
 Reads `.env.defaults` plus a host overlay (default: `.env.local`), keeps only the
-secret-key catalog, validates required keys, and applies one Opaque Secret
-(`vanessa-secrets`).
+secret-key catalog, validates required keys, and applies Secret `vanessa-secrets`
+plus ConfigMap `vanessa-config` (unless `--skip-config`).
 
     poetry run python scripts/k8s_secrets.py check
     poetry run python scripts/k8s_secrets.py apply
@@ -73,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     apply = sub.add_parser(
         "apply",
-        help=f"kubectl apply Secret/{SECRET_NAME}",
+        help="kubectl apply Secret and ConfigMap",
     )
     apply.add_argument(
         "--dry-run",
@@ -89,6 +89,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--broker-host",
         default=None,
         help="Rewrite BROKER_REDIS_URL hostname (hybrid Docker Desktop)",
+    )
+    apply.add_argument(
+        "--skip-config",
+        action="store_true",
+        help="Apply Secret only (default also applies ConfigMap)",
+    )
+    apply.add_argument(
+        "--postgres-host",
+        default=None,
+        help="Override POSTGRES_HOST in the generated ConfigMap",
+    )
+    apply.add_argument(
+        "--qdrant-host",
+        default=None,
+        help="Override QDRANT_HOST in the generated ConfigMap",
+    )
+    apply.add_argument(
+        "--langfuse-host",
+        default=None,
+        help="Override LANGFUSE_HOST in the generated ConfigMap",
     )
 
     cfg = sub.add_parser(
@@ -230,6 +250,18 @@ def cmd_apply(args: argparse.Namespace) -> int:
     secret = build_opaque_secret(namespace=args.namespace, values=values)
     _run_kubectl(args.kubectl, render_yaml(secret), dry_run=args.dry_run)
     print(f"applied {len(plan.values)} keys to Secret/{SECRET_NAME}")
+    if args.skip_config:
+        return 0
+    config_values = select_config_values(
+        env,
+        postgres_host=args.postgres_host,
+        qdrant_host=args.qdrant_host,
+        langfuse_host=args.langfuse_host,
+    )
+    print(f"configmap: {CONFIGMAP_NAME} ({len(config_values)} keys)")
+    manifest = build_configmap(namespace=args.namespace, values=config_values)
+    _run_kubectl(args.kubectl, render_yaml(manifest), dry_run=args.dry_run)
+    print(f"applied {len(config_values)} keys to ConfigMap/{CONFIGMAP_NAME}")
     return 0
 
 

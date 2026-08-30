@@ -1,6 +1,9 @@
 # Deployment
 
-Local Docker Compose is the default runtime. Production is Kubernetes.
+Local Docker Compose is the default runtime. Kubernetes manifests map
+the same topology for a Docker Desktop hybrid lab (apps in-cluster;
+Postgres, Redis, and Qdrant stay on Compose). Hosted production on a
+single machine is the Compose prod overlay (unpublished API + Nginx).
 CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs tests
 on push/PR; image build and cluster apply are not in GitHub Actions yet.
 
@@ -51,7 +54,7 @@ block in that file. Then:
 docker compose --env-file .env.defaults --env-file .env.production \
   -f docker-compose.yml -f docker-compose.infra.yml \
   -f docker-compose.langfuse.yml -f docker-compose.monitoring.yml \
-  -f docker-compose.prod.yml up -d --build
+  -f docker-compose.logging.yml -f docker-compose.prod.yml up -d --build
 ```
 
 YAML content (not env): [Configuration](configuration.md).
@@ -82,11 +85,13 @@ kubectl apply -k deploy/k8s/
 kubectl -n vanessa rollout restart deploy
 ```
 
-- `GET /health` / `/health/live` — liveness (process only).
+- `GET /health` / `/health/live` — liveness (process only). Bot and worker
+  serve `/health` on the metrics port even when metrics are off.
 - `GET /health/ready` — Postgres `SELECT 1`; kubelet keeps the pod out of
   Service until 200.
 - API: uvicorn `--timeout-graceful-shutdown`; bot: aiogram drain on
   SIGTERM.
 
-`scripts/k8s_secrets.py` reads a host overlay (not git) and applies
-`vanessa-secrets`.
+`scripts/k8s_secrets.py apply` reads a host overlay (not git) and applies
+`vanessa-secrets` plus `vanessa-config`. Do not `kubectl apply` the example
+`10-configmap.yaml`.

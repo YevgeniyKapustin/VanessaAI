@@ -30,6 +30,15 @@ groups:
           summary: "Worker task DLQ is accumulating"
           description: "{{ $value }} unprocessed worker tasks in the DLQ — the worker may be down or failing."
 
+      - alert: VanessaTargetDown
+        expr: up{job=~"vanessa-.*|vanessa-k8s"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scrape target is down ({{ $labels.job }} {{ $labels.instance }})"
+          description: "Prometheus cannot scrape {{ $labels.job }} at {{ $labels.instance }}."
+
   - name: nginx
     rules:
       - alert: NginxHighActiveConnections

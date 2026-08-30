@@ -2,9 +2,15 @@
 # Needs kubeconfig mounted at /etc/prometheus/kubeconfig and
 # extra_hosts: kubernetes.docker.internal:host-gateway.
 # Do not merge with prometheus.yml (duplicate jobs).
+# When METRICS_REQUIRE_TOKEN=true, add authorization.credentials.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 rule_files:
   - /etc/prometheus/rules.yml
@@ -27,10 +33,6 @@ scrape_configs:
       - source_labels: [__meta_kubernetes_endpoint_port_name]
         action: keep
         regex: http|metrics|mcp
-      - source_labels:
-          [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        action: drop
-        regex: agent-core;metrics
       - target_label: environment
         replacement: production
       - source_labels: [__meta_kubernetes_service_name]

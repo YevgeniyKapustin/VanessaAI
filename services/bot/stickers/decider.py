@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Mapping
+from collections.abc import Mapping
 
 from services.bot.stickers.heuristics import reply_tags
 from services.bot.stickers.models import StickerCatalog, StickerPick

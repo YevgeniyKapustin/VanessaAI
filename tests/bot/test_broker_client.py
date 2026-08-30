@@ -6,10 +6,10 @@ from aiogram import Bot
 
 from services.bot.messages import IncomingMessage
 from services.bot.services.broker_client import BrokerTurnClient
+from vanessa.contracts.messages import TurnReply, TurnStarted
 from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
-from vanessa.contracts.messages import TurnReply, TurnStarted
 
 
 @pytest.fixture

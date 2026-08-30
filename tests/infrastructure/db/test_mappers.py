@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from vanessa.core.messages import ContextMessage, StoredMessage, stored_to_context
 from vanessa.infrastructure.db.mappers import (
@@ -11,7 +11,7 @@ from vanessa.infrastructure.db.models import Message
 
 
 def test_message_to_stored_maps_fields():
-    created = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    created = datetime(2024, 1, 1, tzinfo=UTC)
     message = Message(
         id=1,
         role="user",

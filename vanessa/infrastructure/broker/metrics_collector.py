@@ -55,6 +55,6 @@ class BrokerMetricsCollector:
                 await self.update_once()
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 - metrics must never crash the app
+            except Exception:
                 logger.exception("broker_metrics_update_failed")
             await asyncio.sleep(self._poll)

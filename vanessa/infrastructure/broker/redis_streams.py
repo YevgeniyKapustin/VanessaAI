@@ -25,14 +25,16 @@ from typing import Any
 import redis.asyncio as aioredis
 from redis.exceptions import ResponseError
 
+from vanessa.contracts.messages import BrokerMessage
 from vanessa.infrastructure.broker.backends import (
     Delivery,
     StreamBackend,
+)
+from vanessa.infrastructure.broker.backends import (
     consume_forever as run_consume_loop,
 )
 from vanessa.infrastructure.broker.errors import BrokerError, BrokerTimeoutError
 from vanessa.infrastructure.broker.serialization import decode, encode
-from vanessa.contracts.messages import BrokerMessage
 from vanessa.infrastructure.observability.metrics import (
     record_broker_consume,
     record_broker_dlq,

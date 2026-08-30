@@ -3,10 +3,10 @@ import pytest
 from vanessa.core.messages import ContextMessage
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
 from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
 from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
 from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
-from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
 
 
 @pytest.fixture

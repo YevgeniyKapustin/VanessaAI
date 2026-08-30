@@ -1,8 +1,7 @@
 from vanessa.pipeline.decision.context import DecisionContext
-from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
+from vanessa.pipeline.decision.gate.continuation import last_bot_reply_partner_sender_id
 from vanessa.pipeline.decision.gate.planner_gate import planner_affirms_reply
 from vanessa.pipeline.decision.gate.protocols import ReplyEligibilityProtocol
-from vanessa.pipeline.decision.gate.continuation import last_bot_reply_partner_sender_id
 from vanessa.pipeline.decision.gate.reply_expectation import (
     expects_follow_up_after_bot,
     is_conversation_closure,
@@ -10,6 +9,7 @@ from vanessa.pipeline.decision.gate.reply_expectation import (
     last_prior_role,
     listen_window_warrants_reply,
 )
+from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
 from vanessa.pipeline.decision.protocols import (
     IntentDetectorProtocol,
     NoiseFilterProtocol,

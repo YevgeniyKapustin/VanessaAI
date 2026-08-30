@@ -134,9 +134,9 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 
 
 async def test_streamable_http_client_round_trip() -> None:
+    from services.mcp import websearch
     from vanessa.core.messages import WebResult
     from vanessa.infrastructure.mcp.client import StreamableHttpMcpClient
-    from services.mcp import websearch
 
     class _Provider:
         async def search(self, query, *, limit=5):

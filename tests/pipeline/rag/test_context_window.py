@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -17,14 +17,14 @@ def test_prompt_builder_formats_block_with_time_and_anchor():
                 role="user",
                 content="до",
                 sender_name="alice",
-                created_at=datetime(2023, 5, 1, 14, 30, tzinfo=timezone.utc),
+                created_at=datetime(2023, 5, 1, 14, 30, tzinfo=UTC),
             ),
             ContextMessage(
                 id=42,
                 role="user",
                 content="про крабера",
                 sender_name="bob",
-                created_at=datetime(2023, 5, 1, 14, 31, tzinfo=timezone.utc),
+                created_at=datetime(2023, 5, 1, 14, 31, tzinfo=UTC),
                 is_anchor=True,
             ),
         ),
@@ -49,7 +49,7 @@ def test_prompt_builder_builds_separated_blocks():
                     id=1,
                     role="user",
                     content="первый",
-                    created_at=datetime(2022, 1, 1, 10, 0, tzinfo=timezone.utc),
+                    created_at=datetime(2022, 1, 1, 10, 0, tzinfo=UTC),
                 ),
             ),
         ),
@@ -60,7 +60,7 @@ def test_prompt_builder_builds_separated_blocks():
                     id=2,
                     role="user",
                     content="второй",
-                    created_at=datetime(2026, 7, 3, 18, 0, tzinfo=timezone.utc),
+                    created_at=datetime(2026, 7, 3, 18, 0, tzinfo=UTC),
                 ),
             ),
         ),
@@ -218,7 +218,10 @@ async def test_hybrid_search_skips_assistant_anchors(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService, effective_window_max_total
+    from vanessa.pipeline.rag.search.hybrid_search import (
+        HybridSearchService,
+        effective_window_max_total,
+    )
 
     seen: dict[str, int] = {}
 

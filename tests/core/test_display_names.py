@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from vanessa.knowledge.users.display_names import resolve_sender_display_name, resolve_user_display_name
 from vanessa.core.messages import ContextMessage
 from vanessa.infrastructure.ingest.user_backfill import load_nicknames
+from vanessa.knowledge.users.display_names import (
+    resolve_sender_display_name,
+    resolve_user_display_name,
+)
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
 
 
@@ -89,7 +92,7 @@ def test_prompt_builder_uses_sender_name():
             content="привет",
             sender_telegram_id=6765300380,
             sender_name="Краб",
-            created_at=datetime(2023, 5, 1, 14, 30, tzinfo=timezone.utc),
+            created_at=datetime(2023, 5, 1, 14, 30, tzinfo=UTC),
         )
     )
     assert 'sender="Краб"' in line

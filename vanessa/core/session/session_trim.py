@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from vanessa.core.messages import ContextMessage
 
@@ -32,7 +32,7 @@ def seconds_since_last_role(
     *,
     now: datetime | None = None,
 ) -> float | None:
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
     for message in reversed(messages):
         if message.role != role or message.created_at is None:
             continue

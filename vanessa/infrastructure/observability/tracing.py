@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Protocol
+from typing import Any, Protocol
 
 from vanessa.config.settings import settings
 
@@ -212,13 +213,12 @@ class LangfuseTracer:
             finally:
                 _sampled.reset(sample_token)
             return
-        with propagator:
-            with root as observation:
-                sample_token = _sampled.set(True)
-                try:
-                    yield _LangfuseSpan(observation)
-                finally:
-                    _sampled.reset(sample_token)
+        with propagator, root as observation:
+            sample_token = _sampled.set(True)
+            try:
+                yield _LangfuseSpan(observation)
+            finally:
+                _sampled.reset(sample_token)
         try:
             self._client.flush()
         except Exception:
@@ -336,14 +336,14 @@ def reset_tracer() -> None:
 
 
 __all__ = [
-    "Span",
-    "Tracer",
+    "LangfuseTracer",
     "NullSpan",
     "NullTracer",
-    "LangfuseTracer",
-    "hash_identifier",
-    "should_sample",
+    "Span",
+    "Tracer",
     "get_tracer",
-    "set_tracer",
+    "hash_identifier",
     "reset_tracer",
+    "set_tracer",
+    "should_sample",
 ]

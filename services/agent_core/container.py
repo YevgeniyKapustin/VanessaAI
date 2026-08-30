@@ -5,21 +5,6 @@ from dataclasses import dataclass
 from vanessa.config.content import get_bot_name_aliases, get_content, get_trigger_keywords
 from vanessa.config.conversation_config import load_conversation_config
 from vanessa.config.settings import settings
-from vanessa.pipeline.decision import (
-    IntentDetector,
-    NoiseFilter,
-    RateLimiter,
-    SessionWindowAnalyzer,
-    TriggerKeywordChecker,
-)
-from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
-from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
-from vanessa.pipeline.decision.gate.reaction_gate import ReactionGate
-from vanessa.pipeline.llm.providers.protocols import create_chat_completer
-from vanessa.pipeline.llm.memes import MemeCatalog, MemeDecider
-
-
 from vanessa.core.protocols import (
     EmbeddingProviderProtocol,
     KnowledgeVectorStoreProtocol,
@@ -31,6 +16,19 @@ from vanessa.infrastructure.runtime.vector_stores import (
     create_message_vector_store,
 )
 from vanessa.pipeline.background import BackgroundExecutor
+from vanessa.pipeline.decision import (
+    IntentDetector,
+    NoiseFilter,
+    RateLimiter,
+    SessionWindowAnalyzer,
+    TriggerKeywordChecker,
+)
+from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
+from vanessa.pipeline.decision.gate.reaction_gate import ReactionGate
+from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
+from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.llm.memes import MemeCatalog, MemeDecider
+from vanessa.pipeline.llm.providers.protocols import create_chat_completer
 
 
 @dataclass

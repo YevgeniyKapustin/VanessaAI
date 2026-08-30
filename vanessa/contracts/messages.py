@@ -9,7 +9,7 @@ without any shared process state.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, ClassVar
 from uuid import uuid4
@@ -21,17 +21,17 @@ from vanessa.contracts.version import SCHEMA_VERSION
 __all__ = [
     "SCHEMA_VERSION",
     "BrokerMessage",
-    "TurnImage",
-    "TurnRequest",
-    "TurnStarted",
-    "TurnReply",
     "TaskKind",
     "TaskMessage",
+    "TurnImage",
+    "TurnReply",
+    "TurnRequest",
+    "TurnStarted",
 ]
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_id() -> str:

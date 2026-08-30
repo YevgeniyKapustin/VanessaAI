@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -40,7 +40,7 @@ async def create_inbox_note(body: InboxNoteRequest) -> InboxNoteResponse:
     if not text and not attachment_bytes:
         raise HTTPException(status_code=400, detail="empty_note")
     await vault.ensure_structure()
-    stamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d_%H%M%S")
+    stamp = datetime.now(UTC).astimezone().strftime("%Y-%m-%d_%H%M%S")
     note_path = f"{INBOX}/{stamp}.md"
     body_parts: list[str] = []
     if text:

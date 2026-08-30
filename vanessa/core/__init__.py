@@ -1,3 +1,4 @@
+from vanessa.core.logging_setup import configure_logging
 from vanessa.core.messages import ContextMessage, StoredMessage, stored_to_context
 from vanessa.core.protocols import (
     ContextRetrieverProtocol,
@@ -11,7 +12,6 @@ from vanessa.core.protocols import (
     UnitOfWorkProtocol,
     VectorStoreProtocol,
 )
-from vanessa.core.logging_setup import configure_logging
 from vanessa.core.request_context import get_request_id, new_request_id
 from vanessa.core.turn import ChatTurnInput, ConversationTurnResult
 
@@ -21,7 +21,6 @@ __all__ = [
     "ContextRetrieverProtocol",
     "ConversationTurnResult",
     "EmbeddingProviderProtocol",
-    "configure_logging",
     "IncomingTurnHandlerProtocol",
     "LLMProviderProtocol",
     "MessageIndexerProtocol",
@@ -31,6 +30,7 @@ __all__ = [
     "TurnQueryProtocol",
     "UnitOfWorkProtocol",
     "VectorStoreProtocol",
+    "configure_logging",
     "get_request_id",
     "new_request_id",
     "stored_to_context",

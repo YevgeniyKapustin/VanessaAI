@@ -14,15 +14,15 @@ import contextlib
 import logging
 from uuid import uuid4
 
-from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
-from vanessa.infrastructure.broker.streams import BrokerStreams
+from services.worker.app import WorkerApp
+from services.worker.handlers import build_worker_handlers
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.streams import BrokerStreams
 from vanessa.infrastructure.db.session import async_session_factory
 from vanessa.knowledge.portraits import PortraitWorker
 from vanessa.knowledge.sweep import SweepWorker
-from services.worker.app import WorkerApp
-from services.worker.handlers import build_worker_handlers
 
 configure_logging("worker")
 logger = logging.getLogger(__name__)

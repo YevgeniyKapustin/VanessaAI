@@ -2,28 +2,23 @@ import logging
 import time
 
 from vanessa.config.settings import settings
-from vanessa.infrastructure.broker.dispatcher import TaskDispatcher
 from vanessa.contracts.messages import TaskKind
 from vanessa.core.messages import (
     ImageAttachment,
     attachments_to_dicts,
     context_message_to_payload,
 )
-from vanessa.core.session.chat_session_state import load_chat_session_state
-from vanessa.knowledge.users.display_names import resolve_user_display_name
-from vanessa.knowledge.users.nicknames import ensure_people_alias_cache
 from vanessa.core.protocols import (
     IncomingTurnHandlerProtocol,
     MessageRepositoryProtocol,
     PhotoCaptionerProtocol,
     UserRepositoryProtocol,
 )
-from vanessa.infrastructure.db.repository import MessageRepository
-from vanessa.knowledge.memory_stage import MemoryStage
-from vanessa.knowledge.metrics.pipeline import MetricsPipeline
 from vanessa.core.request_context import get_planning_started_signal, get_request_id
+from vanessa.core.session.chat_session_state import load_chat_session_state
 from vanessa.core.turn import ChatTurnInput, ConversationTurnResult
-from vanessa.pipeline.decision.models import DecisionAction
+from vanessa.infrastructure.broker.dispatcher import TaskDispatcher
+from vanessa.infrastructure.db.repository import MessageRepository
 from vanessa.infrastructure.observability.eval import RagTriadEvaluator
 from vanessa.infrastructure.observability.metrics import (
     record_reply_length,
@@ -32,9 +27,14 @@ from vanessa.infrastructure.observability.metrics import (
     record_user_activity,
 )
 from vanessa.infrastructure.observability.tracing import get_tracer, hash_identifier
+from vanessa.knowledge.memory_stage import MemoryStage
+from vanessa.knowledge.metrics.pipeline import MetricsPipeline
+from vanessa.knowledge.users.display_names import resolve_user_display_name
+from vanessa.knowledge.users.nicknames import ensure_people_alias_cache
 from vanessa.pipeline.background import BackgroundExecutor
-from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.decision.models import DecisionAction
+from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.protocols import FinalizeStageProtocol, PipelineStage
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 from services.bot.addressing import _bot_username, extract_addressing
 
 

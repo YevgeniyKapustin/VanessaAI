@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 from vanessa.infrastructure.ingest.telegram_export import (
     export_id_to_chat_id,
@@ -59,7 +58,7 @@ def test_parse_telegram_export(tmp_path):
     assert messages[0].sender_telegram_id == 111
     assert messages[0].sender_display_name == "Alice"
     assert messages[0].content == "hello"
-    assert messages[0].created_at == datetime(2024, 1, 1, 10, 1, tzinfo=timezone.utc)
+    assert messages[0].created_at == datetime(2024, 1, 1, 10, 1, tzinfo=UTC)
 
 
 def test_extract_sender_names_from_export(tmp_path):

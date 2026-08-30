@@ -1,15 +1,17 @@
 
-from vanessa.contracts.messages import TaskKind, TaskMessage
+from typing import Self
+
 from services.worker.handlers import (
     IndexMessageHandler,
     PortraitHandler,
     ReindexKnowledgeHandler,
     SweepHandler,
 )
+from vanessa.contracts.messages import TaskKind, TaskMessage
 
 
 class _FakeSession:
-    async def __aenter__(self) -> "_FakeSession":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc) -> bool:

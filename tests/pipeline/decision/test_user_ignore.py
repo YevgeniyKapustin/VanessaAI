@@ -1,5 +1,6 @@
 
 from vanessa.core.messages import ContextMessage
+from vanessa.pipeline.decision.detectors.intent import IntentDetector
 from vanessa.pipeline.decision.gate.bot_names import text_mentions_bot_name
 from vanessa.pipeline.decision.gate.user_ignore import (
     ChatIgnoreRegistry,
@@ -7,7 +8,6 @@ from vanessa.pipeline.decision.gate.user_ignore import (
     is_ignore_user_command,
     resolve_ignore_target,
 )
-from vanessa.pipeline.decision.detectors.intent import IntentDetector
 
 
 def test_text_mentions_inflected_bot_name():

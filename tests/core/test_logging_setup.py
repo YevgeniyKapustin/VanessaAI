@@ -3,7 +3,7 @@ import logging
 import sys
 from pathlib import Path
 
-import vanessa.core.logging_setup as logging_setup
+from vanessa.core import logging_setup
 from vanessa.core.logging_setup import (
     JsonFormatter,
     LoguruStyleFormatter,

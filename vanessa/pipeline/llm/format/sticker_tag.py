@@ -2,7 +2,10 @@ import logging
 import re
 
 from vanessa.config.content import get_content
-from vanessa.infrastructure.observability.metrics import sticker_tagged_total, sticker_unknown_tags_total
+from vanessa.infrastructure.observability.metrics import (
+    sticker_tagged_total,
+    sticker_unknown_tags_total,
+)
 
 logger = logging.getLogger(__name__)
 

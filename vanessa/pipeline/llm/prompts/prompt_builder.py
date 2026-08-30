@@ -1,9 +1,7 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from vanessa.config.content import AppContent, MemeDefContent, get_content
 from vanessa.config.settings import settings
-from vanessa.knowledge.users.display_names import resolve_sender_display_name
-from vanessa.knowledge.users.nicknames import format_aliases_for_prompt
 from vanessa.core.messages import (
     ContextBlock,
     ContextMessage,
@@ -12,6 +10,8 @@ from vanessa.core.messages import (
     WebResult,
 )
 from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.knowledge.users.display_names import resolve_sender_display_name
+from vanessa.knowledge.users.nicknames import format_aliases_for_prompt
 from vanessa.pipeline.llm.photo_request import is_photo_request
 from vanessa.pipeline.llm.prompts.budget import (
     PRIORITY_CONTEXT,
@@ -105,7 +105,7 @@ class PromptBuilder:
         rendered (a message that carried several keeps them all together).
         """
         sender = resolve_sender_display_name(sender_telegram_id, sender_name)
-        time_label = format_message_time(created_at or datetime.now())
+        time_label = format_message_time(created_at or datetime.now(UTC))
         msg = render_msg(
             content=content,
             sender=sender,

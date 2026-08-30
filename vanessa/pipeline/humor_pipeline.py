@@ -1,11 +1,11 @@
 from typing import Protocol
 
 from vanessa.core.protocols import ContextRetrieverProtocol, TurnQueryProtocol
-from vanessa.pipeline.llm.humor.humor_quotes import extract_humor_quotes
-from vanessa.pipeline.llm.humor.humor_reflexion import reflexion_filter_humor_quotes
-from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.infrastructure.observability.metrics import record_rag_search
 from vanessa.infrastructure.observability.tracing import get_tracer
+from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.llm.humor.humor_quotes import extract_humor_quotes
+from vanessa.pipeline.llm.humor.humor_reflexion import reflexion_filter_humor_quotes
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 
 

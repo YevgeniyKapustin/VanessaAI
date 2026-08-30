@@ -21,8 +21,8 @@ __all__ = [
     "DEFAULT_CONTINUATION_PHRASES",
     "DEFAULT_MAX_MESSAGES_BACK",
     "is_continuation_phrase",
-    "last_bot_reply_partner_sender_id",
     "is_sender_continuation_demand",
+    "last_bot_reply_partner_sender_id",
 ]
 
 # Fallback phrase set, used when config/content/decision.yaml provides no

@@ -1,8 +1,12 @@
 from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext, DecisionRule
+from vanessa.pipeline.decision.gate.compose_gate import ComposeGatePolicy
+from vanessa.pipeline.decision.gate.protocols import ReplyEligibilityProtocol
+from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
+from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.metrics_rule import LowAttitudeRule, SenderMetricsRule
 from vanessa.pipeline.decision.models import DecisionReason, DecisionResult
-from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.protocols import (
     IntentDetectorProtocol,
     NoiseFilterProtocol,
@@ -11,10 +15,6 @@ from vanessa.pipeline.decision.protocols import (
     SessionWindowProtocol,
     TriggerCheckerProtocol,
 )
-from vanessa.pipeline.decision.gate.compose_gate import ComposeGatePolicy
-from vanessa.pipeline.decision.gate.protocols import ReplyEligibilityProtocol
-from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.repeated_question import RepeatedQuestionRule
 from vanessa.pipeline.decision.rules import (
     ConsecutiveReplyRule,

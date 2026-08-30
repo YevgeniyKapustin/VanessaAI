@@ -18,7 +18,7 @@ class BrokerStreams:
     tasks: str
 
     @classmethod
-    def from_settings(cls, settings) -> "BrokerStreams":
+    def from_settings(cls, settings) -> BrokerStreams:
         prefix = settings.broker_streams_prefix
         return cls(prefix=prefix, turns=f"{prefix}:turns", tasks=f"{prefix}:tasks")
 

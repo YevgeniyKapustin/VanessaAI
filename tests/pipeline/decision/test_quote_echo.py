@@ -5,7 +5,6 @@ from vanessa.pipeline.decision.gate.quote_echo import (
     quote_loop_depth,
 )
 
-
 BOT_LINE = (
     "Котгаст, ты уже третий круг, скоро Данте тебя запишет в отдельный котёл"
 )

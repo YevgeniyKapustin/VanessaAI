@@ -199,20 +199,19 @@ async def test_chat_endpoint_returns_request_id(api_client_override):
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
-    ) as client:
-        async with client.stream(
-            "POST",
-            "/api/v1/chat",
-            json={
-                "telegram_chat_id": -100123,
-                "message": "hello",
-                "sender_telegram_id": 42,
-            },
-            headers={"X-Request-ID": "trace-abc"},
-        ) as response:
-            assert response.headers["X-Request-ID"] == "trace-abc"
-            async for _ in response.aiter_text():
-                pass
+    ) as client, client.stream(
+        "POST",
+        "/api/v1/chat",
+        json={
+            "telegram_chat_id": -100123,
+            "message": "hello",
+            "sender_telegram_id": 42,
+        },
+        headers={"X-Request-ID": "trace-abc"},
+    ) as response:
+        assert response.headers["X-Request-ID"] == "trace-abc"
+        async for _ in response.aiter_text():
+            pass
 
 
 @pytest.mark.asyncio

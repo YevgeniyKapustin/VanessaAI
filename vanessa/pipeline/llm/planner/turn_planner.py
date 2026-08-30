@@ -10,13 +10,16 @@ from vanessa.config.conversation_config import load_conversation_config
 from vanessa.config.settings import settings
 from vanessa.core.messages import ContextMessage
 from vanessa.core.protocols import LLMChatCompleter
-from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.knowledge.users.nicknames import format_nicknames_for_planner
+from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.pipeline.llm.format.llm_json import normalize_llm_json
 from vanessa.pipeline.llm.planner.detail_detector import detect_detail_level
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
+from vanessa.pipeline.llm.prompts.session_format import (
+    format_session_messages,
+    session_context_messages,
+)
 from vanessa.pipeline.llm.providers.protocols import create_chat_completer
-from vanessa.pipeline.llm.prompts.session_format import format_session_messages, session_context_messages
 
 logger = logging.getLogger(__name__)
 

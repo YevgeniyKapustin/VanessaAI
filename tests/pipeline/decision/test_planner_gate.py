@@ -1,27 +1,27 @@
 
 from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentResult
-from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
-from vanessa.pipeline.decision.gate.planner_gate import planner_affirms_reply
-from vanessa.pipeline.decision.rules import PlannerOverreachRule
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
+from vanessa.pipeline.decision.gate.planner_gate import planner_affirms_reply
+from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
+from vanessa.pipeline.decision.rules import PlannerOverreachRule
 
 
 def _ctx(**kwargs) -> DecisionContext:
-    defaults = dict(
-        text="test",
-        telegram_chat_id=1,
-        recent_messages=[],
-        query_vector=None,
-        intent=IntentResult(detected=False),
-        trigger=TriggerResult(detected=False),
-        session_active=False,
-        relevance_score=0.0,
-        should_reply=None,
-        mentions_bot=False,
-        reply_to_bot=False,
-        in_listen_window=False,
-    )
+    defaults = {
+        "text": "test",
+        "telegram_chat_id": 1,
+        "recent_messages": [],
+        "query_vector": None,
+        "intent": IntentResult(detected=False),
+        "trigger": TriggerResult(detected=False),
+        "session_active": False,
+        "relevance_score": 0.0,
+        "should_reply": None,
+        "mentions_bot": False,
+        "reply_to_bot": False,
+        "in_listen_window": False,
+    }
     defaults.update(kwargs)
     return DecisionContext(**defaults)
 

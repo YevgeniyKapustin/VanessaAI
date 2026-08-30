@@ -163,13 +163,12 @@ class HttpChatApiClient:
                 response.raise_for_status()
                 data = await self._read_body(response, on_started)
                 return data, response.status_code
-        async with httpx.AsyncClient(timeout=self._timeout_config) as client:
-            async with client.stream(
-                "POST", url, json=payload, headers=headers
-            ) as response:
-                response.raise_for_status()
-                data = await self._read_body(response, on_started)
-                return data, response.status_code
+        async with httpx.AsyncClient(timeout=self._timeout_config) as client, client.stream(
+            "POST", url, json=payload, headers=headers
+        ) as response:
+            response.raise_for_status()
+            data = await self._read_body(response, on_started)
+            return data, response.status_code
 
     async def _read_body(
         self,

@@ -1,7 +1,6 @@
-from services.bot.stickers.models import StickerCatalog, StickerDef
-from vanessa.config.content import StickerDefContent, StickersContent
-from vanessa.config.content import get_content
 from services.bot.stickers.catalog import build_catalog
+from services.bot.stickers.models import StickerCatalog, StickerDef
+from vanessa.config.content import StickerDefContent, StickersContent, get_content
 
 
 def _catalog() -> StickerCatalog:

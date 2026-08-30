@@ -8,6 +8,7 @@ propagation.
 """
 
 import asyncio
+from typing import Self
 
 import fakeredis.aioredis
 from aiogram import Bot
@@ -15,14 +16,14 @@ from aiogram import Bot
 from services.agent_core import broker_worker as bw
 from services.bot.messages import IncomingMessage
 from services.bot.services.broker_client import BrokerTurnClient
+from vanessa.core.request_context import get_planning_started_signal, get_request_id
+from vanessa.core.turn import ConversationTurnResult
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
-from vanessa.core.request_context import get_request_id, get_planning_started_signal
-from vanessa.core.turn import ConversationTurnResult
 
 
 class _FakeSessionCM:
-    async def __aenter__(self) -> "_FakeSessionCM":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc) -> bool:

@@ -1,6 +1,6 @@
 from vanessa.config.content import AppContent
-from vanessa.knowledge.users.display_names import resolve_sender_display_name
 from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.users.display_names import resolve_sender_display_name
 from vanessa.pipeline.llm.prompts.context_format import format_message_time
 from vanessa.pipeline.llm.prompts.message_xml import (
     BOT_SENDER,

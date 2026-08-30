@@ -2,9 +2,6 @@ import asyncio
 
 import pytest
 
-from vanessa.infrastructure.broker.backends import Delivery
-from vanessa.infrastructure.broker.errors import BrokerTimeoutError
-from vanessa.infrastructure.broker.redis_streams import RedisDedupGuard, RedisStreamBroker
 from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,
@@ -12,6 +9,9 @@ from vanessa.contracts.messages import (
     TurnRequest,
     TurnStarted,
 )
+from vanessa.infrastructure.broker.backends import Delivery
+from vanessa.infrastructure.broker.errors import BrokerTimeoutError
+from vanessa.infrastructure.broker.redis_streams import RedisDedupGuard, RedisStreamBroker
 
 
 @pytest.fixture

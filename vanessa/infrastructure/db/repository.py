@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -90,10 +90,13 @@ class UserRepository:
         if last_name and not user.last_name:
             user.last_name = last_name
             changed = True
-        if nickname and (force_nickname or not user.nickname):
-            if user.nickname != nickname:
-                user.nickname = nickname
-                changed = True
+        if (
+            nickname
+            and (force_nickname or not user.nickname)
+            and user.nickname != nickname
+        ):
+            user.nickname = nickname
+            changed = True
         if changed:
             await self._session.flush()
             return user, "updated"
@@ -250,7 +253,7 @@ class MessageRepository:
         Used by the deterministic metrics calculator (presence, activity,
         reactivity, counters) which needs interleaved messages across senders.
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         result = await self._session.execute(
             text(
                 """

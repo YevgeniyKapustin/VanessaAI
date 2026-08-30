@@ -17,8 +17,10 @@ _DISMISSAL_PATTERNS = (
     r"\bхватит\b(?!\s+ли\b)(\s*(тебе|мне))?\s*(отвечать|писать)?",
     r"^хватит[.!?]?\s*$",
     r"\bзакрой\s+(контекст|диалог|сессию)\b",
-    r"\b(уйди|уходи|убирайся|сгинь|сгиньте|исчезни|исчезай|"
-    r"свали|отвали|отстань)\b",
+    (
+        r"\b(уйди|уходи|убирайся|сгинь|сгиньте|исчезни|исчезай|"
+        r"свали|отвали|отстань)\b"
+    ),
     r"\b(оставь|не\s+трогай)\s+(меня|нас)(\s+в\s+покое)?\b",
     r"\bдостаточно\b(\s*(тебе|мне))?\s*(отвечать|писать)?",
     r"\bможешь\s+молчать\b",
@@ -38,16 +40,20 @@ _GROUP_REMARK_PATTERNS = (
 _GROUP_REMARK_RE = re.compile("|".join(_GROUP_REMARK_PATTERNS), re.IGNORECASE)
 
 _THIRD_PARTY_BOT_PATTERNS = (
-    r"\b(она|её|ей)\b.*\b("
-    r"игнорирует|молчит|не\s+отвечает|не\s+пишет|"
-    r"тупит|глючит|сломалась|не\s+работает|опять\s+молчит"
-    r")\b",
+    (
+        r"\b(она|её|ей)\b.*\b("
+        r"игнорирует|молчит|не\s+отвечает|не\s+пишет|"
+        r"тупит|глючит|сломалась|не\s+работает|опять\s+молчит"
+        r")\b"
+    ),
     r"\b(почему|зачем|когда|что|разве)\b[^?.!]{0,40}\b(она|её)\b",
     r"\b(она|её)\b[^?.!]{0,20}\b(меня|тебя|нас)\b",
-    r"\bона\b[^.!]{0,80}\b("
-    r"понимает|не\s+понимает|плохо\s+понимает|"
-    r"не\s+всегда\s+понимает|думает|ошибается|теряет"
-    r")\b",
+    (
+        r"\bона\b[^.!]{0,80}\b("
+        r"понимает|не\s+понимает|плохо\s+понимает|"
+        r"не\s+всегда\s+понимает|думает|ошибается|теряет"
+        r")\b"
+    ),
     r"\b(ей|её)\b[^.!]{0,40}\b(отвечают|писали|обращаются)\b",
 )
 _THIRD_PARTY_BOT_RE = re.compile(
@@ -119,9 +125,7 @@ def is_contextual_vocative_address(text: str) -> bool:
         return False
     if _IMPERATIVE_START.search(normalized):
         return True
-    if _VOCATIVE_COMMA.search(normalized):
-        return True
-    return False
+    return bool(_VOCATIVE_COMMA.search(normalized))
 
 
 def mention_warrants_reply(
@@ -146,9 +150,7 @@ def mention_warrants_reply(
         return False
     if is_unsolicited_remark(text):
         return False
-    if is_third_party_about_bot(text):
-        return False
-    return True
+    return not is_third_party_about_bot(text)
 
 
 _BOT_PRONOUN_REPLY = re.compile(

@@ -20,8 +20,8 @@ from vanessa.pipeline.decision.gate.reply_expectation import (
     mention_warrants_reply,
 )
 from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
-from vanessa.pipeline.decision.repeated_question import is_repeated_message
 from vanessa.pipeline.decision.models import DecisionReason
+from vanessa.pipeline.decision.repeated_question import is_repeated_message
 
 
 @dataclass(frozen=True, slots=True)

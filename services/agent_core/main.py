@@ -1,6 +1,6 @@
-from contextlib import asynccontextmanager
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -10,9 +10,9 @@ from services.agent_core.middleware import register_request_id_middleware
 from services.agent_core.routes import chat, health, metrics, notes, observability
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
-from vanessa.infrastructure.observability.alerting import create_alert_manager
 from vanessa.infrastructure.db.base import Base
 from vanessa.infrastructure.db.session import async_session_factory, engine
+from vanessa.infrastructure.observability.alerting import create_alert_manager
 from vanessa.knowledge.compaction import compact_all_person_cards
 from vanessa.knowledge.index import KnowledgeIndex
 from vanessa.knowledge.memory_planner import MemoryPlanner

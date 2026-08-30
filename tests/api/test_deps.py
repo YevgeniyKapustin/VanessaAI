@@ -17,9 +17,9 @@ from services.agent_core.deps import (
 from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
 from vanessa.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from vanessa.pipeline.decision import DecisionEngine
-from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 from vanessa.pipeline.indexing.message_indexing import MessageIndexingService
 from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
+from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 from vanessa.pipeline.turn_metrics import TurnMetrics
 
 

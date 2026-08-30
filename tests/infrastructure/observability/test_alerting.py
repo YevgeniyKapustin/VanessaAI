@@ -6,16 +6,16 @@ from vanessa.infrastructure.observability.alerting import AlertManager
 
 
 def _manager(**overrides) -> AlertManager:
-    defaults = dict(
-        bot_token="t",
-        chat_id=1,
-        check_interval=60,
-        cooldown=0,
-        error_rate_threshold=0.05,
-        latency_p95_threshold=7.0,
-        rag_empty_threshold=0.5,
-        min_samples=5,
-    )
+    defaults = {
+        "bot_token": "t",
+        "chat_id": 1,
+        "check_interval": 60,
+        "cooldown": 0,
+        "error_rate_threshold": 0.05,
+        "latency_p95_threshold": 7.0,
+        "rag_empty_threshold": 0.5,
+        "min_samples": 5,
+    }
     defaults.update(overrides)
     return AlertManager(**defaults)
 

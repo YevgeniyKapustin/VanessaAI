@@ -3,7 +3,7 @@ import time
 
 from vanessa.config import settings
 from vanessa.config.content import get_content
-from vanessa.core.messages import ContextBlock, RAG_SOURCE_ROLE, stored_block_to_context
+from vanessa.core.messages import RAG_SOURCE_ROLE, ContextBlock, stored_block_to_context
 from vanessa.core.protocols import (
     ContextRetrieverProtocol,
     EmbeddingProviderProtocol,
@@ -12,8 +12,8 @@ from vanessa.core.protocols import (
     TurnQueryProtocol,
     VectorStoreProtocol,
 )
-from vanessa.pipeline.rag.search.merger import merge_hybrid_results, merge_vector_search_hits
 from vanessa.infrastructure.observability.metrics import record_rag_search
+from vanessa.pipeline.rag.search.merger import merge_hybrid_results, merge_vector_search_hits
 
 logger = logging.getLogger(__name__)
 

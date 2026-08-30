@@ -1,14 +1,14 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from alembic import context
 from vanessa.config import settings
 from vanessa.infrastructure.db.base import Base
-from vanessa.infrastructure.db.models import (  # noqa: F401
+from vanessa.infrastructure.db.models import (
     KnowledgeDocument,
     KnowledgeNodeRow,
     Message,

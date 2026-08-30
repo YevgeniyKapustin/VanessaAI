@@ -10,7 +10,8 @@ from aiogram import Bot, F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
-from aiogram.types import BufferedInputFile, Message as TelegramMessage, PhotoSize
+from aiogram.types import BufferedInputFile, PhotoSize
+from aiogram.types import Message as TelegramMessage
 
 from services.bot.container import BotServices
 from services.bot.media_groups import MediaGroupBuffer

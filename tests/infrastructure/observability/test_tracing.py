@@ -48,7 +48,7 @@ class _FakeObservationCM:
     def __enter__(self) -> _FakeObservation:
         return self._obs
 
-    def __exit__(self, *exc: Any) -> bool:
+    def __exit__(self, *exc: object) -> bool:
         self._obs.end()
         return False
 
@@ -97,10 +97,12 @@ def test_null_tracer_is_noop() -> None:
     assert tracer.enabled is False
 
     async def run() -> str:
-        async with tracer.trace(name="pipeline", user_id="u"):
-            async with tracer.span(name="gate"):
-                async with tracer.generation(name="llm", model="m", input="q", output="a"):
-                    return "ok"
+        async with (
+            tracer.trace(name="pipeline", user_id="u"),
+            tracer.span(name="gate"),
+            tracer.generation(name="llm", model="m", input="q", output="a"),
+        ):
+            return "ok"
 
     assert asyncio.run(run()) == "ok"
 
@@ -111,16 +113,18 @@ def test_langfuse_tracer_creates_nested_observations(monkeypatch) -> None:
     tracer = LangfuseTracer(client=client)
 
     async def run() -> None:
-        async with tracer.trace(name="pipeline", user_id="u1", session_id="chat1"):
-            async with tracer.span(name="gate"):
-                async with tracer.generation(
-                    name="llm_generation",
-                    model="m",
-                    input="q",
-                    output="a",
-                    usage={"input": 1, "output": 2},
-                ) as gen:
-                    gen.update(metadata={"ok": True})
+        async with (
+            tracer.trace(name="pipeline", user_id="u1", session_id="chat1"),
+            tracer.span(name="gate"),
+            tracer.generation(
+                name="llm_generation",
+                model="m",
+                input="q",
+                output="a",
+                usage={"input": 1, "output": 2},
+            ) as gen,
+        ):
+            gen.update(metadata={"ok": True})
 
     asyncio.run(run())
     assert len(client.traces) == 1
@@ -147,9 +151,10 @@ def test_langfuse_tracer_update_translates_usage(monkeypatch) -> None:
     tracer = LangfuseTracer(client=client)
 
     async def run() -> None:
-        async with tracer.trace(name="pipeline"):
-            async with tracer.generation(name="llm", model="m") as gen:
-                gen.update(output="hi", usage={"input": 3, "output": 4})
+        async with tracer.trace(name="pipeline"), tracer.generation(
+            name="llm", model="m"
+        ) as gen:
+            gen.update(output="hi", usage={"input": 3, "output": 4})
 
     asyncio.run(run())
     gen = next(rec for rec in client.sink if rec["kind"] == "generation")
@@ -165,9 +170,8 @@ def test_langfuse_tracer_unsampled_emits_nothing(monkeypatch) -> None:
     tracer = LangfuseTracer(client=client)
 
     async def run() -> None:
-        async with tracer.trace(name="pipeline"):
-            async with tracer.span(name="gate"):
-                pass
+        async with tracer.trace(name="pipeline"), tracer.span(name="gate"):
+            pass
 
     asyncio.run(run())
     assert client.sink == []
@@ -181,9 +185,8 @@ def test_langfuse_tracer_sample_rate_one_traces(monkeypatch) -> None:
     tracer = LangfuseTracer(client=client)
 
     async def run() -> None:
-        async with tracer.trace(name="pipeline"):
-            async with tracer.span(name="gate"):
-                pass
+        async with tracer.trace(name="pipeline"), tracer.span(name="gate"):
+            pass
 
     asyncio.run(run())
     assert len(client.traces) == 1

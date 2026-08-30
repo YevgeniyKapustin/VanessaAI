@@ -1,4 +1,5 @@
 import asyncio
+from typing import Self
 
 import pytest
 
@@ -50,7 +51,7 @@ async def test_background_indexing_commits_in_separate_session(monkeypatch):
         async def commit(self) -> None:
             committed.append(True)
 
-        async def __aenter__(self) -> "FakeSession":
+        async def __aenter__(self) -> Self:
             return self
 
         async def __aexit__(self, *args: object) -> None:
@@ -271,7 +272,7 @@ async def test_schedule_submits_to_background_executor(monkeypatch):
         async def commit(self) -> None:
             committed.append(True)
 
-        async def __aenter__(self) -> "FakeSession":
+        async def __aenter__(self) -> Self:
             return self
 
         async def __aexit__(self, *args: object) -> None:

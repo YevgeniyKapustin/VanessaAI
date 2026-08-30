@@ -148,14 +148,15 @@ class LoopRegistry:
             if strength > 0:
                 # The same topic keeps coming back — irritation rises sharply.
                 state.annoyance = min(1.0, state.annoyance + _ANNOYANCE_STEP[strength])
-            elif state.last_tokens and current_tokens:
+            elif (
+                state.last_tokens
+                and current_tokens
+                and topic_similarity(current_tokens, state.last_tokens)
+                < similarity_threshold
+            ):
                 # The sender moved to a different topic: Vanessa's irritation
                 # about the old loop resets (annoyance already decayed with time).
-                if (
-                    topic_similarity(current_tokens, state.last_tokens)
-                    < similarity_threshold
-                ):
-                    state.annoyance = 0.0
+                state.annoyance = 0.0
             state.last_tokens = current_tokens
             state.updated = now
             return LoopSignal(loop_strength=strength, annoyance=state.annoyance)

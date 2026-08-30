@@ -13,7 +13,6 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.contracts.messages import TurnReply, TurnRequest, TurnStarted
 from vanessa.core.messages import ImageAttachment
 from vanessa.core.protocols import IncomingTurnHandlerProtocol
@@ -22,6 +21,7 @@ from vanessa.core.request_context import (
     set_planning_started_signal,
 )
 from vanessa.core.turn import ChatTurnInput, ConversationTurnResult
+from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.infrastructure.db.session import async_session_factory
 
 logger = logging.getLogger(__name__)

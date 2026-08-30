@@ -6,6 +6,7 @@ import pytest
 
 from vanessa.config.settings import settings
 from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentResult
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
@@ -16,8 +17,6 @@ from vanessa.pipeline.decision.repeated_loop import (
     detect_loop_strength,
     topic_similarity,
 )
-from vanessa.knowledge.metrics.schema import PersonMetrics
-
 
 # --- pure similarity ---
 

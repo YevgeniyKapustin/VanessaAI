@@ -176,7 +176,7 @@ class AlertManager:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url, headers=headers)
-        except Exception as exc:
+        except httpx.HTTPError as exc:
             logger.warning("balance_check_failed: %s", exc)
             return []
         if response.status_code == 402:
@@ -186,9 +186,7 @@ class AlertManager:
     # -- delivery --------------------------------------------------------------
     def _cooldown_ok(self, rule: str) -> bool:
         last = self._last_sent.get(rule, 0.0)
-        if time.time() - last < self._cooldown:
-            return False
-        return True
+        return time.time() - last >= self._cooldown
 
     async def _send(self, message: str) -> None:
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
@@ -201,7 +199,7 @@ class AlertManager:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
-        except Exception as exc:
+        except httpx.HTTPError as exc:
             logger.warning("alert_send_failed chat_id=%s error=%s", self._chat_id, exc)
 
     async def check_and_alert(self) -> list[str]:

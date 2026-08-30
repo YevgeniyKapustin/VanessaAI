@@ -2,6 +2,7 @@ import pytest
 
 from vanessa.config.settings import settings
 from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentDetector, IntentResult
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
@@ -10,7 +11,6 @@ from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnal
 from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker, TriggerResult
 from vanessa.pipeline.decision.metrics_rule import SenderMetricsRule, should_ignore_for_toxicity
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
-from vanessa.knowledge.metrics.schema import PersonMetrics
 
 TOXIC_METRICS = PersonMetrics(toxicity=0.95, trust_score=10)
 NEUTRAL_METRICS = PersonMetrics(toxicity=0.2, trust_score=80)

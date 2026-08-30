@@ -3,14 +3,14 @@ import pytest
 from vanessa.core.messages import StoredMessage
 from vanessa.core.session.chat_session_state import ChatSessionState
 from vanessa.core.turn import ChatTurnInput
+from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
 from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
 from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
 from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
-from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.stages import GateStage
 from vanessa.pipeline.turn_metrics import TurnMetrics
 

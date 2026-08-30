@@ -1,9 +1,9 @@
 import fakeredis.aioredis
 
+from vanessa.contracts.messages import TaskKind, TaskMessage
 from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
-from vanessa.contracts.messages import TaskKind, TaskMessage
 
 
 async def test_collector_reports_stream_and_lag() -> None:

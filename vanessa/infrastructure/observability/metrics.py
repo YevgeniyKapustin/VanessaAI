@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
-from typing import Any, Callable, Mapping
+from typing import Any
 from urllib.parse import urlparse
 
 from prometheus_client import (
@@ -72,7 +73,7 @@ class EventWindow:
         if not samples:
             return None
         ordered = sorted(samples)
-        index = min(len(ordered) - 1, int(round(percentile / 100.0 * (len(ordered) - 1))))
+        index = min(len(ordered) - 1, round(percentile / 100.0 * (len(ordered) - 1)))
         return float(ordered[index])
 
     def clear(self) -> None:
@@ -536,7 +537,7 @@ def _refresh_db_pool_gauge() -> None:
 
         pool = engine.sync_engine.pool
         knowledge_database_pool_connections.set(int(pool.checkedout()))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return
 
 
@@ -860,35 +861,35 @@ def classify_llm_error(exc: Exception) -> str:
 
 __all__ = [
     "CONTENT_TYPE_LATEST",
+    "classify_llm_error",
+    "estimate_llm_cost",
+    "llm_cache_hit_prompt_price_per_1m",
+    "llm_price_per_1m",
+    "record_background_queue",
+    "record_http",
+    "record_http_client",
+    "record_knowledge_mutation",
+    "record_knowledge_search",
+    "record_knowledge_vector_sync",
+    "record_llm_call",
+    "record_llm_duration",
+    "record_llm_error",
+    "record_llm_request",
+    "record_llm_usage",
+    "record_photo_request_missed",
+    "record_photo_send",
+    "record_prompt_budget",
+    "record_prompt_truncation",
+    "record_rag_eval",
+    "record_rag_search",
+    "record_reply_length",
+    "record_stage",
+    "record_telegram",
+    "record_telegram_error",
+    "record_turn",
+    "record_turn_duration",
+    "record_user_activity",
     "registry",
     "render_metrics",
     "start_metrics_http_server",
-    "record_turn",
-    "record_stage",
-    "record_turn_duration",
-    "record_background_queue",
-    "record_user_activity",
-    "record_reply_length",
-    "record_http",
-    "record_http_client",
-    "record_llm_call",
-    "record_llm_request",
-    "record_llm_usage",
-    "record_llm_duration",
-    "record_llm_error",
-    "estimate_llm_cost",
-    "llm_price_per_1m",
-    "llm_cache_hit_prompt_price_per_1m",
-    "record_rag_search",
-    "record_prompt_budget",
-    "record_prompt_truncation",
-    "record_telegram",
-    "record_telegram_error",
-    "record_photo_send",
-    "record_photo_request_missed",
-    "record_rag_eval",
-    "record_knowledge_mutation",
-    "record_knowledge_vector_sync",
-    "record_knowledge_search",
-    "classify_llm_error",
 ]

@@ -4,9 +4,9 @@ import threading
 
 import uvicorn
 
+from services.mcp import knowledge, vision, websearch
 from vanessa.core.messages import WebResult
 from vanessa.knowledge.vault import KnowledgeVault
-from services.mcp import knowledge, vision, websearch
 
 
 class _FakeSearch:

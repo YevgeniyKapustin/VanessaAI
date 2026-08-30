@@ -8,7 +8,6 @@ from vanessa.pipeline.decision.gate.reply_expectation import (
 )
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
 
-
 _PRE_APPROVED_REASONS = frozenset(
     {
         DecisionReason.ADDRESSING,

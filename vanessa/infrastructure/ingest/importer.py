@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 
+from vanessa.core.messages import StoredMessage
 from vanessa.core.protocols import (
     EmbeddingProviderProtocol,
     MessageRepositoryProtocol,
     UnitOfWorkProtocol,
     VectorStoreProtocol,
 )
-from vanessa.core.messages import StoredMessage
 from vanessa.infrastructure.db.repository import UserRepository
 from vanessa.infrastructure.ingest.telegram_export import ParsedExportMessage
 

@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.detectors.intent import IntentResult
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
 from vanessa.pipeline.decision.gate.reply_expectation import mention_warrants_reply
 from vanessa.pipeline.decision.models import DecisionResult
-from vanessa.knowledge.metrics.schema import PersonMetrics
 
 
 @dataclass(frozen=True, slots=True)

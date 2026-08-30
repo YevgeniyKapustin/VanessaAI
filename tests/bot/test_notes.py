@@ -7,8 +7,8 @@ from aiogram.filters import CommandObject
 
 from services.bot.container import BotServices
 from services.bot.handlers.notes import create_notes_router
-from vanessa.config.content import get_content
 from tests.bot.test_bot_message import make_telegram_message
+from vanessa.config.content import get_content
 
 
 @pytest.mark.asyncio

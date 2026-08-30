@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -80,7 +80,7 @@ def _parsed(message_id: int, text: str = "hello") -> ParsedExportMessage:
         sender_telegram_id=100 + message_id,
         sender_display_name="User",
         content=text,
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 

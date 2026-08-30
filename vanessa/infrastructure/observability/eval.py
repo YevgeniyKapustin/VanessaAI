@@ -17,9 +17,9 @@ import random
 from typing import Any
 
 from vanessa.config.settings import settings
+from vanessa.infrastructure.observability.metrics import record_rag_eval
 from vanessa.pipeline.llm.format.llm_json import normalize_llm_json
 from vanessa.pipeline.llm.providers.protocols import LLMChatCompleter, create_chat_completer
-from vanessa.infrastructure.observability.metrics import record_rag_eval
 
 logger = logging.getLogger(__name__)
 

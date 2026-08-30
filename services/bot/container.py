@@ -1,12 +1,12 @@
 import logging
 from dataclasses import dataclass
 
-from vanessa.config import settings
-from vanessa.config.content import BotMessagesContent, get_content
 from services.bot.services.api_client import HttpChatApiClient
 from services.bot.services.chat_access import ChatAccessGuard
 from services.bot.services.protocols import ChatApiClientProtocol
 from services.bot.stickers import StickerDecider, StickerService, build_catalog
+from vanessa.config import settings
+from vanessa.config.content import BotMessagesContent, get_content
 
 logger = logging.getLogger(__name__)
 

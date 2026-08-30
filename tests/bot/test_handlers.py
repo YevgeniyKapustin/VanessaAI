@@ -18,9 +18,9 @@ from services.bot.handlers.messages import (
     create_messages_router,
 )
 from services.bot.messages.response import ChatProcessResult
+from tests.bot.test_bot_message import make_telegram_message
 from vanessa.config.content import get_content, get_photo_placeholder
 from vanessa.config.settings import settings
-from tests.bot.test_bot_message import make_telegram_message
 
 
 @pytest.mark.asyncio
@@ -573,7 +573,6 @@ async def test_handle_text_no_typing_before_access_check():
     async def slow_access(incoming):
         started.set()
         await release.wait()
-        return None
 
     services = _services()
     services.access_guard.ensure_access = AsyncMock(side_effect=slow_access)

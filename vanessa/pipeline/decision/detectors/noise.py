@@ -67,9 +67,7 @@ class NoiseFilter:
             return True
         if _ACK_RE.match(normalized):
             return True
-        if self._is_reaction_only(normalized):
-            return True
-        return False
+        return bool(self._is_reaction_only(normalized))
 
     def _looks_substantive(self, text: str) -> bool:
         if "?" in text:
@@ -83,9 +81,9 @@ class NoiseFilter:
             if char.isspace():
                 continue
             category = unicodedata.category(char)
-            if category.startswith("P") or category.startswith("S"):
+            if category.startswith(("P", "S")):
                 continue
-            if category.startswith("L") or category.startswith("N"):
+            if category.startswith(("L", "N")):
                 return False
         return bool(text.strip())
 

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import re
 
+from vanessa.config.content import get_bot_name_aliases
 from vanessa.core.messages import ContextMessage
 from vanessa.pipeline.decision.gate.bot_names import text_mentions_bot_name
 from vanessa.pipeline.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
-from vanessa.config.content import get_bot_name_aliases
 
 _IGNORE_CMD = re.compile(
     r"\b(?:"

@@ -1,5 +1,4 @@
 from tests.conftest import make_message
-
 from vanessa.pipeline.rag.search.merger import merge_hybrid_results
 
 

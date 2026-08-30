@@ -31,23 +31,23 @@ class FakeCompleter:
 
 
 def _gate(completer, **overrides) -> ReactionGate:
-    defaults = dict(
-        llm_client=completer,
-        model="test-classifier",
-        prompt=TEST_PROMPT,
-        enabled=True,
-        max_tokens=5,
-        recent_window=4,
-        bypass_reply_to_bot=True,
-        bypass_listen_window=True,
-        heuristics_enabled=True,
-        continuation_enabled=True,
-        continuation_phrases=("а ещё", "давай"),
-        question_words=QUESTION_WORDS,
-        trigger_keywords=TRIGGER_KEYWORDS,
-        modal_verbs=MODAL_VERBS,
-        bot_names=BOT_NAMES,
-    )
+    defaults = {
+        "llm_client": completer,
+        "model": "test-classifier",
+        "prompt": TEST_PROMPT,
+        "enabled": True,
+        "max_tokens": 5,
+        "recent_window": 4,
+        "bypass_reply_to_bot": True,
+        "bypass_listen_window": True,
+        "heuristics_enabled": True,
+        "continuation_enabled": True,
+        "continuation_phrases": ("а ещё", "давай"),
+        "question_words": QUESTION_WORDS,
+        "trigger_keywords": TRIGGER_KEYWORDS,
+        "modal_verbs": MODAL_VERBS,
+        "bot_names": BOT_NAMES,
+    }
     defaults.update(overrides)
     return ReactionGate(**defaults)
 

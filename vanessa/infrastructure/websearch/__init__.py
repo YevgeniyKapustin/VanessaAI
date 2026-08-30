@@ -6,9 +6,9 @@ the composer prompt as a bounded "live web results" block. No tool-calling loop,
 so no extra LLM round-trip on the answer path.
 """
 
+from vanessa.infrastructure.websearch.factory import create_web_search
 from vanessa.infrastructure.websearch.models import WebResult
 from vanessa.infrastructure.websearch.protocols import WebSearchService
-from vanessa.infrastructure.websearch.factory import create_web_search
 
 __all__ = [
     "WebResult",

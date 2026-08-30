@@ -1,14 +1,14 @@
-from dataclasses import dataclass, field
 import time
+from dataclasses import dataclass, field
 
 from vanessa.config.content import MemeDefContent
-from vanessa.core.session.chat_session_state import ChatSessionState
 from vanessa.core.messages import ContextBlock, ContextMessage, StoredMessage, WebResult
+from vanessa.core.session.chat_session_state import ChatSessionState
 from vanessa.core.turn import ChatTurnInput, ConversationTurnResult
-from vanessa.pipeline.decision.models import DecisionResult
 from vanessa.knowledge.metrics.retriever import SenderProfile
 from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.pipeline.decision.models import DecisionResult
 from vanessa.pipeline.decision.turn_plan import TurnPlan
 
 

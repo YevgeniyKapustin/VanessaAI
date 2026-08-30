@@ -143,8 +143,7 @@ def is_repeated_message(
     is known, only same-sender copies count (a different person's similar
     message does not suppress this one).
     """
-    if min_occurrences < 2:
-        min_occurrences = 2
+    min_occurrences = max(min_occurrences, 2)
     current = normalize_content(text)
     if not current:
         return False

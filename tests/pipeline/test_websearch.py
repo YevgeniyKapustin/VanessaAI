@@ -9,18 +9,16 @@ import pytest
 # only resolves when ``vanessa.pipeline.decision`` is already fully loaded. test_orchestrator
 # does the same, so this is the established order.
 import vanessa.pipeline.decision  # noqa: F401
-
 from vanessa.config.settings import settings
 from vanessa.core.messages import WebResult
 from vanessa.core.turn import ChatTurnInput
-from vanessa.pipeline.decision.turn_plan import TurnPlan
-from vanessa.pipeline.context import TurnPipelineContext
-from vanessa.pipeline.stages import RetrieveStage
 from vanessa.infrastructure.websearch.duckduckgo import DuckDuckGoSearch
 from vanessa.infrastructure.websearch.factory import create_web_search
 from vanessa.infrastructure.websearch.serper import SerperSearch
 from vanessa.infrastructure.websearch.tavily import TavilySearch
-
+from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.stages import RetrieveStage
 
 # --- Tavily ------------------------------------------------------------------
 

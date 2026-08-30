@@ -2,10 +2,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from services.bot.addressing import extract_addressing
-from vanessa.core.messages import ImageAttachment
 from aiogram import Bot
 from aiogram.types import Message as TelegramMessage
+
+from services.bot.addressing import extract_addressing
+from vanessa.core.messages import ImageAttachment
 
 
 def _enum_to_str(value: str | Enum) -> str:

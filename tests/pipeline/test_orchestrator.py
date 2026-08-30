@@ -1,27 +1,27 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
-from unittest.mock import AsyncMock
 
 from vanessa.config.settings import settings
 from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment, StoredMessage
 from vanessa.core.turn import ChatTurnInput
 from vanessa.knowledge.metrics.retriever import SenderProfile
 from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
 from vanessa.pipeline.decision.turn_plan import TurnPlan
-from vanessa.pipeline.rag.query_rewriter import QueryRewriter
-from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from vanessa.pipeline.humor_pipeline import HumorPipeline
+from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.stages import (
-    _collect_photo_candidates,
     ComposeStage,
     FinalizeStage,
     GateStage,
     RetrieveStage,
+    _collect_photo_candidates,
 )
 from vanessa.pipeline.turn_metrics import TurnMetrics
 

@@ -1,10 +1,9 @@
+from typing import Self
+
 import fakeredis.aioredis
 import pytest
 
 from services.agent_core import broker_worker as bw
-from vanessa.infrastructure.broker.backends import Delivery
-from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
-from vanessa.infrastructure.broker.serialization import decode
 from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,
@@ -13,10 +12,13 @@ from vanessa.contracts.messages import (
 )
 from vanessa.core.request_context import get_planning_started_signal, get_request_id
 from vanessa.core.turn import ConversationTurnResult
+from vanessa.infrastructure.broker.backends import Delivery
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.serialization import decode
 
 
 class _FakeSessionCM:
-    async def __aenter__(self) -> "_FakeSessionCM":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc) -> bool:

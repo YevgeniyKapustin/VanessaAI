@@ -48,7 +48,7 @@ class OutboxRelay:
                     await self._broker.publish(event.stream, message)
                     await repo.mark_delivered(event.id)
                     published += 1
-                except Exception as exc:  # noqa: BLE001 - poison rows must not stop the relay
+                except Exception as exc:
                     logger.exception(
                         "outbox_publish_failed id=%s stream=%s kind=%s",
                         event.id,
@@ -75,6 +75,6 @@ class OutboxRelay:
                     logger.info("outbox_relay_published count=%s", published)
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 - keep the relay alive across errors
+            except Exception:
                 logger.exception("outbox_relay_flush_failed")
             await asyncio.sleep(self._poll_seconds)

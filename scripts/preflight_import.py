@@ -19,8 +19,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from vanessa.core.logging_setup import configure_logging
 from vanessa.config import settings
+from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.db.session import async_session_factory
 from vanessa.infrastructure.ingest.telegram_export import parse_telegram_export
 

@@ -19,16 +19,13 @@ from vanessa.core.protocols import (
 )
 from vanessa.core.request_context import get_request_id
 from vanessa.core.turn import ConversationTurnResult
-from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
-from vanessa.pipeline.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
-from vanessa.pipeline.decision.repeated_question import is_repeated_message
-from vanessa.pipeline.decision.repeated_loop import LoopRegistry, loop_registry as default_loop_registry
-from vanessa.pipeline.decision.gate.protocols import (
-    PlannerPrefilterProtocol,
-    ReactionGateProtocol,
-    TurnPlannerProtocol,
+from vanessa.infrastructure.observability.metrics import (
+    record_photo_request_missed,
+    record_photo_send,
+    record_web_search,
 )
-from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
+from vanessa.infrastructure.observability.tracing import get_tracer
+from vanessa.infrastructure.websearch.protocols import WebSearchService
 from vanessa.knowledge.entities import is_person_focused
 from vanessa.knowledge.metrics.feedback import (
     render_annoyance_note,
@@ -36,6 +33,27 @@ from vanessa.knowledge.metrics.feedback import (
 )
 from vanessa.knowledge.metrics.retriever import MetricsRetriever
 from vanessa.knowledge.retriever import KnowledgeRetriever
+from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
+from vanessa.pipeline.decision.gate.protocols import (
+    PlannerPrefilterProtocol,
+    ReactionGateProtocol,
+    TurnPlannerProtocol,
+)
+from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
+from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
+from vanessa.pipeline.decision.repeated_loop import LoopRegistry
+from vanessa.pipeline.decision.repeated_loop import loop_registry as default_loop_registry
+from vanessa.pipeline.decision.repeated_question import is_repeated_message
+from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.gate_support import (
+    apply_owner_ignore_if_needed,
+    decision_reason_from_prefilter_tag,
+    finish_decision_ignore,
+    finish_ignore_turn,
+    index_user_on_ignore,
+)
+from vanessa.pipeline.humor_pipeline import HumorPipelineProtocol
 from vanessa.pipeline.llm.format.answer_tag import (
     extract_ignore_reason,
     has_ignore_marker,
@@ -45,29 +63,12 @@ from vanessa.pipeline.llm.format.message_blocks import split_reply_into_blocks, 
 from vanessa.pipeline.llm.format.photo_tag import extract_photo_index
 from vanessa.pipeline.llm.format.reply_format import strip_trailing_periods
 from vanessa.pipeline.llm.format.sticker_tag import extract_sticker_tag
+from vanessa.pipeline.llm.memes import MemeCatalog, MemeDecider
 from vanessa.pipeline.llm.photo_request import is_photo_request
-from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.pipeline.llm.prompts.session_format import session_context_messages
-from vanessa.infrastructure.observability.metrics import (
-    record_photo_request_missed,
-    record_photo_send,
-    record_web_search,
-)
-from vanessa.infrastructure.observability.tracing import get_tracer
+from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.rag.search.react_retriever import retrieve_with_react
 from vanessa.pipeline.rag.search.search_plan import build_main_rag_plan
-from vanessa.pipeline.humor_pipeline import HumorPipelineProtocol
-from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.context import TurnPipelineContext
-from vanessa.infrastructure.websearch.protocols import WebSearchService
-from vanessa.pipeline.llm.memes import MemeCatalog, MemeDecider
-from vanessa.pipeline.gate_support import (
-    apply_owner_ignore_if_needed,
-    decision_reason_from_prefilter_tag,
-    finish_decision_ignore,
-    finish_ignore_turn,
-    index_user_on_ignore,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -478,10 +479,12 @@ class RetrieveStage:
                 if self._meme_decider.decide(ctx.turn.telegram_chat_id):
                     ctx.meme_blocks = matched
                     self._meme_decider.register_meme(ctx.turn.telegram_chat_id)
-            elif self._meme_catalog.offer_on_humor:
-                if self._meme_decider.decide(ctx.turn.telegram_chat_id):
-                    ctx.meme_menu = self._meme_catalog.offerable()
-                    self._meme_decider.register_meme(ctx.turn.telegram_chat_id)
+            elif (
+                self._meme_catalog.offer_on_humor
+                and self._meme_decider.decide(ctx.turn.telegram_chat_id)
+            ):
+                ctx.meme_menu = self._meme_catalog.offerable()
+                self._meme_decider.register_meme(ctx.turn.telegram_chat_id)
 
         logger.info(
             "turn_stage rag request_id=%s context=%s semantic_found=%s "

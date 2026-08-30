@@ -1,14 +1,14 @@
 import asyncio
+from typing import Self
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from vanessa.infrastructure.broker.serialization import encode
 from vanessa.contracts.messages import TaskKind, TaskMessage
+from vanessa.infrastructure.broker.serialization import encode
 from vanessa.infrastructure.db.models import OutboxEvent
 from vanessa.infrastructure.outbox.relay import OutboxRelay
 from vanessa.infrastructure.outbox.repository import OutboxRepository
-
 
 # --- repository ---------------------------------------------------------------
 
@@ -81,7 +81,7 @@ class _FakeSession:
         self.committed = False
         self.rolled_back = False
 
-    async def __aenter__(self) -> "_FakeSession":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc) -> bool:

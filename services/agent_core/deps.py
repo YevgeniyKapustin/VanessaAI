@@ -16,14 +16,12 @@ from vanessa.core.protocols import (
     UserRepositoryProtocol,
     VectorStoreProtocol,
 )
-from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
 from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
 from vanessa.infrastructure.db.session import async_session_factory, get_session
 from vanessa.infrastructure.db.uow import SqlAlchemyUnitOfWork
-from vanessa.pipeline.decision import (
-    DecisionEngine,
-    QdrantRelevanceChecker,
-)
+from vanessa.infrastructure.observability.eval import RagTriadEvaluator
+from vanessa.infrastructure.websearch.factory import create_web_search
+from vanessa.infrastructure.websearch.protocols import WebSearchService
 from vanessa.knowledge.index import KnowledgeIndex
 from vanessa.knowledge.memory_planner import MemoryPlanner
 from vanessa.knowledge.memory_stage import MemoryStage
@@ -37,15 +35,19 @@ from vanessa.knowledge.retriever import KnowledgeRetriever
 from vanessa.knowledge.vault import KnowledgeVault
 from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
 from vanessa.knowledge.writer import KnowledgeVaultWriter
-from vanessa.pipeline.llm.photo_captioner import PhotoCaptioner
-from vanessa.pipeline.llm.providers import create_llm_provider
-from vanessa.infrastructure.observability.eval import RagTriadEvaluator
-from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
-from vanessa.pipeline.rag.query_rewriter import QueryRewriter
-from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
+from vanessa.pipeline.decision import (
+    DecisionEngine,
+    QdrantRelevanceChecker,
+)
+from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
 from vanessa.pipeline.humor_pipeline import HumorPipeline
 from vanessa.pipeline.indexing.message_indexing import MessageIndexingService
+from vanessa.pipeline.llm.photo_captioner import PhotoCaptioner
+from vanessa.pipeline.llm.providers import create_llm_provider
+from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.pipeline.rag.query_rewriter import QueryRewriter
+from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 from vanessa.pipeline.stages import (
     ComposeStage,
     FinalizeStage,
@@ -53,8 +55,6 @@ from vanessa.pipeline.stages import (
     RetrieveStage,
 )
 from vanessa.pipeline.turn_metrics import turn_metrics
-from vanessa.infrastructure.websearch.factory import create_web_search
-from vanessa.infrastructure.websearch.protocols import WebSearchService
 
 
 def create_embedding_provider() -> EmbeddingProviderProtocol:
@@ -188,9 +188,9 @@ def get_task_dispatcher():
     """
     global _task_dispatcher
     if _task_dispatcher is None and settings.worker_enabled:
+        from vanessa.infrastructure.broker.dispatcher import BrokerTaskDispatcher
         from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
         from vanessa.infrastructure.broker.streams import BrokerStreams
-        from vanessa.infrastructure.broker.dispatcher import BrokerTaskDispatcher
 
         streams = BrokerStreams.from_settings(settings)
         _task_dispatcher = BrokerTaskDispatcher(

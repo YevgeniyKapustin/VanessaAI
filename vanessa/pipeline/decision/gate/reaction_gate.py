@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Pattern
+from re import Pattern
 
 from vanessa.config.content import AppContent, get_content, get_continuation_phrases
 from vanessa.config.settings import settings

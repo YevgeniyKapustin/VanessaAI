@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from vanessa.core.messages import ContextMessage
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
@@ -12,13 +12,13 @@ def test_build_user_prompt_includes_session_context():
             role="user",
             content="про тик ток",
             sender_name="Евгений",
-            created_at=datetime(2026, 7, 4, 4, 8, tzinfo=timezone.utc),
+            created_at=datetime(2026, 7, 4, 4, 8, tzinfo=UTC),
         ),
         ContextMessage(
             id=2,
             role="assistant",
             content="поняла",
-            created_at=datetime(2026, 7, 4, 4, 9, tzinfo=timezone.utc),
+            created_at=datetime(2026, 7, 4, 4, 9, tzinfo=UTC),
         ),
     ]
     prompt = builder.build_user_prompt("где там...", [], session_messages=session)
@@ -39,14 +39,14 @@ def test_session_renders_reply_inside_msg_for_recent_message():
             role="user",
             content="не делает карты",
             sender_name="Личь",
-            created_at=datetime(2026, 7, 4, 4, 8, tzinfo=timezone.utc),
+            created_at=datetime(2026, 7, 4, 4, 8, tzinfo=UTC),
         ),
         ContextMessage(
             id=2,
             role="user",
             content="а я про то и говорю",
             sender_name="Евгений",
-            created_at=datetime(2026, 7, 4, 4, 10, tzinfo=timezone.utc),
+            created_at=datetime(2026, 7, 4, 4, 10, tzinfo=UTC),
             reply_to_message_id=1,
             reply_to_text="не делает карты",
             reply_to_sender_telegram_id=99,

@@ -6,7 +6,6 @@ from vanessa.pipeline.decision.gate.continuation import (
     last_bot_reply_partner_sender_id,
 )
 
-
 # --------------------------------------------------------------------------- #
 # is_continuation_phrase
 # --------------------------------------------------------------------------- #

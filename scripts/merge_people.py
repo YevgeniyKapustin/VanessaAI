@@ -231,7 +231,7 @@ def detect_groups(
             keys_b = {identity_key(alias) for alias in card_b.aliases}
             shared = keys_a & keys_b
             if shared:
-                add_edge(a, b, f"identical identity key {sorted(shared)[0]!r}")
+                add_edge(a, b, f"identical identity key {min(shared)!r}")
             elif any(
                 identity_similar(x, y) for x in card_a.aliases for y in card_b.aliases
             ):

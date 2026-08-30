@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from vanessa.core.messages import ContextMessage
 from vanessa.core.session.session_trim import (
@@ -8,7 +8,7 @@ from vanessa.core.session.session_trim import (
 
 
 def test_trim_session_keeps_contiguous_block():
-    base = datetime(2026, 7, 4, 10, 0, tzinfo=timezone.utc)
+    base = datetime(2026, 7, 4, 10, 0, tzinfo=UTC)
     messages = [
         ContextMessage(id=1, role="user", content="old", created_at=base),
         ContextMessage(
@@ -31,7 +31,7 @@ def test_trim_session_keeps_contiguous_block():
 
 
 def test_trim_session_drops_messages_after_idle_gap():
-    base = datetime(2026, 7, 4, 10, 0, tzinfo=timezone.utc)
+    base = datetime(2026, 7, 4, 10, 0, tzinfo=UTC)
     messages = [
         ContextMessage(id=1, role="user", content="old", created_at=base),
         ContextMessage(
@@ -55,7 +55,7 @@ def test_trim_session_drops_messages_after_idle_gap():
 
 
 def test_seconds_since_last_bot():
-    now = datetime(2026, 7, 4, 10, 10, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 4, 10, 10, tzinfo=UTC)
     messages = [
         ContextMessage(
             id=1,

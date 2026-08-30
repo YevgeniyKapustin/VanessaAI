@@ -9,9 +9,9 @@ the persona's hard rules: the owner is never affected by relational metrics.
 from __future__ import annotations
 
 from vanessa.config.settings import settings
+from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
-from vanessa.knowledge.metrics.schema import PersonMetrics
 
 
 def should_ignore_for_toxicity(

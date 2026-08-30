@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from vanessa.infrastructure.broker.errors import UnknownMessageKind
 from vanessa.contracts.messages import (
     BrokerMessage,
     TaskMessage,
@@ -18,6 +17,7 @@ from vanessa.contracts.messages import (
     TurnRequest,
     TurnStarted,
 )
+from vanessa.infrastructure.broker.errors import UnknownMessageKind
 
 _KIND_TO_MODEL: dict[str, type[BrokerMessage]] = {
     model.message_kind(): model

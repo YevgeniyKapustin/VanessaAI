@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, Protocol
 
 from vanessa.core.messages import ContextMessage
 from vanessa.pipeline.decision.detectors.intent import IntentResult
-from vanessa.pipeline.decision.models import DecisionResult
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
+from vanessa.pipeline.decision.models import DecisionResult
 
 if TYPE_CHECKING:
     from vanessa.knowledge.metrics.schema import PersonMetrics

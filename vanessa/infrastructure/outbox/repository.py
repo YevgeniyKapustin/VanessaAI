@@ -8,13 +8,13 @@ consumers deduplicate by ``message_id``.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from vanessa.infrastructure.broker.serialization import encode
 from vanessa.contracts.messages import BrokerMessage
+from vanessa.infrastructure.broker.serialization import encode
 from vanessa.infrastructure.db.models import OutboxEvent
 
 
@@ -52,7 +52,7 @@ class OutboxRepository:
             .where(OutboxEvent.id == event_id)
             .values(
                 status="delivered",
-                delivered_at=datetime.now(timezone.utc),
+                delivered_at=datetime.now(UTC),
             )
         )
 

@@ -34,11 +34,10 @@ class StreamableHttpMcpClient:
                 read,
                 write,
                 _get_session_id,
-            ):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(name, arguments)
-                    return _text_from_result(result)
+            ), ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(name, arguments)
+                return _text_from_result(result)
 
         return await asyncio.wait_for(_call(), timeout=self._timeout)
 
@@ -65,7 +64,7 @@ class FailOpenMcpClient:
             return self._fallback
         try:
             result = await self._client.call_tool(name, arguments)
-        except Exception as exc:  # noqa: BLE001 - any transport/tool error
+        except Exception as exc:
             self._breaker.record_failure()
             logger.warning("mcp_call_failed tool=%s error=%s", name, exc)
             if not self._fail_open:

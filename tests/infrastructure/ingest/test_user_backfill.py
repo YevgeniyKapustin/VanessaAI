@@ -1,7 +1,7 @@
 import pytest
 
-from vanessa.infrastructure.ingest.user_backfill import UserBackfillService, UserBackfillResult
 from vanessa.infrastructure.ingest.telegram_users import TelegramUserProfile
+from vanessa.infrastructure.ingest.user_backfill import UserBackfillResult, UserBackfillService
 
 
 class FakeUow:

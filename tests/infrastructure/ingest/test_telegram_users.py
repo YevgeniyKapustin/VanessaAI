@@ -1,6 +1,7 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock
+
+import httpx
+import pytest
 
 from vanessa.infrastructure.ingest.telegram_users import fetch_telegram_user
 

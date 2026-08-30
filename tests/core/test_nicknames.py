@@ -79,7 +79,7 @@ def test_format_aliases_for_prompt_renders_distinct_aliases(monkeypatch):
 
 
 def test_format_aliases_for_prompt_empty(monkeypatch):
-    monkeypatch.setattr(nicknames, "get_chat_aliases", lambda: {})
+    monkeypatch.setattr(nicknames, "get_chat_aliases", dict)
     assert nicknames.format_aliases_for_prompt() == ""
 
 

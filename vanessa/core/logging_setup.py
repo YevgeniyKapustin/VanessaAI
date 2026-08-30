@@ -4,7 +4,7 @@ import json
 import logging
 import logging.handlers
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar
 
@@ -69,7 +69,7 @@ class LoguruStyleFormatter(logging.Formatter):
         datefmt: str | None = None,
     ) -> str:
         del datefmt
-        created = datetime.fromtimestamp(record.created)
+        created = datetime.fromtimestamp(record.created, tz=UTC)
         return (
             f"{created.strftime('%Y-%m-%d %H:%M:%S')}"
             f".{int(record.msecs):03d}"
@@ -167,7 +167,7 @@ class JsonFormatter(logging.Formatter):
         datefmt: str | None = None,
     ) -> str:
         del datefmt
-        created = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        created = datetime.fromtimestamp(record.created, tz=UTC)
         return created.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
     def format(self, record: logging.LogRecord) -> str:

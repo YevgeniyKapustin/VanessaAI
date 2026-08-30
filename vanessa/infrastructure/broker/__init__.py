@@ -6,7 +6,7 @@ from vanessa.infrastructure.broker.redis_streams import RedisDedupGuard, RedisSt
 __all__ = [
     "BrokerError",
     "BrokerTimeoutError",
-    "UnknownMessageKind",
     "RedisDedupGuard",
     "RedisStreamBroker",
+    "UnknownMessageKind",
 ]

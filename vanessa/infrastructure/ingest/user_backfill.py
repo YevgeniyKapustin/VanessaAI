@@ -26,7 +26,7 @@ def load_nicknames(path: Path) -> dict[int, str]:
     if not raw:
         return {}
     if not isinstance(raw, dict):
-        raise ValueError(f"Nicknames file must be a mapping: {path}")
+        raise TypeError(f"Nicknames file must be a mapping: {path}")
     return {int(key): str(value).strip() for key, value in raw.items() if str(value).strip()}
 
 

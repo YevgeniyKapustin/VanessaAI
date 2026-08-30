@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -286,7 +286,7 @@ async def test_message_fulltext_search():
         "role": "user",
         "content": "привет",
         "qdrant_point_id": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "attachments": None,
         "photo_caption": None,
     }
@@ -309,7 +309,7 @@ async def test_message_get_recent():
         "role": "user",
         "content": "recent",
         "qdrant_point_id": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "sender_name": "Ann",
     }
     session.execute = AsyncMock(return_value=_mappings_result([row]))
@@ -357,7 +357,7 @@ async def test_message_search_photo_messages_uses_savepoint_and_array_guard():
         "role": "user",
         "content": "фото кота",
         "qdrant_point_id": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "attachments": [],
         "photo_caption": None,
     }
@@ -380,7 +380,7 @@ def _window_row(msg_id: int, content: str) -> dict:
         "role": "user",
         "content": content,
         "qdrant_point_id": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "sender_name": "user",
     }
 
@@ -397,7 +397,7 @@ async def test_window_for_anchor_returns_empty_when_missing():
 async def test_window_for_anchor_builds_before_center_after():
     session = AsyncMock()
     repo = MessageRepository(session)
-    created = datetime.now(timezone.utc)
+    created = datetime.now(UTC)
     anchor = StoredMessage(
         id=10,
         role="user",
@@ -423,7 +423,7 @@ async def test_window_for_anchor_builds_before_center_after():
 async def test_conversation_window_blocks_respects_max_total():
     session = AsyncMock()
     repo = MessageRepository(session)
-    created = datetime.now(timezone.utc)
+    created = datetime.now(UTC)
 
     async def fake_window(anchor_id: int, before: int, after: int):
         return [

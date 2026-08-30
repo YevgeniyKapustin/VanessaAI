@@ -8,7 +8,7 @@ from vanessa.infrastructure.mcp.websearch import McpWebSearch
 __all__ = [
     "CircuitBreaker",
     "FailOpenMcpClient",
-    "StreamableHttpMcpClient",
     "McpClientProtocol",
     "McpWebSearch",
+    "StreamableHttpMcpClient",
 ]

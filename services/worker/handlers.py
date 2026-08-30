@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class WorkerAssembly:
     """The fully-built worker components (handlers + polling loops)."""
 
-    handlers: dict[TaskKind, "WorkerTaskHandler"]
+    handlers: dict[TaskKind, WorkerTaskHandler]
     sweep: Any | None = None
     portrait: Any | None = None
 
@@ -212,8 +212,14 @@ async def build_worker_handlers() -> WorkerAssembly:
     """Assemble the real handlers + polling loops (worker process)."""
     from vanessa.config import settings
     from vanessa.infrastructure.db.session import async_session_factory
+    from vanessa.infrastructure.runtime.vector_stores import (
+        create_embedding_provider,
+        create_knowledge_vector_store,
+        create_message_vector_store,
+    )
     from vanessa.knowledge.index import KnowledgeIndex
     from vanessa.knowledge.memory_planner import MemoryPlanner
+    from vanessa.knowledge.memory_stage import MemoryStage
     from vanessa.knowledge.metrics.deterministic import DeterministicMetricsCalculator
     from vanessa.knowledge.metrics.pipeline import MetricsPipeline
     from vanessa.knowledge.metrics.planner import MetricsPlanner
@@ -223,13 +229,7 @@ async def build_worker_handlers() -> WorkerAssembly:
     from vanessa.knowledge.vault import KnowledgeVault
     from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
     from vanessa.knowledge.writer import KnowledgeVaultWriter
-    from vanessa.knowledge.memory_stage import MemoryStage
     from vanessa.pipeline.llm.photo_captioner import PhotoCaptioner
-    from vanessa.infrastructure.runtime.vector_stores import (
-        create_embedding_provider,
-        create_knowledge_vector_store,
-        create_message_vector_store,
-    )
 
     vault = KnowledgeVault()
     await vault.ensure_structure()

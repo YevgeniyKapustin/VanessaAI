@@ -8,8 +8,6 @@ def planner_affirms_reply(context: DecisionContext) -> bool:
         return True
     if context.in_listen_window:
         return True
-    if context.session_active and (
+    return context.session_active and (
         context.intent.detected or context.trigger.detected
-    ):
-        return True
-    return False
+    )

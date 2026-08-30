@@ -1,13 +1,13 @@
 import pytest
 
 from vanessa.core.messages import ContextMessage
-from vanessa.pipeline.decision.engine import DecisionEngine
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
-from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
 from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
 from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
 from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
+from vanessa.pipeline.decision.engine import DecisionEngine
+from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 
 
 @pytest.fixture
@@ -438,9 +438,9 @@ async def test_decision_engine_ignores_dismissal_even_when_addressed(
 
 @pytest.mark.asyncio
 async def test_decision_engine_ignores_side_talk_when_planner_says_no():
-    from vanessa.pipeline.decision.engine import DecisionEngine
     from vanessa.pipeline.decision.detectors.intent import IntentDetector
     from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
+    from vanessa.pipeline.decision.engine import DecisionEngine
 
     engine = DecisionEngine(
         intent_detector=IntentDetector(),

@@ -1,6 +1,6 @@
 from vanessa.core.messages import ContextMessage
-from vanessa.pipeline.decision.protocols import IntentDetectorProtocol, TriggerCheckerProtocol
 from vanessa.pipeline.decision.gate.reply_expectation import is_dismissal_request
+from vanessa.pipeline.decision.protocols import IntentDetectorProtocol, TriggerCheckerProtocol
 
 
 class SessionWindowAnalyzer:

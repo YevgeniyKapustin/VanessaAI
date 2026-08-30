@@ -9,10 +9,10 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run Ruff
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@v4
         with:
           version-file: pyproject.toml
           args: check
@@ -20,7 +20,7 @@ jobs:
   k8s:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Validate Kubernetes manifests
         run: |
@@ -41,7 +41,7 @@ jobs:
     env:
       REQUIRED_USER_TELEGRAM_ID: ${{ secrets.REQUIRED_USER_TELEGRAM_ID || '123456789' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         id: setup-python

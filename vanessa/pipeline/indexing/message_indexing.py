@@ -4,15 +4,15 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from vanessa.contracts.messages import TaskKind
-from vanessa.core.messages import StoredMessage, RAG_SOURCE_ROLE
+from vanessa.core.messages import RAG_SOURCE_ROLE, StoredMessage
 from vanessa.core.protocols import (
     MessageIndexerProtocol,
     MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
 )
+from vanessa.infrastructure.broker.dispatcher import TaskDispatcher
 from vanessa.infrastructure.db.repository import MessageRepository
 from vanessa.pipeline.background import BackgroundExecutor
-from vanessa.infrastructure.broker.dispatcher import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
                     content=record.content,
                     point_id=record.qdrant_point_id,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 if attempt >= self._max_retries:
                     break

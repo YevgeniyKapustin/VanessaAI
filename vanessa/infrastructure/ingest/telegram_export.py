@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -70,12 +70,11 @@ def _parse_sender_display_name(value: Any) -> str | None:
 
 
 def parse_datetime(value: str) -> datetime:
-    from datetime import timezone
 
     normalized = value.replace("Z", "+00:00")
     dt = datetime.fromisoformat(normalized)
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 

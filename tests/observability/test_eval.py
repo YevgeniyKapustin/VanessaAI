@@ -1,8 +1,8 @@
 import asyncio
 import json
 
-from app.config.settings import settings
-from app.observability.eval import RagTriadEvaluator
+from vanessa.config.settings import settings
+from vanessa.observability.eval import RagTriadEvaluator
 
 
 class _FakeCompleter:

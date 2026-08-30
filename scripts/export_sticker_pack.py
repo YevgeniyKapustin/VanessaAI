@@ -28,8 +28,8 @@ if str(_PROJECT_ROOT) not in sys.path:
 import httpx
 import yaml
 
-from app.config.content import get_content, resolve_content_source
-from app.config.settings import settings
+from vanessa.config.content import get_content, resolve_content_source
+from vanessa.config.settings import settings
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

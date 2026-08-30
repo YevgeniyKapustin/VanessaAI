@@ -30,18 +30,18 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from app.config.settings import settings
-from app.ingest.user_backfill import load_nicknames
-from app.knowledge.format import (
+from vanessa.config.settings import settings
+from vanessa.ingest.user_backfill import load_nicknames
+from vanessa.knowledge.format import (
     PEOPLE,
     parse_frontmatter,
     render_note,
     slugify,
     today,
 )
-from app.knowledge.index import KnowledgeIndex
-from app.knowledge.people import identity_key, identity_similar
-from app.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.index import KnowledgeIndex
+from vanessa.knowledge.people import identity_key, identity_similar
+from vanessa.knowledge.vault import KnowledgeVault
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")

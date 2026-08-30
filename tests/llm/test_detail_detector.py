@@ -1,6 +1,6 @@
 import pytest
 
-from app.llm.planner.detail_detector import detect_detail_level
+from vanessa.llm.planner.detail_detector import detect_detail_level
 
 
 @pytest.mark.parametrize(

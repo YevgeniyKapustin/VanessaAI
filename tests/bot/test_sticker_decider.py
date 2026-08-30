@@ -1,5 +1,5 @@
-from app.bot.stickers.decider import StickerDecider
-from app.bot.stickers.models import StickerCatalog, StickerDef
+from services.bot.stickers.decider import StickerDecider
+from services.bot.stickers.models import StickerCatalog, StickerDef
 
 
 class _Rng:

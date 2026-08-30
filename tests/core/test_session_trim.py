@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from app.core.messages import ContextMessage
-from app.core.session.session_trim import (
+from vanessa.core.messages import ContextMessage
+from vanessa.core.session.session_trim import (
     seconds_since_last_role,
     trim_session_by_idle_gap,
 )

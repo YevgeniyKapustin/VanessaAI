@@ -1,4 +1,4 @@
-from app.core.messages import StoredMessage, stored_block_to_context
+from vanessa.core.messages import StoredMessage, stored_block_to_context
 
 
 def test_stored_block_to_context_skips_assistant_messages():

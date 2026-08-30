@@ -18,7 +18,7 @@ notes:
   owner_only: |
     Эта команда только для хозяина
   not_configured: |
-    Vault не настроен: укажи OBSIDIAN_VAULT_PATH
+    Vault не настроен: укажи KNOWLEDGE_PATH
   empty: |
     Напиши текст после /note или прикрепи фото
   success: |

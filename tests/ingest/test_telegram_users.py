@@ -2,7 +2,7 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock
 
-from app.ingest.telegram_users import fetch_telegram_user
+from vanessa.ingest.telegram_users import fetch_telegram_user
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_fetch_telegram_user_handles_http_error():
 
 @pytest.mark.asyncio
 async def test_fetch_telegram_users_batch(monkeypatch):
-    from app.ingest.telegram_users import fetch_telegram_users
+    from vanessa.ingest.telegram_users import fetch_telegram_users
 
     calls: list[int] = []
 
@@ -87,10 +87,10 @@ async def test_fetch_telegram_users_batch(monkeypatch):
         )()
 
     monkeypatch.setattr(
-        "app.ingest.telegram_users.fetch_telegram_user",
+        "vanessa.ingest.telegram_users.fetch_telegram_user",
         fake_fetch,
     )
-    monkeypatch.setattr("app.ingest.telegram_users.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr("vanessa.ingest.telegram_users.asyncio.sleep", AsyncMock())
 
     profiles = await fetch_telegram_users([1, 2], "token", delay_seconds=0.01)
 

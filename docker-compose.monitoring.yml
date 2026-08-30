@@ -2,10 +2,14 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "kubernetes.docker.internal:host-gateway"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${PROMETHEUS_CONFIG:-./prometheus/prometheus.yml}:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro
       - prometheus_data:/prometheus
+      - ${KUBECONFIG_HOST:-./prometheus/kubeconfig.unused}:/etc/prometheus/kubeconfig:ro
     ports:
       - "9090:9090"
     networks:
@@ -39,6 +43,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - prometheus
       - loki
@@ -47,6 +53,9 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Compose Loki: http://loki:3100. Hybrid k8s: host.docker.internal
+      # (cluster Loki hostPort / port-forward --address 0.0.0.0).
+      LOKI_URL: ${LOKI_URL:-http://loki:3100}
     volumes:
       # Named volume first; bind-mount dashboards onto the provisioner path
       # so both JSON files land in /var/lib/grafana/dashboards.

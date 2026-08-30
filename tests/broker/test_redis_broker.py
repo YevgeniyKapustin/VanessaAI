@@ -2,10 +2,10 @@ import asyncio
 
 import pytest
 
-from app.broker.backends import Delivery
-from app.broker.errors import BrokerTimeoutError
-from app.broker.redis_streams import RedisDedupGuard, RedisStreamBroker
-from app.contracts.messages import (
+from vanessa.broker.backends import Delivery
+from vanessa.broker.errors import BrokerTimeoutError
+from vanessa.broker.redis_streams import RedisDedupGuard, RedisStreamBroker
+from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,
     TurnReply,

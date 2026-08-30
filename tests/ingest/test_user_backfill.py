@@ -1,7 +1,7 @@
 import pytest
 
-from app.ingest.user_backfill import UserBackfillService, UserBackfillResult
-from app.ingest.telegram_users import TelegramUserProfile
+from vanessa.ingest.user_backfill import UserBackfillService, UserBackfillResult
+from vanessa.ingest.telegram_users import TelegramUserProfile
 
 
 class FakeUow:

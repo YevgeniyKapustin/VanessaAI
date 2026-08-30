@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.core.users import nicknames
+from vanessa.core.users import nicknames
 
 
 def test_format_nicknames_for_planner_dedupes_repeated_display_names(monkeypatch):
@@ -241,3 +241,52 @@ def test_format_aliases_for_prompt_includes_telegram_username(monkeypatch, tmp_p
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     assert "Гриша = Ну я, nu_ya" in nicknames.format_aliases_for_prompt()
+
+
+async def test_get_chat_aliases_skips_sync_postgres_on_running_loop(monkeypatch):
+    nicknames._ALIAS_CACHE = (("cached",), {"Гриша": ("Ну я",)})
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("sync vault must not run on the event loop")
+
+    monkeypatch.setattr(nicknames, "_people_signature", boom)
+    monkeypatch.setattr(nicknames, "_iter_people_notes", boom)
+    assert nicknames.get_chat_aliases() == {"Гриша": ("Ну я",)}
+    nicknames._ALIAS_CACHE = None
+
+
+async def test_ensure_people_alias_cache_uses_async_vault(monkeypatch):
+    class _Vault:
+        is_configured = True
+
+        async def notes_signature(self, folder):
+            return ("sig",)
+
+        async def list_notes(self, folder):
+            from vanessa.knowledge.schema import VaultNote
+
+            return [
+                VaultNote(
+                    relative_path="People/гриша.md",
+                    meta={
+                        "telegram_id": "1071793838",
+                        "aliases": ["Гриша", "Ну я"],
+                    },
+                    body="",
+                    updated_at=0.0,
+                )
+            ]
+
+    monkeypatch.setattr(
+        nicknames,
+        "load_nicknames",
+        lambda _: {1071793838: "Гриша"},
+    )
+    monkeypatch.setattr(
+        "vanessa.knowledge.vault.KnowledgeVault",
+        lambda *a, **k: _Vault(),
+    )
+    nicknames._ALIAS_CACHE = None
+    await nicknames.ensure_people_alias_cache()
+    assert nicknames.get_chat_aliases()["Гриша"] == ("Ну я",)
+    nicknames._ALIAS_CACHE = None

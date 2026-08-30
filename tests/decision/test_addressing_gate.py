@@ -1,5 +1,5 @@
-from app.decision.detectors.intent import IntentResult
-from app.decision.gate.addressing import is_addressed_to_bot
+from vanessa.decision.detectors.intent import IntentResult
+from vanessa.decision.gate.addressing import is_addressed_to_bot
 
 
 def test_bare_mention_warrants_reply():

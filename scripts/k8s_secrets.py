@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Single entry point for Vanessa Kubernetes secrets.
 
-Reads a host env overlay (default: project `.env`), keeps only the
+Reads `.env.defaults` plus a host overlay (default: `.env.local`), keeps only the
 secret-key catalog, validates required keys, and applies one Opaque Secret
-(`vanessa-secrets`) plus an optional SSH Secret (`vanessa-obsidian-ssh`).
+(`vanessa-secrets`).
 
     poetry run python scripts/k8s_secrets.py check
     poetry run python scripts/k8s_secrets.py apply
@@ -22,19 +22,17 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from app.k8s.configmap import (
+from vanessa.k8s.configmap import (
     CONFIGMAP_NAME,
     build_configmap,
     select_config_values,
 )
-from app.k8s.secrets import (
+from vanessa.k8s.secrets import (
     DEFAULT_NAMESPACE,
     SECRET_NAME,
-    SSH_SECRET_NAME,
     SecretPlan,
     SecretsValidationError,
     build_opaque_secret,
-    build_ssh_secret,
     example_env_text,
     fill_broker_url,
     load_env_file,
@@ -48,15 +46,15 @@ from app.k8s.secrets import (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Apply Vanessa K8s secrets from .env. This is the only supported "
-            "way to put secrets into the cluster."
+            "Apply Vanessa K8s secrets from .env.defaults + .env.local. "
+            "This is the only supported way to put secrets into the cluster."
         ),
     )
     parser.add_argument(
         "--from-env",
         type=Path,
-        default=_PROJECT_ROOT / ".env",
-        help="Env file to read (default: project .env)",
+        default=_PROJECT_ROOT / ".env.local",
+        help="Env file to read (default: project .env.local)",
     )
     parser.add_argument(
         "--namespace",
@@ -75,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     apply = sub.add_parser(
         "apply",
-        help=f"kubectl apply Secret/{SECRET_NAME} (and optional SSH secret)",
+        help=f"kubectl apply Secret/{SECRET_NAME}",
     )
     apply.add_argument(
         "--dry-run",
@@ -86,22 +84,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--ensure-namespace",
         action="store_true",
         help="Create the namespace if it does not exist",
-    )
-    apply.add_argument(
-        "--ssh-dir",
-        type=Path,
-        default=None,
-        help="Directory with id_ed25519 / known_hosts (default: .ssh/obsidian)",
-    )
-    apply.add_argument(
-        "--skip-ssh",
-        action="store_true",
-        help="Do not apply vanessa-obsidian-ssh even if the ssh dir exists",
-    )
-    apply.add_argument(
-        "--require-ssh",
-        action="store_true",
-        help="Fail if the ssh directory is missing or empty",
     )
     apply.add_argument(
         "--broker-host",
@@ -160,7 +142,11 @@ def _print_plan(source: Path, namespace: str, plan: SecretPlan) -> None:
 def _load_plan(env_path: Path) -> tuple[dict[str, str], SecretPlan]:
     if not env_path.is_file():
         raise SystemExit(f"env file not found: {env_path}")
-    env = load_env_file(env_path)
+    env: dict[str, str] = {}
+    defaults_path = env_path.parent / ".env.defaults"
+    if defaults_path.is_file() and env_path.resolve() != defaults_path.resolve():
+        env.update(load_env_file(defaults_path))
+    env.update(load_env_file(env_path))
     env = fill_broker_url(env)
     return env, plan_secrets(env)
 
@@ -196,47 +182,6 @@ def _run_kubectl(
         print(stdout)
 
 
-def _default_ssh_dir(env: dict[str, str]) -> Path:
-    configured = env.get("OBSIDIAN_SSH_DIR", "").strip()
-    if configured:
-        path = Path(configured)
-        if not path.is_absolute():
-            return _PROJECT_ROOT / path
-        return path
-    return _PROJECT_ROOT / ".ssh" / "obsidian"
-
-
-def _apply_ssh(
-    *,
-    env: dict[str, str],
-    namespace: str,
-    kubectl: str,
-    dry_run: bool,
-    ssh_dir: Path | None,
-    skip_ssh: bool,
-    require_ssh: bool,
-) -> None:
-    if skip_ssh:
-        print(f"ssh secret: skipped ({SSH_SECRET_NAME})")
-        return
-    directory = ssh_dir if ssh_dir is not None else _default_ssh_dir(env)
-    if not directory.is_dir():
-        if require_ssh:
-            raise SystemExit(f"ssh directory not found: {directory}")
-        print(f"ssh secret: skip (no directory at {directory})")
-        return
-    try:
-        manifest = build_ssh_secret(namespace=namespace, ssh_dir=directory)
-    except FileNotFoundError as exc:
-        if require_ssh:
-            raise SystemExit(str(exc)) from exc
-        print(f"ssh secret: skip ({exc})")
-        return
-    _run_kubectl(kubectl, render_yaml(manifest), dry_run=dry_run)
-    names = ", ".join(sorted(manifest["stringData"]))
-    print(f"ssh secret: {SSH_SECRET_NAME} ({names})")
-
-
 def cmd_check(args: argparse.Namespace) -> int:
     _, plan = _load_plan(args.from_env)
     _print_plan(args.from_env, args.namespace, plan)
@@ -261,9 +206,11 @@ def cmd_apply(args: argparse.Namespace) -> int:
         return 2
     values = dict(plan.values)
     if args.broker_host:
+        redis_auth = env.get("REDIS_AUTH", "").strip() or None
         values["BROKER_REDIS_URL"] = rewrite_broker_host(
             values["BROKER_REDIS_URL"],
             args.broker_host,
+            password=redis_auth,
         )
         print(f"broker host: {args.broker_host}")
     if args.ensure_namespace:
@@ -274,7 +221,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
                 "metadata": {
                     "name": args.namespace,
                     "labels": {
-                        "app.kubernetes.io/part-of": "vanessa",
+                        "vanessa.kubernetes.io/part-of": "vanessa",
                     },
                 },
             }
@@ -283,15 +230,6 @@ def cmd_apply(args: argparse.Namespace) -> int:
     secret = build_opaque_secret(namespace=args.namespace, values=values)
     _run_kubectl(args.kubectl, render_yaml(secret), dry_run=args.dry_run)
     print(f"applied {len(plan.values)} keys to Secret/{SECRET_NAME}")
-    _apply_ssh(
-        env=env,
-        namespace=args.namespace,
-        kubectl=args.kubectl,
-        dry_run=args.dry_run,
-        ssh_dir=args.ssh_dir,
-        skip_ssh=args.skip_ssh,
-        require_ssh=args.require_ssh,
-    )
     return 0
 
 

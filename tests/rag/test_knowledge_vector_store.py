@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.rag.qdrant_client import KnowledgeQdrantStore
+from vanessa.rag.qdrant_client import KnowledgeQdrantStore
 
 
 def _is_uuid(value: str) -> bool:

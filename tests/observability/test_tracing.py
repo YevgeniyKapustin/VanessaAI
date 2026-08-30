@@ -2,9 +2,9 @@ import asyncio
 from contextlib import nullcontext
 from typing import Any
 
-from app.config.settings import settings
-from app.observability import tracing
-from app.observability.tracing import (
+from vanessa.config.settings import settings
+from vanessa.observability import tracing
+from vanessa.observability.tracing import (
     LangfuseTracer,
     NullTracer,
     get_tracer,

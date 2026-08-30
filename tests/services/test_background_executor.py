@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from app.services.background import BackgroundExecutor
+from vanessa.services.background import BackgroundExecutor
 
 
 @pytest.mark.asyncio

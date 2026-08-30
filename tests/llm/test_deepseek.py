@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from openai import APIStatusError
 
-from app.config.content import get_content
-from app.config.settings import settings
-from app.core.messages import ContextBlock, ContextMessage, ImageAttachment
-from app.llm.planner.generation_config import LLMGenerationParams
-from app.llm.providers.deepseek import DeepSeekLLMProvider, _usage_from_openai
+from vanessa.config.content import get_content
+from vanessa.config.settings import settings
+from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment
+from vanessa.llm.planner.generation_config import LLMGenerationParams
+from vanessa.llm.providers.deepseek import DeepSeekLLMProvider, _usage_from_openai
 
 
 class FakeSubstitutor:
@@ -165,7 +165,7 @@ async def test_deepseek_generate_returns_only_after_answer_tag(
 async def test_deepseek_generate_traces_reasoning(provider: DeepSeekLLMProvider):
     from contextlib import asynccontextmanager
 
-    from app.observability.tracing import set_tracer
+    from vanessa.observability.tracing import set_tracer
 
     class RecordingSpan:
         def __init__(self) -> None:
@@ -214,7 +214,7 @@ async def test_deepseek_retries_on_rate_limit(provider: DeepSeekLLMProvider):
     provider._client.chat.completions.create = AsyncMock(
         side_effect=[rate_limit, _make_response("ok")],
     )
-    with patch("app.llm.providers.deepseek.asyncio.sleep", new_callable=AsyncMock):
+    with patch("vanessa.llm.providers.deepseek.asyncio.sleep", new_callable=AsyncMock):
         reply = await provider.generate("retry me", [])
     assert reply == "Ok"
     assert provider._client.chat.completions.create.await_count == 2
@@ -329,7 +329,7 @@ async def test_deepseek_vision_caps_images_per_turn(
 async def test_deepseek_photo_candidates_injected_into_prompt(
     provider: DeepSeekLLMProvider,
 ):
-    from app.core.messages import PhotoCandidate
+    from vanessa.core.messages import PhotoCandidate
 
     candidates = [
         PhotoCandidate(
@@ -352,7 +352,7 @@ async def test_deepseek_photo_candidates_injected_into_prompt(
 @pytest.mark.asyncio
 async def test_deepseek_web_blocks_injected_into_prompt(provider: DeepSeekLLMProvider):
     """The compose prompt carries the live web-results block verbatim."""
-    from app.core.messages import WebResult
+    from vanessa.core.messages import WebResult
 
     results = [
         WebResult(

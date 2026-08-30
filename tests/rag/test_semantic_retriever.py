@@ -1,9 +1,9 @@
 import pytest
 
-from app.knowledge.format import PEOPLE
-from app.knowledge.index import KnowledgeIndex
-from app.knowledge.retriever import KnowledgeRetriever
-from app.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.format import PEOPLE
+from vanessa.knowledge.index import KnowledgeIndex
+from vanessa.knowledge.retriever import KnowledgeRetriever
+from vanessa.knowledge.vault import KnowledgeVault
 
 
 class FakeEmbeddings:

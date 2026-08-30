@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram.exceptions import TelegramBadRequest
 
-from app.bot.stickers.decider import StickerDecider
-from app.bot.stickers.models import StickerCatalog, StickerDef
-from app.bot.stickers.service import StickerService
+from services.bot.stickers.decider import StickerDecider
+from services.bot.stickers.models import StickerCatalog, StickerDef
+from services.bot.stickers.service import StickerService
 from tests.bot.test_bot_message import make_telegram_message
 
 

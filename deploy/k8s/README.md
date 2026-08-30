@@ -20,24 +20,22 @@ poetry run python scripts/k8s_secrets.py apply --ensure-namespace
 
 What it does:
 
-1. Reads a host env overlay (default: project `.env`; pass `--from-env`
-   `.env.local` or `.env.production`). Non-secret defaults live in
+1. Reads `.env.defaults` then the overlay (default: `.env.local`; pass
+   `--from-env` `.env` or `.env.production`). Overlay keys win. Non-secret
    `.env.defaults`.
-2. Keeps **only** the secret-key catalog (`app/k8s/secrets.py` /
+2. Keeps **only** the secret-key catalog (`vanessa/k8s/secrets.py` /
    `deploy/k8s/secrets.env.example`). Hosts, ports, feature flags stay in
    the ConfigMap — they never leak into the Secret.
 3. Validates required keys (token, DB password, broker URL, plus the active
    LLM key; web-search key if that feature is on).
 4. `kubectl apply`s one Opaque Secret: `vanessa-secrets`. Pods load it via
    `envFrom.secretRef`.
-5. If `.ssh/obsidian` (or `OBSIDIAN_SSH_DIR`) exists, also applies
-   `vanessa-obsidian-ssh`. Missing SSH is skipped, not a hard fail.
 
 `check` / apply logs **key names only**, never values. `--dry-run` is
 `kubectl --dry-run=client`.
 
 ```bash
-poetry run python scripts/k8s_secrets.py apply --dry-run --skip-ssh
+poetry run python scripts/k8s_secrets.py apply --dry-run
 poetry run python scripts/k8s_secrets.py example
 ```
 
@@ -86,24 +84,24 @@ kubectl -n vanessa rollout restart deploy
 
 ## Config: ConfigMap vs Secret
 
-Everything is env-driven (`app.config.settings`). Mapping is mechanical:
+Everything is env-driven (`vanessa.config.settings`). Mapping is mechanical:
 
 | Kind | Examples (keys = env names) |
 |---|---|
-| `ConfigMap` | `TRANSPORT`, `BROKER_STREAMS_PREFIX`, `BROKER_GROUP_*`, `BROKER_RPC_TIMEOUT_SECONDS`, `WORKER_ENABLED`, `WORKER_METRICS_PORT`, `MCP_*_URL`, `POSTGRES_HOST/PORT/USER/DB`, `QDRANT_*`, `RAG_*`, `DECISION_*`, `KNOWLEDGE_*`, `VISION_*`, `LOG_*`, `METRICS_*`, `OBSIDIAN_*` paths |
-| `Secret` (`scripts/k8s_secrets.py`) | `TELEGRAM_BOT_TOKEN`, `POSTGRES_PASSWORD`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `WEB_SEARCH_API_KEY`, `API_INTERNAL_TOKEN`, `HF_TOKEN`, `BROKER_REDIS_URL`, `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_ID_SALT`, `OBSIDIAN_GIT_REMOTE` |
+| `ConfigMap` | `TRANSPORT`, `BROKER_STREAMS_PREFIX`, `BROKER_GROUP_*`, `BROKER_RPC_TIMEOUT_SECONDS`, `WORKER_ENABLED`, `WORKER_METRICS_PORT`, `MCP_*_URL`, `POSTGRES_HOST/PORT/USER/DB`, `QDRANT_*`, `RAG_*`, `DECISION_*`, `KNOWLEDGE_*`, `VISION_*`, `LOG_*`, `METRICS_*` |
+| `Secret` (`scripts/k8s_secrets.py`) | `TELEGRAM_BOT_TOKEN`, `POSTGRES_PASSWORD`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `WEB_SEARCH_API_KEY`, `API_INTERNAL_TOKEN`, `HF_TOKEN`, `BROKER_REDIS_URL`, `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_ID_SALT` |
 
 `10-configmap.yaml` is representative; the full non-secret key set mirrors
-`app/config/settings_sections.py`. The secret catalog is the allow-list in
-`app/k8s/secrets.py` — not a dump of `.env`.
+`vanessa/config/settings_sections.py`. The secret catalog is the allow-list in
+`vanessa/k8s/secrets.py` — not a dump of `.env`.
 
 ## Workloads, resources & HPA
 
 | Service | Image/command | requests | limits | HPA |
 |---|---|---|---|---|
-| `bot` | `vanessa-app:local` / `python -m app.bot.main` | 100m / 256Mi | 500m / 1Gi | no (2 replicas fixed) |
+| `bot` | `vanessa-app:local` / `python -m services.bot.main` | 100m / 256Mi | 500m / 1Gi | no (2 replicas fixed) |
 | `agent-core` | `vanessa-app:local` / uvicorn | 250m / 512Mi | 2 CPU / 4Gi | CPU |
-| `worker` | `vanessa-app:local` / `python -m app.worker.main` | 500m / 1Gi | 4 CPU / 6Gi | CPU |
+| `worker` | `vanessa-app:local` / `python -m services.worker.main` | 500m / 1Gi | 4 CPU / 6Gi | CPU |
 | `mcp-websearch` | runner websearch | 50m / 128Mi | 500m / 512Mi | CPU |
 | `mcp-knowledge` | runner knowledge | 100m / 256Mi | 1 CPU / 1Gi | CPU |
 | `mcp-vision` | runner vision | 100m / 256Mi | 1 CPU / 2Gi | CPU |
@@ -177,9 +175,11 @@ Docker Desktop (hybrid: Postgres/Qdrant/Redis stay in compose):
 
 ```bash
 docker compose stop api bot worker mcp-websearch mcp-knowledge mcp-vision
+docker compose --env-file .env.defaults --env-file .env.local -f docker-compose.infra.yml up -d
 docker tag vanessa-app:latest vanessa-app:local
-poetry run python scripts/k8s_secrets.py apply --ensure-namespace --broker-host host.docker.internal
+python scripts/k8s_secrets.py apply --ensure-namespace --broker-host host.docker.internal
 kubectl apply -k deploy/k8s/overlays/desktop
+kubectl -n vanessa port-forward svc/agent-core 8000:8000
 ```
 
 The desktop overlay points DB/Qdrant at `host.docker.internal`, uses

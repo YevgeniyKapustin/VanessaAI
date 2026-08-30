@@ -1,3 +1,7 @@
+# Hybrid K8s: interpolate REDIS_AUTH / POSTGRES_* from the app overlay:
+#   docker compose --env-file .env.defaults --env-file .env.local \
+#     -f docker-compose.infra.yml up -d
+# Bare `up -d` uses the default password and will not match .env.local.
 services:
   postgres:
     image: postgres:16-alpine
@@ -11,6 +15,10 @@ services:
       - work_mem=4MB
       - -c
       - maintenance_work_mem=32MB
+      - -c
+      - max_connections=200
+      - -c
+      - idle_session_timeout=60000
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vanessa}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vanessa}

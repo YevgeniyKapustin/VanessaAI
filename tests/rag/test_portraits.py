@@ -1,7 +1,7 @@
 import pytest
 
-from app.knowledge.portraits import PortraitBuilder, PortraitPlanner
-from app.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.portraits import PortraitBuilder, PortraitPlanner
+from vanessa.knowledge.vault import KnowledgeVault
 
 
 class FakePlanner:

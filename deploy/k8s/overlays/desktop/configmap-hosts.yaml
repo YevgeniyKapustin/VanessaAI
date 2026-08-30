@@ -6,3 +6,5 @@ metadata:
 data:
   POSTGRES_HOST: host.docker.internal
   QDRANT_HOST: host.docker.internal
+  LANGFUSE_HOST: http://host.docker.internal:3000
+  API_BASE_URL: http://agent-core:8000

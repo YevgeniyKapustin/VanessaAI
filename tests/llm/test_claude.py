@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from anthropic import APIStatusError
 
-from app.config.content import get_content
-from app.core.messages import ContextBlock, ContextMessage
-from app.llm.planner.generation_config import LLMGenerationParams
-from app.llm.providers.claude import ClaudeLLMProvider
+from vanessa.config.content import get_content
+from vanessa.core.messages import ContextBlock, ContextMessage
+from vanessa.llm.planner.generation_config import LLMGenerationParams
+from vanessa.llm.providers.claude import ClaudeLLMProvider
 
 
 class FakeSubstitutor:
@@ -111,7 +111,7 @@ async def test_claude_generate_returns_only_after_answer_tag(
 async def test_claude_generate_traces_reasoning(provider: ClaudeLLMProvider):
     from contextlib import asynccontextmanager
 
-    from app.observability.tracing import set_tracer
+    from vanessa.observability.tracing import set_tracer
 
     class RecordingSpan:
         def __init__(self) -> None:
@@ -164,7 +164,7 @@ async def test_claude_retries_on_rate_limit(provider: ClaudeLLMProvider):
     provider._client.messages.create = AsyncMock(
         side_effect=[rate_limit, ok],
     )
-    with patch("app.llm.providers.claude.asyncio.sleep", new_callable=AsyncMock):
+    with patch("vanessa.llm.providers.claude.asyncio.sleep", new_callable=AsyncMock):
         reply = await provider.generate("retry me", [])
     assert reply == "Ok"
     assert provider._client.messages.create.await_count == 2

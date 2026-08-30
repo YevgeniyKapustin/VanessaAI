@@ -1,4 +1,4 @@
-from app.llm.format.reply_format import (
+from vanessa.llm.format.reply_format import (
     capitalize_sentences,
     strip_leading_address,
     strip_trailing_periods,

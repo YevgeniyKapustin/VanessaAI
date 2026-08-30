@@ -1,7 +1,7 @@
-from app.config.content import get_content
-from app.core.messages import ContextBlock, ContextMessage, ImageAttachment
-from app.knowledge.schema import KnowledgeBlock
-from app.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.config.content import get_content
+from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment
+from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.llm.prompts.prompt_builder import PromptBuilder
 
 
 def test_content_loads_persona_and_templates():
@@ -113,7 +113,7 @@ def test_prompt_builder_builds_user_prompt():
 
 
 def test_prompt_builder_includes_aliases_block(monkeypatch):
-    import app.llm.prompts.prompt_builder as pb
+    import vanessa.llm.prompts.prompt_builder as pb
 
     monkeypatch.setattr(
         pb,
@@ -129,7 +129,7 @@ def test_prompt_builder_includes_aliases_block(monkeypatch):
 
 
 def test_prompt_builder_omits_aliases_block_when_empty(monkeypatch):
-    import app.llm.prompts.prompt_builder as pb
+    import vanessa.llm.prompts.prompt_builder as pb
 
     monkeypatch.setattr(pb, "format_aliases_for_prompt", lambda: "")
     builder = PromptBuilder()
@@ -202,7 +202,7 @@ def test_prompt_builder_system_includes_answer_checklist():
 
 def test_prompt_builder_includes_owner_note_for_host(monkeypatch):
     monkeypatch.setattr(
-        "app.llm.prompts.prompt_builder.settings.required_user_telegram_id",
+        "vanessa.llm.prompts.prompt_builder.settings.required_user_telegram_id",
         7714154251,
     )
     builder = PromptBuilder()
@@ -330,7 +330,7 @@ def test_prompt_builder_system_forbids_addressing_by_name():
 
 def test_prompt_builder_owner_note_forbids_calling_owner_by_name(monkeypatch):
     monkeypatch.setattr(
-        "app.llm.prompts.prompt_builder.settings.required_user_telegram_id",
+        "vanessa.llm.prompts.prompt_builder.settings.required_user_telegram_id",
         7714154251,
     )
     builder = PromptBuilder()
@@ -346,7 +346,7 @@ def test_prompt_builder_owner_note_forbids_calling_owner_by_name(monkeypatch):
 
 
 def test_prompt_builder_renders_album_instruction_when_candidates():
-    from app.core.messages import PhotoCandidate
+    from vanessa.core.messages import PhotoCandidate
 
     builder = PromptBuilder()
     candidates = [
@@ -361,7 +361,7 @@ def test_prompt_builder_renders_album_instruction_when_candidates():
 
 
 def test_prompt_builder_requires_marker_on_explicit_photo_request():
-    from app.core.messages import PhotoCandidate
+    from vanessa.core.messages import PhotoCandidate
 
     builder = PromptBuilder()
     candidates = [PhotoCandidate(index=1, telegram_file_id="f1", caption="кот")]
@@ -372,7 +372,7 @@ def test_prompt_builder_requires_marker_on_explicit_photo_request():
 
 
 def test_prompt_builder_omits_required_note_without_photo_request():
-    from app.core.messages import PhotoCandidate
+    from vanessa.core.messages import PhotoCandidate
 
     builder = PromptBuilder()
     candidates = [PhotoCandidate(index=1, telegram_file_id="f1", caption="кот")]

@@ -1,5 +1,4 @@
-# Compose shipper: docker_logs → Loki. Kubernetes uses
-# deploy/k8s/logging/vector.yaml (kubernetes_logs from /var/log/pods).
+# Compose shipper: docker_logs → Loki + nginx histograms for Prometheus.
 api:
   enabled: true
   address: 0.0.0.0:8686
@@ -12,16 +11,72 @@ sources:
       - loki
 
 transforms:
+  compose_only:
+    type: filter
+    inputs: [docker_logs]
+    condition: '!starts_with(string!(.container_name), "k8s_")'
+
   parse_json:
     type: remap
-    inputs: [docker_logs]
+    inputs: [compose_only]
     source: |
-      .service = .label."com.docker.compose.service" ?? .container_name
+      if exists(.label."com.docker.compose.service") {
+        .service = .label."com.docker.compose.service"
+      } else {
+        .service = .container_name
+      }
       parsed, err = parse_json(.message)
-      if err == null {
-        . = merge(., parsed)
+      if err == null && is_object(parsed) {
+        . = merge!(., parsed)
       }
       del(.label)
+      if exists(.level) {
+        lvl = downcase(string!(.level))
+        if lvl == "warning" {
+          .level = "warn"
+        } else if lvl == "critical" {
+          .level = "fatal"
+        } else {
+          .level = lvl
+        }
+      } else if .stream == "stderr" {
+        .level = "error"
+      } else {
+        .level = "info"
+      }
+      if exists(.request_time) {
+        rt, err = to_float(.request_time)
+        if err == null {
+          .request_time = rt
+        }
+      }
+      if exists(.event) {
+        ev, err = to_string(.event)
+        if err == null {
+          .event = ev
+        } else {
+          .event = "none"
+        }
+      } else {
+        .event = "none"
+      }
+
+  nginx_access:
+    type: filter
+    inputs: [parse_json]
+    condition: '.service == "nginx" && is_float(.request_time)'
+
+  nginx_metrics:
+    type: log_to_metric
+    inputs: [nginx_access]
+    metrics:
+      - type: histogram
+        field: request_time
+        name: request_duration_seconds
+        namespace: nginx
+        tags:
+          status: "{{ status }}"
+          method: "{{ method }}"
 
 sinks:
   loki:
@@ -34,3 +89,10 @@ sinks:
     labels:
       service: "{{ service }}"
       stream: "{{ stream }}"
+      level: "{{ level }}"
+      event: "{{ event }}"
+
+  prometheus:
+    type: prometheus_exporter
+    inputs: [nginx_metrics]
+    address: 0.0.0.0:9598

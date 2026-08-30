@@ -1,5 +1,6 @@
 {
   "annotations": { "list": [] },
+  "description": "Triage for Vanessa services. Empty search applies no line filter (label matchers only). Non-JSON lines are kept. event is a Loki label.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -7,7 +8,18 @@
   "links": [],
   "panels": [
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "id": 2,
+      "options": {
+        "content": "Triage for Vanessa services.\n\n- **search** — literal substring on the raw line (`|=` + `${search:doublequote}`), so JSON keys/values match as they appear in the log. Empty = no line filter.\n- **level** — info/warn/error/fatal on load; add debug if you need it.\n- **All** on service/level interpolates as `.+` via `${…:pipe}` (not `:regex`, which would escape it to `\\\\.+`).",
+        "mode": "markdown"
+      },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki}" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -21,7 +33,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 3 },
       "id": 1,
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -29,8 +41,8 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum by (service) (count_over_time({service=~\"$service\"}[1m]))",
+          "datasource": { "type": "loki", "uid": "${loki}" },
+          "expr": "sum by (service) (count_over_time({service=~\"${service:pipe}\", level=~\"${level:pipe}\"}[1m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
@@ -39,77 +51,133 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 1,
-            "showPoints": "never"
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "id": 2,
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "avg_over_time({service=\"nginx\"} | json | unwrap request_time [1m])",
-          "legendFormat": "request_time",
-          "refId": "A"
-        }
-      ],
-      "title": "Nginx request_time",
-      "type": "timeseries"
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 10,
+      "panels": [],
+      "title": "Log lines",
+      "type": "row"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "${loki}" },
+      "description": "Raw-line |= then json. drop __error__ keeps stack traces and other non-JSON. Empty search is |= \"\" (contains empty = all lines in the label set). maxLines=200.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
       "id": 3,
+      "maxDataPoints": 200,
       "options": {
+        "enableLogDetails": true,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=~\"$service\"} | json",
+          "datasource": { "type": "loki", "uid": "${loki}" },
+          "expr": "{service=~\"${service:pipe}\", level=~\"${level:pipe}\"} |= \"${search:doublequote}\" | json | drop __error__",
+          "maxLines": 200,
           "queryType": "range",
           "refId": "A"
         }
       ],
       "title": "Logs",
       "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki}" },
+      "description": "Uses indexed label event (Vector), not | json | event=.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 25 },
+      "id": 4,
+      "maxDataPoints": 100,
+      "options": {
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki}" },
+          "expr": "{service=~\"${service:pipe}\", level=~\"${level:pipe}\", event=\"knowledge_node_updated\"}",
+          "maxLines": 100,
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Knowledge node updates",
+      "type": "logs"
     }
   ],
+  "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["logs", "loki"],
   "templating": {
     "list": [
       {
-        "current": { "text": "All", "value": "$__all" },
-        "datasource": { "type": "loki", "uid": "loki" },
+        "current": { "text": "Loki", "value": "loki" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Loki",
+        "multi": false,
+        "name": "loki",
+        "options": [],
+        "query": "loki",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "allValue": ".+",
+        "current": { "text": "All", "value": ".+" },
+        "datasource": { "type": "loki", "uid": "${loki}" },
         "includeAll": true,
         "label": "service",
         "multi": true,
         "name": "service",
         "query": "label_values(service)",
         "refresh": 2,
+        "skipUrlSync": true,
+        "sort": 1,
         "type": "query"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "text": ["info", "warn", "error", "fatal"],
+          "value": ["info", "warn", "error", "fatal"]
+        },
+        "description": "info/warn/error/fatal on load. Debug is off until you add it.",
+        "includeAll": true,
+        "label": "level",
+        "multi": true,
+        "name": "level",
+        "options": [
+          { "selected": false, "text": "debug", "value": "debug" },
+          { "selected": true, "text": "info", "value": "info" },
+          { "selected": true, "text": "warn", "value": "warn" },
+          { "selected": true, "text": "error", "value": "error" },
+          { "selected": true, "text": "fatal", "value": "fatal" }
+        ],
+        "query": "debug,info,warn,error,fatal",
+        "type": "custom"
+      },
+      {
+        "current": { "text": "", "value": "" },
+        "description": "Literal substring on the raw line. Empty skips narrowing (|= \"\" matches all in the label set). Quotes escaped via ${search:doublequote}.",
+        "hide": 0,
+        "label": "search",
+        "name": "search",
+        "options": [{ "text": "", "value": "" }],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
       }
     ]
   },
-  "time": { "from": "now-1h", "to": "now" },
-  "title": "Logs",
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m"]
+  },
+  "title": "Service Triage & Logs",
   "uid": "vanessa-logs",
-  "version": 1
+  "version": 7
 }

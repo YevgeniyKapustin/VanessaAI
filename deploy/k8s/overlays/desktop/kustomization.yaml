@@ -18,9 +18,5 @@ patches:
     path: worker-volumes.yaml
   - target:
       kind: Deployment
-      name: bot
-    path: bot-volumes.yaml
-  - target:
-      kind: Deployment
       name: mcp-knowledge
     path: mcp-knowledge-volumes.yaml

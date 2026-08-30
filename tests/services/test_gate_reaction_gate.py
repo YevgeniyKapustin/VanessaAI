@@ -1,15 +1,15 @@
 import pytest
 
-from app.core.messages import StoredMessage
-from app.core.session.chat_session_state import ChatSessionState
-from app.core.turn import ChatTurnInput
-from app.decision.gate.reaction_gate import ReactionGateResult
-from app.decision.models import DecisionAction, DecisionReason
-from app.rag.query_rewriter import QueryRewriter
-from app.services.orchestrator.orchestrator_config import OrchestratorConfig
-from app.services.pipeline.context import TurnPipelineContext
-from app.services.pipeline.stages import GateStage
-from app.services.turn_metrics import TurnMetrics
+from vanessa.core.messages import StoredMessage
+from vanessa.core.session.chat_session_state import ChatSessionState
+from vanessa.core.turn import ChatTurnInput
+from vanessa.decision.gate.reaction_gate import ReactionGateResult
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.rag.query_rewriter import QueryRewriter
+from vanessa.services.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.services.pipeline.context import TurnPipelineContext
+from vanessa.services.pipeline.stages import GateStage
+from vanessa.services.turn_metrics import TurnMetrics
 
 
 class FakeMessageRepo:

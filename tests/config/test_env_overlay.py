@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.config.env_overlay import (
+from vanessa.config.env_overlay import (
     build_local_overlay,
     prepare_local_overlay,
     render_overlay,

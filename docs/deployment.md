@@ -7,15 +7,12 @@ on push/PR; image build and cluster apply are not in GitHub Actions yet.
 ## Repository layout
 
 ```
-app/
-  bot/          Telegram handlers, formatting, API client
-  api/          FastAPI, DI, routes
-  decision/     Gate: prefilter, rules, intent, rate limit
-  llm/          Providers, prompts, planner, humor
-  knowledge/    Vault: format, indexes, retriever, writer, sweep
-  rag/          Hybrid search, Qdrant, ReAct, query rewriter
-  services/     Orchestrator, pipeline stages, metrics
-  ingest/       Telegram export import
+services/
+  bot/          Telegram transport
+  agent_core/   FastAPI + turn pipeline
+  worker/       Indexing, sweep, memory jobs
+  mcp/          Tool servers
+vanessa/        Shared libraries (db, llm, rag, decision, contracts, broker)
 config/content/ Per-section YAML (persona, conversation, llm, …)
 knowledge/      Runtime vault data
 scripts/        import, reindex, portraits, stickers, k8s secrets

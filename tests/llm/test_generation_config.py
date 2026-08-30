@@ -1,5 +1,5 @@
-from app.config.content import get_content
-from app.llm.planner.generation_config import LLMGenerationParams
+from vanessa.config.content import get_content
+from vanessa.llm.planner.generation_config import LLMGenerationParams
 
 
 def test_composer_generation_loaded_from_content():
@@ -64,7 +64,7 @@ def test_reasoning_effort_sent_when_configured():
 
 
 def test_conversation_config_from_content():
-    from app.config.conversation_config import load_conversation_config
+    from vanessa.config.conversation_config import load_conversation_config
 
     config = load_conversation_config()
     assert config.session_window_size == 20

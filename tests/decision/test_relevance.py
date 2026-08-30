@@ -1,6 +1,6 @@
 import pytest
 
-from app.decision.detectors.relevance import QdrantRelevanceChecker
+from vanessa.decision.detectors.relevance import QdrantRelevanceChecker
 
 
 class FakeEmbeddings:

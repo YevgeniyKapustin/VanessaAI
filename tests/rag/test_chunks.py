@@ -1,4 +1,4 @@
-from app.knowledge.chunks import split_dossier_chunks
+from vanessa.knowledge.chunks import split_dossier_chunks
 
 
 def test_short_body_returns_single_block():

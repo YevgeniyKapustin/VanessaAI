@@ -2,9 +2,9 @@ import asyncio
 
 import fakeredis.aioredis
 
-from app.broker.redis_streams import RedisStreamBroker
-from app.contracts.messages import TaskKind, TaskMessage
-from app.worker.app import WorkerApp
+from vanessa.broker.redis_streams import RedisStreamBroker
+from vanessa.contracts.messages import TaskKind, TaskMessage
+from services.worker.app import WorkerApp
 
 
 class _Handler:

@@ -1,14 +1,14 @@
-from app.config.content import PromptBudgetContent
-from app.core.messages import ContextBlock, ContextMessage
-from app.knowledge.schema import KnowledgeBlock
-from app.llm.prompts.budget import (
+from vanessa.config.content import PromptBudgetContent
+from vanessa.core.messages import ContextBlock, ContextMessage
+from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.llm.prompts.budget import (
     PRIORITY_CONTEXT,
     PRIORITY_CURRENT,
     PRIORITY_KNOWLEDGE,
     apply_budget,
     truncate_body,
 )
-from app.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.llm.prompts.prompt_builder import PromptBuilder
 
 
 def test_truncate_body_under_limit_unchanged() -> None:

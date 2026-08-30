@@ -1,6 +1,6 @@
 
-from app.contracts.messages import TaskKind, TaskMessage
-from app.worker.handlers import (
+from vanessa.contracts.messages import TaskKind, TaskMessage
+from services.worker.handlers import (
     IndexMessageHandler,
     PortraitHandler,
     ReindexKnowledgeHandler,
@@ -38,7 +38,7 @@ class _FakeRepo:
 
 
 async def test_index_message_handler(monkeypatch) -> None:
-    from app.db import repository
+    from vanessa.db import repository
 
     fake_repo = _FakeRepo(None)
     monkeypatch.setattr(repository, "MessageRepository", lambda session: fake_repo)
@@ -74,7 +74,7 @@ async def test_index_message_handler_skips_non_user_role() -> None:
 
 
 async def test_sweep_handler_runs_once(monkeypatch) -> None:
-    from app.db import repository
+    from vanessa.db import repository
 
     class _FakeSweep:
         def __init__(self) -> None:

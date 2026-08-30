@@ -1,10 +1,10 @@
 
-from app.decision.context import DecisionContext
-from app.decision.detectors.intent import IntentResult
-from app.decision.models import DecisionAction, DecisionReason
-from app.decision.gate.planner_gate import planner_affirms_reply
-from app.decision.rules import PlannerOverreachRule
-from app.decision.detectors.triggers import TriggerResult
+from vanessa.decision.context import DecisionContext
+from vanessa.decision.detectors.intent import IntentResult
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.decision.gate.planner_gate import planner_affirms_reply
+from vanessa.decision.rules import PlannerOverreachRule
+from vanessa.decision.detectors.triggers import TriggerResult
 
 
 def _ctx(**kwargs) -> DecisionContext:

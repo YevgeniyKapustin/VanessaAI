@@ -1,8 +1,10 @@
 # Prometheus scrape config for VanessaAI.
 # Alerting rules live in rules.yml (rule_files), never inline here.
-# Targets: api, bot, worker, MCP, and nginx-exporter (Compose prod).
-# Compose uses static_configs. Kubernetes/Swarm should replace this
-# with service discovery and __meta_* relabel_configs.
+# Targets are Compose DNS names on the shared `backend` network
+# (docker-compose.monitoring.yml in the same project). Apps do not
+# publish bot/worker/MCP metrics ports to the host.
+# If API/bot run on the host instead, use prometheus.host.yml.
+# Kubernetes/Swarm should replace static_configs with service discovery.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -46,12 +48,12 @@ scrape_configs:
         labels:
           environment: production
 
-  # OSS stub_status: connections + request count. 5xx/429/latency by
-  # status are not in stub_status (needs Plus API or log pipeline).
-  - job_name: nginx
+  # nginx-exporter is only in docker-compose.prod.yml; scrape it there.
+
+  - job_name: vector
     metrics_path: /metrics
     scrape_timeout: 5s
     static_configs:
-      - targets: ["nginx-exporter:9113"]
+      - targets: ["vector:9598"]
         labels:
           environment: production

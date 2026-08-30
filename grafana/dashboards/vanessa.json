@@ -12,7 +12,7 @@
       "gridPos": { "h": 4, "w": 12, "x": 0, "y": 0 },
       "id": 4,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_turns_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))", "legendFormat": "RPS", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_turns_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m]))", "legendFormat": "RPS", "refId": "A" } ],
       "title": "Turn rate (RPS)",
       "type": "timeseries"
     },
@@ -30,7 +30,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "id": 5,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(vanessa_llm_cost_total{token_type=\"total\",environment=~\"$env\",instance=~\"$instance\"}[$__range]))", "legendFormat": "cost", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(vanessa_llm_cost_total{token_type=\"total\",environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[$__range]))", "legendFormat": "cost", "refId": "A" } ],
       "title": "LLM cost",
       "type": "stat"
     },
@@ -48,7 +48,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
       "id": 6,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(vanessa_turns_total{action=\"reply\",environment=~\"$env\",instance=~\"$instance\"}[$__range])) / clamp_min(sum(increase(vanessa_turns_total{environment=~\"$env\",instance=~\"$instance\"}[$__range])), 1e-6)", "legendFormat": "reply share", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(vanessa_turns_total{action=\"reply\",environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[$__range])) / clamp_min(sum(increase(vanessa_turns_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[$__range])), 1e-6)", "legendFormat": "reply share", "refId": "A" } ],
       "title": "Turn success rate",
       "type": "stat"
     },
@@ -66,7 +66,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
       "id": 7,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - max(vanessa_process_start_time_seconds{environment=~\"$env\",instance=~\"$instance\"})", "legendFormat": "uptime", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - max(vanessa_process_start_time_seconds{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"})", "legendFormat": "uptime", "refId": "A" } ],
       "title": "Uptime",
       "type": "stat"
     },
@@ -77,9 +77,9 @@
       "id": 8,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(vanessa_turn_duration_seconds_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_turn_duration_seconds_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.99, sum(rate(vanessa_turn_duration_seconds_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(vanessa_turn_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_turn_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.99, sum(rate(vanessa_turn_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
       ],
       "title": "Turn latency percentiles",
       "type": "timeseries"
@@ -90,7 +90,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "id": 9,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_stage_duration_seconds_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (le, stage))", "legendFormat": "{{stage}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_stage_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le, stage))", "legendFormat": "{{stage}}", "refId": "A" } ],
       "title": "Stage latency p95",
       "type": "timeseries"
     },
@@ -100,7 +100,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
       "id": 10,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_requests_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (model, status)", "legendFormat": "{{model}} {{status}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_requests_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (model, status)", "legendFormat": "{{model}} {{status}}", "refId": "A" } ],
       "title": "LLM requests by model / status",
       "type": "timeseries"
     },
@@ -110,7 +110,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
       "id": 11,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_tokens_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (token_type)", "legendFormat": "{{token_type}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_tokens_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (token_type)", "legendFormat": "{{token_type}}", "refId": "A" } ],
       "title": "LLM token rate",
       "type": "timeseries"
     },
@@ -120,7 +120,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
       "id": 12,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_cost_total{token_type=\"total\",environment=~\"$env\",instance=~\"$instance\"}[5m])) by (model)", "legendFormat": "{{model}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_cost_total{token_type=\"total\",environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (model)", "legendFormat": "{{model}}", "refId": "A" } ],
       "title": "LLM cost rate by model",
       "type": "timeseries"
     },
@@ -130,7 +130,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
       "id": 13,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_rag_hits_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (source) / clamp_min(sum(rate(vanessa_rag_search_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (source), 1e-6)", "legendFormat": "{{source}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_rag_hits_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (source) / clamp_min(sum(rate(vanessa_rag_search_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (source), 1e-6)", "legendFormat": "{{source}}", "refId": "A" } ],
       "title": "RAG hit rate by source",
       "type": "timeseries"
     },
@@ -140,7 +140,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
       "id": 14,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_rag_hits_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (source)", "legendFormat": "{{source}} hits", "refId": "A" }, { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_rag_empty_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (source)", "legendFormat": "{{source}} empty", "refId": "B" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_rag_hits_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (source)", "legendFormat": "{{source}} hits", "refId": "A" }, { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_rag_empty_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (source)", "legendFormat": "{{source}} empty", "refId": "B" } ],
       "title": "RAG hits / empty",
       "type": "timeseries"
     },
@@ -150,7 +150,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
       "id": 15,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_telegram_errors_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (operation, error_type)", "legendFormat": "{{operation}} {{error_type}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_telegram_errors_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (operation, error_type)", "legendFormat": "{{operation}} {{error_type}}", "refId": "A" } ],
       "title": "Telegram API errors",
       "type": "timeseries"
     },
@@ -160,7 +160,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
       "id": 16,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_errors_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(vanessa_llm_requests_total{environment=~\"$env\",instance=~\"$instance\"}[5m])), 1e-6)", "legendFormat": "LLM error rate", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_errors_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) / clamp_min(sum(rate(vanessa_llm_requests_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])), 1e-6)", "legendFormat": "LLM error rate", "refId": "A" } ],
       "title": "LLM error rate",
       "type": "timeseries"
     },
@@ -170,7 +170,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
       "id": 17,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_empty_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (model)", "legendFormat": "{{model}} empty", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_llm_empty_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (model)", "legendFormat": "{{model}} empty", "refId": "A" } ],
       "title": "Empty LLM responses",
       "type": "timeseries"
     },
@@ -180,7 +180,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
       "id": 18,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_telegram_rate_limits_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (operation, error_type)", "legendFormat": "{{operation}} {{error_type}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_telegram_rate_limits_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (operation, error_type)", "legendFormat": "{{operation}} {{error_type}}", "refId": "A" } ],
       "title": "Telegram rate limits / blocked",
       "type": "timeseries"
     },
@@ -191,8 +191,8 @@
       "id": 19,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(vanessa_reply_length_chars_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_reply_length_chars_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(vanessa_reply_length_chars_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_reply_length_chars_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" }
       ],
       "title": "Reply length percentiles (chars)",
       "type": "timeseries"
@@ -203,7 +203,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
       "id": 20,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_http_requests_total{environment=~\"$env\",instance=~\"$instance\"}[5m])) by (status)", "legendFormat": "HTTP {{status}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_http_requests_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (status)", "legendFormat": "HTTP {{status}}", "refId": "A" } ],
       "title": "API HTTP requests by status",
       "type": "timeseries"
     },
@@ -221,9 +221,42 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
       "id": 21,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "textMode": "auto" },
-      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "vanessa_rag_eval_score{environment=~\"$env\",instance=~\"$instance\"}", "legendFormat": "{{dimension}}", "refId": "A" } ],
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "vanessa_rag_eval_score{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}", "legendFormat": "{{dimension}}", "refId": "A" } ],
       "title": "RAG Triad scores",
       "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "spanNulls": false }, "mappings": [], "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+      "id": 22,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_knowledge_mutations_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (type, action)", "legendFormat": "{{type}} {{action}}", "refId": "A" } ],
+      "title": "Knowledge mutations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "spanNulls": false }, "mappings": [], "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 44 },
+      "id": 23,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(vanessa_knowledge_vector_sync_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(vanessa_knowledge_vector_sync_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" }
+      ],
+      "title": "Knowledge vector sync",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "spanNulls": false }, "mappings": [], "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+      "id": 24,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(vanessa_knowledge_search_hits_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])) by (source)", "legendFormat": "{{source}}", "refId": "A" } ],
+      "title": "Knowledge search hits",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -232,8 +265,8 @@
   "templating": {
     "list": [
       {
-        "allValue": ".*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "allValue": ".+",
+        "current": { "selected": true, "text": "production", "value": "production" },
         "datasource": { "type": "prometheus", "uid": "prometheus" },
         "definition": "label_values(up, environment)",
         "includeAll": true,
@@ -244,24 +277,24 @@
         "query": { "query": "label_values(up, environment)", "refId": "StandardVariableQuery" },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "skipUrlSync": true,
         "sort": 1,
         "type": "query"
       },
       {
-        "allValue": ".*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "allValue": ".+",
+        "current": { "selected": true, "text": "All", "value": ".+" },
         "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "definition": "label_values(up{environment=~\"$env\"}, instance)",
+        "definition": "label_values(up{environment=~\"${env:pipe}\"}, instance)",
         "includeAll": true,
         "label": "Instance",
         "multi": true,
         "name": "instance",
         "options": [],
-        "query": { "query": "label_values(up{environment=~\"$env\"}, instance)", "refId": "StandardVariableQuery" },
+        "query": { "query": "label_values(up{environment=~\"${env:pipe}\"}, instance)", "refId": "StandardVariableQuery" },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "skipUrlSync": true,
         "sort": 1,
         "type": "query"
       }
@@ -272,6 +305,6 @@
   "timezone": "browser",
   "title": "VanessaAI Observability",
   "uid": "vanessa-observability",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

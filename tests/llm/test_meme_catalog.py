@@ -1,5 +1,5 @@
-from app.config.content import MemeDefContent, MemesContent
-from app.llm.memes import MemeCatalog
+from vanessa.config.content import MemeDefContent, MemesContent
+from vanessa.llm.memes import MemeCatalog
 
 
 def _content(**kwargs) -> MemesContent:

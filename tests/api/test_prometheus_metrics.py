@@ -1,9 +1,9 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.main import app
-from app.config import settings
-from app.observability.metrics import record_turn
+from services.agent_core.main import app
+from vanessa.config import settings
+from vanessa.observability.metrics import record_turn
 
 
 @pytest.mark.asyncio

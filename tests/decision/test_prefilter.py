@@ -1,12 +1,12 @@
 import pytest
 
-from app.core.messages import ContextMessage
-from app.decision.detectors.intent import IntentDetector
-from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-from app.decision.gate.prefilter import PlannerPrefilter
-from app.decision.gate.reply_eligibility import ReplyEligibility
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
-from app.decision.detectors.triggers import TriggerKeywordChecker
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.detectors.intent import IntentDetector
+from vanessa.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.decision.gate.prefilter import PlannerPrefilter
+from vanessa.decision.gate.reply_eligibility import ReplyEligibility
+from vanessa.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.decision.detectors.triggers import TriggerKeywordChecker
 
 
 @pytest.fixture

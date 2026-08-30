@@ -4,12 +4,12 @@ import fakeredis.aioredis
 import pytest
 from aiogram import Bot
 
-from app.bot.messages import IncomingMessage
-from app.bot.services.broker_client import BrokerTurnClient
-from app.broker.backends import Delivery
-from app.broker.redis_streams import RedisStreamBroker
-from app.broker.streams import BrokerStreams
-from app.contracts.messages import TurnReply, TurnStarted
+from services.bot.messages import IncomingMessage
+from services.bot.services.broker_client import BrokerTurnClient
+from vanessa.broker.backends import Delivery
+from vanessa.broker.redis_streams import RedisStreamBroker
+from vanessa.broker.streams import BrokerStreams
+from vanessa.contracts.messages import TurnReply, TurnStarted
 
 
 @pytest.fixture

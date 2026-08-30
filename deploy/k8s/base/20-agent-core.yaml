@@ -19,7 +19,7 @@ spec:
         - name: api
           image: vanessa-app:local
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "alembic upgrade head && uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30"]
+          command: ["sh", "-c", "alembic upgrade head && uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30"]
           ports:
             - { containerPort: 8000, name: http }
             - { containerPort: 9100, name: metrics }
@@ -29,14 +29,21 @@ spec:
           resources:
             requests: { cpu: "250m", memory: "512Mi" }
             limits: { cpu: "2", memory: "4Gi" }
+          # Uvicorn does not bind :8000 until lifespan finishes (embeddings +
+          # vault index). startupProbe holds off liveness for that window.
+          startupProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 36
           readinessProbe:
             httpGet: { path: /health/ready, port: http }
-            initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 2
           livenessProbe:
             httpGet: { path: /health/live, port: http }
-            initialDelaySeconds: 30
             periodSeconds: 20
+            timeoutSeconds: 2
           volumeMounts:
             - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
       volumes:

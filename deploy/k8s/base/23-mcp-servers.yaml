@@ -18,11 +18,14 @@ spec:
         - name: server
           image: vanessa-app:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.mcp_server.runner", "websearch", "--port", "8101"]
+          command: ["python", "-m", "services.mcp.runner", "websearch", "--port", "8101"]
           ports: [{ containerPort: 8101, name: mcp }]
           envFrom:
             - configMapRef: { name: vanessa-config }
             - secretRef: { name: vanessa-secrets }
+          env:
+            - name: MCP_WEBSEARCH_URL
+              value: ""
           resources:
             requests: { cpu: "50m", memory: "128Mi" }
             limits: { cpu: "500m", memory: "512Mi" }
@@ -58,7 +61,7 @@ spec:
         - name: server
           image: vanessa-app:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.mcp_server.runner", "knowledge", "--port", "8102"]
+          command: ["python", "-m", "services.mcp.runner", "knowledge", "--port", "8102"]
           ports: [{ containerPort: 8102, name: mcp }]
           envFrom:
             - configMapRef: { name: vanessa-config }
@@ -103,7 +106,7 @@ spec:
         - name: server
           image: vanessa-app:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.mcp_server.runner", "vision", "--port", "8103"]
+          command: ["python", "-m", "services.mcp.runner", "vision", "--port", "8103"]
           ports: [{ containerPort: 8103, name: mcp }]
           envFrom:
             - configMapRef: { name: vanessa-config }

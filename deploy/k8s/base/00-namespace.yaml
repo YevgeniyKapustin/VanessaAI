@@ -3,5 +3,5 @@ kind: Namespace
 metadata:
   name: vanessa
   labels:
-    app.kubernetes.io/part-of: vanessa
+    vanessa.kubernetes.io/part-of: vanessa
     pod-security.kubernetes.io/enforce: restricted

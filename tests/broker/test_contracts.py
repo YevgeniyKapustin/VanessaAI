@@ -1,4 +1,4 @@
-from app.contracts.messages import (
+from vanessa.contracts.messages import (
     SCHEMA_VERSION,
     BrokerMessage,
     TaskKind,
@@ -8,8 +8,8 @@ from app.contracts.messages import (
     TurnRequest,
     TurnStarted,
 )
-from app.broker.errors import UnknownMessageKind
-from app.broker.serialization import decode, encode
+from vanessa.broker.errors import UnknownMessageKind
+from vanessa.broker.serialization import decode, encode
 
 
 def test_turn_request_round_trip() -> None:

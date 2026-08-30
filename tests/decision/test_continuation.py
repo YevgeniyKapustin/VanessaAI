@@ -1,5 +1,5 @@
-from app.core.messages import ContextMessage
-from app.decision.gate.continuation import (
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.gate.continuation import (
     DEFAULT_CONTINUATION_PHRASES,
     is_continuation_phrase,
     is_sender_continuation_demand,

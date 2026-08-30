@@ -20,11 +20,11 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from app.config.settings import settings
-from app.knowledge.vault import KnowledgeVault
-from app.knowledge.vector_index import KnowledgeVectorIndexer
-from app.rag.embeddings.local_embeddings import LocalEmbeddingProvider
-from app.rag.qdrant_client import KnowledgeQdrantStore
+from vanessa.config.settings import settings
+from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
+from vanessa.rag.embeddings.local_embeddings import LocalEmbeddingProvider
+from vanessa.rag.qdrant_client import KnowledgeQdrantStore
 
 
 async def main() -> int:

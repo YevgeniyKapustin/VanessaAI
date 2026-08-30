@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from app.core.messages import StoredMessage
-from app.services.indexing.message_indexing import MessageIndexingService
+from vanessa.core.messages import StoredMessage
+from vanessa.services.indexing.message_indexing import MessageIndexingService
 
 
 class FakeIndexer:
@@ -60,7 +60,7 @@ async def test_background_indexing_commits_in_separate_session(monkeypatch):
         return FakeSession()
 
     monkeypatch.setattr(
-        "app.services.indexing.message_indexing.MessageRepository",
+        "vanessa.services.indexing.message_indexing.MessageRepository",
         FakeMessageRepository,
     )
     service = MessageIndexingService(
@@ -250,7 +250,7 @@ async def test_background_indexing_swallows_errors(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_schedule_submits_to_background_executor(monkeypatch):
-    from app.services.background import BackgroundExecutor
+    from vanessa.services.background import BackgroundExecutor
 
     indexer = FakeIndexer()
     updated: list[tuple[int, str]] = []
@@ -281,7 +281,7 @@ async def test_schedule_submits_to_background_executor(monkeypatch):
         return FakeSession()
 
     monkeypatch.setattr(
-        "app.services.indexing.message_indexing.MessageRepository",
+        "vanessa.services.indexing.message_indexing.MessageRepository",
         FakeMessageRepository,
     )
     executor = BackgroundExecutor(maxsize=10, workers=1)

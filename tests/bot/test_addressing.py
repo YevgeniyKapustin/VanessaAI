@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-from app.bot.addressing import _bot_username, extract_addressing
+from services.bot.addressing import _bot_username, extract_addressing
 
 
 @dataclass

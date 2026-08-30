@@ -1,5 +1,5 @@
-from app.core.messages import ContextBlock, ContextMessage
-from app.llm.humor.humor_quotes import extract_humor_quotes
+from vanessa.core.messages import ContextBlock, ContextMessage
+from vanessa.llm.humor.humor_quotes import extract_humor_quotes
 
 
 def test_extract_humor_quotes_prefers_running_jokes():

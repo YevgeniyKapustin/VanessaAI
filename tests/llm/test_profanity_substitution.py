@@ -5,7 +5,7 @@ import pytest
 # environment instead of failing the whole module.
 pytest.importorskip("pymorphy3")
 
-from app.llm.format.profanity_substitution import ProfanitySubstitutor
+from vanessa.llm.format.profanity_substitution import ProfanitySubstitutor
 
 _LEMMAS = {
     "блин": "блядь",

@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.deps import (
+from services.agent_core.deps import (
     create_decision_engine,
     create_embedding_provider,
     create_hybrid_search,
@@ -14,13 +14,13 @@ from app.api.deps import (
     get_unit_of_work,
     get_user_repository,
 )
-from app.db.repository import MessageRepository, UserRepository
-from app.db.uow import SqlAlchemyUnitOfWork
-from app.decision import DecisionEngine
-from app.rag.search.hybrid_search import HybridSearchService
-from app.services.indexing.message_indexing import MessageIndexingService
-from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
-from app.services.turn_metrics import TurnMetrics
+from vanessa.db.repository import MessageRepository, UserRepository
+from vanessa.db.uow import SqlAlchemyUnitOfWork
+from vanessa.decision import DecisionEngine
+from vanessa.rag.search.hybrid_search import HybridSearchService
+from vanessa.services.indexing.message_indexing import MessageIndexingService
+from vanessa.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
+from vanessa.services.turn_metrics import TurnMetrics
 
 
 def test_get_turn_metrics_returns_singleton():
@@ -105,7 +105,7 @@ async def test_get_incoming_turn_handler_builds_orchestrator():
     vector_store = create_vector_store()
     hybrid = create_hybrid_search(messages, embeddings, vector_store)
     decision = create_decision_engine(embeddings, vector_store)
-    from app.api.deps import (
+    from services.agent_core.deps import (
         create_query_rewriter,
         get_llm_provider,
         get_turn_metrics,

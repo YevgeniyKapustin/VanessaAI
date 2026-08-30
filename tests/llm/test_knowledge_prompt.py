@@ -1,6 +1,6 @@
-from app.config.content import get_content
-from app.knowledge.schema import KnowledgeBlock
-from app.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.config.content import get_content
+from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.llm.prompts.prompt_builder import PromptBuilder
 
 
 def test_build_user_prompt_includes_knowledge_blocks():

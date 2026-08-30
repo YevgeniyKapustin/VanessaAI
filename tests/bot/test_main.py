@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.bot import main as bot_main
+from services.bot import main as bot_main
 
 
 @pytest.mark.asyncio
@@ -18,7 +18,6 @@ async def test_main_starts_polling(monkeypatch):
     mock_dp.include_router = MagicMock()
 
     mock_services = MagicMock()
-    mock_services.knowledge.ensure_structure = AsyncMock()
     mock_services.stickers = None
 
     monkeypatch.setattr(bot_main, "Bot", lambda token: mock_bot)
@@ -28,7 +27,6 @@ async def test_main_starts_polling(monkeypatch):
 
     await bot_main.main()
 
-    mock_services.knowledge.ensure_structure.assert_awaited_once()
     mock_bot.get_me.assert_awaited_once()
     mock_dp.start_polling.assert_awaited_once_with(mock_bot)
 

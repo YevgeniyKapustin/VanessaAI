@@ -1,18 +1,18 @@
 import fakeredis.aioredis
 import pytest
 
-from app.api import broker_worker as bw
-from app.broker.backends import Delivery
-from app.broker.redis_streams import RedisStreamBroker
-from app.broker.serialization import decode
-from app.contracts.messages import (
+from services.agent_core import broker_worker as bw
+from vanessa.broker.backends import Delivery
+from vanessa.broker.redis_streams import RedisStreamBroker
+from vanessa.broker.serialization import decode
+from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,
     TurnReply,
     TurnRequest,
 )
-from app.core.request_context import get_planning_started_signal, get_request_id
-from app.core.turn import ConversationTurnResult
+from vanessa.core.request_context import get_planning_started_signal, get_request_id
+from vanessa.core.turn import ConversationTurnResult
 
 
 class _FakeSessionCM:

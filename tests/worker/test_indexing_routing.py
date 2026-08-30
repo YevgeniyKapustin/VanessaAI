@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock
 
-from app.contracts.messages import TaskKind
-from app.core.messages import StoredMessage
-from app.services.indexing.message_indexing import MessageIndexingService
+from vanessa.contracts.messages import TaskKind
+from vanessa.core.messages import StoredMessage
+from vanessa.services.indexing.message_indexing import MessageIndexingService
 
 
 class _FakeDispatcher:

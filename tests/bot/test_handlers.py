@@ -6,8 +6,8 @@ import pytest
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
-from app.bot.container import BotServices, create_bot_services
-from app.bot.handlers.messages import (
+from services.bot.container import BotServices, create_bot_services
+from services.bot.handlers.messages import (
     _pick_photo_size,
     _preview,
     _send_photo,
@@ -17,9 +17,9 @@ from app.bot.handlers.messages import (
     _typing_on_signal,
     create_messages_router,
 )
-from app.bot.messages.response import ChatProcessResult
-from app.config.content import get_content, get_photo_placeholder
-from app.config.settings import settings
+from services.bot.messages.response import ChatProcessResult
+from vanessa.config.content import get_content, get_photo_placeholder
+from vanessa.config.settings import settings
 from tests.bot.test_bot_message import make_telegram_message
 
 
@@ -125,12 +125,10 @@ def _services(
         chat_client.process = AsyncMock(side_effect=_process)
     access_guard = AsyncMock()
     access_guard.ensure_access = AsyncMock(return_value=access_error)
-    knowledge = AsyncMock()
-    knowledge.is_configured = False
     return BotServices(
         chat_client=chat_client,
+        notes_client=AsyncMock(),
         access_guard=access_guard,
-        knowledge=knowledge,
         texts=get_content().bot,
         stickers=stickers,
         message_delay_seconds=message_delay_seconds,
@@ -464,7 +462,7 @@ async def test_handle_text_no_sticker_when_service_absent():
 
 
 def test_create_router_includes_messages():
-    from app.bot.handlers import create_router
+    from services.bot.handlers import create_router
 
     router = create_router(create_bot_services())
     assert router.sub_routers

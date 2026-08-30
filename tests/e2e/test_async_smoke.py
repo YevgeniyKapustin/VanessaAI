@@ -12,13 +12,13 @@ import asyncio
 import fakeredis.aioredis
 from aiogram import Bot
 
-from app.api import broker_worker as bw
-from app.bot.messages import IncomingMessage
-from app.bot.services.broker_client import BrokerTurnClient
-from app.broker.redis_streams import RedisStreamBroker
-from app.broker.streams import BrokerStreams
-from app.core.request_context import get_request_id, get_planning_started_signal
-from app.core.turn import ConversationTurnResult
+from services.agent_core import broker_worker as bw
+from services.bot.messages import IncomingMessage
+from services.bot.services.broker_client import BrokerTurnClient
+from vanessa.broker.redis_streams import RedisStreamBroker
+from vanessa.broker.streams import BrokerStreams
+from vanessa.core.request_context import get_request_id, get_planning_started_signal
+from vanessa.core.turn import ConversationTurnResult
 
 
 class _FakeSessionCM:

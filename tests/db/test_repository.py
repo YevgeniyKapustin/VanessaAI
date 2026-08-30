@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.core.messages import RAG_SOURCE_ROLE, StoredMessage
-from app.db.models import Message, User
-from app.db.repository import MessageRepository, UserRepository
+from vanessa.core.messages import RAG_SOURCE_ROLE, StoredMessage
+from vanessa.db.models import Message, User
+from vanessa.db.repository import MessageRepository, UserRepository
 
 
 def _scalar_result(value):

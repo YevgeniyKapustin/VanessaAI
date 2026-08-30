@@ -4,9 +4,9 @@ import threading
 
 import uvicorn
 
-from app.core.messages import WebResult
-from app.knowledge.vault import KnowledgeVault
-from app.mcp_server import knowledge, vision, websearch
+from vanessa.core.messages import WebResult
+from vanessa.knowledge.vault import KnowledgeVault
+from services.mcp import knowledge, vision, websearch
 
 
 class _FakeSearch:
@@ -79,7 +79,7 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 async def test_knowledge_vault_find_over_http(tmp_path) -> None:
     """MCP contract test: the knowledge server resolves a person alias over the wire."""
 
-    from app.mcp.client import StreamableHttpMcpClient
+    from vanessa.mcp.client import StreamableHttpMcpClient
 
     vault = KnowledgeVault(root_path=str(tmp_path))
     await vault.ensure_structure()

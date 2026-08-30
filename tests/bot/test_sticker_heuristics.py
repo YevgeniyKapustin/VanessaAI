@@ -1,4 +1,4 @@
-from app.bot.stickers.heuristics import is_sticker_request, reply_tags
+from services.bot.stickers.heuristics import is_sticker_request, reply_tags
 
 
 def test_reply_tags_greeting():

@@ -1,5 +1,5 @@
 # Representative ConfigMap for the shared non-secret settings.
-# The full key set mirrors app/config/settings_sections.py (env-driven).
+# The full key set mirrors vanessa/config/settings_sections.py (env-driven).
 # Placeholders must be adjusted for the target cluster.
 apiVersion: v1
 kind: ConfigMap
@@ -28,6 +28,7 @@ data:
   QDRANT_PORT: "6333"
   QDRANT_COLLECTION: "messages"
   QDRANT_KNOWLEDGE_COLLECTION: "knowledge"
+  KNOWLEDGE_STORE: "postgres"
   # MCP server endpoints
   MCP_WEBSEARCH_URL: "http://mcp-websearch:8101/mcp"
   MCP_KNOWLEDGE_URL: "http://mcp-knowledge:8102/mcp"

@@ -1,5 +1,5 @@
-from app.config.content import MemeDefContent
-from app.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.config.content import MemeDefContent
+from vanessa.llm.prompts.prompt_builder import PromptBuilder
 
 
 def test_build_user_prompt_includes_meme_blocks():

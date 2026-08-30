@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.bot.media_groups import MediaGroupBuffer
-from app.core.messages import ImageAttachment
+from services.bot.media_groups import MediaGroupBuffer
+from vanessa.core.messages import ImageAttachment
 
 
 def _image(file_id: str) -> ImageAttachment:

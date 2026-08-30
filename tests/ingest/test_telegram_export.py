@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 
-from app.ingest.telegram_export import (
+from vanessa.ingest.telegram_export import (
     export_id_to_chat_id,
     flatten_text,
     parse_sender_id,
@@ -94,6 +94,6 @@ def test_extract_sender_names_from_export(tmp_path):
         encoding="utf-8",
     )
 
-    from app.ingest.telegram_export import extract_sender_names_from_export
+    from vanessa.ingest.telegram_export import extract_sender_names_from_export
 
     assert extract_sender_names_from_export(export_file) == {111: "Alice"}

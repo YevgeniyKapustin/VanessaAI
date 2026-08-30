@@ -37,5 +37,8 @@ limits_config:
   ingestion_rate_mb: 16
   ingestion_burst_size_mb: 32
 
+pattern_ingester:
+  enabled: true
+
 analytics:
   reporting_enabled: false

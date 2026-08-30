@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram.enums import ChatMemberStatus, ChatType
 
-from app.bot.messages import IncomingMessage
-from app.bot.services.chat_access import ChatAccessGuard
-from app.config.content import get_content
+from services.bot.messages import IncomingMessage
+from services.bot.services.chat_access import ChatAccessGuard
+from vanessa.config.content import get_content
 
 
 def make_incoming(

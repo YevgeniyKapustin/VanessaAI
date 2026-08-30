@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram.enums import ChatType
 
-from app.bot.messages import IncomingMessage
-from app.bot.services.api_client import HttpChatApiClient
-from app.decision.models import DecisionAction
+from services.bot.messages import IncomingMessage
+from services.bot.services.api_client import HttpChatApiClient
+from vanessa.decision.models import DecisionAction
 
 
 def _stream_ctx(
@@ -303,7 +303,7 @@ async def test_api_client_messages_none_when_absent():
 
 
 def test_api_client_timeout_config_from_settings(monkeypatch):
-    from app.config import settings
+    from vanessa.config import settings
 
     monkeypatch.setattr(settings, "api_client_read_timeout", 45.0)
     monkeypatch.setattr(settings, "api_client_connect_timeout", 5.0)

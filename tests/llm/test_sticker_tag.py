@@ -1,5 +1,5 @@
-from app.config.content import get_content
-from app.llm.format.sticker_tag import (
+from vanessa.config.content import get_content
+from vanessa.llm.format.sticker_tag import (
     KNOWN_STICKER_TAGS,
     TAG_ALIASES,
     extract_sticker_tag,

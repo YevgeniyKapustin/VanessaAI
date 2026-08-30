@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.broker.serialization import encode
-from app.contracts.messages import TaskKind, TaskMessage
-from app.db.models import OutboxEvent
-from app.outbox.relay import OutboxRelay
-from app.outbox.repository import OutboxRepository
+from vanessa.broker.serialization import encode
+from vanessa.contracts.messages import TaskKind, TaskMessage
+from vanessa.db.models import OutboxEvent
+from vanessa.outbox.relay import OutboxRelay
+from vanessa.outbox.repository import OutboxRepository
 
 
 # --- repository ---------------------------------------------------------------
@@ -95,7 +95,7 @@ class _FakeSession:
 
 
 def _relay(monkeypatch, *, repo, publish):
-    monkeypatch.setattr("app.outbox.relay.OutboxRepository", lambda session: repo)
+    monkeypatch.setattr("vanessa.outbox.relay.OutboxRepository", lambda session: repo)
     broker = MagicMock()
     broker.publish = publish
     session = _FakeSession()

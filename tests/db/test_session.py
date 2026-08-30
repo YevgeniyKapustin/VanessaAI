@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.db import session as db_session
+from vanessa.db import session as db_session
 
 
 @pytest.mark.asyncio

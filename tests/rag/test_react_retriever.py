@@ -1,8 +1,8 @@
 import pytest
 
-from app.core.messages import ContextBlock, ContextMessage
-from app.llm.planner.turn_planner import TurnPlan
-from app.rag.search.react_retriever import derive_follow_up_query, retrieve_with_react
+from vanessa.core.messages import ContextBlock, ContextMessage
+from vanessa.llm.planner.turn_planner import TurnPlan
+from vanessa.rag.search.react_retriever import derive_follow_up_query, retrieve_with_react
 
 
 class FakeRetriever:

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.main import app
+from services.agent_core.main import app
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,7 @@ async def test_readiness_endpoint_ready():
     engine_mock = MagicMock()
     engine_mock.connect.return_value.__aenter__ = AsyncMock(return_value=conn)
     engine_mock.connect.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("app.api.routes.health.engine", engine_mock):
+    with patch("services.agent_core.routes.health.engine", engine_mock):
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://test",
@@ -49,7 +49,7 @@ async def test_readiness_endpoint_ready():
 async def test_readiness_endpoint_unavailable():
     engine_mock = MagicMock()
     engine_mock.connect.side_effect = RuntimeError("db down")
-    with patch("app.api.routes.health.engine", engine_mock):
+    with patch("services.agent_core.routes.health.engine", engine_mock):
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://test",

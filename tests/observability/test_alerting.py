@@ -1,8 +1,8 @@
 import asyncio
 import time
 
-from app.observability import metrics
-from app.observability.alerting import AlertManager
+from vanessa.observability import metrics
+from vanessa.observability.alerting import AlertManager
 
 
 def _manager(**overrides) -> AlertManager:

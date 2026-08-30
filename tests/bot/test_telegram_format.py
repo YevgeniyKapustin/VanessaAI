@@ -1,5 +1,5 @@
-from app.bot.telegram_format import markdown_to_telegram_html
-from app.llm.format.reply_format import capitalize_sentences
+from services.bot.telegram_format import markdown_to_telegram_html
+from vanessa.llm.format.reply_format import capitalize_sentences
 
 
 def test_markdown_fenced_code_block():

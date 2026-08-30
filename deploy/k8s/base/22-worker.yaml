@@ -19,7 +19,7 @@ spec:
         - name: worker
           image: vanessa-app:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.worker.main"]
+          command: ["python", "-m", "services.worker.main"]
           ports:
             - { containerPort: 9102, name: metrics }
           envFrom:

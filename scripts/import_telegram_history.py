@@ -11,16 +11,16 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from app.core.logging_setup import configure_logging
-from app.config import settings
-from app.db.repository import MessageRepository, UserRepository
-from app.db.session import async_session_factory
-from app.db.uow import SqlAlchemyUnitOfWork
-from app.ingest.importer import HistoryImporter
-from app.ingest.telegram_export import parse_telegram_export
-from app.rag.embeddings.embeddings import LocalEmbeddingProvider
-from app.rag.embeddings.local_embeddings import preload_embedding_model
-from app.rag.qdrant_client import QdrantVectorStore
+from vanessa.core.logging_setup import configure_logging
+from vanessa.config import settings
+from vanessa.db.repository import MessageRepository, UserRepository
+from vanessa.db.session import async_session_factory
+from vanessa.db.uow import SqlAlchemyUnitOfWork
+from vanessa.ingest.importer import HistoryImporter
+from vanessa.ingest.telegram_export import parse_telegram_export
+from vanessa.rag.embeddings.embeddings import LocalEmbeddingProvider
+from vanessa.rag.embeddings.local_embeddings import preload_embedding_model
+from vanessa.rag.qdrant_client import QdrantVectorStore
 
 configure_logging("import")
 logger = logging.getLogger(__name__)

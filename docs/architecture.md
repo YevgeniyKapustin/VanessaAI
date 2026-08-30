@@ -26,9 +26,11 @@ flowchart LR
 - **Compose** — DeepSeek (default) or Claude via the provider adapter.
 - **Post** — Telegram formatting, profanity filter.
 
-Orchestrator stages live in `app/services/pipeline/`; dependencies are
-wired through protocols (`app/core/protocols.py`) so stages stay
-testable.
+Orchestrator stages live in `vanessa/services/pipeline/`; dependencies are
+wired through protocols (`vanessa/core/protocols.py`) so stages stay
+testable. Process entrypoints live under `services/` (`bot`, `agent_core`,
+`worker`, `mcp`). Wire contracts are `vanessa/contracts/`; Redis transport
+is `vanessa/broker/`.
 
 ## Gate
 
@@ -47,9 +49,10 @@ window, not only by message count.
 
 ## Knowledge vault
 
-Beyond raw history, Vanessa keeps structured memory in repo-local
-`knowledge/`. Humans are not the audience — the format is a
-deterministic contract for the LLM.
+Beyond raw history, Vanessa keeps structured memory in Postgres
+(`knowledge_nodes` + `knowledge_documents`) with Qdrant collection
+`knowledge` as the embedding index. `KNOWLEDGE_STORE=filesystem` keeps
+the legacy markdown tree for tests and local work.
 
 | Folder | Contents |
 |--------|----------|
@@ -61,9 +64,14 @@ deterministic contract for the LLM.
 | `Metrics/` | Mood and relationship time series (YAML) |
 | `inbox/` | Manual `/note` entries |
 
-Each folder has `_index.yaml` (alias → file), so nicknames resolve in O(1).
-Notes use typed YAML frontmatter and fixed headings so writes stay
-idempotent; git is the audit log.
+Each row keeps typed columns plus JSONB metadata and a markdown body
+with the same headings as the old files. Folder `_index.yaml` manifests
+live in `knowledge_documents`. Migrate with
+`scripts/migrate_knowledge_to_postgres.py`, then
+`scripts/reindex_knowledge_vectors.py`. Observability is request-scoped:
+Prometheus (`vanessa_knowledge_*`), Langfuse spans
+(`retrieve:knowledge_vault`, `compose:inject_knowledge`,
+`finalize:extract_knowledge`), and JSON logs with `node_id` for Loki.
 
 **Write:**
 

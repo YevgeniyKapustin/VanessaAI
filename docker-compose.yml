@@ -4,8 +4,18 @@ include:
   - docker-compose.infra.yml
 
 x-app-image: &app-image
-  image: vanessa-app:latest
-  build: .
+  image: vanessa-agent:latest
+  build:
+    context: .
+    args:
+      PRELOAD_EMBEDDINGS: "1"
+
+x-lite-image: &lite-image
+  image: vanessa-lite:latest
+  build:
+    context: .
+    args:
+      PRELOAD_EMBEDDINGS: "0"
 
 x-env-files: &env-files
   - .env.defaults
@@ -31,7 +41,7 @@ services:
   api:
     <<: *app-image
     command: >
-      uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+      uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000
       --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     ports:
       - "${API_PORT:-8000}:8000"
@@ -63,8 +73,8 @@ services:
       - frontend
 
   bot:
-    <<: *app-image
-    command: python -m app.bot.main
+    <<: *lite-image
+    command: python -m services.bot.main
     restart: unless-stopped
     # aiogram stops polling on SIGTERM and lets in-flight updates drain.
     stop_grace_period: 45s
@@ -84,7 +94,7 @@ services:
   # start in worker mode, and an empty task stream is a no-op.
   worker:
     <<: *app-image
-    command: python -m app.worker.main
+    command: python -m services.worker.main
     restart: unless-stopped
     stop_grace_period: 45s
     env_file: *env-files
@@ -110,10 +120,12 @@ services:
   # Each is an isolated process/container exposing its own /health, /metrics
   # and /mcp endpoint; the agent core calls them over the wire (never imports).
   mcp-websearch:
-    <<: *app-image
-    command: python -m app.mcp_server.runner websearch --port 8101
+    <<: *lite-image
+    command: python -m services.mcp.runner websearch --port 8101
     restart: unless-stopped
     env_file: *env-files
+    environment:
+      MCP_WEBSEARCH_URL: ""
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
       interval: 10s
@@ -128,8 +140,8 @@ services:
           memory: 512M
 
   mcp-knowledge:
-    <<: *app-image
-    command: python -m app.mcp_server.runner knowledge --port 8102
+    <<: *lite-image
+    command: python -m services.mcp.runner knowledge --port 8102
     restart: unless-stopped
     env_file: *env-files
     healthcheck:
@@ -146,8 +158,8 @@ services:
           memory: 512M
 
   mcp-vision:
-    <<: *app-image
-    command: python -m app.mcp_server.runner vision --port 8103
+    <<: *lite-image
+    command: python -m services.mcp.runner vision --port 8103
     restart: unless-stopped
     env_file: *env-files
     healthcheck:

@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.rag.qdrant_client import QdrantVectorStore
+from vanessa.rag.qdrant_client import QdrantVectorStore
 
 
 def _make_client(*, collection_exists: bool = False) -> MagicMock:

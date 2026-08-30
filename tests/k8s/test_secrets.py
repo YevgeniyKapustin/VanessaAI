@@ -3,21 +3,18 @@ from pathlib import Path
 import pytest
 import yaml
 
-from app.k8s.configmap import (
+from vanessa.k8s.configmap import (
     CLUSTER_OVERRIDES,
     CONFIGMAP_NAME,
     build_configmap,
     select_config_values,
 )
-from app.k8s.secrets import (
+from vanessa.k8s.secrets import (
     ALWAYS_REQUIRED,
     SECRET_KEYS,
     SECRET_NAME,
-    SSH_FILENAMES,
-    SSH_SECRET_NAME,
     SecretsValidationError,
     build_opaque_secret,
-    build_ssh_secret,
     example_env_text,
     load_env_file,
     plan_secrets,
@@ -42,8 +39,16 @@ def test_rewrite_broker_host_without_auth():
     assert rewritten == "redis://host.docker.internal:6379/1"
 
 
+def test_rewrite_broker_host_overrides_password():
+    url = "redis://:stale@redis:6379/0"
+    rewritten = rewrite_broker_host(
+        url, "host.docker.internal", password="s3cret"
+    )
+    assert rewritten == "redis://:s3cret@host.docker.internal:6379/0"
+
+
 def test_fill_broker_url_from_redis_auth():
-    from app.k8s.secrets import fill_broker_url
+    from vanessa.k8s.secrets import fill_broker_url
 
     filled = fill_broker_url({"REDIS_AUTH": "s3cret"})
     assert filled["BROKER_REDIS_URL"] == "redis://:s3cret@redis:6379/0"
@@ -195,27 +200,6 @@ def test_build_opaque_secret_yaml_roundtrip():
 def test_build_opaque_secret_rejects_empty():
     with pytest.raises(ValueError):
         build_opaque_secret(namespace="vanessa", values={})
-
-
-def test_build_ssh_secret(tmp_path: Path):
-    (tmp_path / "id_ed25519").write_text("PRIVATE", encoding="utf-8")
-    (tmp_path / "known_hosts").write_text("github.com ssh-ed25519 A", encoding="utf-8")
-    (tmp_path / "readme.txt").write_text("ignore", encoding="utf-8")
-    manifest = build_ssh_secret(namespace="vanessa", ssh_dir=tmp_path)
-    assert manifest["metadata"]["name"] == SSH_SECRET_NAME
-    assert manifest["stringData"]["id_ed25519"] == "PRIVATE"
-    assert "readme.txt" not in manifest["stringData"]
-    assert set(manifest["stringData"]) <= set(SSH_FILENAMES)
-
-
-def test_build_ssh_secret_missing_dir(tmp_path: Path):
-    with pytest.raises(FileNotFoundError):
-        build_ssh_secret(namespace="vanessa", ssh_dir=tmp_path / "nope")
-
-
-def test_build_ssh_secret_empty_dir(tmp_path: Path):
-    with pytest.raises(FileNotFoundError):
-        build_ssh_secret(namespace="vanessa", ssh_dir=tmp_path)
 
 
 def test_example_env_matches_committed_file():

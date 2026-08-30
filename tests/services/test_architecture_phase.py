@@ -1,5 +1,5 @@
-from app.llm.humor.humor_reflexion import reflexion_filter_humor_quotes
-from app.services.turn_metrics import TurnMetrics
+from vanessa.llm.humor.humor_reflexion import reflexion_filter_humor_quotes
+from vanessa.services.turn_metrics import TurnMetrics
 
 
 def test_reflexion_prefers_theme_matching_quotes():

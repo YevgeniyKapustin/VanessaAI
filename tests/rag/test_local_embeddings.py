@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.rag.embeddings.local_embeddings import LocalEmbeddingProvider
+from vanessa.rag.embeddings.local_embeddings import LocalEmbeddingProvider
 
 
 @pytest.mark.asyncio
@@ -12,7 +12,7 @@ async def test_local_embedding_provider_returns_vector():
     mock_model = MagicMock()
     mock_model.encode.return_value = fake_vector
 
-    with patch("app.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
+    with patch("vanessa.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
         vector = await provider.embed("привет")
 
     assert vector == fake_vector
@@ -24,7 +24,7 @@ async def test_local_embedding_provider_uses_cache():
     mock_model = MagicMock()
     mock_model.encode.return_value = [0.5, 0.6]
 
-    with patch("app.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
+    with patch("vanessa.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
         first = await provider.embed("кэш")
         second = await provider.embed("кэш")
 
@@ -38,7 +38,7 @@ async def test_local_embedding_provider_embed_batch():
     mock_model = MagicMock()
     mock_model.encode.return_value = [[0.1], [0.2]]
 
-    with patch("app.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
+    with patch("vanessa.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
         vectors = await provider.embed_batch(["a", "b"])
 
     assert vectors == [[0.1], [0.2]]
@@ -56,7 +56,7 @@ async def test_local_embedding_provider_evicts_old_cache_entries():
     mock_model = MagicMock()
     mock_model.encode.side_effect = [[0.1], [0.2]]
 
-    with patch("app.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
+    with patch("vanessa.rag.embeddings.local_embeddings._load_model", return_value=mock_model):
         await provider.embed("first")
         await provider.embed("second")
 
@@ -66,10 +66,10 @@ async def test_local_embedding_provider_evicts_old_cache_entries():
 def test_preload_embedding_model():
     mock_model = MagicMock()
     with patch(
-        "app.rag.embeddings.local_embeddings._load_model",
+        "vanessa.rag.embeddings.local_embeddings._load_model",
         return_value=mock_model,
     ) as load:
-        from app.rag.embeddings.local_embeddings import preload_embedding_model
+        from vanessa.rag.embeddings.local_embeddings import preload_embedding_model
 
         preload_embedding_model()
         load.assert_called_once()
@@ -78,8 +78,8 @@ def test_preload_embedding_model():
 def test_embed_executor_is_dedicated_thread_pool():
     from concurrent.futures import ThreadPoolExecutor
 
-    from app.config.settings import settings
-    from app.rag.embeddings.local_embeddings import _get_embed_executor
+    from vanessa.config.settings import settings
+    from vanessa.rag.embeddings.local_embeddings import _get_embed_executor
 
     executor = _get_embed_executor()
     assert isinstance(executor, ThreadPoolExecutor)

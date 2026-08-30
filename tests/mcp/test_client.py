@@ -5,10 +5,10 @@ import threading
 import pytest
 import uvicorn
 
-from app.core.messages import WebResult
-from app.mcp.circuit_breaker import CircuitBreaker
-from app.mcp.client import FailOpenMcpClient
-from app.mcp.websearch import McpWebSearch
+from vanessa.core.messages import WebResult
+from vanessa.mcp.circuit_breaker import CircuitBreaker
+from vanessa.mcp.client import FailOpenMcpClient
+from vanessa.mcp.websearch import McpWebSearch
 
 
 class _FakeClient:
@@ -134,9 +134,9 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 
 
 async def test_streamable_http_client_round_trip() -> None:
-    from app.core.messages import WebResult
-    from app.mcp.client import StreamableHttpMcpClient
-    from app.mcp_server import websearch
+    from vanessa.core.messages import WebResult
+    from vanessa.mcp.client import StreamableHttpMcpClient
+    from services.mcp import websearch
 
     class _Provider:
         async def search(self, query, *, limit=5):

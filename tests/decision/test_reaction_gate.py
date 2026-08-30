@@ -1,7 +1,7 @@
 import pytest
 
-from app.core.messages import ContextMessage
-from app.decision.gate.reaction_gate import ReactionGate
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.gate.reaction_gate import ReactionGate
 
 TEST_PROMPT = (
     "Message: {message}\n"
@@ -440,7 +440,7 @@ async def test_tier1_direct_address_with_imperative_is_yes_without_llm():
 
 
 def test_configured_prompt_teaches_imperative_is_direct_address():
-    from app.config.content import get_content
+    from vanessa.config.content import get_content
 
     prompt = get_content().decision.reaction_gate_prompt
     assert "ванесса, не тормози, я написал" in prompt
@@ -449,7 +449,7 @@ def test_configured_prompt_teaches_imperative_is_direct_address():
 
 
 def test_default_prompt_teaches_imperative_is_direct_address():
-    from app.decision.gate.reaction_gate import DEFAULT_REACTION_GATE_PROMPT
+    from vanessa.decision.gate.reaction_gate import DEFAULT_REACTION_GATE_PROMPT
 
     assert "ванесса, не тормози, я написал" in DEFAULT_REACTION_GATE_PROMPT
     assert "Общение между собой" in DEFAULT_REACTION_GATE_PROMPT

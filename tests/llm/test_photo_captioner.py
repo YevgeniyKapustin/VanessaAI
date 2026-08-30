@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.config.settings import settings
-from app.core.messages import ImageAttachment
-from app.llm.photo_captioner import PhotoCaptioner
+from vanessa.config.settings import settings
+from vanessa.core.messages import ImageAttachment
+from vanessa.llm.photo_captioner import PhotoCaptioner
 
 
 def _response(text: str) -> MagicMock:

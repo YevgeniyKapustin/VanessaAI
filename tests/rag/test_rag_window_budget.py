@@ -1,5 +1,5 @@
-from app.config import settings
-from app.rag.search.hybrid_search import effective_window_max_total
+from vanessa.config import settings
+from vanessa.rag.search.hybrid_search import effective_window_max_total
 
 
 def test_effective_window_max_total_scales_with_anchors():

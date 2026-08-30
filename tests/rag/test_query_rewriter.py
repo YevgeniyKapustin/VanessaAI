@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.rag.query_rewriter import QueryRewriter
+from vanessa.rag.query_rewriter import QueryRewriter
 
 
 @pytest.fixture

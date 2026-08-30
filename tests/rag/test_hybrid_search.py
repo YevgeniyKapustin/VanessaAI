@@ -1,6 +1,6 @@
 from tests.conftest import make_message
 
-from app.rag.search.merger import merge_hybrid_results
+from vanessa.rag.search.merger import merge_hybrid_results
 
 
 def test_merge_hybrid_results_deduplicates():

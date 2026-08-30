@@ -1,9 +1,9 @@
 import fakeredis.aioredis
 
-from app.broker.metrics_collector import BrokerMetricsCollector
-from app.broker.redis_streams import RedisStreamBroker
-from app.broker.streams import BrokerStreams
-from app.contracts.messages import TaskKind, TaskMessage
+from vanessa.broker.metrics_collector import BrokerMetricsCollector
+from vanessa.broker.redis_streams import RedisStreamBroker
+from vanessa.broker.streams import BrokerStreams
+from vanessa.contracts.messages import TaskKind, TaskMessage
 
 
 async def test_collector_reports_stream_and_lag() -> None:
@@ -22,7 +22,7 @@ async def test_collector_reports_stream_and_lag() -> None:
     )
     await collector.update_once()
 
-    from app.observability import metrics
+    from vanessa.observability import metrics
 
     assert metrics.broker_stream_length.labels(stream="vanessa:tasks")._value.get() == 1
     assert metrics.broker_stream_length.labels(stream="vanessa:turns")._value.get() == 0

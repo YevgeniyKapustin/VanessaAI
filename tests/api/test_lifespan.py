@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.main import app, lifespan
+from services.agent_core.main import app, lifespan
 
 
 @pytest.mark.asyncio
@@ -16,23 +16,23 @@ async def test_lifespan_runs_startup_and_shutdown(monkeypatch):
         __aexit__=AsyncMock(return_value=None),
     ))
     mock_engine.dispose = AsyncMock()
-    monkeypatch.setattr("app.api.main.engine", mock_engine)
-    monkeypatch.setattr("app.api.main.settings.api_auto_create_schema", True)
+    monkeypatch.setattr("services.agent_core.main.engine", mock_engine)
+    monkeypatch.setattr("services.agent_core.main.settings.api_auto_create_schema", True)
 
     vector_store = AsyncMock()
     vector_store.ensure_collection = AsyncMock()
     monkeypatch.setattr(
-        "app.api.main.create_vector_store",
+        "services.agent_core.main.create_vector_store",
         lambda: vector_store,
     )
 
     embeddings = AsyncMock()
     embeddings.embed = AsyncMock(return_value=[0.1])
     monkeypatch.setattr(
-        "app.api.main.create_embedding_provider",
+        "services.agent_core.main.create_embedding_provider",
         lambda: embeddings,
     )
-    monkeypatch.setattr("app.api.main.preload_embedding_model", lambda: None)
+    monkeypatch.setattr("services.agent_core.main.preload_embedding_model", lambda: None)
 
     async with lifespan(app):
         vector_store.ensure_collection.assert_awaited_once()
@@ -50,19 +50,19 @@ async def test_app_health_after_lifespan_mocks(monkeypatch):
         __aexit__=AsyncMock(return_value=None),
     ))
     mock_engine.dispose = AsyncMock()
-    monkeypatch.setattr("app.api.main.engine", mock_engine)
-    monkeypatch.setattr("app.api.main.settings.api_auto_create_schema", False)
+    monkeypatch.setattr("services.agent_core.main.engine", mock_engine)
+    monkeypatch.setattr("services.agent_core.main.settings.api_auto_create_schema", False)
 
     vector_store = AsyncMock()
     vector_store.ensure_collection = AsyncMock()
     embeddings = AsyncMock()
     embeddings.embed = AsyncMock(return_value=[0.1])
-    monkeypatch.setattr("app.api.main.create_vector_store", lambda: vector_store)
+    monkeypatch.setattr("services.agent_core.main.create_vector_store", lambda: vector_store)
     monkeypatch.setattr(
-        "app.api.main.create_embedding_provider",
+        "services.agent_core.main.create_embedding_provider",
         lambda: embeddings,
     )
-    monkeypatch.setattr("app.api.main.preload_embedding_model", lambda: None)
+    monkeypatch.setattr("services.agent_core.main.preload_embedding_model", lambda: None)
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

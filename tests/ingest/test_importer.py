@@ -2,9 +2,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.core.messages import StoredMessage
-from app.ingest.importer import HistoryImporter
-from app.ingest.telegram_export import ParsedExportMessage
+from vanessa.core.messages import StoredMessage
+from vanessa.ingest.importer import HistoryImporter
+from vanessa.ingest.telegram_export import ParsedExportMessage
 
 
 class FakeUow:

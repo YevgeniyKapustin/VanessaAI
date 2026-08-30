@@ -1,8 +1,8 @@
 import pytest
 
-from app.config.content import get_content
-from app.core.messages import ContextMessage
-from app.llm.planner.turn_planner import TurnPlan, TurnPlanner
+from vanessa.config.content import get_content
+from vanessa.core.messages import ContextMessage
+from vanessa.llm.planner.turn_planner import TurnPlan, TurnPlanner
 
 
 async def test_turn_planner_parse_should_reply():

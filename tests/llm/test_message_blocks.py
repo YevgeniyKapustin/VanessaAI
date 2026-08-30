@@ -1,4 +1,4 @@
-from app.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
+from vanessa.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
 
 
 def test_strip_block_markers_removes_marker_lines():

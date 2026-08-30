@@ -1,0 +1,37 @@
+# Scrape Vanessa + Vector in Docker Desktop Kubernetes from Compose Prometheus.
+# Needs kubeconfig mounted at /etc/prometheus/kubeconfig and
+# extra_hosts: kubernetes.docker.internal:host-gateway.
+# Do not merge with prometheus.yml (duplicate jobs).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  - job_name: vanessa-k8s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    kubernetes_sd_configs:
+      - role: endpoints
+        kubeconfig_file: /etc/prometheus/kubeconfig
+        namespaces:
+          names:
+            - vanessa
+            - logging
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: agent-core|bot|worker|mcp-websearch|mcp-knowledge|mcp-vision|vector
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: http|metrics|mcp
+      - source_labels:
+          [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: drop
+        regex: agent-core;metrics
+      - target_label: environment
+        replacement: production
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service

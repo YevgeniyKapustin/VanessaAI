@@ -1,13 +1,13 @@
 import pytest
 
-from app.core.messages import ContextMessage
-from app.decision.detectors.intent import IntentDetector
-from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-from app.decision.detectors.rate_limit import RateLimiter
-from app.decision.detectors.session_window import SessionWindowAnalyzer
-from app.decision.detectors.triggers import TriggerKeywordChecker
-from app.decision.models import DecisionAction, DecisionReason
-from app.decision.repeated_question import (
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.detectors.intent import IntentDetector
+from vanessa.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.decision.detectors.rate_limit import RateLimiter
+from vanessa.decision.detectors.session_window import SessionWindowAnalyzer
+from vanessa.decision.detectors.triggers import TriggerKeywordChecker
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.decision.repeated_question import (
     RepeatedQuestionRule,
     is_pure_repeat,
     is_repeated_message,
@@ -31,7 +31,7 @@ class FakeRelevance:
 
 @pytest.fixture
 def engine():
-    from app.decision.engine import DecisionEngine
+    from vanessa.decision.engine import DecisionEngine
 
     intent = IntentDetector()
     trigger = TriggerKeywordChecker(("помоги", "объясни", "найди", "расскажи"))
@@ -83,9 +83,9 @@ def test_rule_ignores_unanswered_repeat():
         ContextMessage(id=1, role="user", content="ванесса как починить импорт в unity"),
         ContextMessage(id=2, role="user", content="и ещё вопрос"),
     ]
-    from app.decision.context import DecisionContext
-    from app.decision.detectors.intent import IntentDetector
-    from app.decision.detectors.triggers import TriggerKeywordChecker
+    from vanessa.decision.context import DecisionContext
+    from vanessa.decision.detectors.intent import IntentDetector
+    from vanessa.decision.detectors.triggers import TriggerKeywordChecker
 
     intent = IntentDetector().detect("ванесса как починить импорт в unity")
     trigger = TriggerKeywordChecker(()).detect("ванесса как починить импорт в unity")
@@ -147,9 +147,9 @@ def test_is_repeated_message_normalizes_punctuation_case():
 
 def test_rule_ignores_short_repeat_burst():
     rule = RepeatedQuestionRule()
-    from app.decision.context import DecisionContext
-    from app.decision.detectors.intent import IntentDetector
-    from app.decision.detectors.triggers import TriggerKeywordChecker
+    from vanessa.decision.context import DecisionContext
+    from vanessa.decision.detectors.intent import IntentDetector
+    from vanessa.decision.detectors.triggers import TriggerKeywordChecker
 
     recent = [
         ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),

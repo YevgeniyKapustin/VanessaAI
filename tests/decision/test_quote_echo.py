@@ -1,5 +1,5 @@
-from app.core.messages import ContextMessage
-from app.decision.gate.quote_echo import (
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.gate.quote_echo import (
     is_recursive_quote_loop,
     messages_echo,
     quote_loop_depth,

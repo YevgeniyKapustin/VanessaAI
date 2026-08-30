@@ -1,5 +1,5 @@
-from app.core.messages import ContextMessage
-from app.knowledge.entities import (
+from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.entities import (
     is_person_focused,
     mentioned_people_in_text,
     resolve_mentioned_people,

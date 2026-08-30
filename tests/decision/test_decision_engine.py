@@ -1,13 +1,13 @@
 import pytest
 
-from app.core.messages import ContextMessage
-from app.decision.engine import DecisionEngine
-from app.decision.detectors.intent import IntentDetector
-from app.decision.models import DecisionAction, DecisionReason
-from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-from app.decision.detectors.rate_limit import RateLimiter
-from app.decision.detectors.session_window import SessionWindowAnalyzer
-from app.decision.detectors.triggers import TriggerKeywordChecker
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.engine import DecisionEngine
+from vanessa.decision.detectors.intent import IntentDetector
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.decision.detectors.rate_limit import RateLimiter
+from vanessa.decision.detectors.session_window import SessionWindowAnalyzer
+from vanessa.decision.detectors.triggers import TriggerKeywordChecker
 
 
 @pytest.fixture
@@ -438,9 +438,9 @@ async def test_decision_engine_ignores_dismissal_even_when_addressed(
 
 @pytest.mark.asyncio
 async def test_decision_engine_ignores_side_talk_when_planner_says_no():
-    from app.decision.engine import DecisionEngine
-    from app.decision.detectors.intent import IntentDetector
-    from app.decision.detectors.triggers import TriggerKeywordChecker
+    from vanessa.decision.engine import DecisionEngine
+    from vanessa.decision.detectors.intent import IntentDetector
+    from vanessa.decision.detectors.triggers import TriggerKeywordChecker
 
     engine = DecisionEngine(
         intent_detector=IntentDetector(),
@@ -543,7 +543,7 @@ async def test_decision_engine_skips_relevance_for_trigger(
     trigger_checker: TriggerKeywordChecker,
 ):
     relevance = FakeRelevance(0.99)
-    from app.decision.engine import DecisionEngine
+    from vanessa.decision.engine import DecisionEngine
 
     engine = DecisionEngine(
         intent_detector=intent_detector,

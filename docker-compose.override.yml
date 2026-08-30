@@ -3,13 +3,15 @@
 services:
   migrate:
     volumes:
-      - ./app:/app/app
+      - ./vanessa:/app/vanessa
+      - ./services:/app/services
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
 
   api:
     volumes:
-      - ./app:/app/app
+      - ./vanessa:/app/vanessa
+      - ./services:/app/services
       - ./config:/app/config
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
@@ -18,16 +20,15 @@ services:
 
   bot:
     volumes:
-      - ./app:/app/app
+      - ./vanessa:/app/vanessa
+      - ./services:/app/services
       - ./config:/app/config
-      - ./knowledge:/app/knowledge
       - ./data/logs:/app/logs
-      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
-      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/home/app/.ssh:ro
 
   worker:
     volumes:
-      - ./app:/app/app
+      - ./vanessa:/app/vanessa
+      - ./services:/app/services
       - ./config:/app/config
       - ./knowledge:/app/knowledge
       - ./data/logs:/app/logs

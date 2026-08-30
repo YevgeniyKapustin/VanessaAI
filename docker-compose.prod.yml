@@ -19,7 +19,7 @@ services:
     env_file: *prod-env-files
     ports: !reset []
     command: >
-      uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+      uvicorn services.agent_core.main:app --host 0.0.0.0 --port 8000
       --workers ${API_WORKERS:-1}
       --timeout-graceful-shutdown ${API_GRACEFUL_TIMEOUT:-30}
     volumes: !override
@@ -29,10 +29,7 @@ services:
 
   bot:
     env_file: *prod-env-files
-    volumes: !override
-      - ./knowledge:/app/knowledge
-      - ${OBSIDIAN_VAULT_HOST_PATH:-./data/obsidian-vault}:/vault
-      - ${OBSIDIAN_SSH_DIR:-./.ssh/obsidian}:/home/app/.ssh:ro
+    volumes: !reset []
     restart: always
     stop_grace_period: 45s
 

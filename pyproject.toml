@@ -3,7 +3,10 @@ name = "vanessa"
 version = "0.1.0"
 description = "Telegram bot Vanessa with RAG and DeepSeek"
 authors = ["Vanessa Team"]
-packages = [{ include = "app" }]
+packages = [
+  { include = "vanessa" },
+  { include = "services" },
+]
 requires-poetry = "==2.1.1"
 
 [tool.poetry.dependencies]
@@ -56,7 +59,7 @@ asyncio_mode = "auto"
 pythonpath = ["."]
 
 [tool.coverage.run]
-source = ["app"]
+source = ["vanessa", "services"]
 
 [tool.coverage.report]
 show_missing = true

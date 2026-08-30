@@ -1,6 +1,6 @@
-from app.core.users.nicknames import find_nicknames_in_text
-from app.llm.planner.turn_planner import TurnPlan
-from app.rag.search.search_plan import build_main_rag_plan
+from vanessa.core.users.nicknames import find_nicknames_in_text
+from vanessa.llm.planner.turn_planner import TurnPlan
+from vanessa.rag.search.search_plan import build_main_rag_plan
 
 
 def test_find_nicknames_in_text_matches_inflected_form():

@@ -1,4 +1,4 @@
-from app.llm.memes import MemeDecider
+from vanessa.llm.memes import MemeDecider
 
 
 class _Rng:

@@ -3,8 +3,8 @@ import logging
 import sys
 from pathlib import Path
 
-import app.core.logging_setup as logging_setup
-from app.core.logging_setup import (
+import vanessa.core.logging_setup as logging_setup
+from vanessa.core.logging_setup import (
     JsonFormatter,
     LoguruStyleFormatter,
     RequestIdFilter,
@@ -12,12 +12,12 @@ from app.core.logging_setup import (
     configure_logging,
     create_file_handler,
 )
-from app.core.request_context import request_id_var
+from vanessa.core.request_context import request_id_var
 
 
 def _make_record(**overrides: object) -> logging.LogRecord:
     base = {
-        "name": "app.bot.handlers.messages",
+        "name": "services.bot.handlers.messages",
         "level": logging.INFO,
         "pathname": __file__,
         "lineno": 42,
@@ -74,7 +74,7 @@ def test_loguru_formatter_plain_output():
 
 def test_loguru_formatter_shortens_app_prefix():
     formatter = LoguruStyleFormatter(colorize=False)
-    record = _make_record(name="app.services.conversation_orchestrator")
+    record = _make_record(name="vanessa.services.conversation_orchestrator")
     record.service = "api"
     record.request_id = "-"
     record.funcName = "handle_incoming"
@@ -82,7 +82,7 @@ def test_loguru_formatter_shortens_app_prefix():
     line = formatter.format(record)
 
     assert "services.conversation_orchestrator:handle_incoming:42" in line
-    assert "app.services" not in line
+    assert "vanessa.services" not in line
 
 
 def test_loguru_formatter_includes_exception_traceback():
@@ -91,7 +91,7 @@ def test_loguru_formatter_includes_exception_traceback():
         raise ValueError("boom")
     except ValueError:
         record = logging.LogRecord(
-            name="app.knowledge.writer",
+            name="vanessa.knowledge.writer",
             level=logging.ERROR,
             pathname=__file__,
             lineno=143,
@@ -120,7 +120,7 @@ def test_create_file_handler_writes_plain_lines(tmp_path: Path) -> None:
         max_bytes=1024 * 1024,
         backup_count=1,
     )
-    logger = logging.getLogger("app.test_file_logging")
+    logger = logging.getLogger("vanessa.test_file_logging")
     logger.handlers = [handler]
     logger.propagate = False
     logger.setLevel(logging.INFO)
@@ -144,7 +144,7 @@ def test_create_file_handler_rotates(tmp_path: Path) -> None:
         max_bytes=256,
         backup_count=1,
     )
-    logger = logging.getLogger("app.test_file_logging_rotate")
+    logger = logging.getLogger("vanessa.test_file_logging_rotate")
     logger.handlers = [handler]
     logger.propagate = False
     logger.setLevel(logging.INFO)
@@ -172,8 +172,30 @@ def test_json_formatter_emits_one_object() -> None:
     assert payload["request_id"] == "req-1"
     assert payload["level"] == "INFO"
     assert payload["message"] == "message_received chat_id=-100"
-    assert payload["logger"] == "app.bot.handlers.messages"
+    assert payload["logger"] == "services.bot.handlers.messages"
     assert payload["timestamp"].endswith("Z")
+
+
+def test_json_formatter_includes_extra_fields() -> None:
+    formatter = JsonFormatter()
+    record = _make_record(msg="knowledge_node_updated")
+    record.service = "api"
+    record.request_id = "req_9f83b1a"
+    record.created = 1_700_000_000.0
+    record.event = "knowledge_node_updated"
+    record.node_id = "People/андрей-матов.md"
+    record.node_type = "person"
+    record.mutation_source = "post_reply_extract"
+    record.duration_ms = 42.5
+
+    payload = json.loads(formatter.format(record))
+
+    assert payload["event"] == "knowledge_node_updated"
+    assert payload["node_id"] == "People/андрей-матов.md"
+    assert payload["node_type"] == "person"
+    assert payload["mutation_source"] == "post_reply_extract"
+    assert payload["duration_ms"] == 42.5
+    assert payload["request_id"] == "req_9f83b1a"
 
 
 def test_json_formatter_includes_exception() -> None:
@@ -182,7 +204,7 @@ def test_json_formatter_includes_exception() -> None:
         raise ValueError("boom")
     except ValueError:
         record = logging.LogRecord(
-            name="app.worker.main",
+            name="services.worker.main",
             level=logging.ERROR,
             pathname=__file__,
             lineno=10,
@@ -203,13 +225,13 @@ def test_json_formatter_includes_exception() -> None:
 def test_configure_logging_json_to_stdout(monkeypatch, capsys) -> None:
     logging_setup._configured_service = None
     logging.getLogger().handlers.clear()
-    from app.config import settings
+    from vanessa.config import settings
 
     monkeypatch.setattr(settings, "log_json", True)
     monkeypatch.setattr(settings, "log_file_enabled", False)
     try:
         configure_logging("bot", level="INFO")
-        logging.getLogger("app.test_json").info("hello json %s", 7)
+        logging.getLogger("vanessa.test_json").info("hello json %s", 7)
         line = capsys.readouterr().out.strip().splitlines()[-1]
         payload = json.loads(line)
         assert payload["message"] == "hello json 7"

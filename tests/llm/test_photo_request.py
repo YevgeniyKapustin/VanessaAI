@@ -1,4 +1,4 @@
-from app.llm.photo_request import is_photo_request
+from vanessa.llm.photo_request import is_photo_request
 
 
 def test_is_photo_request_matches_russian_phrases():

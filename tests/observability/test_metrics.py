@@ -2,8 +2,8 @@ import time
 
 import pytest
 
-from app.config.settings import settings
-from app.observability import metrics
+from vanessa.config.settings import settings
+from vanessa.observability import metrics
 
 
 class _StatusError(Exception):
@@ -63,6 +63,23 @@ def test_classify_llm_error_by_status() -> None:
 def test_classify_llm_error_network_and_unknown() -> None:
     assert metrics.classify_llm_error(TimeoutError()) == "network"
     assert metrics.classify_llm_error(ValueError("boom")) == "unknown"
+
+
+def test_start_metrics_http_server_uses_app_registry(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_serve(port, addr="", registry=None):
+        seen["port"] = port
+        seen["addr"] = addr
+        seen["registry"] = registry
+
+    monkeypatch.setattr("prometheus_client.start_http_server", fake_serve)
+    metrics.start_metrics_http_server(9101, addr="127.0.0.1")
+    assert seen["port"] == 9101
+    assert seen["addr"] == "127.0.0.1"
+    assert seen["registry"] is metrics.registry
+    metrics.start_metrics_http_server(9102)
+    assert seen["addr"] == "0.0.0.0"
 
 
 def test_render_metrics_contains_metric_families() -> None:
@@ -167,6 +184,21 @@ def test_prompt_budget_metrics_exposed() -> None:
     assert "vanessa_prompt_truncations_total" in text
     assert 'section="knowledge_blocks"' in text
     assert 'section="context_blocks"' in text
+
+
+def test_knowledge_vault_metrics_exposed() -> None:
+    metrics.record_knowledge_mutation("person", "update")
+    metrics.record_knowledge_vector_sync(0.12)
+    metrics.record_knowledge_search("qdrant", hits=3)
+    metrics.record_knowledge_search("postgres_fts", hits=1)
+    text = metrics.render_metrics().decode()
+    assert "vanessa_knowledge_mutations_total" in text
+    assert "vanessa_knowledge_vector_sync_duration_seconds" in text
+    assert "vanessa_knowledge_search_hits_total" in text
+    assert 'type="person"' in text
+    assert 'action="update"' in text
+    assert 'source="qdrant"' in text
+    assert 'source="postgres_fts"' in text
 
 
 def test_record_llm_usage_records_cost() -> None:

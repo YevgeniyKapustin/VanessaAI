@@ -1,4 +1,4 @@
-from app.llm.format.photo_tag import extract_photo_index
+from vanessa.llm.format.photo_tag import extract_photo_index
 
 
 def test_extract_photo_index_strips_marker():

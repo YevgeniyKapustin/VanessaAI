@@ -4,19 +4,19 @@ and the LowAttitudeRule (maximal ignore tendency at critically low attitude).
 
 import pytest
 
-from app.config.settings import settings
-from app.core.messages import ContextMessage
-from app.decision.context import DecisionContext
-from app.decision.detectors.intent import IntentResult
-from app.decision.detectors.triggers import TriggerResult
-from app.decision.metrics_rule import LowAttitudeRule, is_low_attitude
-from app.decision.models import DecisionAction, DecisionReason
-from app.decision.repeated_loop import (
+from vanessa.config.settings import settings
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.context import DecisionContext
+from vanessa.decision.detectors.intent import IntentResult
+from vanessa.decision.detectors.triggers import TriggerResult
+from vanessa.decision.metrics_rule import LowAttitudeRule, is_low_attitude
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.decision.repeated_loop import (
     LoopRegistry,
     detect_loop_strength,
     topic_similarity,
 )
-from app.knowledge.metrics.schema import PersonMetrics
+from vanessa.knowledge.metrics.schema import PersonMetrics
 
 
 # --- pure similarity ---
@@ -330,12 +330,12 @@ def test_low_attitude_rule_never_for_owner():
 
 @pytest.mark.asyncio
 async def test_engine_low_attitude_ignores_weak_message():
-    from app.decision.detectors.intent import IntentDetector
-    from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-    from app.decision.detectors.rate_limit import RateLimiter
-    from app.decision.detectors.session_window import SessionWindowAnalyzer
-    from app.decision.detectors.triggers import TriggerKeywordChecker
-    from app.decision.engine import DecisionEngine
+    from vanessa.decision.detectors.intent import IntentDetector
+    from vanessa.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+    from vanessa.decision.detectors.rate_limit import RateLimiter
+    from vanessa.decision.detectors.session_window import SessionWindowAnalyzer
+    from vanessa.decision.detectors.triggers import TriggerKeywordChecker
+    from vanessa.decision.engine import DecisionEngine
 
     class FakeRelevance:
         async def score(self, text, query_vector=None, search_text=None) -> float:
@@ -367,12 +367,12 @@ async def test_engine_low_attitude_ignores_weak_message():
 
 @pytest.mark.asyncio
 async def test_engine_low_attitude_still_replies_to_direct_question():
-    from app.decision.detectors.intent import IntentDetector
-    from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-    from app.decision.detectors.rate_limit import RateLimiter
-    from app.decision.detectors.session_window import SessionWindowAnalyzer
-    from app.decision.detectors.triggers import TriggerKeywordChecker
-    from app.decision.engine import DecisionEngine
+    from vanessa.decision.detectors.intent import IntentDetector
+    from vanessa.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+    from vanessa.decision.detectors.rate_limit import RateLimiter
+    from vanessa.decision.detectors.session_window import SessionWindowAnalyzer
+    from vanessa.decision.detectors.triggers import TriggerKeywordChecker
+    from vanessa.decision.engine import DecisionEngine
 
     class FakeRelevance:
         async def score(self, text, query_vector=None, search_text=None) -> float:

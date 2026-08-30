@@ -1,22 +1,22 @@
 import pytest
 
-from app.core.messages import ContextMessage, StoredMessage
-from app.core.session.chat_session_state import ChatSessionState
-from app.core.turn import ChatTurnInput
-from app.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
-from app.decision.engine import DecisionEngine
-from app.decision.gate.reply_eligibility import ReplyEligibility
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
-from app.decision.detectors.rate_limit import RateLimiter
-from app.decision.detectors.session_window import SessionWindowAnalyzer
-from app.decision.models import DecisionAction, DecisionReason
-from app.decision.detectors.noise import NoiseHeuristics
-from app.llm.planner.turn_planner import TurnPlan
-from app.rag.query_rewriter import QueryRewriter
-from app.services.orchestrator.orchestrator_config import OrchestratorConfig
-from app.services.pipeline.context import TurnPipelineContext
-from app.services.pipeline.stages import GateStage
-from app.services.turn_metrics import TurnMetrics
+from vanessa.core.messages import ContextMessage, StoredMessage
+from vanessa.core.session.chat_session_state import ChatSessionState
+from vanessa.core.turn import ChatTurnInput
+from vanessa.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
+from vanessa.decision.engine import DecisionEngine
+from vanessa.decision.gate.reply_eligibility import ReplyEligibility
+from vanessa.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.decision.detectors.rate_limit import RateLimiter
+from vanessa.decision.detectors.session_window import SessionWindowAnalyzer
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.decision.detectors.noise import NoiseHeuristics
+from vanessa.llm.planner.turn_planner import TurnPlan
+from vanessa.rag.query_rewriter import QueryRewriter
+from vanessa.services.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.services.pipeline.context import TurnPipelineContext
+from vanessa.services.pipeline.stages import GateStage
+from vanessa.services.turn_metrics import TurnMetrics
 
 
 class FakeRelevance:

@@ -1,10 +1,10 @@
 import pytest
 
-from app.core.messages import ContextMessage
-from app.knowledge.format import PEOPLE
-from app.knowledge.index import KnowledgeIndex
-from app.knowledge.participants import ParticipantsDigest
-from app.knowledge.vault import KnowledgeVault
+from vanessa.core.messages import ContextMessage
+from vanessa.knowledge.format import PEOPLE
+from vanessa.knowledge.index import KnowledgeIndex
+from vanessa.knowledge.participants import ParticipantsDigest
+from vanessa.knowledge.vault import KnowledgeVault
 
 
 async def _seed_vault(tmp_path) -> KnowledgeVault:

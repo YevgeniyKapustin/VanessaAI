@@ -1,12 +1,17 @@
 apiVersion: 1
 
+deleteDatasources:
+  - name: Loki
+    orgId: 1
+
 datasources:
   - name: Loki
     uid: loki
     type: loki
     access: proxy
-    url: http://loki:3100
+    url: $LOKI_URL
     isDefault: false
     editable: false
     jsonData:
       maxLines: 1000
+      timeout: 60

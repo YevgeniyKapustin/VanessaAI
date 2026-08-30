@@ -2,8 +2,10 @@
 !pyproject.toml
 !poetry.lock
 !alembic.ini
-!app/
-!app/**
+!vanessa/
+!vanessa/**
+!services/
+!services/**
 !config/
 !config/**
 !alembic/

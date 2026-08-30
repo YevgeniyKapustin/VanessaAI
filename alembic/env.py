@@ -6,9 +6,15 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.config import settings
-from app.db.base import Base
-from app.db.models import Message, OutboxEvent, User  # noqa: F401
+from vanessa.config import settings
+from vanessa.db.base import Base
+from vanessa.db.models import (  # noqa: F401
+    KnowledgeDocument,
+    KnowledgeNodeRow,
+    Message,
+    OutboxEvent,
+    User,
+)
 
 config = context.config
 if config.config_file_name is not None:

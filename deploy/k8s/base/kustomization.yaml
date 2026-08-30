@@ -7,4 +7,5 @@ resources:
   - 21-bot.yaml
   - 22-worker.yaml
   - 23-mcp-servers.yaml
+  - 24-metrics-services.yaml
   - 40-pvc.yaml

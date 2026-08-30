@@ -1,4 +1,4 @@
-from app.core.messages import StoredMessage
+from vanessa.core.messages import StoredMessage
 
 
 def make_message(msg_id: int, content: str = "test") -> StoredMessage:

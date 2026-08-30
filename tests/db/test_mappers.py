@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 
-from app.core.messages import ContextMessage, StoredMessage, stored_to_context
-from app.db.mappers import (
+from vanessa.core.messages import ContextMessage, StoredMessage, stored_to_context
+from vanessa.db.mappers import (
     message_to_context,
     message_to_stored,
     messages_stored_to_context,
     messages_to_context,
 )
-from app.db.models import Message
+from vanessa.db.models import Message
 
 
 def test_message_to_stored_maps_fields():

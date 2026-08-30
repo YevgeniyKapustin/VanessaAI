@@ -141,6 +141,7 @@ services:
     environment:
       <<: *langfuse-env
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-vanessa-nextauth-secret-change-me}
+      HOSTNAME: "0.0.0.0"
       PORT: "3000"
     ports:
       - "3000:3000"

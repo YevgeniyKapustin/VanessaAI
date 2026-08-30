@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from app.core.messages import ContextMessage
-from app.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.core.messages import ContextMessage
+from vanessa.llm.prompts.prompt_builder import PromptBuilder
 
 
 def test_build_user_prompt_includes_session_context():

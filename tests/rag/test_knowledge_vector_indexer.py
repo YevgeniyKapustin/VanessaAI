@@ -1,7 +1,7 @@
 import pytest
 
-from app.knowledge.vault import KnowledgeVault
-from app.knowledge.vector_index import KnowledgeVectorIndexer, knowledge_kind_for_path
+from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.vector_index import KnowledgeVectorIndexer, knowledge_kind_for_path
 
 
 class FakeEmbeddings:

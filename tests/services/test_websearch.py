@@ -4,22 +4,22 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-# Imported before ``app.services``: ``app/services/__init__.py`` eagerly pulls
+# Imported before ``vanessa.services``: ``app/services/__init__.py`` eagerly pulls
 # the orchestrator, whose import chain (core.session -> decision -> core.session)
-# only resolves when ``app.decision`` is already fully loaded. test_orchestrator
+# only resolves when ``vanessa.decision`` is already fully loaded. test_orchestrator
 # does the same, so this is the established order.
-import app.decision  # noqa: F401
+import vanessa.decision  # noqa: F401
 
-from app.config.settings import settings
-from app.core.messages import WebResult
-from app.core.turn import ChatTurnInput
-from app.llm.planner.turn_planner import TurnPlan
-from app.services.pipeline.context import TurnPipelineContext
-from app.services.pipeline.stages import RetrieveStage
-from app.services.websearch.duckduckgo import DuckDuckGoSearch
-from app.services.websearch.factory import create_web_search
-from app.services.websearch.serper import SerperSearch
-from app.services.websearch.tavily import TavilySearch
+from vanessa.config.settings import settings
+from vanessa.core.messages import WebResult
+from vanessa.core.turn import ChatTurnInput
+from vanessa.llm.planner.turn_planner import TurnPlan
+from vanessa.services.pipeline.context import TurnPipelineContext
+from vanessa.services.pipeline.stages import RetrieveStage
+from vanessa.services.websearch.duckduckgo import DuckDuckGoSearch
+from vanessa.services.websearch.factory import create_web_search
+from vanessa.services.websearch.serper import SerperSearch
+from vanessa.services.websearch.tavily import TavilySearch
 
 
 # --- Tavily ------------------------------------------------------------------
@@ -278,7 +278,7 @@ async def test_retrieve_stage_fails_open_on_search_error(monkeypatch):
 
 
 def test_record_web_search_metric_registered():
-    from app.observability import metrics as m
+    from vanessa.observability import metrics as m
 
     m.record_web_search("found", 12.3)
     m.record_web_search("error", 0.1)

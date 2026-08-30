@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.core.messages import ContextBlock, ContextMessage, StoredMessage
-from app.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.core.messages import ContextBlock, ContextMessage, StoredMessage
+from vanessa.llm.prompts.prompt_builder import PromptBuilder
 
 
 def test_prompt_builder_formats_block_with_time_and_anchor():
@@ -78,7 +78,7 @@ def test_prompt_builder_builds_separated_blocks():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_returns_blocks(monkeypatch):
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     class FakeRepo:
         async def fulltext_search(self, query: str, limit: int = 30) -> list[StoredMessage]:
@@ -137,14 +137,14 @@ async def test_hybrid_search_returns_blocks(monkeypatch):
         async def search(self, vector: list[float], limit: int = 30):
             return [{"message_id": 42, "score": 0.95}]
 
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 5)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_before", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_after", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_max_total", 80)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_vector_min_score", 0.35)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_anchor_max", 5)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_before", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_after", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_max_total", 80)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_vector_min_score", 0.35)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.get_content",
+        "vanessa.rag.search.hybrid_search.get_content",
         lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.35})()})(),
     )
 
@@ -161,7 +161,7 @@ async def test_hybrid_search_returns_blocks(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_skips_assistant_anchors(monkeypatch):
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     class FakeRepo:
         async def fulltext_search(self, query: str, limit: int = 30):
@@ -197,14 +197,14 @@ async def test_hybrid_search_skips_assistant_anchors(monkeypatch):
         async def search(self, vector: list[float], limit: int = 30):
             return [{"message_id": 99, "score": 0.99}, {"message_id": 42, "score": 0.5}]
 
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 5)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_before", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_after", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_max_total", 80)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_vector_min_score", 0.35)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_anchor_max", 5)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_before", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_after", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_max_total", 80)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_vector_min_score", 0.35)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.get_content",
+        "vanessa.rag.search.hybrid_search.get_content",
         lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.35})()})(),
     )
 
@@ -218,7 +218,7 @@ async def test_hybrid_search_skips_assistant_anchors(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
-    from app.rag.search.hybrid_search import HybridSearchService, effective_window_max_total
+    from vanessa.rag.search.hybrid_search import HybridSearchService, effective_window_max_total
 
     seen: dict[str, int] = {}
 
@@ -257,14 +257,14 @@ async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
                 for index in range(1, 11)
             ]
 
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_before", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_after", 10)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_context_window_max_total", 80)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_vector_min_score", 0.35)
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_anchor_max", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_before", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_after", 10)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_context_window_max_total", 80)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_vector_min_score", 0.35)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.get_content",
+        "vanessa.rag.search.hybrid_search.get_content",
         lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.35})()})(),
     )
 
@@ -278,7 +278,7 @@ async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_empty_query_returns_nothing():
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     service = HybridSearchService(AsyncMock(), AsyncMock(), AsyncMock())
     assert await service.search("   ") == []
@@ -286,7 +286,7 @@ async def test_hybrid_search_empty_query_returns_nothing():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_embed_query():
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     embeddings = AsyncMock()
     embeddings.embed = AsyncMock(return_value=[0.1, 0.2])
@@ -297,7 +297,7 @@ async def test_hybrid_search_embed_query():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_index_skips_non_user_role():
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     embeddings = AsyncMock()
     vector_store = AsyncMock()
@@ -311,7 +311,7 @@ async def test_hybrid_search_index_skips_non_user_role():
 async def test_hybrid_search_uses_semantic_queries(monkeypatch):
     from unittest.mock import AsyncMock
 
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     class FakeRepo:
         async def fulltext_search(self, query: str, limit: int = 30):
@@ -337,26 +337,26 @@ async def test_hybrid_search_uses_semantic_queries(monkeypatch):
         return_value=[{"message_id": 5, "score": 0.9}]
     )
 
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 5)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_anchor_max", 5)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_context_window_before",
+        "vanessa.rag.search.hybrid_search.settings.rag_context_window_before",
         1,
     )
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_context_window_after",
+        "vanessa.rag.search.hybrid_search.settings.rag_context_window_after",
         1,
     )
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_context_window_max_total",
+        "vanessa.rag.search.hybrid_search.settings.rag_context_window_max_total",
         80,
     )
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_vector_min_score",
+        "vanessa.rag.search.hybrid_search.settings.rag_vector_min_score",
         0.1,
     )
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.get_content",
+        "vanessa.rag.search.hybrid_search.get_content",
         lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.1})()})(),
     )
 
@@ -373,7 +373,7 @@ async def test_hybrid_search_uses_semantic_queries(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_without_window_expansion(monkeypatch):
-    from app.rag.search.hybrid_search import HybridSearchService
+    from vanessa.rag.search.hybrid_search import HybridSearchService
 
     class FakeRepo:
         async def fulltext_search(self, query: str, limit: int = 30):
@@ -392,22 +392,22 @@ async def test_hybrid_search_without_window_expansion(monkeypatch):
         return_value=[{"message_id": 7, "score": 0.95}]
     )
 
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_anchor_max", 5)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_anchor_max", 5)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_context_window_before",
+        "vanessa.rag.search.hybrid_search.settings.rag_context_window_before",
         0,
     )
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_context_window_after",
+        "vanessa.rag.search.hybrid_search.settings.rag_context_window_after",
         0,
     )
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.settings.rag_vector_min_score",
+        "vanessa.rag.search.hybrid_search.settings.rag_vector_min_score",
         0.1,
     )
-    monkeypatch.setattr("app.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
+    monkeypatch.setattr("vanessa.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
-        "app.rag.search.hybrid_search.get_content",
+        "vanessa.rag.search.hybrid_search.get_content",
         lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.1})()})(),
     )
 

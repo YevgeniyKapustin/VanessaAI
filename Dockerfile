@@ -27,13 +27,18 @@ COPY pyproject.toml poetry.lock ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     poetry install --no-root --only main
 
-RUN python -c "from sentence_transformers import SentenceTransformer; \
-SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+ARG PRELOAD_EMBEDDINGS=1
+RUN if [ "$PRELOAD_EMBEDDINGS" = "1" ]; then \
+    python -c "from sentence_transformers import SentenceTransformer; \
+SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"; \
+    fi
 
-COPY app/ ./app/
+COPY vanessa/ ./vanessa/
+COPY services/ ./services/
 COPY config/ ./config/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
+
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

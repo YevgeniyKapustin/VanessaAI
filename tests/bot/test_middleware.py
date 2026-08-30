@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiogram.types import Chat, Message, Update, User
 
-from app.bot.middleware.logging import (
+from services.bot.middleware.logging import (
     BotLoggingMiddleware,
     _event_label,
     _resolve_request_id,

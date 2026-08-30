@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.db.uow import SqlAlchemyUnitOfWork
+from vanessa.db.uow import SqlAlchemyUnitOfWork
 
 
 @pytest.mark.asyncio

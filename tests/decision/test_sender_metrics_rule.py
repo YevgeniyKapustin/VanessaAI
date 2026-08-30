@@ -1,16 +1,16 @@
 import pytest
 
-from app.config.settings import settings
-from app.core.messages import ContextMessage
-from app.decision.context import DecisionContext
-from app.decision.detectors.intent import IntentDetector, IntentResult
-from app.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-from app.decision.detectors.rate_limit import RateLimiter
-from app.decision.detectors.session_window import SessionWindowAnalyzer
-from app.decision.detectors.triggers import TriggerKeywordChecker, TriggerResult
-from app.decision.metrics_rule import SenderMetricsRule, should_ignore_for_toxicity
-from app.decision.models import DecisionAction, DecisionReason
-from app.knowledge.metrics.schema import PersonMetrics
+from vanessa.config.settings import settings
+from vanessa.core.messages import ContextMessage
+from vanessa.decision.context import DecisionContext
+from vanessa.decision.detectors.intent import IntentDetector, IntentResult
+from vanessa.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.decision.detectors.rate_limit import RateLimiter
+from vanessa.decision.detectors.session_window import SessionWindowAnalyzer
+from vanessa.decision.detectors.triggers import TriggerKeywordChecker, TriggerResult
+from vanessa.decision.metrics_rule import SenderMetricsRule, should_ignore_for_toxicity
+from vanessa.decision.models import DecisionAction, DecisionReason
+from vanessa.knowledge.metrics.schema import PersonMetrics
 
 TOXIC_METRICS = PersonMetrics(toxicity=0.95, trust_score=10)
 NEUTRAL_METRICS = PersonMetrics(toxicity=0.2, trust_score=80)
@@ -128,7 +128,7 @@ class FakeRelevance:
 
 
 def build_engine(intent_detector, trigger_checker):
-    from app.decision.engine import DecisionEngine
+    from vanessa.decision.engine import DecisionEngine
 
     return DecisionEngine(
         intent_detector=intent_detector,

@@ -1,4 +1,4 @@
-from app.rag.search.merger import merge_vector_search_hits
+from vanessa.rag.search.merger import merge_vector_search_hits
 
 
 def test_merge_vector_search_hits_keeps_best_score():

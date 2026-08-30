@@ -19,17 +19,64 @@ transforms:
       .container = .kubernetes.container_name
       .service = .kubernetes.pod_labels.component || .container
       parsed, err = parse_json(.message)
-      if err == null {
-        . = merge(., parsed)
+      if err == null && is_object(parsed) {
+        . = merge!(., parsed)
       }
       del(.kubernetes)
       del(.file)
+      if exists(.level) {
+        lvl = downcase(string!(.level))
+        if lvl == "warning" {
+          .level = "warn"
+        } else if lvl == "critical" {
+          .level = "fatal"
+        } else {
+          .level = lvl
+        }
+      } else if .stream == "stderr" {
+        .level = "error"
+      } else {
+        .level = "info"
+      }
+      if exists(.request_time) {
+        rt, err = to_float(.request_time)
+        if err == null {
+          .request_time = rt
+        }
+      }
+      if exists(.event) {
+        ev, err = to_string(.event)
+        if err == null {
+          .event = ev
+        } else {
+          .event = "none"
+        }
+      } else {
+        .event = "none"
+      }
+
+  nginx_access:
+    type: filter
+    inputs: [parse_json]
+    condition: '.service == "nginx" && is_float(.request_time)'
+
+  nginx_metrics:
+    type: log_to_metric
+    inputs: [nginx_access]
+    metrics:
+      - type: histogram
+        field: request_time
+        name: request_duration_seconds
+        namespace: nginx
+        tags:
+          status: "{{ status }}"
+          method: "{{ method }}"
 
 sinks:
   loki:
     type: loki
     inputs: [parse_json]
-    endpoint: http://loki.logging.svc.cluster.local:3100
+    endpoint: http://loki:3100
     out_of_order_action: accept
     encoding:
       codec: json
@@ -38,3 +85,10 @@ sinks:
       service: "{{ service }}"
       container: "{{ container }}"
       stream: "{{ stream }}"
+      level: "{{ level }}"
+      event: "{{ event }}"
+
+  prometheus:
+    type: prometheus_exporter
+    inputs: [nginx_metrics]
+    address: 0.0.0.0:9598

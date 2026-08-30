@@ -1,7 +1,7 @@
-from app.bot.stickers.models import StickerCatalog, StickerDef
-from app.config.content import StickerDefContent, StickersContent
-from app.config.content import get_content
-from app.bot.stickers.catalog import build_catalog
+from services.bot.stickers.models import StickerCatalog, StickerDef
+from vanessa.config.content import StickerDefContent, StickersContent
+from vanessa.config.content import get_content
+from services.bot.stickers.catalog import build_catalog
 
 
 def _catalog() -> StickerCatalog:
@@ -206,7 +206,7 @@ class _Bot:
 
 
 def test_match_remote_prefers_emoji_over_stale_index():
-    from app.bot.stickers.catalog import _match_remote
+    from services.bot.stickers.catalog import _match_remote
 
     remote = [
         _RemoteSticker("❤️", "f:heart"),
@@ -223,7 +223,7 @@ def test_match_remote_prefers_emoji_over_stale_index():
 
 
 def test_match_remote_disambiguates_duplicate_emoji_by_index():
-    from app.bot.stickers.catalog import _match_remote
+    from services.bot.stickers.catalog import _match_remote
 
     remote = [
         _RemoteSticker("❤️", "f:heart"),
@@ -239,7 +239,7 @@ def test_match_remote_disambiguates_duplicate_emoji_by_index():
 def test_resolve_file_ids_refreshes_baked_ids_from_live_pack():
     import asyncio
 
-    from app.bot.stickers.catalog import build_catalog, resolve_file_ids
+    from services.bot.stickers.catalog import build_catalog, resolve_file_ids
 
     content = StickersContent(
         sticker_set_name="VanessaBot",

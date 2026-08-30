@@ -3,27 +3,27 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock
 
-from app.config.settings import settings
-from app.core.messages import ContextBlock, ContextMessage, ImageAttachment, StoredMessage
-from app.core.turn import ChatTurnInput
-from app.knowledge.metrics.retriever import SenderProfile
-from app.knowledge.schema import KnowledgeBlock
-from app.decision.gate.user_ignore import ChatIgnoreRegistry
-from app.decision.models import DecisionAction, DecisionReason, DecisionResult
-from app.llm.planner.turn_planner import TurnPlan
-from app.rag.query_rewriter import QueryRewriter
-from app.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
-from app.services.humor_pipeline import HumorPipeline
-from app.services.orchestrator.orchestrator_config import OrchestratorConfig
-from app.services.pipeline.context import TurnPipelineContext
-from app.services.pipeline.stages import (
+from vanessa.config.settings import settings
+from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment, StoredMessage
+from vanessa.core.turn import ChatTurnInput
+from vanessa.knowledge.metrics.retriever import SenderProfile
+from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.decision.models import DecisionAction, DecisionReason, DecisionResult
+from vanessa.llm.planner.turn_planner import TurnPlan
+from vanessa.rag.query_rewriter import QueryRewriter
+from vanessa.services.orchestrator.conversation_orchestrator import ConversationOrchestrator
+from vanessa.services.humor_pipeline import HumorPipeline
+from vanessa.services.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.services.pipeline.context import TurnPipelineContext
+from vanessa.services.pipeline.stages import (
     _collect_photo_candidates,
     ComposeStage,
     FinalizeStage,
     GateStage,
     RetrieveStage,
 )
-from app.services.turn_metrics import TurnMetrics
+from vanessa.services.turn_metrics import TurnMetrics
 
 
 class FakeMessageRepo:
@@ -580,7 +580,7 @@ async def test_orchestrator_passes_reply_context_to_llm():
 
 @pytest.mark.asyncio
 async def test_orchestrator_returns_reply_before_background_memory_metrics():
-    from app.services.background import BackgroundExecutor
+    from vanessa.services.background import BackgroundExecutor
 
     messages = FakeMessageRepo()
     indexing = FakeIndexing()

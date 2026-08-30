@@ -5,7 +5,7 @@
   "graphTooltip": 1,
   "title": "Vanessa — Broker & Worker",
   "uid": "vanessa-broker",
-  "version": 2,
+  "version": 3,
   "time": { "from": "now-1h", "to": "now" },
   "refresh": "30s",
   "schemaVersion": 39,
@@ -13,8 +13,8 @@
   "templating": {
     "list": [
       {
-        "allValue": ".*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "allValue": ".+",
+        "current": { "selected": true, "text": "production", "value": "production" },
         "datasource": { "type": "prometheus", "uid": "prometheus" },
         "definition": "label_values(up, environment)",
         "includeAll": true,
@@ -25,24 +25,24 @@
         "query": { "query": "label_values(up, environment)", "refId": "StandardVariableQuery" },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "skipUrlSync": true,
         "sort": 1,
         "type": "query"
       },
       {
-        "allValue": ".*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "allValue": ".+",
+        "current": { "selected": true, "text": "All", "value": ".+" },
         "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "definition": "label_values(up{environment=~\"$env\"}, instance)",
+        "definition": "label_values(up{environment=~\"${env:pipe}\"}, instance)",
         "includeAll": true,
         "label": "Instance",
         "multi": true,
         "name": "instance",
         "options": [],
-        "query": { "query": "label_values(up{environment=~\"$env\"}, instance)", "refId": "StandardVariableQuery" },
+        "query": { "query": "label_values(up{environment=~\"${env:pipe}\"}, instance)", "refId": "StandardVariableQuery" },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "skipUrlSync": true,
         "sort": 1,
         "type": "query"
       }
@@ -64,7 +64,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "targets": [
         {
-          "expr": "sum by (stream) (rate(vanessa_broker_published_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (stream) (rate(vanessa_broker_published_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m]))",
           "legendFormat": "{{stream}}",
           "refId": "A"
         }
@@ -78,7 +78,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "sum by (stream) (rate(vanessa_broker_consumed_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (stream) (rate(vanessa_broker_consumed_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m]))",
           "legendFormat": "{{stream}}",
           "refId": "A"
         }
@@ -114,7 +114,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
       "targets": [
         {
-          "expr": "sum by (stream) (increase(vanessa_broker_dlq_total{environment=~\"$env\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (stream) (increase(vanessa_broker_dlq_total{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m]))",
           "legendFormat": "{{stream}}",
           "refId": "A"
         }
@@ -143,12 +143,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
       "targets": [
         {
-          "expr": "vanessa_broker_stream_length{environment=~\"$env\",instance=~\"$instance\"}",
+          "expr": "vanessa_broker_stream_length{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}",
           "legendFormat": "len {{stream}}",
           "refId": "A"
         },
         {
-          "expr": "vanessa_broker_dlq_depth{environment=~\"$env\",instance=~\"$instance\"}",
+          "expr": "vanessa_broker_dlq_depth{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}",
           "legendFormat": "dlq {{stream}}",
           "refId": "B"
         }
@@ -177,7 +177,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
       "targets": [
         {
-          "expr": "vanessa_broker_consumer_lag{environment=~\"$env\",instance=~\"$instance\"}",
+          "expr": "vanessa_broker_consumer_lag{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}",
           "legendFormat": "{{stream}}/{{group}}",
           "refId": "A"
         }
@@ -198,7 +198,7 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 19 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(vanessa_broker_rpc_duration_seconds_bucket{environment=~\"$env\",instance=~\"$instance\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(vanessa_broker_rpc_duration_seconds_bucket{environment=~\"${env:pipe}\",instance=~\"${instance:pipe}\"}[5m])))",
           "legendFormat": "{{kind}}",
           "refId": "A"
         }

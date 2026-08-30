@@ -17,7 +17,7 @@ spec:
         - name: bot
           image: vanessa-app:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.bot.main"]
+          command: ["python", "-m", "services.bot.main"]
           ports:
             - { containerPort: 9101, name: metrics }
           envFrom:
@@ -26,14 +26,3 @@ spec:
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "500m", memory: "1Gi" }
-          volumeMounts:
-            - { name: knowledge, mountPath: /app/knowledge, readOnly: true }
-            - { name: obsidian-ssh, mountPath: /home/app/.ssh, readOnly: true }
-      volumes:
-        - name: knowledge
-          persistentVolumeClaim: { claimName: vanessa-knowledge }
-        - name: obsidian-ssh
-          secret:
-            secretName: vanessa-obsidian-ssh
-            defaultMode: 0600
-            optional: true

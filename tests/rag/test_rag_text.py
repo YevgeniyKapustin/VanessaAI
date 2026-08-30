@@ -1,4 +1,4 @@
-from app.rag.text import truncate_for_embedding
+from vanessa.rag.text import truncate_for_embedding
 
 
 def test_truncate_for_embedding():

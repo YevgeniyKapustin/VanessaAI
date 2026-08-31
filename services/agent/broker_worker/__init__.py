@@ -1,5 +1,3 @@
-from vanessa.infrastructure.db.session import async_session_factory
-
 from services.agent.broker_worker.handlers import TurnHandlerFactory
 from services.agent.broker_worker.mapping import TurnMapper
 from services.agent.broker_worker.pipeline import SessionPipeline
@@ -10,6 +8,7 @@ from services.agent.broker_worker.worker import (
     TurnDeliveryHandler,
 )
 from services.agent.container import AppContainer
+from vanessa.infrastructure.db.session import async_session_factory
 
 
 def default_handler_builder(container: AppContainer):

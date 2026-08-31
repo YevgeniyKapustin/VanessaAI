@@ -868,6 +868,7 @@ def classify_llm_error(exc: Exception) -> str:
 
 __all__ = [
     "CONTENT_TYPE_LATEST",
+    "ProcessMetricsServer",
     "classify_llm_error",
     "estimate_llm_cost",
     "llm_cache_hit_prompt_price_per_1m",
@@ -899,5 +900,4 @@ __all__ = [
     "registry",
     "render_metrics",
     "start_metrics_http_server",
-    "ProcessMetricsServer",
 ]

@@ -7,7 +7,6 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
 from services.bot.container import BotServices, create_bot_services
-from services.bot.services.broker_client import BrokerTurnClient
 from services.bot.handlers.messages import (
     _pick_photo_size,
     _preview,
@@ -19,6 +18,7 @@ from services.bot.handlers.messages import (
     create_messages_router,
 )
 from services.bot.messages.response import ChatProcessResult
+from services.bot.services.broker_client import BrokerTurnClient
 from tests.bot.test_bot_message import make_telegram_message
 from vanessa.config.content import get_content, get_photo_placeholder
 from vanessa.config.settings import settings

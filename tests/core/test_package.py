@@ -1,7 +1,6 @@
+import tomllib
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
-
-import tomllib
 
 from vanessa.core import package as package_mod
 from vanessa.core.package import package_info, package_version

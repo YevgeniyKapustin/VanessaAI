@@ -15,8 +15,7 @@ portrait_prompt: |
   - Cover: who the person is (identity, occupation, hobbies), their character and how
     they interact with Vanessa, current mood if known, recurring running jokes, and any
     important current context (job changes, moves, conflicts).
-  - Keep it to 3-5 sentences, about 250-350 characters total. No bullet lists, no
-    dates, no verbatim quotes.
+  - Keep it to 3-5 short sentences. No bullet lists, no dates, no verbatim quotes.
   - Focus on the CURRENT state: drop outdated facts (old job, past move, resolved
     conflicts, one-off trivia) — the raw chat history still holds the past, the portrait
     only needs who the person is right now.

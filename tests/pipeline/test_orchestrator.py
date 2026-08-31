@@ -717,6 +717,35 @@ async def test_compose_stage_forwards_needs_clarification():
 
 
 @pytest.mark.asyncio
+async def test_compose_stage_allows_repeat_when_planner_wants_reply():
+    llm = CountingLLM()
+    compose = ComposeStage(llm)
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="Чек",
+            sender_telegram_id=42,
+        ),
+        turn_plan=TurnPlan(
+            original="Чек",
+            text="",
+            skip_search=True,
+            should_reply=True,
+        ),
+    )
+    ctx.recent = [
+        ContextMessage(id=1, role="user", content="Чек", sender_telegram_id=42),
+        ContextMessage(id=2, role="user", content="Чек", sender_telegram_id=42),
+    ]
+
+    proceed = await compose.run(ctx)
+
+    assert proceed is True
+    assert llm.calls == 1
+    assert ctx.reply == "echo"
+
+
+@pytest.mark.asyncio
 async def test_compose_stage_forwards_detail():
     llm = FakeLLM()
     compose = ComposeStage(llm)
@@ -1355,6 +1384,40 @@ def test_photo_candidates_exclude_current_turn_images():
     candidates = _collect_photo_candidates(ctx, [prior])
 
     assert candidates == []
+
+
+def test_photo_candidates_do_not_treat_user_caption_as_description():
+    """Telegram caption is the user's words, not a visual description."""
+    from vanessa.config.content import get_photo_placeholder
+
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="cap-1",
+    )
+    prior = ContextMessage(
+        id=10,
+        role="user",
+        content="ванесса ты хочешь этого?",
+        sender_telegram_id=42,
+        sender_name="Yevgeniy",
+        attachments=(photo,),
+        photo_caption=None,
+    )
+    ctx = TurnPipelineContext(
+        turn=ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="скинь то фото",
+            sender_telegram_id=42,
+        ),
+    )
+    ctx.recent = [prior]
+
+    candidates = _collect_photo_candidates(ctx, [prior])
+
+    assert len(candidates) == 1
+    assert candidates[0].caption == get_photo_placeholder()
+    assert "хочешь этого" not in candidates[0].caption
 
 
 @pytest.mark.asyncio

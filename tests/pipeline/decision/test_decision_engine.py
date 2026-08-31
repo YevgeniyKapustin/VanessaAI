@@ -464,6 +464,22 @@ async def test_decision_engine_ignores_side_talk_when_planner_says_no():
 
 
 @pytest.mark.asyncio
+async def test_decision_engine_replies_when_planner_says_yes_without_mention(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    result = await engine.decide(
+        text="модест",
+        telegram_chat_id=1,
+        recent_messages=[],
+        should_reply=True,
+    )
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.PLANNER
+
+
+@pytest.mark.asyncio
 async def test_decision_engine_replies_direct_address_despite_planner_veto(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,

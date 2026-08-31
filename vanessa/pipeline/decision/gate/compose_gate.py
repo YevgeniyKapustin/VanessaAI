@@ -13,6 +13,7 @@ _PRE_APPROVED_REASONS = frozenset(
         DecisionReason.ADDRESSING,
         DecisionReason.FORCE_REPLY,
         DecisionReason.LISTEN_WINDOW,
+        DecisionReason.PLANNER,
     }
 )
 

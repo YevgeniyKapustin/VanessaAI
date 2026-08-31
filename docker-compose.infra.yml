@@ -19,6 +19,7 @@ services:
       - max_connections=200
       - -c
       - idle_session_timeout=60000
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vanessa}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vanessa}
@@ -37,13 +38,19 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.13.4
+    restart: unless-stopped
     ports:
       - "127.0.0.1:6333:6333"
       - "127.0.0.1:6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6333/readyz || exit 1"]
+      # Image has no wget/curl; bash /dev/tcp is enough for listen-ready.
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'echo >/dev/tcp/127.0.0.1/6333' || exit 1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5

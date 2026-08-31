@@ -175,6 +175,10 @@ class RepeatedQuestionRule:
         return False
 
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
+        # Planner already classified this turn as worth a reply (poker "чек",
+        # a joke callback, etc.). Do not override that with the burst detector.
+        if context.should_reply is True:
+            return None
         recent = context.recent_messages[-self._window :]
         if len(recent) < 2:
             return None

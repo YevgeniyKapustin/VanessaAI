@@ -32,7 +32,7 @@ class TurnPlan:
     # planner decides; the composer routes the generation call accordingly.
     uses_pro_model: bool = False
     # Short reason for declining a reply — filled only when should_reply=false
-    # or skip=true (e.g. «пустая фраза», «общение между собой», «прощание»).
+    # (planner skip=true means stay silent; the parser forces should_reply=false).
     reason: str = ""
     # Loop-repetition signal: the SAME sender keeps asking about the SAME TOPIC
     # in the recent context (different phrasings, same meaning — a loop «по

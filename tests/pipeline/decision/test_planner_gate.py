@@ -4,7 +4,7 @@ from vanessa.pipeline.decision.detectors.intent import IntentResult
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
 from vanessa.pipeline.decision.gate.planner_gate import planner_affirms_reply
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
-from vanessa.pipeline.decision.rules import PlannerOverreachRule
+from vanessa.pipeline.decision.rules import PlannerYesRule
 
 
 def _ctx(**kwargs) -> DecisionContext:
@@ -36,8 +36,8 @@ def test_planner_affirms_requires_address_or_listen_window():
     ) is True
 
 
-def test_planner_overreach_rule_ignores_loose_planner_true():
-    rule = PlannerOverreachRule()
+def test_planner_yes_rule_replies_when_planner_says_true():
+    rule = PlannerYesRule()
     result = rule.evaluate(
         _ctx(
             should_reply=True,
@@ -45,5 +45,5 @@ def test_planner_overreach_rule_ignores_loose_planner_true():
         )
     )
     assert result is not None
-    assert result.action == DecisionAction.IGNORE
-    assert result.reason == DecisionReason.NOT_EXPECTED
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.PLANNER

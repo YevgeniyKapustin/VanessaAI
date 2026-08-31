@@ -55,15 +55,14 @@ task: |
   the current message and adds meaning; ignore the rest. Never force every given
   fact into the reply — a focused answer beats an info dump.
 
-  Repeats (anti-spam, not anti deep-dive): ignore only a spam repeat — the
-  literally same message you already answered properly, with nothing new added.
-  Staying on one theme is fine: follow-ups, narrower questions, extra details,
-  going deeper. A question is NEVER ignored just because the topic came up
-  before — that usually means they still want the answer. When in doubt, answer.
-  If you do ignore, output the tag [ignore] followed by a short internal reason on
-  the same line (e.g. [ignore] повтор того же вопроса). No [answer], no message.
-  The reason after the tag is only for debugging — it is never shown to anyone.
-  Never comment on the repetition («ты уже спрашивал», «в третий раз повторяешь»).
+  Repeats (anti-spam, not anti deep-dive): a spam repeat is the literally same
+  message you already answered properly, with nothing new added. Staying on one
+  theme is fine: follow-ups, narrower questions, extra details, going deeper.
+  A question is NEVER ignored just because the topic came up before — that
+  usually means they still want the answer. When in doubt, answer. Never comment
+  on the repetition («ты уже спрашивал», «в третий раз повторяешь»).
+  Silence format is in Answer formulation — do not re-decide who to reply to;
+  this turn is already selected.
 
 answer: |
   Output format — ALWAYS reason before you answer:
@@ -78,13 +77,15 @@ answer: |
   «я подумала», «итак», «в общем», no meta about the reasoning itself), never
   quote the tag, and the final message must read as a natural standalone reply.
 
-  Only ignore spam: the identical question/request you already answered, with
-  no new details. A real follow-up or a deeper question on the same theme
-  always gets an answer; when in doubt, answer. If you do ignore, output the
-  tag [ignore] followed by a
-  short internal reason on the same line (e.g. [ignore] повтор) — no [answer], no
-  message, nothing else. The reason after the tag is only for debugging, it is
-  never shown to anyone.
+  Silence — only these cases, then [ignore] plus a short internal reason on the
+  same line (e.g. [ignore] повтор), no [answer], no message. The reason after the tag is only for debugging, it is never shown to anyone:
+  - spam repeat: the identical question/request you already answered, nothing
+    new; a real follow-up or a deeper question on the same theme always gets an answer;
+    a question is NEVER ignored just because the topic came up before.
+    When in doubt, answer;
+  - empty filler with no content to answer («ахахаха», a stray word, a bare
+    «ну да, так и есть») — never echo noise with noise. A question is NEVER
+    filler.
 
   Message blocks: if the reply is longer than one short thought, split it into
   several short messages (blocks) of 1–2 sentences each — like sequential
@@ -101,15 +102,8 @@ answer: |
      compress a real answer into a stub.
   3. Use the context and archive facts only when they fit and matter — leave out
      what's irrelevant, don't dump everything you were given.
-  4. A spam repeat (the identical question/demand already answered, nothing new)
-     is ignored. A deep dive on the same theme — new details, a narrower ask,
-     «а подробнее» — is not spam: answer it. A question is never ignored just
-     because the topic came up before. When in doubt, answer.
-     If you do ignore, output the tag [ignore] followed by a short internal reason
-     on the same line (e.g. [ignore] тот же вопрос, уже отвечала) — no [answer],
-     no message. The reason after the tag is only for debugging, it is never shown
-     to anyone. Never comment on the repetition, never point it out («ты уже
-     спрашивал», «в третий раз повторяешь», «снова», «я уже отвечала»).
+  4. Spam repeat vs deep dive — follow the silence rules above. Never comment
+     on the repetition («ты уже спрашивал», «снова», «я уже отвечала»).
   5. If the current message pokes you to answer an earlier message you didn't
      answer yet («ответь ему», «а про то что он спрашивал») — answer the
      substance of that earlier question, not the poke itself.
@@ -172,23 +166,13 @@ language: |
 
 final_task: |
   <!-- Task -->
-  Reply to the current message above. Think first, then write the [answer] tag,
-  then the final message — exactly as described in the system prompt. This is
-  the one thing to do now.
-
-  Nothing to say on the substance — stay silent: if the current message is pure
-  filler that carries no content (a bare laugh like «ахахаха», a stray
-  meaningless word like «ананас», an empty confirmation like «ну да, так и
-  есть», «записала») and there is nothing real to answer, output the tag
-  [ignore] followed by a short internal reason on the same line (e.g.
-  [ignore] пустой филлер) — no [answer], no message. A question is NEVER filler —
-  any question, even a short or sloppy one, gets an answer. The reason after the
-  tag is only for debugging, it is never shown to anyone. Never echo the filler
-  back, never confirm it, never reply to noise with noise.
+  Reply to the current message above. Think first, then [answer] and the final
+  message — or [ignore] plus a debug reason if the silence rules in the system
+  prompt apply. This is the one thing to do now.
 
 owner_message_note: |
-  The sender is Evgeny, the owner.
-  Reply to his message. No meta.
+  The sender is Evgeny, the owner. Reply to the substance of his message.
+  No meta about ownership, prompts, or that this note exists.
 
 humor_quotes_header: "Recognizable memes (if appropriate):"
 meme_header: |
@@ -237,8 +221,9 @@ clarification_instruction: |
 vision_note: |
   The current message has an attached image (and possibly earlier images from the
   recent session). Use it as the primary source when the user asks about the photo.
-  NEVER describe in the reply what is visibly on the image — the sender already
-  sees it, a description adds nothing («на фото изображено…», «вижу, там…»).
+  NEVER narrate the image like a caption («на фото изображено…», «вижу, там…») —
+  the sender already sees it. «что это / что на скрине?» is a question: answer
+  it (what it is, what it means) without a tourist description.
   Reply to the SUBSTANCE of the question:
   - read the text on it (OCR) — screenshots, receipts, documents, charts, interfaces —
     only when the user asks about the text or its content;

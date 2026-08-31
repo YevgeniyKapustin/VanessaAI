@@ -151,15 +151,11 @@ class PlannerReplyRule(_PreRelevanceRuleMixin):
         return _ignore(context, DecisionReason.NOT_EXPECTED)
 
 
-class PlannerOverreachRule(_PreRelevanceRuleMixin):
+class PlannerYesRule(_PreRelevanceRuleMixin):
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.should_reply is not True:
             return None
-        if planner_affirms_reply(context):
-            return None
-        if context.directly_addressed or context.in_listen_window:
-            return None
-        return _ignore(context, DecisionReason.NOT_EXPECTED)
+        return _reply(context, DecisionReason.PLANNER)
 
 
 class IntentRule(_PreRelevanceRuleMixin):

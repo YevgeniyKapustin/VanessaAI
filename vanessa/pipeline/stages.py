@@ -579,12 +579,15 @@ def _collect_turn_images(ctx: TurnPipelineContext) -> list[ImageAttachment]:
 
 
 def _photo_caption_for(message) -> str:
-    """Best human label of a photo message for the album list."""
+    """Visual label of a photo for the album ``<description>``.
+
+    Only the vision-generated ``photo_caption`` belongs here. The user's
+    Telegram caption is message text (``<text>``), not a picture label —
+    stuffing it into ``<description>`` makes the model treat a question as
+    "what is on the photo".
+    """
     if message.photo_caption and message.photo_caption.strip():
         return message.photo_caption.strip()
-    content = (message.content or "").strip()
-    if content and content != get_photo_placeholder():
-        return content
     return get_photo_placeholder()
 
 
@@ -682,9 +685,9 @@ class ComposeStage:
     async def run(self, ctx: TurnPipelineContext) -> bool:
         # Compose-stage refusal, defense-in-depth for spam: the gate usually
         # catches repeats, but some paths never run the decision engine (the
-        # vision forced-turn path) or could be bypassed in the future. Re-check
-        # deterministically here, at the very moment of preparing the answer, so
-        # the expensive LLM is not even invoked for an identical spam burst.
+        # vision forced-turn path) or could be bypassed in the future. Skip
+        # when the planner explicitly asked to reply — a poker "чек" is a
+        # legitimate repeat. Otherwise refuse before the expensive LLM.
         # A bare caption-less photo carries only the placeholder ("[фото]") — not
         # real content — so two consecutive photos must never be mistaken for a
         # repeated-message spam burst (they normalize to the same token). The
@@ -693,11 +696,19 @@ class ComposeStage:
             ctx.turn.has_image
             and ctx.turn.message.strip() == get_photo_placeholder()
         )
-        if self._refuse_enabled and not bare_photo and is_repeated_message(
-            ctx.turn.message,
-            ctx.recent,
-            sender_telegram_id=ctx.turn.sender_telegram_id,
-            min_occurrences=self._refuse_min_occurrences,
+        planner_wants_reply = (
+            ctx.turn_plan is not None and ctx.turn_plan.should_reply is True
+        )
+        if (
+            self._refuse_enabled
+            and not bare_photo
+            and not planner_wants_reply
+            and is_repeated_message(
+                ctx.turn.message,
+                ctx.recent,
+                sender_telegram_id=ctx.turn.sender_telegram_id,
+                min_occurrences=self._refuse_min_occurrences,
+            )
         ):
             return self._refuse(
                 ctx,

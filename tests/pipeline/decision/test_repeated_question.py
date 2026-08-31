@@ -174,6 +174,33 @@ def test_rule_ignores_short_repeat_burst():
     assert result.reason == DecisionReason.REPEATED
 
 
+def test_rule_defers_burst_when_planner_wants_reply():
+    rule = RepeatedQuestionRule()
+    from vanessa.pipeline.decision.context import DecisionContext
+    from vanessa.pipeline.decision.detectors.intent import IntentDetector
+    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
+
+    recent = [
+        ContextMessage(id=1, role="user", content="чек", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="чек", sender_telegram_id=7),
+    ]
+    intent = IntentDetector().detect("чек")
+    trigger = TriggerKeywordChecker(()).detect("чек")
+    context = DecisionContext(
+        text="чек",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        query_vector=None,
+        intent=intent,
+        trigger=trigger,
+        session_active=True,
+        relevance_score=0.0,
+        sender_telegram_id=7,
+        should_reply=True,
+    )
+    assert rule.evaluate(context) is None
+
+
 # --- integration via the decision engine ---
 
 
@@ -271,6 +298,26 @@ async def test_engine_ignores_same_sender_short_burst(engine):
 
     assert result.action == DecisionAction.IGNORE
     assert result.reason == DecisionReason.REPEATED
+
+
+@pytest.mark.asyncio
+async def test_engine_replies_short_burst_when_planner_says_yes(engine):
+    recent = [
+        ContextMessage(id=1, role="user", content="чек", sender_telegram_id=7),
+        ContextMessage(id=2, role="user", content="чек", sender_telegram_id=7),
+    ]
+
+    result = await engine.decide(
+        text="чек",
+        telegram_chat_id=1,
+        recent_messages=recent,
+        mentions_bot=False,
+        should_reply=True,
+        sender_telegram_id=7,
+    )
+
+    assert result.action == DecisionAction.REPLY
+    assert result.reason == DecisionReason.PLANNER
 
 
 @pytest.mark.asyncio

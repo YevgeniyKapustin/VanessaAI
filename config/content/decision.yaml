@@ -66,7 +66,9 @@ reaction_gate_prompt: |
   Answer with exactly one word — YES or NO — nothing else.
   YES — the message is addressed to the bot, asks a question, requests help,
         clearly expects the bot's reaction (a reply), or is a short follow-up
-        right after the bot's own reply demanding more (e.g. "а ещё").
+        right after the bot's own reply demanding more (e.g. "а ещё",
+        «ну чет мало», «а про текстуры?») — especially when
+        listen_window=yes.
         IMPORTANT: any imperative addressed to the bot by name or «ты»
         («ванесса, не тормози, я написал», «ванесса, отвечай», «ну ванесса
         давай») is an address to her → YES, even without a question mark.

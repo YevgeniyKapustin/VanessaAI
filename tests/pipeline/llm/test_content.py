@@ -420,6 +420,30 @@ def test_current_message_renders_all_attached_photos():
     assert prompt.count("<msg") == 1
 
 
+def test_history_photo_keeps_user_caption_in_text_not_description():
+    """User text on a photo stays in <text>; <description> is vision-only."""
+    builder = PromptBuilder()
+    photo = ImageAttachment(
+        data_url="data:image/jpeg;base64,AAAA",
+        mime_type="image/jpeg",
+        telegram_file_id="file-1",
+    )
+    line = builder.format_message_line(
+        ContextMessage(
+            id=7,
+            role="user",
+            content="ванесса ты хочешь этого?",
+            sender_telegram_id=42,
+            sender_name="Yevgeniy",
+            attachments=(photo,),
+            photo_caption=None,
+        )
+    )
+    assert "<text>ванесса ты хочешь этого?</text>" in line
+    assert "<description>" not in line
+    assert '<attachment type="photo" />' in line
+
+
 def test_current_message_omits_attachments_without_images():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt("привет", [])

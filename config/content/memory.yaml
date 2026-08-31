@@ -44,13 +44,13 @@ extraction_prompt: |
     ]
   }}
 
-  Rules by type:
-  - quote: added to the person's Quote book; needs person.
-  - person_mood: person's mood; needs person and mood.
-  - person_fact: a fact about a person; needs person and text.
-  - glossary: a new or recurring meme; needs term.
-  - event: a significant event or argument; needs title.
-  - recommendation: a movie/game/music suggestion; needs kind and title.
+  Rules by type (fill only the fields that type needs; leave the rest ""):
+  - quote: person, quote, context.
+  - person_mood: person, mood.
+  - person_fact: person, section, text.
+  - glossary: term, definition; optional aliases, first_quote.
+  - event: title; optional date, participants, outcome, text.
+  - recommendation: kind, title; optional status, recommended_by.
   - weekly_summary: only at the end of the week; needs summary.
 
   Person identity rules:

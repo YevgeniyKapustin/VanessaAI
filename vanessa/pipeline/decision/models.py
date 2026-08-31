@@ -23,6 +23,7 @@ class DecisionReason(StrEnum):
     # message does not require a bot reaction (people chatting among themselves).
     REACTION_GATE = "reaction_gate"
     LISTEN_WINDOW = "listen_window"
+    PLANNER = "planner"
     DISMISSAL = "dismissal"
     QUOTE_ECHO = "quote_echo"
     USER_IGNORED = "user_ignored"

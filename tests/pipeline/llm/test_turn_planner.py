@@ -508,6 +508,35 @@ async def test_turn_planner_participants_provider_receives_message_and_recent():
     assert received == [("расскажи про крабера", recent)]
 
 
+@pytest.mark.asyncio
+async def test_turn_planner_prompt_includes_sender():
+    captured = {}
+
+    class _Client:
+        async def complete(self, model, messages, kind, **kwargs):
+            captured["prompt"] = messages[0]["content"]
+            return (
+                '{"should_reply": true, "search_query": "личь", "skip": false, '
+                '"humor_ok": false, "humor_query": "", '
+                '"knowledge_indexes": ["people"], "knowledge_query": "личь"}'
+            )
+
+    planner = TurnPlanner(use_llm=True, llm_client=_Client())
+    await planner.prepare("расскажи про меня", sender_name="Личь")
+
+    assert "Sender" in captured["prompt"]
+    assert "Личь" in captured["prompt"]
+    assert "{sender}" not in captured["prompt"]
+
+
+def test_turn_planner_prompt_teaches_pro_menya_is_sender():
+    prompt = get_content().rag.turn_planner_prompt
+    assert "{sender}" in prompt
+    assert "ALWAYS the Sender, never Vanessa" in prompt
+    assert "«расскажи про меня»" in prompt
+    assert "«расскажи про себя»" in prompt
+
+
 def test_turn_plan_to_trace_dict():
     """The Langfuse gate-span output must expose every planner decision."""
     plan = TurnPlan(

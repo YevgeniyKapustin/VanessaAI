@@ -75,6 +75,7 @@ class TurnPlannerProtocol(Protocol):
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
+        sender_name: str = "",
     ) -> TurnPlan: ...
 
 

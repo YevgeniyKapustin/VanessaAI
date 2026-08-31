@@ -69,14 +69,11 @@ class ParticipantsDigest:
         self._cache_files: list[str] = []
         self._cache_key: tuple = ()
 
-    def _signature(self) -> tuple:
-        """Per-note identity so body edits invalidate the cache."""
-        return self._vault.notes_signature_sync(PEOPLE)
-
     async def build(
         self,
         message: str = "",
         recent_messages: list[ContextMessage] | None = None,
+        sender_name: str = "",
     ) -> str:
         """Return the digest for the people relevant to this turn.
 
@@ -88,7 +85,7 @@ class ParticipantsDigest:
         if not self._vault.is_configured:
             return ""
         people_index = await self._index.load_folder(PEOPLE)
-        signature = self._signature()
+        signature = await self._vault.notes_signature(PEOPLE)
         if self._cache_lines is None or signature != self._cache_key:
             lines, files = await self._build_person_lines(people_index)
             self._cache_lines = lines
@@ -99,6 +96,7 @@ class ParticipantsDigest:
             people_index,
             message,
             recent_messages,
+            sender_name,
         )
         return "\n".join(
             self._cache_lines[file] for file in selected if file in self._cache_lines
@@ -110,6 +108,7 @@ class ParticipantsDigest:
         people_index: dict,
         message: str,
         recent_messages: list[ContextMessage] | None,
+        sender_name: str = "",
     ) -> list[str]:
         """Ordered selection: mentioned people first, then the fallback floor."""
         mentioned = resolve_mentioned_people(
@@ -117,6 +116,7 @@ class ParticipantsDigest:
             recent_messages,
             people_index,
             recent_window=self._recent_window,
+            sender_name=sender_name,
         )
         known = {file for file in files}
         selected = [file for file in mentioned if file in known]

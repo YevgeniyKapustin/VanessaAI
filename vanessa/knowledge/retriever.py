@@ -504,6 +504,7 @@ class KnowledgeRetriever:
         recent_messages: list[ContextMessage] | None = None,
         *,
         recent_window: int | None = None,
+        sender_name: str = "",
     ) -> list[str]:
         """Deterministic People-card files mentioned in message + recent window.
 
@@ -523,6 +524,7 @@ class KnowledgeRetriever:
                 if recent_window is not None
                 else settings.knowledge_participant_recent_window
             ),
+            sender_name=sender_name,
         )
 
     async def _read_blocks(

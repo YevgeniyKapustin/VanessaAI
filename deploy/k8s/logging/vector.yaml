@@ -5,6 +5,9 @@ api:
   address: 0.0.0.0:8686
 
 sources:
+  internal_metrics:
+    type: internal_metrics
+
   kubernetes_logs:
     type: kubernetes_logs
     extra_label_selector: app=vanessa
@@ -56,6 +59,11 @@ transforms:
       }
 
 sinks:
+  prometheus:
+    type: prometheus_exporter
+    inputs: [internal_metrics]
+    address: 0.0.0.0:9598
+
   loki:
     type: loki
     inputs: [parse_json]

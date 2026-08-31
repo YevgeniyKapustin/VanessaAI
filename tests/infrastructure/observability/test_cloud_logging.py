@@ -36,6 +36,7 @@ def test_compose_binds_ui_and_data_plane_to_localhost() -> None:
     assert "clickhouse/clickhouse-server:25.12" in langfuse
     assert "clickhouse-server:latest" not in langfuse
     assert "minio/minio:latest" not in langfuse
+    assert "LANGFUSE_INGESTION_V4_WRITE_MODE: dual" in langfuse
 
 
 def test_vector_daemonset_tails_pod_logs() -> None:

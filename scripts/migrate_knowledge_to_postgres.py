@@ -38,8 +38,7 @@ async def migrate(root: str) -> int:
         print("Filesystem vault is not configured")
         return 1
     await source.ensure_structure()
-    dest = PostgresKnowledgeStore(filesystem_root=root)
-    await dest.ensure_structure()
+    dest = PostgresKnowledgeStore()
 
     imported = 0
     for folder in (*ALL_FOLDERS, "_archive"):

@@ -1,7 +1,9 @@
 from vanessa.core.messages import ContextMessage
 from vanessa.knowledge.entities import (
     is_person_focused,
+    is_self_person_query,
     mentioned_people_in_text,
+    people_file_for_name,
     resolve_mentioned_people,
 )
 
@@ -100,3 +102,38 @@ def test_is_person_focused_prompt_phrase() -> None:
 def test_is_person_focused_casual_mention_false() -> None:
     assert is_person_focused("крабер пещеры") is False
     assert is_person_focused("личь опять молчит") is False
+
+
+def test_is_self_person_query_about_sender() -> None:
+    assert is_self_person_query("расскажи про меня") is True
+    assert is_self_person_query("кто я") is True
+    assert is_self_person_query("что ты знаешь обо мне") is True
+    assert is_self_person_query("расскажи про себя") is False
+    assert is_self_person_query("дай мне код") is False
+
+
+def test_is_person_focused_self_query() -> None:
+    assert is_person_focused("расскажи про меня") is True
+    assert is_person_focused("обо мне") is True
+
+
+def test_people_file_for_name_matches_alias() -> None:
+    index = _people_index({"Личь": "People/личь.md", "Крабер": "People/крабер.md"})
+    assert people_file_for_name("личь", index) == "People/личь.md"
+    assert people_file_for_name("ванесса", index) is None
+
+
+def test_resolve_self_query_uses_sender_card() -> None:
+    index = _people_index({"Личь": "People/личь.md", "Ванесса": "People/ванесса.md"})
+    result = resolve_mentioned_people(
+        "расскажи про меня",
+        None,
+        index,
+        sender_name="Личь",
+    )
+    assert result == ["People/личь.md"]
+
+
+def test_resolve_self_query_without_sender_finds_nobody() -> None:
+    index = _people_index({"Личь": "People/личь.md", "Ванесса": "People/ванесса.md"})
+    assert resolve_mentioned_people("расскажи про меня", None, index) == []

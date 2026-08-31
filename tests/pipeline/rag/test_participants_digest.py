@@ -98,6 +98,17 @@ async def test_build_selects_mentioned_people_only(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_build_self_query_selects_sender(tmp_path):
+    vault = await _seed_vault(tmp_path)
+    digest = ParticipantsDigest(vault, max_people=20, max_facts=5, min_people=1)
+
+    text = await digest.build("расскажи про меня", sender_name="личь")
+
+    assert "личь" in text
+    assert "крабер" not in text
+
+
+@pytest.mark.asyncio
 async def test_build_includes_recent_window_mentions(tmp_path):
     vault = await _seed_vault(tmp_path)
     digest = ParticipantsDigest(vault, max_people=20, max_facts=5, min_people=1)

@@ -23,11 +23,12 @@ Search hits those first. Raw chat history only if the cards are empty.
 ## How a message gets handled
 
 ```
-telegram → bot → api → ingress → gate → retrieve → compose → post
+telegram → bot → redis → agent → ingress → gate → retrieve → compose → post
 ```
 
-Telegram hits the bot. Photos in an album count as one turn. The
-person and the text go into Postgres. Then a gate: cheap filters
+Telegram hits the bot. Photos in an album count as one turn. The bot
+publishes the turn on Redis Streams; the agent runs the pipeline.
+The person and the text go into Postgres. Then a gate: cheap filters
 kill noise without calling a model. A planner may say “reply”.
 Rules can still veto that (rate limit, nobody asked her, off-topic).
 
@@ -41,10 +42,11 @@ Longer version: [architecture](docs/architecture.md).
 
 ## Stack, if you care
 
-Python 3.12, aiogram, FastAPI, Postgres, Qdrant, Redis. DeepSeek by
+Python 3.12, aiogram, Postgres, Qdrant, Redis. DeepSeek by
 default, Claude if you switch it. Embeddings on local CPU on purpose —
-I didn't want another paid API. Bot, API, and a worker are separate
-processes. Tests in `tests/`, CI fails under 90% coverage. Metrics and
+I didn't want another paid LLM API. Bot, agent, and a worker are
+separate processes. Turns never go through an HTTP API. Tests in
+`tests/`, CI fails under 90% coverage. Metrics and
 Grafana exist and stay off until you turn them on
 ([observability](docs/observability.md)).
 
@@ -60,7 +62,7 @@ python scripts/prepare_env.py
 docker compose --env-file .env.defaults --env-file .env.local up -d --build
 ```
 
-API listens on `http://localhost:8000`. Prod / k8s / importing a
+Agent health/metrics: `http://localhost:8000`. Prod / k8s / importing a
 Telegram export: [deployment](docs/deployment.md). Persona and rules:
 [configuration](docs/configuration.md).
 

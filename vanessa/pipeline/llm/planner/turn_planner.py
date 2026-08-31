@@ -80,6 +80,7 @@ class TurnPlanner:
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
+        sender_name: str = "",
     ) -> TurnPlan:
         if not self._use_llm:
             result = self._apply_detail(self._fallback(message), message)
@@ -110,6 +111,7 @@ class TurnPlanner:
                 reply_to_bot=reply_to_bot,
                 reply_to_other_user=reply_to_other_user,
                 in_listen_window=in_listen_window,
+                sender_name=sender_name,
             )
         except Exception:
             logger.exception(
@@ -173,6 +175,7 @@ class TurnPlanner:
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
+        sender_name: str = "",
     ) -> TurnPlan:
         client = self._client or create_chat_completer()
         participants = "(нет данных)"
@@ -181,12 +184,15 @@ class TurnPlanner:
                 # The digest is turn-scoped: it must know the current message
                 # and the recent window to render only relevant people.
                 participants = (
-                    await self._participants_provider(message, recent_messages)
+                    await self._call_participants(
+                        message, recent_messages, sender_name
+                    )
                 ).strip() or participants
             except Exception:
                 logger.exception("participants_digest_failed, using placeholder")
         prompt = self._content.rag.planner_prompt.format(
             message=message,
+            sender=sender_name.strip() or "(unknown)",
             recent_messages=self._format_recent(recent_messages) or "(none)",
             nicknames=format_nicknames_for_planner(),
             participants=participants,
@@ -204,6 +210,20 @@ class TurnPlanner:
             )
         ).strip()
         return self._parse_llm_response(message, raw)
+
+    async def _call_participants(
+        self,
+        message: str,
+        recent_messages: list[ContextMessage],
+        sender_name: str,
+    ) -> str:
+        provider = self._participants_provider
+        if provider is None:
+            return ""
+        try:
+            return await provider(message, recent_messages, sender_name)
+        except TypeError:
+            return await provider(message, recent_messages)
 
     @staticmethod
     def _normalize_llm_json(raw: str) -> str:

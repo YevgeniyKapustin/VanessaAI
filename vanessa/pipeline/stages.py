@@ -214,6 +214,7 @@ class GateStage:
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=ctx.session.in_listen_window,
+            sender_name=ctx.sender_name,
         )
         ctx.plan_ms = (time.perf_counter() - rewrite_started) * 1000
 
@@ -385,6 +386,7 @@ class RetrieveStage:
                 people_files = await self._knowledge.resolve_people(
                     ctx.turn.message,
                     ctx.recent,
+                    sender_name=ctx.sender_name,
                 )
             except Exception:
                 logger.exception("people_resolve_failed, ignoring")

@@ -33,6 +33,14 @@ _PERSON_PROMPT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# First-person "about ME (the sender)", never the bot: «расскажи про меня»,
+# «кто я», «обо мне». «про себя» is the bot and must not match here.
+_SELF_PERSON_RE = re.compile(
+    r"(?:\bпро\s+меня\b|\bобо\s+мне\b|\bкто\s+я\b|"
+    r"\bкак(?:ой|ая|ое|ие)\s+я\b)",
+    re.IGNORECASE,
+)
+
 
 def _normalize(text: str) -> str:
     return _SPACE_RE.sub(" ", (text or "").replace("ё", "е").lower()).strip()
@@ -123,22 +131,59 @@ def mentioned_people_in_text(
     return [file for _, file in matches]
 
 
+def people_file_for_name(name: str, people_index: dict) -> str | None:
+    """People-card file whose alias or id matches ``name``, or None."""
+    key = _normalize(name)
+    if len(key) < 3:
+        return None
+    aliases = _aliases_map(people_index)
+    prefix_hit: str | None = None
+    for alias, entry in aliases.items():
+        if not isinstance(entry, dict):
+            continue
+        file = entry.get("file")
+        if not file:
+            continue
+        alias_key = _normalize(str(alias))
+        person_id = _normalize(str(entry.get("id") or ""))
+        if key == alias_key or (person_id and key == person_id):
+            return str(file)
+        stem = alias_key.rstrip("ьъ")
+        if prefix_hit is None and stem and key.startswith(stem):
+            prefix_hit = str(file)
+    return prefix_hit
+
+
+def is_self_person_query(text: str) -> bool:
+    """True when the user asks about themselves, not about Vanessa."""
+    normalized = _normalize(text)
+    if not normalized:
+        return False
+    return bool(_SELF_PERSON_RE.search(normalized))
+
+
 def resolve_mentioned_people(
     message: str,
     recent_messages: list[ContextMessage] | None,
     people_index: dict,
     *,
     recent_window: int = 5,
+    sender_name: str = "",
 ) -> list[str]:
     """People mentioned in the current message, then in the recent window.
 
     The current message is the strongest signal and always comes first; the
     recent window (conversation continuation, per the sliding-window scheme)
     only fills in people not already named. ``recent_window <= 0`` disables the
-    window scan.
+    window scan. A first-person «про меня» prepends the sender's card.
     """
     result: list[str] = []
     seen: set[str] = set()
+    if sender_name and is_self_person_query(message or ""):
+        self_file = people_file_for_name(sender_name, people_index)
+        if self_file:
+            seen.add(self_file)
+            result.append(self_file)
     for file in mentioned_people_in_text(message or "", people_index):
         if file not in seen:
             seen.add(file)
@@ -170,6 +215,8 @@ def is_person_focused(text: str) -> bool:
     normalized = _normalize(text)
     if not normalized:
         return False
+    if is_self_person_query(normalized):
+        return True
     if _question_pattern().search(normalized):
         return True
     return bool(_PERSON_PROMPT_RE.search(normalized))

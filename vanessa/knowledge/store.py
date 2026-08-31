@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
@@ -270,14 +271,12 @@ class PostgresKnowledgeStore:
         from vanessa.infrastructure.db.session import async_session_factory
 
         self._factory = async_session_factory
-        raw = (
-            filesystem_root
-            if filesystem_root is not None
-            else settings.knowledge_path
-        )
-        self._root = Path(raw.strip()).resolve() if raw and raw.strip() else None
-        self._files = FilesystemKnowledgeStore(
-            str(self._root) if self._root is not None else ""
+        raw = (filesystem_root or "").strip()
+        self._root = Path(raw).resolve() if raw else None
+        self._files = (
+            FilesystemKnowledgeStore(str(self._root))
+            if self._root is not None
+            else None
         )
 
     @property
@@ -289,8 +288,7 @@ class PostgresKnowledgeStore:
         return self._root
 
     async def ensure_structure(self) -> None:
-        if self._root is not None:
-            await self._files.ensure_structure()
+        return None
 
     async def write_note(self, relative_path: str, meta: dict, body: str) -> str:
         note = VaultNote(
@@ -355,9 +353,21 @@ class PostgresKnowledgeStore:
         await self.write_yaml(STATE_FILENAME, data)
 
     async def write_attachment(self, relative_path: str, data: bytes) -> str:
-        if self._root is None:
-            raise RuntimeError("knowledge vault attachments require KNOWLEDGE_PATH")
-        return await self._files.write_attachment(relative_path, data)
+        if self._files is not None:
+            return await self._files.write_attachment(relative_path, data)
+        payload = {
+            "encoding": "base64",
+            "bytes": base64.b64encode(data).decode("ascii"),
+        }
+        async with self._factory() as session:
+            path = await KnowledgeService(session).write_document(
+                relative_path, payload
+            )
+            await session.commit()
+        logger.info(
+            "knowledge_attachment_written path=%s store=postgres", path
+        )
+        return path
 
     async def search_fts(
         self,

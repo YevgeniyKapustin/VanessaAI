@@ -37,8 +37,6 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.13.4
-    environment:
-      QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD: 20000
     ports:
       - "127.0.0.1:6333:6333"
       - "127.0.0.1:6334:6334"

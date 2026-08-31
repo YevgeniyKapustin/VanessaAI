@@ -38,7 +38,8 @@ def test_readiness_unavailable_when_check_fails() -> None:
 
 
 def test_postgres_ready_false_on_error(monkeypatch) -> None:
-    engine = MagicMock()
-    engine.sync_engine.connect.side_effect = RuntimeError("db down")
-    monkeypatch.setattr("services.agent.main.engine", engine)
+    monkeypatch.setattr(
+        "services.agent.main.asyncio.run",
+        MagicMock(side_effect=RuntimeError("db down")),
+    )
     assert postgres_ready() is False

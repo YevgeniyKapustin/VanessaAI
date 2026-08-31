@@ -227,9 +227,7 @@ class GateStage:
                 logger.exception("metrics_retrieve_failed")
                 ctx.sender_profile = None
 
-        # Loop-repetition signal: the same sender re-asking the SAME topic with
-        # different words raises Vanessa's annoyance (drives LowAttitudeRule —
-        # maximal ignore tendency — and the cold compose note).
+        # Same sender, same ask at least twice already — not a follow-up.
         if ctx.turn_plan is not None:
             signal = self._loop_registry.update(
                 ctx.turn.sender_telegram_id,

@@ -60,7 +60,7 @@ def test_detect_loop_strength_zero_on_new_topic():
     )
 
 
-def test_detect_loop_strength_one_repeat():
+def test_detect_loop_strength_one_prior_is_not_a_loop():
     recent = _recent("как сделать меш в unity")
     assert (
         detect_loop_strength(
@@ -68,7 +68,34 @@ def test_detect_loop_strength_one_repeat():
             recent,
             sender_telegram_id=42,
         )
-        == 1
+        == 0
+    )
+
+
+def test_detect_loop_strength_two_priors_is_a_loop():
+    recent = _recent(
+        "как сделать меш в unity",
+        "ну как сделать меш в unity",
+    )
+    assert (
+        detect_loop_strength(
+            "сделать меш в unity",
+            recent,
+            sender_telegram_id=42,
+        )
+        == 2
+    )
+
+
+def test_detect_loop_strength_ignores_current_turn_in_window():
+    recent = _recent("а как же меш сделать")
+    assert (
+        detect_loop_strength(
+            "а как же меш сделать",
+            recent,
+            sender_telegram_id=42,
+        )
+        == 0
     )
 
 
@@ -84,6 +111,19 @@ def test_detect_loop_strength_ignores_other_senders():
             "а как же меш сделать",
             [other],
             sender_telegram_id=42,
+        )
+        == 0
+    )
+
+
+def test_detect_loop_strength_planner_level_one_ignored():
+    assert (
+        detect_loop_strength(
+            "ну что там с мешем",
+            [],
+            sender_telegram_id=42,
+            planner_repeated=True,
+            planner_loop_level=1,
         )
         == 0
     )
@@ -115,50 +155,28 @@ def test_detect_loop_strength_planner_signal():
 # --- LoopRegistry ---
 
 
-def test_registry_annoyance_rises_on_loop_and_resets_on_topic_change():
+def test_registry_annoyance_only_on_real_loop():
     registry = LoopRegistry()
-    registry.update(
-        42,
-        "как сделать меш в unity",
-        [],
-        now=1_000.0,
-    )
-    signal = registry.update(
+    one = registry.update(
         42,
         "а как же меш сделать",
         _recent("как сделать меш в unity"),
-        now=1_000.1,
     )
-    assert signal.loop_strength >= 1
-    assert signal.annoyance > 0.0
-    # Topic changes → annoyance resets.
-    signal = registry.update(
+    assert one.loop_strength == 0
+    assert one.annoyance == 0.0
+    looped = registry.update(
+        42,
+        "сделать меш в unity",
+        _recent("как сделать меш в unity", "ну как сделать меш в unity"),
+    )
+    assert looped.loop_strength == 2
+    assert looped.annoyance >= 0.5
+    fresh = registry.update(
         42,
         "что там по работе у лича",
-        _recent("как сделать меш в unity"),
-        now=1_001.0,
+        _recent("как сделать меш в unity", "ну как сделать меш в unity"),
     )
-    assert signal.annoyance == 0.0
-
-
-def test_registry_annoyance_decays_over_time():
-    registry = LoopRegistry(decay_half_life_seconds=10.0)
-    registry.update(42, "как сделать меш в unity", [], now=1_000.0)
-    first = registry.update(
-        42,
-        "а как же меш сделать",
-        _recent("как сделать меш в unity"),
-        now=1_000.1,
-    )
-    assert first.annoyance > 0.0
-    # A long pause on a DIFFERENT topic halves/decays the old annoyance.
-    decayed = registry.update(
-        42,
-        "полностью новая тема про погоду",
-        _recent("как сделать меш в unity"),
-        now=1_000.0 + 10.0,
-    )
-    assert decayed.annoyance < first.annoyance
+    assert fresh.annoyance == 0.0
 
 
 def test_registry_returns_zero_without_sender_id():

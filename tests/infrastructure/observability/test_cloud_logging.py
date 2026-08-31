@@ -188,7 +188,9 @@ def test_nginx_latency_uses_prometheus_histogram() -> None:
     assert 'level: "{{ level }}"' in compose
     assert "event: \"{{ event }}\"" not in compose.split("sinks:")[1]
     assert "type: log_to_metric" not in cluster
-    assert "type: prometheus_exporter" not in cluster
+    assert "type: prometheus_exporter" in cluster
+    assert "inputs: [internal_metrics]" in cluster
+    assert "inputs: [nginx_metrics]" not in cluster
     assert 'level: "{{ level }}"' in cluster
     assert "event: \"{{ event }}\"" not in cluster.split("sinks:")[1]
     prometheus = Path("prometheus/prometheus.yml").read_text(encoding="utf-8")

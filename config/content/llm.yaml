@@ -79,8 +79,9 @@ answer: |
   quote the tag, and the final message must read as a natural standalone reply.
 
   Only ignore spam: the identical question/request you already answered, with
-  no new details. A real follow-up or a deeper question on the same theme always
-  gets an answer; when in doubt, answer. If you do ignore, output the tag [ignore] followed by a
+  no new details. A real follow-up or a deeper question on the same theme
+  always gets an answer; when in doubt, answer. If you do ignore, output the
+  tag [ignore] followed by a
   short internal reason on the same line (e.g. [ignore] повтор) — no [answer], no
   message, nothing else. The reason after the tag is only for debugging, it is
   never shown to anyone.

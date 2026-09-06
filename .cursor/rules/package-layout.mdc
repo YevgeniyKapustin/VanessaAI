@@ -1,0 +1,80 @@
+---
+description: VanessaAI package layout, capability grouping, and import boundaries
+alwaysApply: true
+---
+
+# Package layout
+
+Telegram pipeline bot, not CRUD. Do **not** invent `users/orders/payments`
+or `domain/use_cases/adapters` inside features. Function style (class
+only for state or a DI boundary): `.cursor/rules/python-clean-code.mdc`.
+
+## Where code goes
+
+Top-level is **role**. Inside a role, group by **capability**
+(decision, rag, llm, stickers, ingest, broker, …).
+
+| Role | Path |
+|------|------|
+| Protocols, DTOs, session, logging | `vanessa/core/` |
+| Redis/wire messages | `vanessa/contracts/` |
+| Turn stages | `vanessa/pipeline/` (`decision`, `rag`, `llm`, `orchestrator`, `stages`, `indexing`) |
+| Vault / nodes / portraits | `vanessa/knowledge/` |
+| Redis, Postgres, ingest, outbox, metrics | `vanessa/infrastructure/` |
+| Shared completers | `vanessa/llm/` (not compose-stage prompts) |
+| Settings / YAML loaders | `vanessa/config/` |
+| Telegram adapter | `services/bot/` |
+| Pipeline wiring; HTTP = health/metrics | `services/agent/` |
+| Async jobs / MCP | `services/worker/`, `services/mcp/` |
+
+Do not add a fifth process. Do not import sibling services.
+
+```
+# GOOD — capability colocated
+vanessa/pipeline/decision/gate/eligibility/reply_eligibility.py
+services/bot/stickers/heuristics.py
+
+# BAD
+vanessa/users/domain/entities.py
+vanessa/pipeline/decision/use_cases/adapters/repo.py
+vanessa/pipeline/models/ + vanessa/pipeline/services/   # scattered by technique
+```
+
+Small capabilities stay flat. Add a submodule only for a distinct job
+(`gate/`, `detectors/`, `prompts/`).
+
+## Nesting (soft)
+
+Prefer `vanessa/<area>/<capability>/<file>.py`. One extra level is OK
+for a real submodule. Never `v1/` folders. Do not add a nested
+`services/` dumping ground inside a capability (leave the existing
+`services/bot/services/` adapter helpers unless asked to move them).
+
+## Split files vs folders
+
+**File length wins** (150–200 lines): add a sibling module. Do not
+merge files to stay under a file count. Do not allowlist length.
+
+10–15 files in one folder is a *smell* to consider a submodule, not a
+hard split. Twelve short cohesive files beat four 400-line files.
+Dense roots (`vanessa/knowledge/`, `services/agent/container/`): put
+new work in a named submodule, not a new top-level package.
+
+## Public surfaces
+
+`__init__.py` + `__all__` at **major** boundaries (`vanessa.core`,
+`vanessa.contracts`, capability roots other packages import). Do not
+barrel-export every tiny subpackage. Cross-capability: protocols and
+contracts, not sibling internals.
+
+## Forbidden imports
+
+| From | Must not import |
+|------|-----------------|
+| `vanessa.core` | `vanessa.knowledge`, `vanessa.pipeline`, `vanessa.infrastructure` |
+| `vanessa.pipeline.decision` | `vanessa.pipeline.llm`, `vanessa.pipeline.rag`, `vanessa.infrastructure` |
+| `vanessa.knowledge` | `vanessa.pipeline` |
+| `services.bot` | `vanessa.pipeline`, `vanessa.knowledge`, `vanessa.infrastructure.db`, sibling services |
+| any `services.*` | other `services.*` |
+
+Tests: `tests/test_layer_boundaries.py`, `tests/test_service_boundaries.py`.

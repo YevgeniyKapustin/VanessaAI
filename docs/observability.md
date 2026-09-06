@@ -6,7 +6,7 @@ Bot and API share a `request_id` via `X-Request-ID`. Features stay
 
 ## Prometheus and Grafana
 
-`vanessa/infrastructure/observability/metrics.py` exports:
+`vanessa/infrastructure/observability/metrics/` (`__init__` is the facade; helpers like `observability.metrics.metrics_http`) exports:
 
 - turns (reply vs ignore by reason)
 - per-stage latency (gate, retrieve, compose)
@@ -27,7 +27,8 @@ Grafana, Alertmanager) in the **same** project as the app so Prometheus
 shares the `backend` network. Include `docker-compose.logging.yml` for
 Compose Loki/Vector. Do **not** also apply `deploy/k8s/logging` — one
 Loki only. Hybrid: omit the logging compose file and set
-`LOKI_URL=http://host.docker.internal:3100`. Grafana/Prometheus/Alertmanager
+`LOKI_URL=http://kubernetes.docker.internal:3100` (Docker Desktop
+hostPort is on the k8s node, not Windows `localhost`). Grafana/Prometheus/Alertmanager
 bind `127.0.0.1` so they are not on the LAN. Compose Loki is Cluster-network
 only (no host port).
 
@@ -62,7 +63,7 @@ Flags and defaults: [`.env.defaults`](../.env.defaults) /
 
 ## Langfuse
 
-`vanessa/infrastructure/observability/tracing.py` wraps the orchestrator, pipeline stages,
+`vanessa/infrastructure/observability/tracing/` wraps the orchestrator, pipeline stages,
 LLM providers, and completers. You see gate → retrieve → compose as
 spans plus per-call token usage.
 
@@ -85,7 +86,7 @@ running a second expensive model on every turn.
 
 ## Alerting
 
-`vanessa/infrastructure/observability/alerting.py` watches local rolling windows:
+`vanessa/infrastructure/observability/alerting/` watches local rolling windows:
 
 - LLM error rate
 - turn p95 latency

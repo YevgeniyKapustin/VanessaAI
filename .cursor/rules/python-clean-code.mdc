@@ -1,0 +1,142 @@
+---
+description: >-
+  Python clean-code: guard clauses, pathlib, functions vs classes,
+  DI at composition roots, no boolean traps, low complexity
+globs: **/*.py
+alwaysApply: false
+---
+
+# Python clean code
+
+Applies to new code and edits. Python 3.12 (Poetry
+`python = "^3.12"`, Ruff `target-version = "py312"`). 3.12 idioms
+(`type` aliases, `match`) are allowed. Do not down-level.
+
+- **RET:** flatten with guard clauses. No `else` after `return`.
+- **PTH:** use `pathlib.Path`. Do not mix `os.path` and `Path` in one
+  function. If the module is `os.path`-heavy, stay consistent or convert
+  the whole local helper.
+- **FBT:** no boolean positional args. Keyword-only flags (`*,`).
+- **C90:** complexity under 4. Flatten with guard clauses. Extract a
+  named helper when a branch cluster has a clear job. Do not invent
+  a Strategy/Factory tree just to hit the number.
+- **Module size:** under 150–200 lines; split into sibling modules.
+  Prefer a new file over growing past the budget. Do not pack one
+  line, stuff huge strings, disable the CI check, or allowlist a path.
+  Tests may exceed 200; keep them compact. Where the new file goes:
+  `.cursor/rules/package-layout.mdc`.
+- **UP:** modern idioms for *this* project's Python only.
+- Preserve public signatures unless asked.
+- **YAGNI:** no new layers, Unit of Work, or DDD packages without a
+  real problem. Do not invent a Protocol/Factory for one-off branches.
+  Do pass dependencies explicitly at composition roots (below).
+
+```python
+# BAD: else-after-return, os.path+Path mix, positional bool
+def load(path, cache):
+    if os.path.isfile(path):
+        return Path(path).read_text()
+    else:
+        return ""
+
+# GOOD
+def load(path: Path, *, cache: bool = False) -> str:
+    if not path.is_file():
+        return ""
+    return path.read_text()
+```
+
+## Functions vs classes
+
+Default: **plain functions**; modules are namespaces. Do **not**
+impose uniform OOP or method-chaining. Telegram pipeline, not CRUD.
+
+| Use | When |
+|-----|------|
+| Function | Handlers, routers, formatters, parsers, gate rules, stages |
+| Class | Mutable state / lifecycle, **or** a DI boundary: broker, repository, store, retriever, completer, engine, session |
+| Pydantic / dataclass | Schemas, config, wire DTOs, validation — data, not rich domain |
+
+```python
+# BAD: stateless @staticmethod wrapper
+class Formatters:
+    @staticmethod
+    def telegram(text: str) -> str: ...
+
+# GOOD
+def format_telegram(text: str) -> str: ...
+```
+
+**DI:** pass services/repos/clients at process roots
+(`services/agent/container`, factories). No hidden globals where
+injection is viable. Inside a stage, pass deps as function arguments;
+do not wrap every helper as a service class.
+
+**Protocol:** `vanessa.core` (or the capability) when behaviors are
+interchangeable. Not a Strategy class for one `if`.
+
+**Factory:** only if construction is multi-step, env-conditional, or
+messy. Not for every DTO. Prefer a plain function `build_…()`, not a
+Factory/Builder class. Repository already lives in
+`infrastructure/db` — no extra UoW layer unless a real transaction
+boundary exists. No `domain/` package for “business logic”.
+
+SRP = one reason to change (and 150–200 line modules). Composition
+over inheritance; no deep class trees. Leading `_` for internals;
+avoid `__` name-mangling unless there is a clash.
+
+## Anti-patterns
+
+- No utility classes of only `@staticmethod` / `@classmethod`.
+- No god objects (routing + serialization + logic + I/O together).
+- Do **not** ban anemic models. Contracts, messages, settings, gate
+  results **should** be data. Behavior lives in stage functions. Rich
+  methods only where invariants exist (session, outbox, stores,
+  brokers).
+- Do **not** unpack an existing context or DTO into a long kwargs list
+  for a sibling that immediately rebuilds the same object (`decide`
+  taking 15 fields then constructing `DecisionContext` twice). Pass
+  the object (`DecisionContext`, `TurnPipelineContext`, `ChatTurnInput`,
+  `OrchestratorConfig`, `LLMGenerationParams`). Do not enable PLR0913.
+  Do not invent a Parameter Object to dodge argument count. Keyword-only
+  flags remain OK at a true boundary when no such object exists yet.
+
+### Constructor wallpaper
+
+Fat DTO signatures are OK. The bug is re-listing their fields at
+call sites — especially a stage that builds several objects that way.
+
+```python
+# BAD: stage lists fields of two fat DTOs
+def run_turn(msg, settings):
+    turn = ChatTurnInput(
+        telegram_chat_id=msg.chat.id,
+        message=msg.text,
+        sender_telegram_id=msg.from_user.id,
+        mentions_bot=msg.mentions_bot,
+        reply_to_bot=msg.reply_to_bot,
+        reply_to_text=msg.reply_to_text,
+    )
+    cfg = OrchestratorConfig(
+        session_window_size=settings.session_window_size,
+        session_idle_seconds=settings.session_idle_seconds,
+        planner_prefilter_enabled=settings.planner_prefilter,
+        humor_top_k=settings.rag_humor_top_k,
+    )
+    return orchestrate(turn, cfg)
+
+# GOOD: assembly in build_*; the stage takes finished objects
+turn = build_turn_input(msg)
+cfg = build_orchestrator_config(settings)
+
+def run_turn(turn: ChatTurnInput, cfg: OrchestratorConfig) -> ...:
+    return orchestrate(turn, cfg)
+```
+
+Wallpaper at a composition root may move into `build_*` (plain
+functions, not a Factory class). Nested fields that are real parts
+(`llm: LLMGenerationParams` on a larger config) are structure, not a
+Parameter Object. Do not "fix" wallpaper with
+`Foo(**bar.model_dump())`, `**kwargs` forwarding, or a new dataclass
+to dodge argument count. One composition-root helper may be a bit
+long; business/stage functions must not be.

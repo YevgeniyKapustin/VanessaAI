@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Check Python file length
+        run: bash scripts/check_python_file_length.sh
+
       - name: Run Ruff
         uses: astral-sh/ruff-action@v4.1.0
         with:

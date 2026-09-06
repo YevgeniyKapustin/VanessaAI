@@ -153,7 +153,8 @@ docker tag vanessa-agent:latest vanessa-agent:local
   `kubectl apply -k deploy/k8s/` is **apps only**. Logging is
   `kubectl apply -k deploy/k8s/logging` or the desktop overlay.
 - Hybrid: omit `docker-compose.logging.yml`, set
-  `LOKI_URL=http://host.docker.internal:3100` (desktop overlay hostPort 3100).
+  `LOKI_URL=http://kubernetes.docker.internal:3100` (desktop overlay
+  hostPort 3100 on the Docker Desktop node, not Windows localhost).
   Grafana stays in Compose.
 
 ```bash
@@ -182,7 +183,7 @@ Docker Desktop (hybrid: Postgres/Qdrant/Redis stay in compose):
 ```bash
 docker compose stop agent bot worker mcp-websearch mcp-knowledge mcp-vision
 # Keep Compose Prometheus/Grafana; omit docker-compose.logging.yml
-# (cluster Loki). Set LOKI_URL=http://host.docker.internal:3100
+# (cluster Loki). Set LOKI_URL=http://kubernetes.docker.internal:3100
 docker compose --env-file .env.defaults --env-file .env.local \
   -f docker-compose.infra.yml -f docker-compose.monitoring.yml up -d
 docker tag vanessa-agent:latest vanessa-agent:local
@@ -195,9 +196,10 @@ kubectl apply -k deploy/k8s/overlays/desktop
 kubectl -n vanessa port-forward svc/agent 8000:8000
 ```
 
-The desktop overlay publishes Loki hostPort 3100 so Compose Grafana can
-reach it. That port binds every host interface — Desktop only. Hosts
-come from the CLI flags above, not from kustomize. Vanessa stays
+The desktop overlay publishes Loki hostPort 3100 on the Docker Desktop
+node (`kubernetes.docker.internal`), not Windows localhost. Compose
+Grafana needs `LOKI_URL=http://kubernetes.docker.internal:3100`.
+Hosts come from the CLI flags above, not from kustomize. Vanessa stays
 restricted PSS; logging stays privileged for Vector.
 
 ```bash

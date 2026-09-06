@@ -1,0 +1,75 @@
+# VanessaAI: keep source, tests, configs, and docs visible.
+# Hide caches, secrets, dumps, and other agent-useless noise.
+
+# Caches, coverage, and tool scratch (git status is flooded by .ruff_cache)
+.ruff_cache/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+
+# Virtualenvs and local package/build leftovers
+.venv/
+venv/
+env/
+.eggs/
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+*.pyc
+*.pyo
+
+# HuggingFace / sentence-transformers caches
+.cache/
+.huggingface/
+HF_HOME/
+
+# Logs and temp
+logs/
+*.log
+tmp/
+tmp_out.txt
+
+# Local data dumps, DBs, and the root Obsidian vault (not vanessa/knowledge/)
+/data/
+/knowledge/
+*.sqlite
+*.sqlite3
+*.db
+plans/
+result.json
+scripts/result.json
+ruff_remaining.txt
+
+# Secrets (keep .env.example and .env.defaults — agents need those)
+.env
+.env.*
+!.env.example
+!.env.defaults
+.ssh/
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+secrets.env
+*.secrets.yaml
+deploy/k8s/secrets.env
+
+# IDE junk and a large root binary; .cursor/ stays visible for project rules
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Vanessa.png
+poetry.toml
+
+# Cursor defaults also ignore *.lock and .env*; re-include what agents need
+!poetry.lock

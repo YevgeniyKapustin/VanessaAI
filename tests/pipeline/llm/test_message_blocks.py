@@ -1,4 +1,7 @@
-from vanessa.pipeline.llm.format.message_blocks import split_reply_into_blocks, strip_block_markers
+from vanessa.pipeline.llm.format.message_blocks import (
+    split_reply_into_blocks,
+    strip_block_markers,
+)
 
 
 def test_strip_block_markers_removes_marker_lines():
@@ -39,16 +42,19 @@ def test_split_fallback_on_long_reply_without_markers():
         "Второе предложение тоже длинное. "
         "Третье предложение ещё одно."
     )
-    blocks = split_reply_into_blocks(reply, fallback_target_chars=20)
-    assert len(blocks) >= 2
+    fallback_target_chars = 20
+    blocks = split_reply_into_blocks(reply, fallback_target_chars=fallback_target_chars)
+    min_blocks = 2
+    assert len(blocks) >= min_blocks
     assert all(block.strip() for block in blocks)
 
 
 def test_split_hard_cap_every_block_under_max():
     reply = "слово " * 5000
-    blocks = split_reply_into_blocks(reply, max_chars=1000)
+    max_chars = 1000
+    blocks = split_reply_into_blocks(reply, max_chars=max_chars)
     assert len(blocks) > 1
-    assert all(len(block) <= 1000 for block in blocks)
+    assert all(len(block) <= max_chars for block in blocks)
 
 
 def test_split_empty_reply_returns_empty():
@@ -71,18 +77,20 @@ def test_split_fallback_splits_chat_text_without_punctuation():
     # Casual chat often has no sentence punctuation — the fallback must still
     # split a long reply into short blocks instead of one wall of text.
     reply = "первое сообщение про крабера и его гаражи " * 3
-    blocks = split_reply_into_blocks(reply, fallback_target_chars=40)
+    fallback_target_chars = 40
+    blocks = split_reply_into_blocks(reply, fallback_target_chars=fallback_target_chars)
     assert len(blocks) > 1
-    assert all(len(block) <= 40 for block in blocks)
+    assert all(len(block) <= fallback_target_chars for block in blocks)
 
 
 def test_split_fallback_splits_long_single_paragraph():
     # One long unpunctuated paragraph (typical model output) → several blocks,
     # each at most the target size.
     reply = " ".join(f"слово{i}" for i in range(200))
-    blocks = split_reply_into_blocks(reply, fallback_target_chars=120)
+    fallback_target_chars = 120
+    blocks = split_reply_into_blocks(reply, fallback_target_chars=fallback_target_chars)
     assert len(blocks) > 1
-    assert all(len(block) <= 120 for block in blocks)
+    assert all(len(block) <= fallback_target_chars for block in blocks)
 
 
 def test_fallback_splits_reply_into_short_messages_without_newlines():
@@ -95,7 +103,8 @@ def test_fallback_splits_reply_into_short_messages_without_newlines():
         "Third thought wraps it up."
     )
     blocks = split_reply_into_blocks(reply)
-    assert len(blocks) == 2
+    expected_blocks = 2
+    assert len(blocks) == expected_blocks
     assert all("\n" not in block for block in blocks)
     assert "First thought about the garages. Second thought keeps it going." in blocks
 
@@ -103,7 +112,8 @@ def test_fallback_splits_reply_into_short_messages_without_newlines():
 def test_fallback_groups_at_most_two_sentences_per_message():
     reply = "One. Two. Three. Four."
     blocks = split_reply_into_blocks(reply)
-    assert len(blocks) == 2
+    expected_blocks = 2
+    assert len(blocks) == expected_blocks
     assert blocks == ["One. Two.", "Three. Four."]
 
 
@@ -112,7 +122,8 @@ def test_fallback_never_joins_paragraphs_with_newline():
     # into one message with blank-line breaks.
     reply = "One thought.\n\nAnother thought.\n\nA third one."
     blocks = split_reply_into_blocks(reply)
-    assert len(blocks) == 2
+    expected_blocks = 2
+    assert len(blocks) == expected_blocks
     assert all("\n" not in block for block in blocks)
 
 

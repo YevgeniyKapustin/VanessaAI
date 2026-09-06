@@ -17,14 +17,16 @@ def test_truncate_body_under_limit_unchanged() -> None:
 
 def test_truncate_body_cuts_at_sentence_boundary() -> None:
     text = "Первое предложение. Второе предложение с длинным хвостом."
-    result = truncate_body(text, 24)
-    assert len(result) <= 24
+    char_limit = 24
+    result = truncate_body(text, char_limit)
+    assert len(result) <= char_limit
     assert result.startswith("Первое предложение")
 
 
 def test_truncate_body_without_boundary_appends_ellipsis() -> None:
-    result = truncate_body("а" * 100, 10)
-    assert len(result) <= 10
+    char_limit = 10
+    result = truncate_body("а" * 100, char_limit)
+    assert len(result) <= char_limit
     assert result.endswith("…")
 
 
@@ -36,15 +38,17 @@ def test_apply_budget_disabled_returns_all_parts() -> None:
 
 
 def test_apply_budget_per_section_cap() -> None:
-    budget = PromptBudgetContent(enabled=True, max_chars=0, context_blocks=10)
+    context_cap = 10
+    budget = PromptBudgetContent(enabled=True, max_chars=0, context_blocks=context_cap)
     parts = [(PRIORITY_CONTEXT, "context_blocks", "c" * 100)]
     result = apply_budget(parts, budget, enabled=True)
     assert len(result) == 1
-    assert len(result[0][2]) <= 10
+    assert len(result[0][2]) <= context_cap
 
 
 def test_apply_budget_global_cap_keeps_high_priority() -> None:
-    budget = PromptBudgetContent(enabled=True, max_chars=400)
+    max_chars = 400
+    budget = PromptBudgetContent(enabled=True, max_chars=max_chars)
     current = "CURRENT_" * 20  # 160 chars
     parts = [
         (PRIORITY_CURRENT, "current_message", current),
@@ -57,7 +61,7 @@ def test_apply_budget_global_cap_keeps_high_priority() -> None:
     assert bodies["current_message"] == current
     assert "context_blocks" not in bodies
     total = sum(len(body) for body in bodies.values())
-    assert total <= 400
+    assert total <= max_chars
 
 
 def test_apply_budget_global_cap_keeps_order() -> None:

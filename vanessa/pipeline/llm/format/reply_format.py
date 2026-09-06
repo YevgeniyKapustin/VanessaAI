@@ -1,10 +1,13 @@
 import re
 
+from vanessa.pipeline.llm.format.code_fences import (
+    map_outside_fences as _map_outside_fences,
+)
+
 _LOWERCASE_OK = frozenset({"хз", "ок", "ага", "угу", "мм", "..."})
 _SENTENCE_START = re.compile(
     r"(^|[.!?…]\s+|\.{3}\s+)([a-zа-яё])",
 )
-_FENCED_CODE = re.compile(r"```[\s\S]*?```", re.DOTALL)
 _LICH_SPELLING = re.compile(r"(?<![а-яё])([Лл])ич(?![ьЬа-яё])")
 
 
@@ -14,21 +17,9 @@ def fix_participant_spelling(text: str) -> str:
 
 def capitalize_sentences(text: str) -> str:
     stripped = text.strip()
-    if not stripped:
+    if not stripped or stripped.lower() in _LOWERCASE_OK:
         return stripped
-    if stripped.lower() in _LOWERCASE_OK:
-        return stripped
-
-    parts: list[str] = []
-    last = 0
-    for match in _FENCED_CODE.finditer(stripped):
-        if match.start() > last:
-            parts.append(_capitalize_prose(stripped[last : match.start()]))
-        parts.append(match.group(0))
-        last = match.end()
-    if last < len(stripped):
-        parts.append(_capitalize_prose(stripped[last:]))
-    result = "".join(parts) if parts else _capitalize_prose(stripped)
+    result = _map_outside_fences(stripped, _capitalize_prose)
     return fix_participant_spelling(result)
 
 
@@ -47,6 +38,7 @@ _TRAILING_PERIODS = re.compile(r"\.+$")
 _ADDRESS_SEPARATOR = r"(?:,|:|…|\.\.\.|—)"
 _ADDRESS_WRAP = r"[«„“\"'»”']?"
 _DIGITS_ONLY = re.compile(r"^\d+$")
+_MIN_NAME_TOKEN_LEN = 3
 
 
 def _sender_name_tokens(sender_name: str) -> list[str]:
@@ -57,9 +49,9 @@ def _sender_name_tokens(sender_name: str) -> list[str]:
     """
     tokens: list[str] = []
     for token in re.split(r"[\s(),«»\"'„“\-]+", sender_name):
-        token = token.strip(".,;:!?")
-        if len(token) >= 3 and not _DIGITS_ONLY.match(token):
-            tokens.append(token)
+        cleaned = token.strip(".,;:!?")
+        if len(cleaned) >= _MIN_NAME_TOKEN_LEN and not _DIGITS_ONLY.match(cleaned):
+            tokens.append(cleaned)
     return tokens
 
 
@@ -70,6 +62,18 @@ def _leading_address_pattern(name: str) -> re.Pattern[str]:
         rf"^\s*{_ADDRESS_WRAP}{core}{_ADDRESS_WRAP}\s*{_ADDRESS_SEPARATOR}\s*",
         re.IGNORECASE,
     )
+
+
+def _strip_first_address(stripped: str, sender_name: str) -> str:
+    for token in _sender_name_tokens(sender_name):
+        match = _leading_address_pattern(token).match(stripped)
+        if match is None:
+            continue
+        # Never return an empty reply: if the whole text was just the name,
+        # keep it as-is rather than sending an empty message.
+        result = stripped[match.end() :].strip()
+        return result or stripped
+    return stripped
 
 
 def strip_leading_address(text: str, sender_name: str | None = None) -> str:
@@ -86,15 +90,7 @@ def strip_leading_address(text: str, sender_name: str | None = None) -> str:
     stripped = text.strip()
     if not stripped:
         return stripped
-    for token in _sender_name_tokens(sender_name):
-        match = _leading_address_pattern(token).match(stripped)
-        if match is None:
-            continue
-        # Never return an empty reply: if the whole text was just the name,
-        # keep it as-is rather than sending an empty message.
-        result = stripped[match.end() :].strip()
-        return result or stripped
-    return stripped
+    return _strip_first_address(stripped, sender_name)
 
 
 def strip_trailing_periods(text: str) -> str:

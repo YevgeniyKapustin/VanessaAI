@@ -3,6 +3,11 @@
 from vanessa.config.content import get_content
 from vanessa.config.settings import settings
 from vanessa.core.messages import WebResult
+from vanessa.pipeline.llm.prompts.budget import (
+    PRIORITY_KNOWLEDGE,
+    PRIORITY_WEB,
+    apply_budget,
+)
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
 
 
@@ -70,7 +75,6 @@ def test_web_block_yields_to_prompt_budget(monkeypatch):
 def test_web_priority_below_archive_in_budget(monkeypatch):
     """Web results have LOWER budget priority than the archive: under a tight
     global cap, the archive survives and the web block is dropped first."""
-    from vanessa.pipeline.llm.prompts.budget import PRIORITY_KNOWLEDGE, PRIORITY_WEB, apply_budget
 
     budget = get_content().llm.budget
     monkeypatch.setattr(budget, "max_chars", 400)

@@ -18,7 +18,13 @@ from __future__ import annotations
 
 import re
 
-_FENCED_CODE = re.compile(r"```[\s\S]*?```", re.DOTALL)
+from vanessa.pipeline.llm.format.code_fences import (
+    FENCED_CODE as _FENCED_CODE,
+)
+from vanessa.pipeline.llm.format.code_fences import (
+    map_outside_fences as _map_outside_fences,
+)
+
 # Tag like `[answer]`, `[ANSWER]`, `[ Answer ]`.
 _ANSWER_TAG = re.compile(r"\[\s*answer\s*\]", re.IGNORECASE)
 # Explicit "this is a repeat, stay silent" tag the compose model emits INSTEAD
@@ -44,6 +50,20 @@ _CONTROL_TOKEN = re.compile(
 )
 
 
+def _offset_last_span(
+    text: str,
+    start: int,
+    end: int,
+    last: tuple[int, int] | None,
+) -> tuple[int, int] | None:
+    if end <= start:
+        return last
+    found = _last_tag_span_in_segment(text[start:end])
+    if found is None:
+        return last
+    return (start + found[0], start + found[1])
+
+
 def _last_tag_span(text: str) -> tuple[int, int] | None:
     """``(start, end)`` of the last ``[answer]`` tag outside code fences, or None.
 
@@ -53,16 +73,9 @@ def _last_tag_span(text: str) -> tuple[int, int] | None:
     last: tuple[int, int] | None = None
     cursor = 0
     for match in _FENCED_CODE.finditer(text):
-        if match.start() > cursor:
-            found = _last_tag_span_in_segment(text[cursor : match.start()])
-            if found is not None:
-                last = (cursor + found[0], cursor + found[1])
+        last = _offset_last_span(text, cursor, match.start(), last)
         cursor = match.end()
-    if cursor < len(text):
-        found = _last_tag_span_in_segment(text[cursor:])
-        if found is not None:
-            last = (cursor + found[0], cursor + found[1])
-    return last
+    return _offset_last_span(text, cursor, len(text), last)
 
 
 def _last_tag_span_in_segment(segment: str) -> tuple[int, int] | None:
@@ -72,20 +85,6 @@ def _last_tag_span_in_segment(segment: str) -> tuple[int, int] | None:
         return None
     match = matches[-1]
     return match.start(), match.end()
-
-
-def _map_outside_fences(text: str, mapper) -> str:
-    """Apply ``mapper`` to every non-code segment, keeping code fences intact."""
-    parts: list[str] = []
-    cursor = 0
-    for match in _FENCED_CODE.finditer(text):
-        if match.start() > cursor:
-            parts.append(mapper(text[cursor : match.start()]))
-        parts.append(match.group(0))
-        cursor = match.end()
-    if cursor < len(text):
-        parts.append(mapper(text[cursor:]))
-    return "".join(parts)
 
 
 def strip_control_tags(text: str) -> str:
@@ -156,10 +155,7 @@ def has_ignore_marker(text: str) -> bool:
     is NOT a refusal.
     """
     text = text or ""
-    for line in text.splitlines():
-        if _IGNORE_TAG.match(line.strip()):
-            return True
-    return False
+    return any(_IGNORE_TAG.match(line.strip()) for line in text.splitlines())
 
 
 def extract_ignore_reason(text: str) -> str:

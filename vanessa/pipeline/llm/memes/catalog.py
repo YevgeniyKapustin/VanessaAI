@@ -77,6 +77,19 @@ class MemeCatalog:
         window = memes[offset:] + memes[:offset]
         return window[:count]
 
+    def _keyword_hit(self, patterns: list[re.Pattern[str]], message: str) -> bool:
+        return any(pattern.search(message) for pattern in patterns)
+
+    def _collect_matches(self, message: str, limit: int) -> list[MemeDefContent]:
+        matched: list[MemeDefContent] = []
+        for meme, patterns in self._patterns:
+            if not self._keyword_hit(patterns, message):
+                continue
+            matched.append(meme)
+            if len(matched) >= limit:
+                break
+        return matched
+
     def match(
         self,
         message: str,
@@ -93,10 +106,4 @@ class MemeCatalog:
         limit = max_results if max_results is not None else self._content.max_per_reply
         if limit <= 0:
             return []
-        matched: list[MemeDefContent] = []
-        for meme, patterns in self._patterns:
-            if any(pattern.search(message) for pattern in patterns):
-                matched.append(meme)
-                if len(matched) >= limit:
-                    break
-        return matched
+        return self._collect_matches(message, limit)

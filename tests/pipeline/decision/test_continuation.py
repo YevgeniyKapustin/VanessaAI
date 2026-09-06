@@ -1,5 +1,5 @@
 from vanessa.core.messages import ContextMessage
-from vanessa.pipeline.decision.gate.continuation import (
+from vanessa.pipeline.decision.gate.addressing.continuation import (
     DEFAULT_CONTINUATION_PHRASES,
     is_continuation_phrase,
     is_sender_continuation_demand,
@@ -82,13 +82,15 @@ def _recent_with_reply(partner: int = 1, *, interleaved: int = 0) -> list[Contex
 
 
 def test_last_bot_reply_partner_sender_id():
-    recent = _recent_with_reply(partner=7)
-    assert last_bot_reply_partner_sender_id(recent) == 7
+    partner_id = 7
+    recent = _recent_with_reply(partner=partner_id)
+    assert last_bot_reply_partner_sender_id(recent) == partner_id
 
 
 def test_last_bot_reply_partner_sender_id_with_interleaving():
-    recent = _recent_with_reply(partner=7, interleaved=2)
-    assert last_bot_reply_partner_sender_id(recent) == 7
+    partner_id = 7
+    recent = _recent_with_reply(partner=partner_id, interleaved=2)
+    assert last_bot_reply_partner_sender_id(recent) == partner_id
 
 
 def test_last_bot_reply_partner_sender_id_none_without_assistant():
@@ -107,29 +109,33 @@ def test_last_bot_reply_partner_sender_id_none_when_no_prior_user():
 
 
 def test_sender_continuation_demand_match():
-    recent = _recent_with_reply(partner=1) + [
-        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=1)
+    recent = [
+        *_recent_with_reply(partner=1),
+        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=1),
     ]
     assert is_sender_continuation_demand("а ещё", recent, 1) is True
 
 
 def test_sender_continuation_demand_wrong_sender():
-    recent = _recent_with_reply(partner=1) + [
-        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=2)
+    recent = [
+        *_recent_with_reply(partner=1),
+        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=2),
     ]
     assert is_sender_continuation_demand("а ещё", recent, 2) is False
 
 
 def test_sender_continuation_demand_requires_sender():
-    recent = _recent_with_reply(partner=1) + [
-        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=1)
+    recent = [
+        *_recent_with_reply(partner=1),
+        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=1),
     ]
     assert is_sender_continuation_demand("а ещё", recent, None) is False
 
 
 def test_sender_continuation_demand_too_far_back():
-    recent = _recent_with_reply(partner=1, interleaved=2) + [
-        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=1)
+    recent = [
+        *_recent_with_reply(partner=1, interleaved=2),
+        ContextMessage(id=5, role="user", content="а ещё", sender_telegram_id=1),
     ]
     # messages_since = 3 <= DEFAULT_MAX_MESSAGES_BACK, still matches.
     assert is_sender_continuation_demand("а ещё", recent, 1) is True
@@ -146,7 +152,8 @@ def test_sender_continuation_demand_without_assistant():
 
 
 def test_sender_continuation_demand_non_phrase():
-    recent = _recent_with_reply(partner=1) + [
-        ContextMessage(id=5, role="user", content="как дела", sender_telegram_id=1)
+    recent = [
+        *_recent_with_reply(partner=1),
+        ContextMessage(id=5, role="user", content="как дела", sender_telegram_id=1),
     ]
     assert is_sender_continuation_demand("как дела", recent, 1) is False

@@ -2,7 +2,9 @@ from collections import Counter
 from threading import Lock
 
 from vanessa.core.turn_metrics import TurnMetricsSnapshot
-from vanessa.infrastructure.observability.metrics import record_turn as record_turn_metric
+from vanessa.infrastructure.observability.metrics import (
+    record_turn as record_turn_metric,
+)
 
 
 class TurnMetrics:

@@ -30,15 +30,16 @@ def test_schedule_publishes_with_dispatcher() -> None:
         session_factory=MagicMock(),
         dispatcher=dispatcher,
     )
-    svc.schedule(_message())
+    stored = _message()
+    svc.schedule(stored)
     assert len(dispatcher.submissions) == 1
     task, payload, dedup_key = dispatcher.submissions[0]
     assert task == TaskKind.INDEX_MESSAGE
-    assert payload["message_id"] == 7
+    assert payload["message_id"] == stored.id
     assert payload["role"] == "user"
     assert payload["content"] == "hello"
     assert payload["point_id"] == "old-point"
-    assert dedup_key == "index:7"
+    assert dedup_key == f"index:{stored.id}"
 
 
 def test_schedule_uses_background_without_dispatcher() -> None:

@@ -9,8 +9,10 @@ from vanessa.pipeline.decision.detectors.noise import NoiseHeuristics
 from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
 from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
 from vanessa.pipeline.decision.engine import DecisionEngine
-from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
+    ReplyEligibility,
+)
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
@@ -29,12 +31,13 @@ class FakeRelevance:
         query_vector: list[float] | None = None,
         search_text: str | None = None,
     ) -> float:
+        _ = text, query_vector, search_text
         return self._score
 
 
 class FakeMessageRepo:
     async def create(self, **kwargs: object):
-        return None
+        _ = kwargs
 
 
 class FakeIndexing:
@@ -90,6 +93,7 @@ class ScriptedPlanner:
         self._plan = plan
 
     async def prepare(self, *args: object, **kwargs: object) -> TurnPlan:
+        _ = args, kwargs
         return self._plan
 
 

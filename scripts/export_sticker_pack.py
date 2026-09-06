@@ -21,15 +21,22 @@ import argparse
 import sys
 from pathlib import Path
 
+import yaml
+
+from scripts.export_sticker_pack_ops import (
+    fetch_remote_stickers,
+    match_sticker,
+    print_new_in_pack,
+    print_pack_listing,
+    record_match,
+    require_token,
+    write_updates,
+)
+from vanessa.config.content import get_content, resolve_content_source
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-import httpx
-import yaml
-
-from vanessa.config.content import get_content, resolve_content_source
-from vanessa.config.settings import settings
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -66,74 +73,6 @@ def _resolve_stickers_yaml() -> Path:
     return source
 
 
-def _parse_name(stripped: str) -> str:
-    value = stripped.split(":", 1)[1].strip()
-    return value.strip("\"'").strip()
-
-
-def _rewrite_block(block: list[str], index: int, file_id: str) -> list[str]:
-    """Return the sticker block with index/file_id set, inserting file_id if absent."""
-    out: list[str] = []
-    had_file_id = False
-    for line in block:
-        stripped = line.strip()
-        if stripped.startswith("index:"):
-            indent = line[: len(line) - len(line.lstrip())]
-            out.append(f"{indent}index: {index}\n")
-            continue
-        if stripped.startswith("file_id:"):
-            indent = line[: len(line) - len(line.lstrip())]
-            out.append(f'{indent}file_id: "{file_id}"\n')
-            had_file_id = True
-            continue
-        out.append(line)
-    if not had_file_id:
-        # Insert file_id right after the index line (fall back to emoji line).
-        for pos, line in enumerate(out):
-            if line.strip().startswith("index:"):
-                indent = line[: len(line) - len(line.lstrip())]
-                out.insert(pos + 1, f'{indent}file_id: "{file_id}"\n')
-                break
-        else:
-            for pos, line in enumerate(out):
-                if line.strip().startswith("emoji:"):
-                    indent = line[: len(line) - len(line.lstrip())]
-                    out.insert(pos + 1, f'{indent}file_id: "{file_id}"\n')
-                    break
-    return out
-
-
-def apply_updates_to_text(text: str, updates: dict[str, tuple[int, str]]) -> str:
-    """Rewrite index/file_id inside the yaml by name, preserving all other content."""
-    lines = text.splitlines(keepends=True)
-    out: list[str] = []
-    i = 0
-    n = len(lines)
-    while i < n:
-        line = lines[i]
-        stripped = line.strip()
-        if stripped.startswith("- name:"):
-            name = _parse_name(stripped)
-            base_indent = len(line) - len(line.lstrip())
-            block = [line]
-            i += 1
-            while i < n:
-                nxt = lines[i]
-                if nxt.strip() and (len(nxt) - len(nxt.lstrip())) <= base_indent:
-                    break
-                block.append(nxt)
-                i += 1
-            if name in updates:
-                index, file_id = updates[name]
-                out.extend(_rewrite_block(block, index, file_id))
-            else:
-                out.extend(block)
-            continue
-        out.append(line)
-        i += 1
-    return "".join(out)
-
-
 def build_updates(data: dict, remote: list[dict]) -> dict[str, tuple[int, str]]:
     """Compute index/file_id updates for known stickers and report pack changes."""
     by_index = {r["index"]: r for r in remote}
@@ -142,86 +81,33 @@ def build_updates(data: dict, remote: list[dict]) -> dict[str, tuple[int, str]]:
     matched_remote: set[int] = set()
 
     for item in data.get("stickers", []):
-        name = item.get("name")
-        match = None
-        idx = item.get("index")
-        if idx is not None and idx in by_index:
-            match = by_index[idx]
-        if match is None and item.get("emoji") in by_emoji:
-            match = by_emoji[item["emoji"]]
+        match = match_sticker(item, by_index, by_emoji)
         if match is None:
-            print(f"MISSING in pack: name={name} index={idx!r} emoji={item.get('emoji')!r}")
+            print(
+                f"MISSING in pack: name={item.get('name')} "
+                f"index={item.get('index')!r} emoji={item.get('emoji')!r}"
+            )
             continue
-        matched_remote.add(match["index"])
-        old_id = item.get("file_id")
-        new_id = match["file_id"]
-        new_index = match["index"]
-        if old_id != new_id or item.get("index") != new_index:
-            updates[name] = (new_index, new_id)
-            old_desc = old_id if old_id else "<missing>"
-            print(f"UPDATE name={name} index={item.get('index')!r}->{new_index} "
-                  f"file_id={old_desc}->{new_id}")
-        else:
-            print(f"OK name={name} index={new_index} file_id={new_id}")
+        record_match(item, match, updates, matched_remote)
 
-    new_pack = [r for r in remote if r["index"] not in matched_remote]
-    for r in new_pack:
-        print(
-            f"NEW in pack (not in config): index={r['index']} "
-            f"emoji={r['emoji']!r} file_id={r['file_id']}"
-        )
+    print_new_in_pack(remote, matched_remote)
     return updates
 
 
 def main() -> None:
     args = build_parser().parse_args()
-
-    token = settings.telegram_bot_token.strip()
-    if not token:
-        print("TELEGRAM_BOT_TOKEN is not set", file=sys.stderr)
-        raise SystemExit(1)
-
-    response = httpx.post(
-        f"https://api.telegram.org/bot{token}/getStickerSet",
-        json={"name": args.set_name},
-        timeout=30.0,
-    )
-    response.raise_for_status()
-    data = response.json()
-    if not data.get("ok"):
-        print(f"API error: {data.get('description')}", file=sys.stderr)
-        raise SystemExit(1)
-
-    stickers = data.get("result", {}).get("stickers", [])
-    remote = [
-        {"index": index, "emoji": sticker.get("emoji", ""), "file_id": sticker.get("file_id", "")}
-        for index, sticker in enumerate(stickers)
-    ]
-    print(f"set_name={args.set_name} stickers={len(stickers)}")
-
+    token = require_token()
+    remote = fetch_remote_stickers(token, args.set_name)
+    print(f"set_name={args.set_name} stickers={len(remote)}")
     if not args.update:
-        for r in remote:
-            print(
-                f"index={r['index']} "
-                f"emoji={r['emoji'].encode('unicode_escape').decode('ascii')!r} "
-                f"file_id={r['file_id']}"
-            )
+        print_pack_listing(remote)
         return
 
     yaml_path = _resolve_stickers_yaml()
     print(f"sticker_config={yaml_path}")
     config = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
     updates = build_updates(config, remote)
-    if not updates:
-        print("No file_id/index changes needed.")
-        return
-    if args.dry_run:
-        print("dry_run: skipping write")
-        return
-
-    text = yaml_path.read_text(encoding="utf-8")
-    yaml_path.write_text(apply_updates_to_text(text, updates), encoding="utf-8")
-    print(f"Updated {len(updates)} sticker(s) in {yaml_path}")
+    write_updates(yaml_path, updates, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

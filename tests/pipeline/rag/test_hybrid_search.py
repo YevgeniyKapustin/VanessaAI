@@ -20,19 +20,22 @@ def test_merge_hybrid_results_deduplicates():
         context_max=10,
     )
 
-    assert 2 in result
-    assert 4 in result
+    overlapping_id = 2
+    fts_only_id = 4
+    assert overlapping_id in result
+    assert fts_only_id in result
 
 
 def test_merge_hybrid_results_respects_max():
     vector_hits = [{"message_id": i, "score": 1.0 / i} for i in range(1, 60)]
     fts_hits = []
 
+    context_max = 50
     result = merge_hybrid_results(
         vector_hits,
         fts_hits,
         context_min=20,
-        context_max=50,
+        context_max=context_max,
     )
 
-    assert len(result) == 50
+    assert len(result) == context_max

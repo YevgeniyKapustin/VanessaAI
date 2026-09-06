@@ -51,7 +51,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       # Compose Loki: http://loki:3100
-      # Hybrid k8s (desktop overlay hostPort): http://host.docker.internal:3100
+      # Hybrid Docker Desktop k8s: hostPort is on the node, not Windows
+      # localhost. Use http://kubernetes.docker.internal:3100
       LOKI_URL: ${LOKI_URL:-http://loki:3100}
     volumes:
       - grafana_data:/var/lib/grafana

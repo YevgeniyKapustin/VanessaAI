@@ -20,17 +20,18 @@ from vanessa.infrastructure.observability.metrics import start_metrics_http_serv
 logger = logging.getLogger(__name__)
 
 
+async def _ping_postgres() -> None:
+    conn = await asyncpg.connect(_dsn())
+    try:
+        await conn.execute("SELECT 1")
+    finally:
+        await conn.close()
+
+
 def postgres_ready() -> bool:
     # Probe thread: do not use the shared async engine (wrong event loop).
-    async def ping() -> None:
-        conn = await asyncpg.connect(_dsn())
-        try:
-            await conn.execute("SELECT 1")
-        finally:
-            await conn.close()
-
     try:
-        asyncio.run(ping())
+        asyncio.run(_ping_postgres())
         return True
     except Exception:  # noqa: BLE001
         return False

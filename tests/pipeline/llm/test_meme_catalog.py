@@ -75,22 +75,26 @@ def test_max_results_limits_matches():
 
 
 def test_properties_expose_gate_settings():
+    probability = 0.2
+    min_messages_between = 5
+    max_per_reply = 2
     catalog = _catalog(
         enabled=False,
-        probability=0.2,
-        min_messages_between=5,
-        max_per_reply=2,
+        probability=probability,
+        min_messages_between=min_messages_between,
+        max_per_reply=max_per_reply,
     )
     assert catalog.enabled is False
-    assert catalog.probability == 0.2
-    assert catalog.min_messages_between == 5
-    assert catalog.max_per_reply == 2
+    assert catalog.probability == probability
+    assert catalog.min_messages_between == min_messages_between
+    assert catalog.max_per_reply == max_per_reply
 
 
 def test_offer_properties_expose_config():
-    catalog = _catalog(offer_on_humor=False, offer_max=3)
+    offer_max = 3
+    catalog = _catalog(offer_on_humor=False, offer_max=offer_max)
     assert catalog.offer_on_humor is False
-    assert catalog.offer_max == 3
+    assert catalog.offer_max == offer_max
 
 
 def test_offerable_rotates_across_calls():
@@ -107,7 +111,8 @@ def test_offerable_rotates_across_calls():
 def test_offerable_caps_to_catalog_size():
     catalog = _catalog(offer_max=10)  # only 2 memes exist
     offered = catalog.offerable()
-    assert len(offered) == 2
+    catalog_size = 2
+    assert len(offered) == catalog_size
     assert offered[0].name == "Окак"
 
 

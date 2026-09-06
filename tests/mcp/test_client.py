@@ -1,13 +1,15 @@
 import json
 import socket
 import threading
+import time
 
 import pytest
 import uvicorn
 
+from services.mcp import websearch
 from vanessa.core.messages import WebResult
 from vanessa.infrastructure.mcp.circuit_breaker import CircuitBreaker
-from vanessa.infrastructure.mcp.client import FailOpenMcpClient
+from vanessa.infrastructure.mcp.client import FailOpenMcpClient, StreamableHttpMcpClient
 from vanessa.infrastructure.mcp.websearch import McpWebSearch
 
 
@@ -68,8 +70,6 @@ async def test_success_resets_circuit() -> None:
 # --- CircuitBreaker ------------------------------------------------------------
 
 def test_circuit_breaker_trips_and_half_open_allows_probe() -> None:
-    import time
-
     breaker = CircuitBreaker(failure_threshold=2, reset_timeout_seconds=30)
     breaker.record_failure()
     breaker.record_failure()
@@ -119,8 +119,6 @@ def _free_port() -> int:
 
 
 def _wait_port(port: int, timeout: float = 10.0) -> None:
-    import time
-
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         with socket.socket() as s:
@@ -134,12 +132,9 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 
 
 async def test_streamable_http_client_round_trip() -> None:
-    from services.mcp import websearch
-    from vanessa.core.messages import WebResult
-    from vanessa.infrastructure.mcp.client import StreamableHttpMcpClient
-
     class _Provider:
         async def search(self, query, *, limit=5):
+            _ = (query, limit)
             return [
                 WebResult(
                     title="Title",

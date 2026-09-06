@@ -44,6 +44,36 @@ CLUSTER_OVERRIDES: dict[str, str] = {
 }
 
 
+def _is_cluster_config_key(key: str) -> bool:
+    return key not in SECRET_KEYS and key not in COMPOSE_ONLY_KEYS
+
+
+def _copy_public_env(env: Mapping[str, str]) -> dict[str, str]:
+    selected: dict[str, str] = {}
+    for key, value in env.items():
+        if not _is_cluster_config_key(key):
+            continue
+        stripped = value.strip()
+        if stripped:
+            selected[key] = stripped
+    return selected
+
+
+def _apply_host_overrides(
+    selected: dict[str, str],
+    *,
+    postgres_host: str | None,
+    qdrant_host: str | None,
+    langfuse_host: str | None,
+) -> None:
+    if postgres_host:
+        selected["POSTGRES_HOST"] = postgres_host
+    if qdrant_host:
+        selected["QDRANT_HOST"] = qdrant_host
+    if langfuse_host:
+        selected["LANGFUSE_HOST"] = langfuse_host
+
+
 def select_config_values(
     env: Mapping[str, str],
     *,
@@ -51,20 +81,14 @@ def select_config_values(
     qdrant_host: str | None = None,
     langfuse_host: str | None = None,
 ) -> dict[str, str]:
-    selected: dict[str, str] = {}
-    for key, value in env.items():
-        if key in SECRET_KEYS or key in COMPOSE_ONLY_KEYS:
-            continue
-        stripped = value.strip()
-        if stripped:
-            selected[key] = stripped
+    selected = _copy_public_env(env)
     selected.update(CLUSTER_OVERRIDES)
-    if postgres_host:
-        selected["POSTGRES_HOST"] = postgres_host
-    if qdrant_host:
-        selected["QDRANT_HOST"] = qdrant_host
-    if langfuse_host:
-        selected["LANGFUSE_HOST"] = langfuse_host
+    _apply_host_overrides(
+        selected,
+        postgres_host=postgres_host,
+        qdrant_host=qdrant_host,
+        langfuse_host=langfuse_host,
+    )
     return dict(sorted(selected.items()))
 
 

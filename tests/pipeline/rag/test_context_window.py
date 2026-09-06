@@ -5,6 +5,161 @@ import pytest
 
 from vanessa.core.messages import ContextBlock, ContextMessage, StoredMessage
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
+from vanessa.pipeline.rag.search.hybrid_search import (
+    HybridSearchService,
+    effective_window_max_total,
+)
+
+ANCHOR_ID = 42
+
+
+def _stub_get_content(vector_min_score: float = 0.35):
+    rag = type("R", (), {"vector_min_score": vector_min_score})()
+    content = type("C", (), {"rag": rag})()
+
+    def get_content():
+        return content
+
+    return get_content
+
+
+class _FixedEmbeddings:
+    async def embed(self, text: str) -> list[float]:
+        _ = text
+        return [0.1, 0.2]
+
+
+class _BlocksRepo:
+    async def fulltext_search(self, query: str, limit: int = 30) -> list[StoredMessage]:
+        _ = query, limit
+        return []
+
+    async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
+        messages = {
+            40: StoredMessage(
+                id=40,
+                role="user",
+                content="до",
+                sender_name="alice",
+            ),
+            42: StoredMessage(
+                id=42,
+                role="user",
+                content="якорь",
+                sender_name="bob",
+            ),
+        }
+        return [messages[mid] for mid in message_ids if mid in messages]
+
+    async def get_conversation_window_blocks(
+        self,
+        anchor_ids: list[int],
+        before: int = 10,
+        after: int = 10,
+        max_total: int = 80,
+    ) -> list[tuple[int, list[StoredMessage]]]:
+        _ = before, after, max_total
+        assert anchor_ids == [42]
+        return [
+            (
+                42,
+                [
+                    StoredMessage(
+                        id=40,
+                        role="user",
+                        content="до",
+                        sender_name="alice",
+                    ),
+                    StoredMessage(
+                        id=42,
+                        role="user",
+                        content="якорь",
+                        sender_name="bob",
+                    ),
+                ],
+            )
+        ]
+
+
+class _BlocksVectorStore:
+    async def search(self, vector: list[float], limit: int = 30):
+        _ = vector, limit
+        return [{"message_id": 42, "score": 0.95}]
+
+
+class _SkipAssistantRepo:
+    async def fulltext_search(self, query: str, limit: int = 30):
+        _ = query, limit
+        return []
+
+    async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
+        _ = message_ids
+        return [
+            StoredMessage(id=99, role="assistant", content="ответ бота"),
+            StoredMessage(id=42, role="user", content="про крабера"),
+        ]
+
+    async def get_conversation_window_blocks(
+        self,
+        anchor_ids: list[int],
+        before: int = 10,
+        after: int = 10,
+        max_total: int = 80,
+    ):
+        _ = anchor_ids, before, after, max_total
+        return [
+            (
+                42,
+                [
+                    StoredMessage(id=42, role="user", content="про крабера"),
+                ],
+            )
+        ]
+
+
+class _SkipAssistantVectorStore:
+    async def search(self, vector: list[float], limit: int = 30):
+        _ = vector, limit
+        return [{"message_id": 99, "score": 0.99}, {"message_id": 42, "score": 0.5}]
+
+
+class _BudgetRepo:
+    def __init__(self, seen: dict[str, int]) -> None:
+        self._seen = seen
+
+    async def fulltext_search(self, query: str, limit: int = 30):
+        _ = query, limit
+        return []
+
+    async def get_by_ids(self, message_ids: list[int]):
+        return [
+            StoredMessage(id=mid, role="user", content=f"msg-{mid}")
+            for mid in message_ids
+        ]
+
+    async def get_conversation_window_blocks(
+        self,
+        anchor_ids: list[int],
+        before: int = 10,
+        after: int = 10,
+        max_total: int = 80,
+    ):
+        _ = before, after
+        self._seen["anchor_count"] = len(anchor_ids)
+        self._seen["max_total"] = max_total
+        return [
+            (anchor_id, [StoredMessage(id=anchor_id, role="user", content="x")])
+            for anchor_id in anchor_ids
+        ]
+
+
+class _BudgetVectorStore:
+    async def search(self, vector: list[float], limit: int = 30):
+        _ = vector, limit
+        return [
+            {"message_id": index, "score": 0.9 - index * 0.01}
+            for index in range(1, 11)
+        ]
 
 
 def test_prompt_builder_formats_block_with_time_and_anchor():
@@ -68,7 +223,8 @@ def test_prompt_builder_builds_separated_blocks():
 
     prompt = builder.build_user_prompt("вопрос", blocks)
 
-    assert prompt.count("<!-- Block") == 2
+    expected_blocks = 2
+    assert prompt.count("<!-- Block") == expected_blocks
     assert "Block 1" in prompt
     assert "Block 2" in prompt
     assert "первый" in prompt
@@ -78,65 +234,6 @@ def test_prompt_builder_builds_separated_blocks():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_returns_blocks(monkeypatch):
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
-
-    class FakeRepo:
-        async def fulltext_search(self, query: str, limit: int = 30) -> list[StoredMessage]:
-            return []
-
-        async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
-            messages = {
-                40: StoredMessage(
-                    id=40,
-                    role="user",
-                    content="до",
-                    sender_name="alice",
-                ),
-                42: StoredMessage(
-                    id=42,
-                    role="user",
-                    content="якорь",
-                    sender_name="bob",
-                ),
-            }
-            return [messages[mid] for mid in message_ids if mid in messages]
-
-        async def get_conversation_window_blocks(
-            self,
-            anchor_ids: list[int],
-            before: int = 10,
-            after: int = 10,
-            max_total: int = 80,
-        ) -> list[tuple[int, list[StoredMessage]]]:
-            assert anchor_ids == [42]
-            return [
-                (
-                    42,
-                    [
-                        StoredMessage(
-                            id=40,
-                            role="user",
-                            content="до",
-                            sender_name="alice",
-                        ),
-                        StoredMessage(
-                            id=42,
-                            role="user",
-                            content="якорь",
-                            sender_name="bob",
-                        ),
-                    ],
-                )
-            ]
-
-    class FakeEmbeddings:
-        async def embed(self, text: str) -> list[float]:
-            return [0.1, 0.2]
-
-    class FakeVectorStore:
-        async def search(self, vector: list[float], limit: int = 30):
-            return [{"message_id": 42, "score": 0.95}]
-
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_anchor_max", 5)
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_context_window_before", 10)
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_context_window_after", 10)
@@ -145,15 +242,16 @@ async def test_hybrid_search_returns_blocks(monkeypatch):
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
         "vanessa.pipeline.rag.search.hybrid_search.get_content",
-        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.35})()})(),
+        _stub_get_content(0.35),
     )
 
-    service = HybridSearchService(FakeRepo(), FakeEmbeddings(), FakeVectorStore())
+    service = HybridSearchService(_BlocksRepo(), _FixedEmbeddings(), _BlocksVectorStore())
     result = await service.search("крабер")
 
     assert len(result) == 1
-    assert result[0].anchor_id == 42
-    assert len(result[0].messages) == 2
+    assert result[0].anchor_id == ANCHOR_ID
+    expected_messages = 2
+    assert len(result[0].messages) == expected_messages
     assert result[0].messages[1].is_anchor is True
     assert result[0].messages[1].content == "якорь"
     assert all(message.role == "user" for message in result[0].messages)
@@ -161,42 +259,6 @@ async def test_hybrid_search_returns_blocks(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_skips_assistant_anchors(monkeypatch):
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
-
-    class FakeRepo:
-        async def fulltext_search(self, query: str, limit: int = 30):
-            return []
-
-        async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
-            return [
-                StoredMessage(id=99, role="assistant", content="ответ бота"),
-                StoredMessage(id=42, role="user", content="про крабера"),
-            ]
-
-        async def get_conversation_window_blocks(
-            self,
-            anchor_ids: list[int],
-            before: int = 10,
-            after: int = 10,
-            max_total: int = 80,
-        ):
-            return [
-                (
-                    42,
-                    [
-                        StoredMessage(id=42, role="user", content="про крабера"),
-                    ],
-                )
-            ]
-
-    class FakeEmbeddings:
-        async def embed(self, text: str) -> list[float]:
-            return [0.1, 0.2]
-
-    class FakeVectorStore:
-        async def search(self, vector: list[float], limit: int = 30):
-            return [{"message_id": 99, "score": 0.99}, {"message_id": 42, "score": 0.5}]
-
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_anchor_max", 5)
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_context_window_before", 10)
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_context_window_after", 10)
@@ -205,60 +267,24 @@ async def test_hybrid_search_skips_assistant_anchors(monkeypatch):
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
         "vanessa.pipeline.rag.search.hybrid_search.get_content",
-        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.35})()})(),
+        _stub_get_content(0.35),
     )
 
-    service = HybridSearchService(FakeRepo(), FakeEmbeddings(), FakeVectorStore())
+    service = HybridSearchService(
+        _SkipAssistantRepo(),
+        _FixedEmbeddings(),
+        _SkipAssistantVectorStore(),
+    )
     result = await service.search("крабер")
 
     assert len(result) == 1
-    assert result[0].anchor_id == 42
+    assert result[0].anchor_id == ANCHOR_ID
     assert result[0].messages[0].content == "про крабера"
 
 
 @pytest.mark.asyncio
 async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
-    from vanessa.pipeline.rag.search.hybrid_search import (
-        HybridSearchService,
-        effective_window_max_total,
-    )
-
     seen: dict[str, int] = {}
-
-    class FakeRepo:
-        async def fulltext_search(self, query: str, limit: int = 30):
-            return []
-
-        async def get_by_ids(self, message_ids: list[int]):
-            return [
-                StoredMessage(id=mid, role="user", content=f"msg-{mid}")
-                for mid in message_ids
-            ]
-
-        async def get_conversation_window_blocks(
-            self,
-            anchor_ids: list[int],
-            before: int = 10,
-            after: int = 10,
-            max_total: int = 80,
-        ):
-            seen["anchor_count"] = len(anchor_ids)
-            seen["max_total"] = max_total
-            return [
-                (anchor_id, [StoredMessage(id=anchor_id, role="user", content="x")])
-                for anchor_id in anchor_ids
-            ]
-
-    class FakeEmbeddings:
-        async def embed(self, text: str) -> list[float]:
-            return [0.1, 0.2]
-
-    class FakeVectorStore:
-        async def search(self, vector: list[float], limit: int = 30):
-            return [
-                {"message_id": index, "score": 0.9 - index * 0.01}
-                for index in range(1, 11)
-            ]
 
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_anchor_max", 10)
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_context_window_before", 10)
@@ -268,20 +294,24 @@ async def test_hybrid_search_passes_budget_for_ten_anchors(monkeypatch):
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
         "vanessa.pipeline.rag.search.hybrid_search.get_content",
-        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.35})()})(),
+        _stub_get_content(0.35),
     )
 
-    service = HybridSearchService(FakeRepo(), FakeEmbeddings(), FakeVectorStore())
+    service = HybridSearchService(
+        _BudgetRepo(seen),
+        _FixedEmbeddings(),
+        _BudgetVectorStore(),
+    )
     result = await service.search("крабер")
 
-    assert seen["anchor_count"] == 10
-    assert seen["max_total"] == effective_window_max_total(10)
-    assert len(result) == 10
+    expected_anchors = 10
+    assert seen["anchor_count"] == expected_anchors
+    assert seen["max_total"] == effective_window_max_total(expected_anchors)
+    assert len(result) == expected_anchors
 
 
 @pytest.mark.asyncio
 async def test_hybrid_search_empty_query_returns_nothing():
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 
     service = HybridSearchService(AsyncMock(), AsyncMock(), AsyncMock())
     assert await service.search("   ") == []
@@ -289,7 +319,6 @@ async def test_hybrid_search_empty_query_returns_nothing():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_embed_query():
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 
     embeddings = AsyncMock()
     embeddings.embed = AsyncMock(return_value=[0.1, 0.2])
@@ -300,7 +329,6 @@ async def test_hybrid_search_embed_query():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_index_skips_non_user_role():
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 
     embeddings = AsyncMock()
     vector_store = AsyncMock()
@@ -312,12 +340,11 @@ async def test_hybrid_search_index_skips_non_user_role():
 
 @pytest.mark.asyncio
 async def test_hybrid_search_uses_semantic_queries(monkeypatch):
-    from unittest.mock import AsyncMock
 
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 
     class FakeRepo:
         async def fulltext_search(self, query: str, limit: int = 30):
+            _ = query, limit
             return []
 
         async def get_by_ids(self, message_ids: list[int]):
@@ -360,7 +387,7 @@ async def test_hybrid_search_uses_semantic_queries(monkeypatch):
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
         "vanessa.pipeline.rag.search.hybrid_search.get_content",
-        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.1})()})(),
+        _stub_get_content(0.1),
     )
 
     service = HybridSearchService(FakeRepo(), embeddings, vector_store)
@@ -376,10 +403,10 @@ async def test_hybrid_search_uses_semantic_queries(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hybrid_search_without_window_expansion(monkeypatch):
-    from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 
     class FakeRepo:
         async def fulltext_search(self, query: str, limit: int = 30):
+            _ = query, limit
             return []
 
         async def get_by_ids(self, message_ids: list[int]):
@@ -411,11 +438,12 @@ async def test_hybrid_search_without_window_expansion(monkeypatch):
     monkeypatch.setattr("vanessa.pipeline.rag.search.hybrid_search.settings.rag_hybrid_top_k", 20)
     monkeypatch.setattr(
         "vanessa.pipeline.rag.search.hybrid_search.get_content",
-        lambda: type("C", (), {"rag": type("R", (), {"vector_min_score": 0.1})()})(),
+        _stub_get_content(0.1),
     )
 
     service = HybridSearchService(FakeRepo(), embeddings, vector_store)
     result = await service.search("крабер")
 
+    low_score_anchor = 7
     assert len(result) == 1
-    assert result[0].anchor_id == 7
+    assert result[0].anchor_id == low_score_anchor

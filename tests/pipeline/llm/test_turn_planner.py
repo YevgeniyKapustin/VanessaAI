@@ -91,8 +91,9 @@ async def test_turn_planner_parse_loop_signal():
         '"repeated_topic": true, "loop_level": 2, "reason": "повтор темы"}',
     )
 
+    expected_loop_level = 2
     assert result.repeated_topic is True
-    assert result.loop_level == 2
+    assert result.loop_level == expected_loop_level
 
 
 @pytest.mark.asyncio
@@ -474,6 +475,7 @@ class _FakeClient:
     """Minimal LLM chat completer that returns a valid planner JSON."""
 
     async def complete(self, model, messages, kind, **kwargs):
+        _ = model, messages, kind, kwargs
         return (
             '{"search_query": "x", "skip": false, "humor_ok": false, '
             '"humor_query": "", "should_reply": true}'
@@ -514,6 +516,7 @@ async def test_turn_planner_prompt_includes_sender():
 
     class _Client:
         async def complete(self, model, messages, kind, **kwargs):
+            _ = model, kind, kwargs
             captured["prompt"] = messages[0]["content"]
             return (
                 '{"should_reply": true, "search_query": "личь", "skip": false, '

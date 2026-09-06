@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -24,7 +25,7 @@ def test_prometheus_metrics_endpoint(metrics_server) -> None:
     record_turn("reply", "intent")
     host, port = metrics_server.server_address
     with urlopen(f"http://{host}:{port}/metrics", timeout=2) as response:
-        assert response.status == 200
+        assert response.status == HTTPStatus.OK
         assert "text/plain" in response.headers["content-type"]
         body = response.read().decode()
         assert "vanessa_turns_total" in body
@@ -39,19 +40,19 @@ def test_prometheus_metrics_endpoint_requires_token(monkeypatch) -> None:
         host, port = server.server_address
         with pytest.raises(HTTPError) as denied:
             urlopen(f"http://{host}:{port}/metrics", timeout=2)
-        assert denied.value.code == 401
+        assert denied.value.code == HTTPStatus.UNAUTHORIZED
         allowed = Request(
             f"http://{host}:{port}/metrics",
             headers={"X-Internal-Token": "secret"},
         )
         with urlopen(allowed, timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
         bearer = Request(
             f"http://{host}:{port}/metrics",
             headers={"Authorization": "Bearer secret"},
         )
         with urlopen(bearer, timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
     finally:
         server.shutdown()
         server.server_close()

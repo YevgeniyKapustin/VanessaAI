@@ -1,5 +1,5 @@
 from vanessa.core.messages import ContextMessage
-from vanessa.pipeline.decision.gate.quote_echo import (
+from vanessa.pipeline.decision.gate.addressing.quote_echo import (
     is_recursive_quote_loop,
     messages_echo,
     quote_loop_depth,
@@ -39,7 +39,8 @@ def test_quote_loop_depth_counts_echo_chain():
         ContextMessage(id=4, role="user", content=RECURSION_LINE),
     ]
 
-    assert quote_loop_depth(recent) == 2
+    expected_depth = 2
+    assert quote_loop_depth(recent) == expected_depth
 
 
 def test_is_recursive_quote_loop_on_reply_to_bot_echo():

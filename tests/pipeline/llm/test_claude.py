@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -5,6 +6,7 @@ from anthropic import APIStatusError
 
 from vanessa.config.content import get_content
 from vanessa.core.messages import ContextBlock, ContextMessage
+from vanessa.infrastructure.observability.tracing import set_tracer
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
 from vanessa.pipeline.llm.providers.claude import ClaudeLLMProvider
 
@@ -12,6 +14,28 @@ from vanessa.pipeline.llm.providers.claude import ClaudeLLMProvider
 class FakeSubstitutor:
     def apply(self, text: str) -> str:
         return text.replace("bad", "блин")
+
+
+class _RecordingSpan:
+    def __init__(self) -> None:
+        self.updates: list[dict] = []
+
+    def update(self, **kwargs) -> None:
+        self.updates.append(kwargs)
+
+
+class _RecordingTracer:
+    enabled = True
+
+    def __init__(self, span: _RecordingSpan) -> None:
+        self._span = span
+
+    @asynccontextmanager
+    async def generation(
+        self, *, name, model=None, input=None, output=None,  # noqa: A002
+                         usage=None, metadata=None):
+        del name, model, input, output, usage, metadata
+        yield self._span
 
 
 @pytest.fixture
@@ -109,31 +133,8 @@ async def test_claude_generate_returns_only_after_answer_tag(
 
 @pytest.mark.asyncio
 async def test_claude_generate_traces_reasoning(provider: ClaudeLLMProvider):
-    from contextlib import asynccontextmanager
-
-    from vanessa.infrastructure.observability.tracing import set_tracer
-
-    class RecordingSpan:
-        def __init__(self) -> None:
-            self.updates: list[dict] = []
-
-        def update(self, **kwargs) -> None:
-            self.updates.append(kwargs)
-
-    class RecordingTracer:
-        enabled = True
-
-        def __init__(self, span: RecordingSpan) -> None:
-            self._span = span
-
-        @asynccontextmanager
-        async def generation(self, *, name, model=None, input=None, output=None,
-                             usage=None, metadata=None):
-            del name, model, input, output, usage, metadata
-            yield self._span
-
-    span = RecordingSpan()
-    set_tracer(RecordingTracer(span))
+    span = _RecordingSpan()
+    set_tracer(_RecordingTracer(span))
     try:
         provider._client.messages.create = AsyncMock(
             return_value=MagicMock(
@@ -167,7 +168,8 @@ async def test_claude_retries_on_rate_limit(provider: ClaudeLLMProvider):
     with patch("vanessa.pipeline.llm.providers.claude.asyncio.sleep", new_callable=AsyncMock):
         reply = await provider.generate("retry me", [])
     assert reply == "Ok"
-    assert provider._client.messages.create.await_count == 2
+    expected_attempts = 2
+    assert provider._client.messages.create.await_count == expected_attempts
 
 
 def test_should_retry_only_transient_errors(provider: ClaudeLLMProvider):

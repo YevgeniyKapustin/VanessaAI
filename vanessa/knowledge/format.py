@@ -51,6 +51,7 @@ TYPE_LOG = "log"
 TYPE_NOTE = "note"
 
 _FRONTMATTER_DELIM = "---"
+_MIN_FRONTMATTER_LINES = 3
 _UNSAFE_CHARS = re.compile(r"[^\w\-]+", re.UNICODE)
 _DASHES = re.compile(r"-+")
 
@@ -80,30 +81,36 @@ def render_frontmatter(meta: dict) -> str:
     return f"{_FRONTMATTER_DELIM}\n{body}\n{_FRONTMATTER_DELIM}"
 
 
+def _closing_frontmatter_index(lines: list[str]) -> int | None:
+    for index in range(1, len(lines)):
+        if lines[index].strip() == _FRONTMATTER_DELIM:
+            return index
+    return None
+
+
+def _load_frontmatter_meta(fm_text: str) -> dict:
+    try:
+        meta = yaml.safe_load(fm_text) or {}
+    except yaml.YAMLError:
+        meta = {}
+    if not isinstance(meta, dict):
+        return {}
+    return meta
+
+
 def parse_frontmatter(text: str) -> tuple[dict, str]:
     """Split a markdown document into (meta, body). Falls back to ({}, text)."""
     stripped = text.lstrip("\ufeff")
     if not stripped.startswith(_FRONTMATTER_DELIM):
         return {}, stripped
     lines = stripped.splitlines()
-    if len(lines) < 3:
+    if len(lines) < _MIN_FRONTMATTER_LINES:
         return {}, stripped
-    fm_lines: list[str] = []
-    body_start = 0
-    for index in range(1, len(lines)):
-        if lines[index].strip() == _FRONTMATTER_DELIM:
-            body_start = index + 1
-            break
-        fm_lines.append(lines[index])
-    else:
+    close = _closing_frontmatter_index(lines)
+    if close is None:
         return {}, stripped
-    body = "\n".join(lines[body_start:]).strip("\n")
-    try:
-        meta = yaml.safe_load("\n".join(fm_lines)) or {}
-    except yaml.YAMLError:
-        meta = {}
-    if not isinstance(meta, dict):
-        meta = {}
+    body = "\n".join(lines[close + 1 :]).strip("\n")
+    meta = _load_frontmatter_meta("\n".join(lines[1:close]))
     return meta, body
 
 

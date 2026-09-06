@@ -66,7 +66,7 @@ async def test_full_async_round_trip() -> None:
         stream=streams.turns,
         group="agent",
         consumer="agent-smoke",
-        handler_builder=lambda session: _FakePipeline(),
+        handler_builder=lambda _session: _FakePipeline(),
         session_factory=FakeFactory(),
         dedup=broker.dedup_guard(),
     )

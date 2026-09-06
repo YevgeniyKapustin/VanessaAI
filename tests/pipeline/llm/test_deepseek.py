@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -5,14 +6,46 @@ from openai import APIStatusError
 
 from vanessa.config.content import get_content
 from vanessa.config.settings import settings
-from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment
+from vanessa.core.messages import (
+    ContextBlock,
+    ContextMessage,
+    ImageAttachment,
+    PhotoCandidate,
+    WebResult,
+)
+from vanessa.infrastructure.observability.tracing import set_tracer
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
-from vanessa.pipeline.llm.providers.deepseek import DeepSeekLLMProvider, _usage_from_openai
+from vanessa.pipeline.llm.providers.deepseek import (
+    DeepSeekLLMProvider,
+    _usage_from_openai,
+)
 
 
 class FakeSubstitutor:
     def apply(self, text: str) -> str:
         return text.replace("bad", "блин")
+
+
+class _RecordingSpan:
+    def __init__(self) -> None:
+        self.updates: list[dict] = []
+
+    def update(self, **kwargs) -> None:
+        self.updates.append(kwargs)
+
+
+class _RecordingTracer:
+    enabled = True
+
+    def __init__(self, span: _RecordingSpan) -> None:
+        self._span = span
+
+    @asynccontextmanager
+    async def generation(
+        self, *, name, model=None, input=None, output=None,  # noqa: A002
+                         usage=None, metadata=None):
+        del name, model, input, output, usage, metadata
+        yield self._span
 
 
 def _make_response(text: str) -> MagicMock:
@@ -163,31 +196,8 @@ async def test_deepseek_generate_returns_only_after_answer_tag(
 
 @pytest.mark.asyncio
 async def test_deepseek_generate_traces_reasoning(provider: DeepSeekLLMProvider):
-    from contextlib import asynccontextmanager
-
-    from vanessa.infrastructure.observability.tracing import set_tracer
-
-    class RecordingSpan:
-        def __init__(self) -> None:
-            self.updates: list[dict] = []
-
-        def update(self, **kwargs) -> None:
-            self.updates.append(kwargs)
-
-    class RecordingTracer:
-        enabled = True
-
-        def __init__(self, span: RecordingSpan) -> None:
-            self._span = span
-
-        @asynccontextmanager
-        async def generation(self, *, name, model=None, input=None, output=None,
-                             usage=None, metadata=None):
-            del name, model, input, output, usage, metadata
-            yield self._span
-
-    span = RecordingSpan()
-    set_tracer(RecordingTracer(span))
+    span = _RecordingSpan()
+    set_tracer(_RecordingTracer(span))
     try:
         provider._client.chat.completions.create = AsyncMock(
             return_value=_make_response(
@@ -217,7 +227,8 @@ async def test_deepseek_retries_on_rate_limit(provider: DeepSeekLLMProvider):
     with patch("vanessa.pipeline.llm.providers.deepseek.asyncio.sleep", new_callable=AsyncMock):
         reply = await provider.generate("retry me", [])
     assert reply == "Ok"
-    assert provider._client.chat.completions.create.await_count == 2
+    expected_attempts = 2
+    assert provider._client.chat.completions.create.await_count == expected_attempts
 
 
 def test_should_retry_only_transient_errors(provider: DeepSeekLLMProvider):
@@ -267,7 +278,7 @@ async def test_deepseek_generate_keeps_base_max_tokens_for_normal(
 ):
     await provider.generate("привет", [], detail="normal")
     call = provider._client.chat.completions.create.await_args
-    assert call.kwargs["max_tokens"] == 128
+    assert call.kwargs["max_tokens"] == provider._generation.max_tokens
 
 
 @pytest.mark.asyncio
@@ -314,22 +325,22 @@ async def test_deepseek_vision_caps_images_per_turn(
 ):
     # The provider itself does not cap — the ComposeStage does — but it must
     # attach exactly the images it is given and route them all as blocks.
+    image_count = 2
     images = [
         ImageAttachment(data_url=f"data:image/jpeg;base64,{i}", mime_type="image/jpeg")
-        for i in range(2)
+        for i in range(image_count)
     ]
     await provider.generate("фото", [], images=images)
     call = provider._client.chat.completions.create.await_args
     user_content = call.kwargs["messages"][1]["content"]
     image_blocks = [b for b in user_content if b["type"] == "image_url"]
-    assert len(image_blocks) == 2
+    assert len(image_blocks) == image_count
 
 
 @pytest.mark.asyncio
 async def test_deepseek_photo_candidates_injected_into_prompt(
     provider: DeepSeekLLMProvider,
 ):
-    from vanessa.core.messages import PhotoCandidate
 
     candidates = [
         PhotoCandidate(
@@ -352,7 +363,6 @@ async def test_deepseek_photo_candidates_injected_into_prompt(
 @pytest.mark.asyncio
 async def test_deepseek_web_blocks_injected_into_prompt(provider: DeepSeekLLMProvider):
     """The compose prompt carries the live web-results block verbatim."""
-    from vanessa.core.messages import WebResult
 
     results = [
         WebResult(

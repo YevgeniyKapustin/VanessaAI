@@ -1,3 +1,5 @@
+import pytest
+
 from vanessa.contracts.messages import (
     SCHEMA_VERSION,
     BrokerMessage,
@@ -62,12 +64,9 @@ def test_every_kind_registers() -> None:
 
 
 def test_unknown_kind_raises() -> None:
-    try:
+    with pytest.raises(UnknownMessageKind) as caught:
         decode({"kind": "bogus", "payload": "{}"})
-    except UnknownMessageKind as exc:
-        assert exc.kind == "bogus"
-    else:  # pragma: no cover - must raise
-        raise AssertionError("expected UnknownMessageKind")
+    assert caught.value.kind == "bogus"
 
 
 def test_schema_version_stamped() -> None:

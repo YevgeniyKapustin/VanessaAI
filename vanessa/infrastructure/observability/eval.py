@@ -115,7 +115,7 @@ class RagTriadEvaluator:
             logger.exception("rag_eval_judge_failed")
             return {}
 
-        payload = self._parse(raw)
+        payload = _parse_judge_payload(raw)
         if not payload:
             return {}
 
@@ -124,14 +124,14 @@ class RagTriadEvaluator:
             record_rag_eval(dimension, score)
         return scores
 
-    @staticmethod
-    def _parse(raw: str) -> dict[str, Any]:
-        normalized = normalize_llm_json(raw)
-        try:
-            payload = json.loads(normalized)
-        except json.JSONDecodeError:
-            logger.warning("rag_eval unparseable judge response: %r", raw[:200])
-            return {}
-        if not isinstance(payload, dict):
-            return {}
-        return payload
+
+def _parse_judge_payload(raw: str) -> dict[str, Any]:
+    normalized = normalize_llm_json(raw)
+    try:
+        payload = json.loads(normalized)
+    except json.JSONDecodeError:
+        logger.warning("rag_eval unparseable judge response: %r", raw[:200])
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return payload

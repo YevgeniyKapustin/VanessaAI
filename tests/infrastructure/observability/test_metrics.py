@@ -1,4 +1,7 @@
 import time
+from http import HTTPStatus
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -14,22 +17,26 @@ class _StatusError(Exception):
 
 def test_event_window_error_rate() -> None:
     window = metrics.EventWindow(window_seconds=60)
-    for _ in range(6):
+    errors, successes = 6, 4
+    for _ in range(errors):
         window.add("error")
-    for _ in range(4):
+    for _ in range(successes):
         window.add("success")
-    assert window.count() == 10
-    assert window.error_rate(lambda value: value == "error") == 0.6
+    assert window.count() == errors + successes
+    assert window.error_rate(lambda value: value == "error") == errors / (
+        errors + successes
+    )
 
 
 def test_event_window_percentile() -> None:
     window = metrics.EventWindow(window_seconds=60)
-    for value in (1, 2, 3, 4, 5):
+    values = (1.0, 2.0, 3.0, 4.0, 5.0)
+    for value in values:
         window.add(value)
-    assert window.percentile(50) == 3.0
-    assert window.percentile(80) == 4.0
-    assert window.percentile(100) == 5.0
-    assert window.percentile(0) == 1.0
+    assert window.percentile(50) == values[2]
+    assert window.percentile(80) == values[3]
+    assert window.percentile(100) == values[4]
+    assert window.percentile(0) == values[0]
 
 
 def test_event_window_prunes_old_samples() -> None:
@@ -73,13 +80,12 @@ def test_start_metrics_http_server_serves_health(
     server = metrics.start_metrics_http_server(0, addr="127.0.0.1")
     try:
         host, port = server.server_address
-        from urllib.request import urlopen
 
         with urlopen(f"http://{host}:{port}/health", timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
             assert response.read() == b"ok\n"
         with urlopen(f"http://{host}:{port}/metrics", timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
             body = response.read()
             assert b"vanessa_" in body or b"#" in body
     finally:
@@ -94,28 +100,24 @@ def test_start_metrics_http_server_requires_token(monkeypatch) -> None:
     server = metrics.start_metrics_http_server(0, addr="127.0.0.1")
     try:
         host, port = server.server_address
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
 
         with urlopen(f"http://{host}:{port}/health", timeout=2) as response:
-            assert response.status == 200
-        try:
+            assert response.status == HTTPStatus.OK
+        with pytest.raises(HTTPError) as denied:
             urlopen(f"http://{host}:{port}/metrics", timeout=2)
-            raise AssertionError("expected 401")
-        except HTTPError as exc:
-            assert exc.code == 401
+        assert denied.value.code == HTTPStatus.UNAUTHORIZED
         req = Request(
             f"http://{host}:{port}/metrics",
             headers={"X-Internal-Token": "secret"},
         )
         with urlopen(req, timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
         bearer = Request(
             f"http://{host}:{port}/metrics",
             headers={"Authorization": "Bearer secret"},
         )
         with urlopen(bearer, timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
     finally:
         server.shutdown()
         server.server_close()
@@ -220,9 +222,10 @@ def test_record_telegram_and_error() -> None:
     metrics.telegram_outcomes.clear()
     metrics.record_telegram("send_reply", "success")
     metrics.record_telegram_error("send_reply", "flood")
-    assert metrics.telegram_outcomes.count() == 2
+    recorded = 2
+    assert metrics.telegram_outcomes.count() == recorded
     rate = metrics.telegram_outcomes.error_rate(lambda value: value[1] == "error")
-    assert rate == 0.5
+    assert rate == 1 / recorded
 
 
 def test_queue_length_helper() -> None:
@@ -312,11 +315,13 @@ def test_estimate_llm_cost_applies_cache_hit_discount() -> None:
         1_000_000,
         cache_hit_tokens=900_000,
     )
-    expected = (100_000 / 1_000_000 * 0.18) + (900_000 / 1_000_000 * 0.0049) + 0.47
+    flash_cache_hit = 0.0049
+    pro_cache_hit = 0.0128
+    expected = (100_000 / 1_000_000 * 0.18) + (900_000 / 1_000_000 * flash_cache_hit) + 0.47
     assert cost == pytest.approx(expected)
     # Cache-hit price helper resolves the known model and the fallback.
-    assert metrics.llm_cache_hit_prompt_price_per_1m("deepseek", "deepseek-v4-flash") == 0.0049
-    assert metrics.llm_cache_hit_prompt_price_per_1m("deepseek", "deepseek-v4-pro") == 0.0128
+    assert metrics.llm_cache_hit_prompt_price_per_1m("deepseek", "deepseek-v4-flash") == flash_cache_hit
+    assert metrics.llm_cache_hit_prompt_price_per_1m("deepseek", "deepseek-v4-pro") == pro_cache_hit
     assert metrics.llm_cache_hit_prompt_price_per_1m("deepseek", "unknown-model") == (
         settings.llm_default_cache_hit_prompt_cost_per_1m
     )

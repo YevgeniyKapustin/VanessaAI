@@ -2,12 +2,14 @@
 from typing import Self
 
 from services.worker.handlers import (
+    InboxNoteHandler,
     IndexMessageHandler,
     PortraitHandler,
     ReindexKnowledgeHandler,
     SweepHandler,
 )
-from vanessa.contracts.messages import TaskKind, TaskMessage
+from vanessa.contracts.messages import InboxNoteReply, TaskKind, TaskMessage
+from vanessa.infrastructure.db import repository
 
 
 class _FakeSession:
@@ -23,16 +25,19 @@ class _FakeSession:
 
 class _FakeEmbeddings:
     async def embed(self, content):
+        _ = content
         return [0.1, 0.2]
 
 
 class _FakeVectorStore:
     async def upsert_message(self, **kwargs):
+        _ = kwargs
         return "point-1"
 
 
 class _FakeRepo:
     def __init__(self, session) -> None:
+        _ = session
         self.updated: list[tuple[int, str]] = []
 
     async def update_qdrant_point_id(self, message_id, point_id) -> None:
@@ -40,10 +45,8 @@ class _FakeRepo:
 
 
 async def test_index_message_handler(monkeypatch) -> None:
-    from vanessa.infrastructure.db import repository
-
     fake_repo = _FakeRepo(None)
-    monkeypatch.setattr(repository, "MessageRepository", lambda session: fake_repo)
+    monkeypatch.setattr(repository, "MessageRepository", lambda _session: fake_repo)
 
     session = _FakeSession()
     handler = IndexMessageHandler(
@@ -76,18 +79,17 @@ async def test_index_message_handler_skips_non_user_role() -> None:
 
 
 async def test_sweep_handler_runs_once(monkeypatch) -> None:
-    from vanessa.infrastructure.db import repository
-
     class _FakeSweep:
         def __init__(self) -> None:
             self.runs = 0
 
         async def run(self, repo):
+            _ = repo
             self.runs += 1
             return 3
 
     fake_sweep = _FakeSweep()
-    monkeypatch.setattr(repository, "MessageRepository", lambda session: object())
+    monkeypatch.setattr(repository, "MessageRepository", lambda _session: object())
     session = _FakeSession()
     handler = SweepHandler(fake_sweep, lambda: session)
     await handler.handle(TaskMessage(task=TaskKind.SWEEP, payload={}))
@@ -100,6 +102,7 @@ async def test_portrait_handler_runs_builder() -> None:
             self.runs = 0
 
         async def run(self, *, force: bool = False):
+            _ = force
             self.runs += 1
             return 2
 
@@ -124,13 +127,10 @@ async def test_reindex_knowledge_handler() -> None:
 
 
 async def test_inbox_note_handler_replies(monkeypatch) -> None:
-    from services.worker.handlers import InboxNoteHandler
-    from vanessa.contracts.messages import InboxNoteReply
-
     async def fake_save(vault, **kwargs):
         return "inbox/saved.md"
 
-    monkeypatch.setattr("vanessa.knowledge.inbox.save_inbox_note", fake_save)
+    monkeypatch.setattr("services.worker.handlers.inbox.save_inbox_note", fake_save)
 
     published: list = []
 

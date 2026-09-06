@@ -4,7 +4,7 @@ from vanessa.core.messages import StoredMessage
 from vanessa.core.session.chat_session_state import ChatSessionState
 from vanessa.core.turn import ChatTurnInput
 from vanessa.pipeline.context import TurnPipelineContext
-from vanessa.pipeline.decision.gate.reaction_gate import ReactionGateResult
+from vanessa.pipeline.decision.gate.reaction.reaction_gate import ReactionGateResult
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.rag.query_rewriter import QueryRewriter
@@ -14,7 +14,7 @@ from vanessa.pipeline.turn_metrics import TurnMetrics
 
 class FakeMessageRepo:
     async def create(self, **kwargs: object):
-        return None
+        _ = kwargs
 
 
 class FakeIndexing:
@@ -27,11 +27,12 @@ class FakeIndexing:
 
 class NoDecision:
     async def decide(self, *args: object, **kwargs: object):
+        _ = args, kwargs
         raise AssertionError("decision should not run")
 
 
 class FakeReactionGate:
-    def __init__(self, respond: bool, reason: str = "no") -> None:
+    def __init__(self, *, respond: bool, reason: str = "no") -> None:
         self._respond = respond
         self._reason = reason
         self.calls: list[dict] = []

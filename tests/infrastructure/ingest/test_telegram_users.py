@@ -3,19 +3,24 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from vanessa.infrastructure.ingest.telegram_users import fetch_telegram_user
+from vanessa.infrastructure.ingest.telegram_users import (
+    fetch_telegram_user,
+    fetch_telegram_users,
+)
 
 
 @pytest.mark.asyncio
 async def test_fetch_telegram_user_parses_profile():
+    telegram_id = 123
+
     async def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.params["chat_id"] == "123"
+        assert request.url.params["chat_id"] == str(telegram_id)
         return httpx.Response(
             200,
             json={
                 "ok": True,
                 "result": {
-                    "id": 123,
+                    "id": telegram_id,
                     "username": "alice",
                     "first_name": "Alice",
                     "last_name": "Smith",
@@ -25,10 +30,10 @@ async def test_fetch_telegram_user_parses_profile():
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        profile = await fetch_telegram_user(123, "token", client=client)
+        profile = await fetch_telegram_user(telegram_id, "token", client=client)
 
     assert profile is not None
-    assert profile.telegram_id == 123
+    assert profile.telegram_id == telegram_id
     assert profile.username == "alice"
     assert profile.first_name == "Alice"
     assert profile.last_name == "Smith"
@@ -65,8 +70,6 @@ async def test_fetch_telegram_user_handles_http_error():
 
 @pytest.mark.asyncio
 async def test_fetch_telegram_users_batch(monkeypatch):
-    from vanessa.infrastructure.ingest.telegram_users import fetch_telegram_users
-
     calls: list[int] = []
 
     async def fake_fetch(

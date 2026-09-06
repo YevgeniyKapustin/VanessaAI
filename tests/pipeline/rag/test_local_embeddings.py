@@ -1,8 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vanessa.pipeline.rag.embeddings.local_embeddings import LocalEmbeddingProvider
+from vanessa.config.settings import settings
+from vanessa.pipeline.rag.embeddings.local_embeddings import (
+    LocalEmbeddingProvider,
+    _get_embed_executor,
+    preload_embedding_model,
+)
 
 
 @pytest.mark.asyncio
@@ -60,7 +66,8 @@ async def test_local_embedding_provider_evicts_old_cache_entries():
         await provider.embed("first")
         await provider.embed("second")
 
-    assert mock_model.encode.call_count == 2
+    expected_calls = 2
+    assert mock_model.encode.call_count == expected_calls
 
 
 def test_preload_embedding_model():
@@ -69,17 +76,13 @@ def test_preload_embedding_model():
         "vanessa.pipeline.rag.embeddings.local_embeddings._load_model",
         return_value=mock_model,
     ) as load:
-        from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
 
         preload_embedding_model()
         load.assert_called_once()
 
 
 def test_embed_executor_is_dedicated_thread_pool():
-    from concurrent.futures import ThreadPoolExecutor
 
-    from vanessa.config.settings import settings
-    from vanessa.pipeline.rag.embeddings.local_embeddings import _get_embed_executor
 
     executor = _get_embed_executor()
     assert isinstance(executor, ThreadPoolExecutor)

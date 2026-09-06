@@ -8,87 +8,16 @@ from urllib.parse import quote, urlparse, urlunparse
 import yaml
 from dotenv import dotenv_values
 
-SECRET_NAME = "vanessa-secrets"
-DEFAULT_NAMESPACE = "vanessa"
-IMAGE = "vanessa-agent:local"
-
-SECRET_KEYS: frozenset[str] = frozenset(
-    {
-        "TELEGRAM_BOT_TOKEN",
-        "POSTGRES_PASSWORD",
-        "DEEPSEEK_API_KEY",
-        "ANTHROPIC_API_KEY",
-        "WEB_SEARCH_API_KEY",
-        "API_INTERNAL_TOKEN",
-        "HF_TOKEN",
-        "BROKER_REDIS_URL",
-        "LANGFUSE_PUBLIC_KEY",
-        "LANGFUSE_SECRET_KEY",
-        "LANGFUSE_ID_SALT",
-    }
+from vanessa.k8s.secrets_catalog import (
+    ALWAYS_REQUIRED,
+    DEFAULT_NAMESPACE,
+    IMAGE,
+    OPTIONAL_SECRET_KEYS,
+    SECRET_KEYS,
+    SECRET_NAME,
+    WORKLOAD_SECRET_KEYS,
+    example_env_text,
 )
-
-ALWAYS_REQUIRED: frozenset[str] = frozenset(
-    {
-        "TELEGRAM_BOT_TOKEN",
-        "POSTGRES_PASSWORD",
-        "BROKER_REDIS_URL",
-    }
-)
-
-OPTIONAL_SECRET_KEYS: frozenset[str] = frozenset(
-    {
-        "DEEPSEEK_API_KEY",
-        "ANTHROPIC_API_KEY",
-        "WEB_SEARCH_API_KEY",
-        "API_INTERNAL_TOKEN",
-        "HF_TOKEN",
-        "LANGFUSE_PUBLIC_KEY",
-        "LANGFUSE_SECRET_KEY",
-        "LANGFUSE_ID_SALT",
-    }
-)
-
-# Keys injected per workload. Missing optional keys use secretKeyRef.optional.
-WORKLOAD_SECRET_KEYS: dict[str, frozenset[str]] = {
-    "migrate": frozenset({"POSTGRES_PASSWORD"}),
-    "agent": frozenset(
-        {
-            "TELEGRAM_BOT_TOKEN",
-            "POSTGRES_PASSWORD",
-            "BROKER_REDIS_URL",
-            "DEEPSEEK_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "API_INTERNAL_TOKEN",
-            "HF_TOKEN",
-            "LANGFUSE_PUBLIC_KEY",
-            "LANGFUSE_SECRET_KEY",
-            "LANGFUSE_ID_SALT",
-        }
-    ),
-    "bot": frozenset(
-        {
-            "TELEGRAM_BOT_TOKEN",
-            "BROKER_REDIS_URL",
-            "API_INTERNAL_TOKEN",
-        }
-    ),
-    "worker": frozenset(
-        {
-            "POSTGRES_PASSWORD",
-            "BROKER_REDIS_URL",
-            "DEEPSEEK_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "HF_TOKEN",
-            "LANGFUSE_PUBLIC_KEY",
-            "LANGFUSE_SECRET_KEY",
-            "LANGFUSE_ID_SALT",
-        }
-    ),
-    "mcp-websearch": frozenset({"WEB_SEARCH_API_KEY"}),
-    "mcp-knowledge": frozenset({"POSTGRES_PASSWORD"}),
-    "mcp-vision": frozenset({"DEEPSEEK_API_KEY"}),
-}
 
 _TRUE = frozenset({"1", "true", "yes", "on"})
 
@@ -116,7 +45,7 @@ class SecretPlan:
 
 
 def fill_broker_url(env: Mapping[str, str]) -> dict[str, str]:
-    merged = {key: value for key, value in env.items()}
+    merged = dict(env)
     if merged.get("BROKER_REDIS_URL", "").strip():
         return merged
     auth = merged.get("REDIS_AUTH", "").strip()
@@ -237,31 +166,24 @@ def render_yaml(manifest: Mapping) -> str:
     return dumped if dumped.endswith("\n") else dumped + "\n"
 
 
-def example_env_text() -> str:
-    required_block = "\n".join(f"{key}=" for key in sorted(ALWAYS_REQUIRED))
-    return (
-        "# Vanessa K8s secrets catalog. Values live in the project .env — never "
-        "commit them.\n"
-        "# Apply with: poetry run python scripts/k8s_secrets.py apply\n"
-        "# Do not kubectl-apply this file; it has no values.\n"
-        "\n"
-        "# --- always required ---\n"
-        f"{required_block}\n"
-        "\n"
-        "# --- required when LLM_PROVIDER=deepseek (default) ---\n"
-        "DEEPSEEK_API_KEY=\n"
-        "\n"
-        "# --- required when LLM_PROVIDER=claude ---\n"
-        "ANTHROPIC_API_KEY=\n"
-        "\n"
-        "# --- required when WEB_SEARCH_ENABLED=true "
-        "(unless provider=duckduckgo) ---\n"
-        "WEB_SEARCH_API_KEY=\n"
-        "\n"
-        "# --- optional ---\n"
-        "API_INTERNAL_TOKEN=\n"
-        "HF_TOKEN=\n"
-        "LANGFUSE_PUBLIC_KEY=\n"
-        "LANGFUSE_SECRET_KEY=\n"
-        "LANGFUSE_ID_SALT=\n"
-    )
+__all__ = [
+    "ALWAYS_REQUIRED",
+    "DEFAULT_NAMESPACE",
+    "IMAGE",
+    "OPTIONAL_SECRET_KEYS",
+    "SECRET_KEYS",
+    "SECRET_NAME",
+    "WORKLOAD_SECRET_KEYS",
+    "SecretPlan",
+    "SecretsValidationError",
+    "build_opaque_secret",
+    "example_env_text",
+    "fill_broker_url",
+    "load_env_file",
+    "plan_secrets",
+    "render_yaml",
+    "required_keys_for",
+    "rewrite_broker_host",
+    "select_secret_values",
+    "validate_plan",
+]

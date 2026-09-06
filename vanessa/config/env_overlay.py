@@ -6,13 +6,16 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-SKIP_KEYS = frozenset({"VISION_PHOTO_PLACEHOLDER"})
-ANTHROPIC_PREFIX = "ANTHROPIC_"
-PLACEHOLDER_MARKERS = (
-    "your_",
-    "pk-lf-...",
-    "sk-lf-...",
-    "change-me",
+from vanessa.config.env_overlay_filters import (
+    ANTHROPIC_PREFIX,
+    PLACEHOLDER_MARKERS,
+    SKIP_KEYS,
+    is_placeholder_value,
+    keep_anthropic_provider,
+    matches_default_value,
+    skip_anthropic_key,
+    skip_overlay_key,
+    windows_compose_file,
 )
 
 LOCAL_PROFILE: dict[str, str] = {
@@ -21,28 +24,73 @@ LOCAL_PROFILE: dict[str, str] = {
     "WORKER_ENABLED": "true",
 }
 
+__all__ = [
+    "ANTHROPIC_PREFIX",
+    "LOCAL_PROFILE",
+    "PLACEHOLDER_MARKERS",
+    "SKIP_KEYS",
+    "build_local_overlay",
+    "format_env_value",
+    "load_env_values",
+    "prepare_local_overlay",
+    "render_overlay",
+]
+
+
+def _stripped_env_value(
+    key: str | None,
+    value: str | None,
+) -> tuple[str, str] | None:
+    if not key or value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    return key, stripped
+
 
 def load_env_values(path: Path) -> dict[str, str]:
     if not path.is_file():
         return {}
     loaded: dict[str, str] = {}
     for key, value in dotenv_values(path).items():
-        if not key or value is None:
+        entry = _stripped_env_value(key, value)
+        if entry is None:
             continue
-        stripped = value.strip()
-        if stripped:
-            loaded[key] = stripped
+        loaded[entry[0]] = entry[1]
     return loaded
 
 
-def _is_placeholder(value: str) -> bool:
-    lowered = value.lower()
-    return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
+def _keep_legacy_overlay_value(
+    key: str,
+    value: str,
+    defaults: Mapping[str, str],
+    *,
+    keep_anthropic: bool,
+) -> bool:
+    if skip_overlay_key(key):
+        return False
+    if is_placeholder_value(value):
+        return False
+    if skip_anthropic_key(key, keep_anthropic=keep_anthropic):
+        return False
+    return not matches_default_value(key, value, defaults)
 
 
-def _keep_anthropic(legacy: Mapping[str, str]) -> bool:
-    provider = legacy.get("LLM_PROVIDER", "deepseek").strip().lower()
-    return provider == "claude"
+def _legacy_overlay_values(
+    defaults: Mapping[str, str],
+    legacy: Mapping[str, str],
+    *,
+    keep_anthropic: bool,
+) -> dict[str, str]:
+    overlay: dict[str, str] = dict(LOCAL_PROFILE)
+    for key, value in legacy.items():
+        if not _keep_legacy_overlay_value(
+            key, value, defaults, keep_anthropic=keep_anthropic
+        ):
+            continue
+        overlay[key] = value
+    return overlay
 
 
 def build_local_overlay(
@@ -51,23 +99,16 @@ def build_local_overlay(
     *,
     windows: bool | None = None,
 ) -> dict[str, str]:
-    keep_anthropic = _keep_anthropic(legacy)
-    overlay: dict[str, str] = dict(LOCAL_PROFILE)
-    for key, value in legacy.items():
-        if key in SKIP_KEYS or _is_placeholder(value):
-            continue
-        if key.startswith(ANTHROPIC_PREFIX) and not keep_anthropic:
-            continue
-        default = defaults.get(key)
-        if default is not None and default == value:
-            continue
-        overlay[key] = value
     if windows is None:
         windows = os.name == "nt"
-    if windows and "COMPOSE_FILE" not in overlay:
-        compose = defaults.get("COMPOSE_FILE", "")
-        if compose and ":" in compose and ";" not in compose:
-            overlay["COMPOSE_FILE"] = compose.replace(":", ";")
+    overlay = _legacy_overlay_values(
+        defaults,
+        legacy,
+        keep_anthropic=keep_anthropic_provider(legacy),
+    )
+    compose = windows_compose_file(defaults, overlay, windows=windows)
+    if compose is not None:
+        overlay["COMPOSE_FILE"] = compose
     return overlay
 
 

@@ -3,7 +3,7 @@ import time
 
 from vanessa.config import settings
 from vanessa.config.content import get_content
-from vanessa.core.messages import RAG_SOURCE_ROLE, ContextBlock, stored_block_to_context
+from vanessa.core.messages import RAG_SOURCE_ROLE, ContextBlock
 from vanessa.core.protocols import (
     ContextRetrieverProtocol,
     EmbeddingProviderProtocol,
@@ -13,19 +13,19 @@ from vanessa.core.protocols import (
     VectorStoreProtocol,
 )
 from vanessa.infrastructure.observability.metrics import record_rag_search
-from vanessa.pipeline.rag.search.merger import merge_hybrid_results, merge_vector_search_hits
+from vanessa.pipeline.rag.search.hybrid_vectors import resolve_search_vectors
+from vanessa.pipeline.rag.search.hybrid_windows import (
+    effective_window_max_total,
+    load_selected_context_blocks,
+)
+from vanessa.pipeline.rag.search.merger import (
+    merge_hybrid_results,
+    merge_vector_search_hits,
+)
 
 logger = logging.getLogger(__name__)
 
-
-def effective_window_max_total(anchor_max: int | None = None) -> int:
-    anchors = anchor_max or settings.rag_anchor_max
-    per_window = (
-        settings.rag_context_window_before
-        + 1
-        + settings.rag_context_window_after
-    )
-    return max(settings.rag_context_window_max_total, anchors * per_window)
+__all__ = ["HybridSearchService", "effective_window_max_total"]
 
 
 class HybridSearchService(
@@ -82,27 +82,9 @@ class HybridSearchService(
 
         top_k = top_k or settings.rag_hybrid_top_k
         min_score = get_content().rag.vector_min_score or settings.rag_vector_min_score
-
-        embed_texts: list[str] = []
-        if semantic_queries:
-            seen: set[str] = set()
-            for text in semantic_queries:
-                normalized = text.strip()
-                if not normalized:
-                    continue
-                key = normalized.lower()
-                if key in seen:
-                    continue
-                seen.add(key)
-                embed_texts.append(normalized)
-
-        vectors: list[list[float]] = []
-        if query_vector is not None:
-            vectors.append(query_vector)
-        if embed_texts:
-            vectors.extend(await self._embeddings.embed_batch(embed_texts))
-        if not vectors:
-            vectors.append(await self._embeddings.embed(query))
+        vectors = await resolve_search_vectors(
+            self._embeddings, query, query_vector, semantic_queries
+        )
 
         started = time.perf_counter()
         vector_hit_lists = [
@@ -116,16 +98,9 @@ class HybridSearchService(
             hit for hit in vector_hits if float(hit["score"]) >= min_score
         ]
 
-        fts_hits: list = []
-        fts_ms = 0.0
-        if not skip_fts:
-            fts_started = time.perf_counter()
-            fts_hits = await self._messages.fulltext_search(
-                query=fts_query or query,
-                limit=top_k,
-            )
-            fts_ms = (time.perf_counter() - fts_started) * 1000
-
+        fts_hits, fts_ms = await self._fts_hits(
+            query, top_k, skip_fts=skip_fts, fts_query=fts_query
+        )
         selected_ids = merge_hybrid_results(
             vector_hits,
             fts_hits,
@@ -151,56 +126,34 @@ class HybridSearchService(
             record_rag_search("raw", hits=0, top_score=top_score)
             return []
 
-        before = window_before if window_before is not None else settings.rag_context_window_before
-        after = window_after if window_after is not None else settings.rag_context_window_after
-        max_total = effective_window_max_total(anchor_max)
-        window_started = time.perf_counter()
-        if before > 0 or after > 0:
-            raw_blocks = await self._messages.get_conversation_window_blocks(
-                anchor_ids=selected_ids,
-                before=before,
-                after=after,
-                max_total=max_total,
-            )
-            blocks = [
-                block
-                for anchor_id, messages in raw_blocks
-                if (block := stored_block_to_context(anchor_id, messages)) is not None
-            ]
-            message_count = sum(len(block.messages) for block in blocks)
-            window_ms = (time.perf_counter() - window_started) * 1000
-            logger.info(
-                "rag_context_expanded query=%r anchors=%s blocks=%s messages=%s "
-                "vector_ms=%.1f fts_ms=%.1f window_ms=%.1f",
-                query,
-                len(selected_ids),
-                len(blocks),
-                message_count,
-                vector_ms,
-                fts_ms,
-                window_ms,
-            )
-            record_rag_search("raw", hits=len(blocks), top_score=top_score)
-            return blocks
-
-        messages = await self._messages.get_by_ids(selected_ids)
-        user_messages = [message for message in messages if message.role == RAG_SOURCE_ROLE]
-        window_ms = (time.perf_counter() - window_started) * 1000
-        logger.info(
-            "rag_search_done query=%r anchors=%s vector_ms=%.1f fts_ms=%.1f "
-            "window_ms=%.1f",
+        return await load_selected_context_blocks(
+            self._messages,
             query,
-            len(user_messages),
-            vector_ms,
-            fts_ms,
-            window_ms,
+            selected_ids,
+            window_before=window_before,
+            window_after=window_after,
+            anchor_max=anchor_max,
+            vector_ms=vector_ms,
+            fts_ms=fts_ms,
+            top_score=top_score,
         )
-        record_rag_search("raw", hits=len(user_messages), top_score=top_score)
-        return [
-            block
-            for message in user_messages
-            if (block := stored_block_to_context(message.id, [message])) is not None
-        ]
+
+    async def _fts_hits(
+        self,
+        query: str,
+        top_k: int,
+        *,
+        skip_fts: bool,
+        fts_query: str | None,
+    ) -> tuple[list, float]:
+        if skip_fts:
+            return [], 0.0
+        fts_started = time.perf_counter()
+        fts_hits = await self._messages.fulltext_search(
+            query=fts_query or query,
+            limit=top_k,
+        )
+        return fts_hits, (time.perf_counter() - fts_started) * 1000
 
     async def _user_anchor_ids(self, message_ids: list[int]) -> list[int]:
         if not message_ids:

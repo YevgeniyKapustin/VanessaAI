@@ -11,6 +11,7 @@ from services.agent.container import (
     RetrievalStack,
     TurnWiring,
 )
+from services.agent.container.broker import BrokerResources
 
 
 def test_process_graph_composes_stacks() -> None:
@@ -128,8 +129,6 @@ def test_retrieval_and_jobs_are_objects() -> None:
 
 
 def test_broker_resources_reuse_client() -> None:
-    from services.agent.container.broker import BrokerResources
-
     first = object()
     broker = BrokerResources(client=first, dispatch_tasks=False)
     assert broker.ensure_client() is first

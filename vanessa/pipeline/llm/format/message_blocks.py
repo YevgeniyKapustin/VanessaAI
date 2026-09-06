@@ -19,95 +19,34 @@ and every block is hard-capped at ``max_chars`` (Telegram's 4096-char limit).
 
 from __future__ import annotations
 
-import re
-
-DEFAULT_BLOCK_MARKER = "[next]"
-
-_FENCED_CODE = re.compile(r"```[\s\S]*?```", re.DOTALL)
-# Paragraph / sentence boundaries — used by the deterministic fallback splitter.
-_PARAGRAPH_BOUNDARY = re.compile(r"\n\s*\n")
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?…])\s+")
-
-
-def _is_marker_line(line: str, marker: str) -> bool:
-    """True when ``line`` is exactly the block marker (whitespace-tolerant).
-
-    Both sides are normalized (whitespace stripped, lowercased), so ``[ Next ]``,
-    ``[next]`` and ``[ NEXT ]`` all match the default ``[next]`` marker, while a
-    differently-spelled tag is never treated as a separator for a custom marker.
-    """
-    stripped = line.strip()
-    if not stripped:
-        return False
-    return (
-        re.sub(r"\s+", "", stripped).lower()
-        == re.sub(r"\s+", "", marker).lower()
-    )
+from vanessa.pipeline.llm.format.block_fallback import _sentence_fallback
+from vanessa.pipeline.llm.format.block_markers import (
+    DEFAULT_BLOCK_MARKER,
+    _is_marker_line,
+    _keep_nonempty,
+    _strip_marker_tokens,
+    strip_block_markers,
+)
+from vanessa.pipeline.llm.format.code_fences import FENCED_CODE as _FENCED_CODE
 
 
-def _map_outside_fences(text: str, mapper) -> str:
-    """Apply ``mapper`` to every non-code segment, keeping code fences intact."""
-    parts: list[str] = []
-    cursor = 0
-    for match in _FENCED_CODE.finditer(text):
-        if match.start() > cursor:
-            parts.append(mapper(text[cursor : match.start()]))
-        parts.append(match.group(0))
-        cursor = match.end()
-    if cursor < len(text):
-        parts.append(mapper(text[cursor:]))
-    return "".join(parts)
+def _flush_current_block(blocks: list[str], current: list[str]) -> None:
+    if current:
+        blocks.append("\n".join(current))
+        current.clear()
 
 
-def _marker_token_regexes(marker: str) -> tuple[re.Pattern[str], re.Pattern[str]]:
-    """Regexes matching a complete ``[next]`` token and a truncated unclosed tail
-    (``[next`` / ``[Next `` left by an output cap), both whitespace/case tolerant.
-    Fenced code is handled by the caller, never matched here.
-    """
-    core = re.escape(marker.strip("[]"))
-    return (
-        re.compile(rf"\[\s*{core}\s*\]", re.IGNORECASE),
-        re.compile(rf"\[\s*{core}\s*$", re.IGNORECASE),
-    )
-
-
-def _strip_marker_tokens(text: str, marker: str = DEFAULT_BLOCK_MARKER) -> str:
-    """Remove ``[next]`` marker tokens from ``text``.
-
-    Handles standalone marker lines (the normal case), inline markers the model
-    put on a content line («блок [next] ещё») and truncated unclosed tails
-    («[next» left when the output cap hits mid-marker) — so a control marker
-    never reaches a delivered message or the stored history. Fenced code blocks
-    are left untouched.
-    """
-    complete, truncated = _marker_token_regexes(marker)
-
-    def clean(segment: str) -> str:
-        lines: list[str] = []
-        for raw_line in segment.splitlines(keepends=True):
-            if _is_marker_line(raw_line, marker):
-                continue
-            body = raw_line.rstrip("\r\n")
-            ending = raw_line[len(body):]
-            cleaned = complete.sub("", body)
-            cleaned = truncated.sub("", cleaned)
-            # Keep structural blank lines; drop a line ONLY when it was pure
-            # marker content (an inline `[next]` or a truncated `[next`).
-            if not body.strip() or cleaned.strip():
-                lines.append(re.sub(r" {2,}", " ", cleaned).rstrip() + ending)
-        return "".join(lines)
-
-    return _map_outside_fences(text, clean)
-
-
-def strip_block_markers(reply: str, *, marker: str = DEFAULT_BLOCK_MARKER) -> str:
-    """Remove the ``[next]`` marker tokens from a reply, keeping content intact.
-
-    Removes standalone marker lines, inline markers and truncated unclosed tails
-    (see ``_strip_marker_tokens``); fenced code blocks are left untouched.
-    """
-    text = reply or ""
-    return _strip_marker_tokens(text, marker).strip()
+def _consume_marker_segment(
+    segment: str,
+    marker: str,
+    blocks: list[str],
+    current: list[str],
+) -> None:
+    for line in segment.splitlines():
+        if _is_marker_line(line, marker):
+            _flush_current_block(blocks, current)
+        else:
+            current.append(line)
 
 
 def _split_on_markers(text: str, marker: str) -> list[str]:
@@ -118,128 +57,49 @@ def _split_on_markers(text: str, marker: str) -> list[str]:
     """
     blocks: list[str] = []
     current: list[str] = []
-
-    def flush() -> None:
-        if current:
-            blocks.append("\n".join(current))
-            current.clear()
-
-    def consume_segment(segment: str) -> None:
-        for line in segment.splitlines():
-            if _is_marker_line(line, marker):
-                flush()
-            else:
-                current.append(line)
-
     cursor = 0
     for match in _FENCED_CODE.finditer(text):
         if match.start() > cursor:
-            consume_segment(text[cursor : match.start()])
+            _consume_marker_segment(
+                text[cursor : match.start()], marker, blocks, current
+            )
         current.append(match.group(0))
         cursor = match.end()
     if cursor < len(text):
-        consume_segment(text[cursor:])
-    flush()
-    return [block.strip() for block in blocks if block.strip()]
+        _consume_marker_segment(text[cursor:], marker, blocks, current)
+    _flush_current_block(blocks, current)
+    return _keep_nonempty(blocks)
 
 
-def _split_prose_units(prose: str) -> list[str]:
-    """Paragraphs (blank-line separated) further split into sentences.
-
-    Splitting on newlines/sentences — not just hard char caps — keeps blocks on
-    natural boundaries even when the model omits punctuation (common in casual
-    chat), so the fallback rarely produces one giant wall of text.
-    """
-    units: list[str] = []
-    for paragraph in _PARAGRAPH_BOUNDARY.split(prose):
-        paragraph = paragraph.strip()
-        if not paragraph:
-            continue
-        units.extend(_SENTENCE_BOUNDARY.split(paragraph))
-    return units
+def _sanitize_delivered(blocks: list[str], marker: str) -> list[str]:
+    # Sanitize every delivered block so an inline or truncated `[next]` the
+    # model left behind (e.g. the output cap hit mid-marker) never reaches
+    # the chat as a literal control tag.
+    return [
+        block
+        for block in (_strip_marker_tokens(b, marker).strip() for b in blocks)
+        if block
+    ]
 
 
-def _split_units(text: str) -> list[str]:
-    """Semantic units for the deterministic fallback (code fences stay atomic)."""
-    units: list[str] = []
-    cursor = 0
-    for match in _FENCED_CODE.finditer(text):
-        if match.start() > cursor:
-            units.extend(_split_prose_units(text[cursor : match.start()]))
-        units.append(match.group(0))
-        cursor = match.end()
-    if cursor < len(text):
-        units.extend(_split_prose_units(text[cursor:]))
-    return [unit.strip() for unit in units if unit.strip()]
-
-
-def _chunk_words(unit: str, size: int) -> list[str]:
-    """Split an over-long unit into word chunks of at most ``size`` chars."""
-    if len(unit) <= size:
-        return [unit]
-    chunks: list[str] = []
-    current = ""
-    for word in unit.split():
-        if current and len(current) + len(word) + 1 > size:
-            chunks.append(current)
-            current = word
-        else:
-            current = f"{current} {word}" if current else word
-    if current:
-        chunks.append(current)
-    return chunks
-
-
-def _is_fenced_code(unit: str) -> bool:
-    """True when ``unit`` is (or contains) a fenced code block."""
-    return bool(_FENCED_CODE.search(unit))
-
-
-def _sentence_fallback(
-    text: str,
-    *,
+def _blocks_from_markers(
+    marker_blocks: list[str],
     max_chars: int,
-    target_chars: int,
+    fallback_target_chars: int,
 ) -> list[str]:
-    """Deterministic fallback splitter used when the model emitted no markers.
-
-    Splits into paragraphs/sentences and delivers them as several short
-    messages — the same "1–2 sentences per message" shape the ``[next]``
-    markers would produce — instead of packing the whole reply into one
-    multi-line wall of text. Consecutive short units are joined with a single
-    space (never a newline) up to two per block; a fenced code block is glue,
-    never a message boundary of its own (a code reply stays one message); any
-    unit longer than ``target_chars`` (a run-on sentence, an unpunctuated
-    paragraph) is hard-chunked on word boundaries; every block is capped at
-    ``max_chars``. Never returns empty strings.
-    """
-    pieces: list[str] = []
-    for unit in _split_units(text):
-        for chunk in _chunk_words(unit, target_chars):
-            if len(chunk) <= max_chars:
-                pieces.append(chunk)
-            else:
-                pieces.extend(_chunk_words(chunk, max_chars))
-
-    blocks: list[str] = []
-    current = ""
-    current_count = 0
-    for piece in pieces:
-        sticky = _is_fenced_code(piece)
-        if current and not sticky and (
-            current_count >= 2
-            or len(current) + len(piece) + 1 > target_chars
-        ):
-            blocks.append(current)
-            current = ""
-            current_count = 0
-        current = f"{current} {piece}" if current else piece
-        # A code fence attaches to the surrounding block, not a countable unit.
-        if not sticky:
-            current_count += 1
-    if current:
-        blocks.append(current)
-    return [block.strip() for block in blocks if block.strip()]
+    result: list[str] = []
+    for block in marker_blocks:
+        if len(block) <= max_chars:
+            result.append(block)
+            continue
+        result.extend(
+            _sentence_fallback(
+                block,
+                max_chars=max_chars,
+                target_chars=fallback_target_chars,
+            )
+        )
+    return result
 
 
 def split_reply_into_blocks(
@@ -260,27 +120,13 @@ def split_reply_into_blocks(
         return []
 
     marker_blocks = _split_on_markers(text, marker)
-    if marker_blocks and len(marker_blocks) > 1:
-        result: list[str] = []
-        for block in marker_blocks:
-            if len(block) > max_chars:
-                result.extend(
-                    _sentence_fallback(
-                        block,
-                        max_chars=max_chars,
-                        target_chars=fallback_target_chars,
-                    )
-                )
-            else:
-                result.append(block)
-        # Sanitize every delivered block so an inline or truncated `[next]` the
-        # model left behind (e.g. the output cap hit mid-marker) never reaches
-        # the chat as a literal control tag.
-        return [
-            block
-            for block in (_strip_marker_tokens(b, marker).strip() for b in result)
-            if block
-        ]
+    if len(marker_blocks) > 1:
+        return _sanitize_delivered(
+            _blocks_from_markers(
+                marker_blocks, max_chars, fallback_target_chars
+            ),
+            marker,
+        )
 
     # No explicit blocks (single reply or the model skipped markers): apply the
     # deterministic splitter so long replies still arrive as several messages.
@@ -288,15 +134,11 @@ def split_reply_into_blocks(
     # limit right after emitting `[next]` (a dangling, truncated or inline
     # marker), the fallback must never deliver that control marker as a real
     # chat message. The post-sanitize below is a belt-and-braces guarantee.
-    return [
-        block
-        for block in (
-            _strip_marker_tokens(b, marker).strip()
-            for b in _sentence_fallback(
-                strip_block_markers(text, marker=marker),
-                max_chars=max_chars,
-                target_chars=fallback_target_chars,
-            )
-        )
-        if block
-    ]
+    return _sanitize_delivered(
+        _sentence_fallback(
+            strip_block_markers(text, marker=marker),
+            max_chars=max_chars,
+            target_chars=fallback_target_chars,
+        ),
+        marker,
+    )

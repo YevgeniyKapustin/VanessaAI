@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.store.vault import KnowledgeVault
 
 # Folders checked by ``vault_find``, in priority order.
 _SEARCH_FOLDERS = (
@@ -30,6 +30,23 @@ def _candidates(name: str) -> list[str]:
     return [f"{folder}/{clean}.md" for folder in _SEARCH_FOLDERS]
 
 
+async def _read_note_body(vault: KnowledgeVault, relative_path: str) -> str:
+    note = await vault.read_note(relative_path)
+    if note is None:
+        return f"NOT FOUND: {relative_path}"
+    if not note.body:
+        return "(empty note)"
+    return note.body
+
+
+async def _find_note_body(vault: KnowledgeVault, name: str) -> str:
+    for relative_path in _candidates(name):
+        note = await vault.read_note(relative_path)
+        if note is not None:
+            return f"{relative_path}\n---\n{note.body}"
+    return f"NOT FOUND: {name}"
+
+
 def build_server(vault: KnowledgeVault | None = None) -> FastMCP:
     vault = vault if vault is not None else KnowledgeVault()
     server = FastMCP(
@@ -46,10 +63,7 @@ def build_server(vault: KnowledgeVault | None = None) -> FastMCP:
         ),
     )
     async def vault_read(relative_path: str) -> str:
-        note = await vault.read_note(relative_path)
-        if note is None:
-            return f"NOT FOUND: {relative_path}"
-        return note.body if note.body else "(empty note)"
+        return await _read_note_body(vault, relative_path)
 
     @server.tool(
         name="vault_find",
@@ -59,10 +73,6 @@ def build_server(vault: KnowledgeVault | None = None) -> FastMCP:
         ),
     )
     async def vault_find(name: str) -> str:
-        for relative_path in _candidates(name):
-            note = await vault.read_note(relative_path)
-            if note is not None:
-                return f"{relative_path}\n---\n{note.body}"
-        return f"NOT FOUND: {name}"
+        return await _find_note_body(vault, name)
 
     return server

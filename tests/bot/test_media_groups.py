@@ -18,8 +18,11 @@ def _image(file_id: str) -> ImageAttachment:
     )
 
 
+CHAT_ID = -1001
+
+
 def _message(caption: str | None = None) -> SimpleNamespace:
-    return SimpleNamespace(caption=caption, chat=SimpleNamespace(id=-1001))
+    return SimpleNamespace(caption=caption, chat=SimpleNamespace(id=CHAT_ID))
 
 
 async def _wait_for(predicate, timeout: float = 2.0) -> None:
@@ -43,17 +46,18 @@ async def test_buffers_whole_group_into_one_flush():
         await asyncio.sleep(0)
         flushed.append(entry)
 
-    await buffer.add(-1001, "album-1", _message("сравни картины"), [_image("f1")], on_flush)
-    await buffer.add(-1001, "album-1", _message(), [_image("f2")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message("сравни картины"), [_image("f1")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f2")], on_flush)
 
     await _wait_for(lambda: len(flushed) == 1)
 
     assert len(flushed) == 1
     entry = flushed[0]
-    assert entry.chat_id == -1001
+    assert entry.chat_id == CHAT_ID
     assert entry.media_group_id == "album-1"
-    assert [img.telegram_file_id for img in entry.images] == ["f1", "f2"]
-    assert len(entry.messages) == 2
+    expected_ids = ["f1", "f2"]
+    assert [img.telegram_file_id for img in entry.images] == expected_ids
+    assert len(entry.messages) == len(expected_ids)
 
 
 @pytest.mark.asyncio
@@ -66,14 +70,14 @@ async def test_restarts_timer_on_each_photo_no_early_flush():
         await asyncio.sleep(0)
         flushed.append(entry)
 
-    await buffer.add(-1001, "album-1", _message(), [_image("f1")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f1")], on_flush)
     await asyncio.sleep(0.02)  # inside the debounce window
     assert not flushed
-    await buffer.add(-1001, "album-1", _message(), [_image("f2")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f2")], on_flush)
 
     await _wait_for(lambda: len(flushed) == 1)
     assert len(flushed) == 1
-    assert len(flushed[0].images) == 2
+    assert len(flushed[0].images) == len(["f1", "f2"])
 
 
 @pytest.mark.asyncio
@@ -86,11 +90,11 @@ async def test_flushes_immediately_on_cap():
         await asyncio.sleep(0)
         flushed.append(entry)
 
-    await buffer.add(-1001, "album-1", _message(), [_image("f1")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f1")], on_flush)
     assert not flushed  # below cap — still waiting for the debounce
-    await buffer.add(-1001, "album-1", _message(), [_image("f2")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f2")], on_flush)
     assert len(flushed) == 1
-    assert len(flushed[0].images) == 2
+    assert len(flushed[0].images) == len(["f1", "f2"])
 
 
 @pytest.mark.asyncio
@@ -103,12 +107,13 @@ async def test_separate_groups_flush_independently():
         await asyncio.sleep(0)
         flushed.append(entry)
 
-    await buffer.add(-1001, "album-1", _message(), [_image("f1")], on_flush)
-    await buffer.add(-1001, "album-2", _message(), [_image("f2")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f1")], on_flush)
+    await buffer.add(CHAT_ID, "album-2", _message(), [_image("f2")], on_flush)
 
-    await _wait_for(lambda: len(flushed) == 2)
+    expected_groups = {"album-1", "album-2"}
+    await _wait_for(lambda: len(flushed) == len(expected_groups))
 
-    assert len(flushed) == 2
+    assert len(flushed) == len(expected_groups)
     assert {entry.media_group_id for entry in flushed} == {"album-1", "album-2"}
 
 
@@ -124,6 +129,6 @@ async def test_flush_error_is_logged_and_group_consumed():
         calls += 1
         raise RuntimeError("boom")
 
-    await buffer.add(-1001, "album-1", _message(), [_image("f1")], on_flush)
+    await buffer.add(CHAT_ID, "album-1", _message(), [_image("f1")], on_flush)
     await _wait_for(lambda: calls == 1)
     assert buffer.pending() == 0

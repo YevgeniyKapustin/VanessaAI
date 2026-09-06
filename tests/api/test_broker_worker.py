@@ -28,16 +28,18 @@ def test_turn_handler_factory_uses_turn_wiring() -> None:
 
 
 def test_turn_mapper_copies_request_fields() -> None:
+    telegram_chat_id = 9
+    sender_telegram_id = 3
     request = TurnRequest(
         correlation_id="c",
-        telegram_chat_id=9,
+        telegram_chat_id=telegram_chat_id,
         message="hi",
-        sender_telegram_id=3,
+        sender_telegram_id=sender_telegram_id,
     )
     turn = TurnMapper().to_turn(request)
-    assert turn.telegram_chat_id == 9
+    assert turn.telegram_chat_id == telegram_chat_id
     assert turn.message == "hi"
-    assert turn.sender_telegram_id == 3
+    assert turn.sender_telegram_id == sender_telegram_id
 
 
 class _FakeSessionCM:
@@ -92,7 +94,7 @@ async def _publish_worker(broker, message) -> _FakeHandler:
         stream="turns",
         group="agent",
         consumer="agent-test",
-        handler_builder=lambda s: fake_handler,
+        handler_builder=lambda _s: fake_handler,
         session_factory=FakeFactory(),
     )
     await worker._handle(Delivery(stream="turns", stream_id="1-0", message=message))
@@ -109,11 +111,12 @@ async def _read_kinds(broker, stream: str) -> list[str]:
 
 
 async def test_worker_publishes_started_and_reply(broker) -> None:
+    sender_id = 2
     request = TurnRequest(
         correlation_id="c1",
         telegram_chat_id=1,
         message="hello",
-        sender_telegram_id=2,
+        sender_telegram_id=sender_id,
         chat_type="group",
         reply_to="replies:bot-test:c1",
     )
@@ -124,7 +127,7 @@ async def test_worker_publishes_started_and_reply(broker) -> None:
     turn = fake_handler.turns[0]
     assert turn.telegram_chat_id == 1
     assert turn.message == "hello"
-    assert turn.sender_telegram_id == 2
+    assert turn.sender_telegram_id == sender_id
     # The transport request id was propagated into the pipeline context.
     assert fake_handler.request_ids == ["c1"]
 

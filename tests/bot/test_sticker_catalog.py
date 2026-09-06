@@ -1,4 +1,12 @@
-from services.bot.stickers.catalog import build_catalog
+# Intentional Cyrillic sticker copy — not lookalike Latin.
+import asyncio
+import xml.etree.ElementTree as ET
+
+from services.bot.stickers.catalog import (
+    _match_remote,
+    build_catalog,
+    resolve_file_ids,
+)
 from services.bot.stickers.models import StickerCatalog, StickerDef
 from vanessa.config.content import StickerDefContent, StickersContent, get_content
 
@@ -83,7 +91,8 @@ def test_real_config_parses_and_has_live_stickers():
     assert stickers.enabled is True
     assert stickers.sticker_set_name == "VanessaBot"
     # synced from the live pack (https://t.me/addstickers/VanessaBot)
-    assert len(stickers.stickers) == 10
+    live_pack_size = 10
+    assert len(stickers.stickers) == live_pack_size
     # every sticker is resolvable: explicit file_id or index+emoji (runtime fetch)
     for sticker in stickers.stickers:
         assert (
@@ -138,9 +147,10 @@ def test_tag_lines_render_description():
 
 def test_tag_probability_and_aliases_parse():
     stickers = get_content().stickers
-    assert stickers.tag_probability.get("love") == 0.8
-    assert stickers.tag_probability.get("thinking") == 0.4
-    assert stickers.tag_probability.get("weary") == 0.4
+    love_p, thinking_p, weary_p = 0.8, 0.4, 0.4
+    assert stickers.tag_probability.get("love") == love_p
+    assert stickers.tag_probability.get("thinking") == thinking_p
+    assert stickers.tag_probability.get("weary") == weary_p
     # every tag_probability key and alias target is a real catalog tag
     assert set(stickers.tag_probability) <= set(stickers.available_tags)
     assert stickers.tag_aliases.get("angry") == "irritation"
@@ -172,8 +182,6 @@ def test_xml_system_block_renders_tag_entry():
 
 
 def test_xml_system_block_is_well_formed_and_synced():
-    import xml.etree.ElementTree as ET
-
     stickers = get_content().stickers
     block = stickers.xml_system_block()
     root = ET.fromstring(block)  # raises on malformed XML
@@ -182,7 +190,8 @@ def test_xml_system_block_is_well_formed_and_synced():
     # each tag is advertised exactly once
     assert len(tags) == len(set(tags)) == len(stickers.available_tags)
     rules = root.find("tag_rules")
-    assert rules is not None and len(rules) == len(stickers.tag_rules)
+    assert rules is not None
+    assert len(rules) == len(stickers.tag_rules)
 
 
 class _RemoteSticker:
@@ -201,12 +210,11 @@ class _Bot:
         self._set = _StickerSet(stickers)
 
     async def get_sticker_set(self, name: str):
+        _ = name
         return self._set
 
 
 def test_match_remote_prefers_emoji_over_stale_index():
-    from services.bot.stickers.catalog import _match_remote
-
     remote = [
         _RemoteSticker("❤️", "f:heart"),
         _RemoteSticker("🤩", "f:hype"),  # index 1
@@ -222,8 +230,6 @@ def test_match_remote_prefers_emoji_over_stale_index():
 
 
 def test_match_remote_disambiguates_duplicate_emoji_by_index():
-    from services.bot.stickers.catalog import _match_remote
-
     remote = [
         _RemoteSticker("❤️", "f:heart"),
         _RemoteSticker("👋", "f:hello"),  # index 1
@@ -236,10 +242,6 @@ def test_match_remote_disambiguates_duplicate_emoji_by_index():
 
 
 def test_resolve_file_ids_refreshes_baked_ids_from_live_pack():
-    import asyncio
-
-    from services.bot.stickers.catalog import build_catalog, resolve_file_ids
-
     content = StickersContent(
         sticker_set_name="VanessaBot",
         stickers=[

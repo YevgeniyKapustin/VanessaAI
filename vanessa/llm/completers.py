@@ -16,68 +16,62 @@ from vanessa.infrastructure.observability.tracing import get_tracer
 logger = logging.getLogger(__name__)
 
 
-class _InstrumentedCompleterMixin:
+async def run_instrumented_completion(
+    provider: str,
+    model: str,
+    messages: list[dict[str, Any]],
+    kind: str,
+    call,
+) -> str:
     """Shared metrics/tracing around a single chat completion."""
-
-    @property
-    def provider(self) -> str:
-        raise NotImplementedError
-
-    async def _run_completion(
-        self,
-        model: str,
-        messages: list[dict[str, Any]],
-        kind: str,
-        call,
-    ) -> str:
-        started = time.perf_counter()
-        tracer = get_tracer()
-        async with tracer.generation(
-            name=f"llm_{kind}",
-            model=model,
-            input=messages,
-            metadata={"provider": self.provider, "kind": kind},
-        ) as gen:
-            try:
-                text, usage, reasoning = await call()
-            except Exception as exc:
-                record_llm_call(
-                    provider=self.provider,
-                    model=model,
-                    kind=kind,
-                    started=started,
-                    status="error",
-                    error_type=classify_llm_error(exc),
-                )
-                raise
-            if reasoning:
-                gen.update(
-                    output=f"[reasoning_content]\n{reasoning}\n\n{text}",
-                    metadata={"reasoning_content": reasoning},
-                    usage=usage or None,
-                )
-                logger.debug(
-                    "llm_reasoning_content kind=%s model=%s chars=%s head=%r",
-                    kind,
-                    model,
-                    len(reasoning),
-                    reasoning[:120],
-                )
-            else:
-                gen.update(output=text, usage=usage or None)
-        record_llm_call(
-            provider=self.provider,
-            model=model,
-            kind=kind,
-            started=started,
-            status="success",
-            usage=usage,
-            output=text,
-        )
-        return text
+    started = time.perf_counter()
+    tracer = get_tracer()
+    async with tracer.generation(
+        name=f"llm_{kind}",
+        model=model,
+        input=messages,
+        metadata={"provider": provider, "kind": kind},
+    ) as gen:
+        try:
+            text, usage, reasoning = await call()
+        except Exception as exc:
+            record_llm_call(
+                provider=provider,
+                model=model,
+                kind=kind,
+                started=started,
+                status="error",
+                error_type=classify_llm_error(exc),
+            )
+            raise
+        if reasoning:
+            gen.update(
+                output=f"[reasoning_content]\n{reasoning}\n\n{text}",
+                metadata={"reasoning_content": reasoning},
+                usage=usage or None,
+            )
+            logger.debug(
+                "llm_reasoning_content kind=%s model=%s chars=%s head=%r",
+                kind,
+                model,
+                len(reasoning),
+                reasoning[:120],
+            )
+        else:
+            gen.update(output=text, usage=usage or None)
+    record_llm_call(
+        provider=provider,
+        model=model,
+        kind=kind,
+        started=started,
+        status="success",
+        usage=usage,
+        output=text,
+    )
+    return text
 
 
-class ClaudeChatCompleter(_InstrumentedCompleterMixin):
+class ClaudeChatCompleter:
     def __init__(self, client: AsyncAnthropic | None = None) -> None:
         self._client = client or AsyncAnthropic(api_key=settings.anthropic_api_key)
 
@@ -113,10 +107,12 @@ class ClaudeChatCompleter(_InstrumentedCompleterMixin):
                 else None
             ), ""
 
-        return await self._run_completion(model, messages, kind, call)
+        return await run_instrumented_completion(
+            self.provider, model, messages, kind, call
+        )
 
 
-class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
+class DeepSeekChatCompleter:
     def __init__(self, client: AsyncOpenAI | None = None) -> None:
         self._client = client
 
@@ -178,7 +174,9 @@ class DeepSeekChatCompleter(_InstrumentedCompleterMixin):
                 ),
             }, reasoning
 
-        return await self._run_completion(model, messages, kind, call)
+        return await run_instrumented_completion(
+            self.provider, model, messages, kind, call
+        )
 
 
 def create_chat_completer() -> LLMChatCompleter:

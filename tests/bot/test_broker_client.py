@@ -74,7 +74,8 @@ async def test_client_process_roundtrip(broker) -> None:
     assert result.reason == "intent"
     assert result.reply == "pong"
     assert result.messages == ["pong"]
-    assert result.relevance_score == 0.9
+    expected_score = 0.9
+    assert result.relevance_score == expected_score
 
 
 async def test_client_uses_correlation_id_from_message(broker) -> None:

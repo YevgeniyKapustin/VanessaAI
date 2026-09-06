@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from services.agent.container import AppContainer, Persistence
+from services.agent.container import AppContainer, Persistence, TurnWiring
 from services.agent.deps import (
     get_incoming_turn_handler,
     get_turn_metrics,
@@ -29,8 +29,6 @@ def test_app_container_composes_factories() -> None:
     search = MagicMock()
     indexing = MagicMock()
     graph = MagicMock()
-    from services.agent.container import TurnWiring
-
     turns = TurnWiring(
         graph,
         persistence=persistence,

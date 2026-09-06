@@ -1,6 +1,12 @@
 from vanessa.config.content import get_content
-from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment
+from vanessa.core.messages import (
+    ContextBlock,
+    ContextMessage,
+    ImageAttachment,
+    PhotoCandidate,
+)
 from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.pipeline.llm.prompts import prompt_directives
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
 
 
@@ -113,10 +119,9 @@ def test_prompt_builder_builds_user_prompt():
 
 
 def test_prompt_builder_includes_aliases_block(monkeypatch):
-    import vanessa.pipeline.llm.prompts.prompt_builder as pb
 
     monkeypatch.setattr(
-        pb,
+        prompt_directives,
         "format_aliases_for_prompt",
         lambda: "Гриша = Ну я",
     )
@@ -129,9 +134,8 @@ def test_prompt_builder_includes_aliases_block(monkeypatch):
 
 
 def test_prompt_builder_omits_aliases_block_when_empty(monkeypatch):
-    import vanessa.pipeline.llm.prompts.prompt_builder as pb
 
-    monkeypatch.setattr(pb, "format_aliases_for_prompt", lambda: "")
+    monkeypatch.setattr(prompt_directives, "format_aliases_for_prompt", lambda: "")
     builder = PromptBuilder()
     prompt = builder.build_user_prompt("привет", [])
 
@@ -324,7 +328,6 @@ def test_prompt_builder_system_forbids_addressing_by_name():
 
 
 def test_prompt_builder_renders_album_instruction_when_candidates():
-    from vanessa.core.messages import PhotoCandidate
 
     builder = PromptBuilder()
     candidates = [
@@ -339,7 +342,6 @@ def test_prompt_builder_renders_album_instruction_when_candidates():
 
 
 def test_prompt_builder_requires_marker_on_explicit_photo_request():
-    from vanessa.core.messages import PhotoCandidate
 
     builder = PromptBuilder()
     candidates = [PhotoCandidate(index=1, telegram_file_id="f1", caption="кот")]
@@ -350,7 +352,6 @@ def test_prompt_builder_requires_marker_on_explicit_photo_request():
 
 
 def test_prompt_builder_omits_required_note_without_photo_request():
-    from vanessa.core.messages import PhotoCandidate
 
     builder = PromptBuilder()
     candidates = [PhotoCandidate(index=1, telegram_file_id="f1", caption="кот")]
@@ -405,16 +406,17 @@ def test_current_message_renders_all_attached_photos():
     """If a message carried several photos, ALL of them are rendered with the
     message text (one <attachment> per photo inside the same <msg>)."""
     builder = PromptBuilder()
+    photo_count = 2
     photos = [
         ImageAttachment(
             data_url=f"data:image/jpeg;base64,{i}",
             mime_type="image/jpeg",
             telegram_file_id=f"file-{i}",
         )
-        for i in range(2)
+        for i in range(photo_count)
     ]
     prompt = builder.build_user_prompt("вот фото", [], current_images=photos)
-    assert prompt.count('<attachment type="photo"') == 2
+    assert prompt.count('<attachment type="photo"') == photo_count
     # Both attachments appear after the text, inside the single current <msg>.
     assert prompt.index("вот фото") < prompt.index('<attachment type="photo"')
     assert prompt.count("<msg") == 1

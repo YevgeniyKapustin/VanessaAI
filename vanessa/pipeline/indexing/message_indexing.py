@@ -23,6 +23,7 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
         indexer: MessageIndexerProtocol,
         messages: MessageRepositoryProtocol,
         session_factory: async_sessionmaker[AsyncSession],
+        *,
         max_retries: int = 2,
         background: BackgroundExecutor | None = None,
         dispatcher: TaskDispatcher | None = None,
@@ -33,10 +34,14 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
         self._max_retries = max_retries
         self._background = background
         self._dispatcher = dispatcher
+        self._bg_tasks: set[asyncio.Task] = set()
 
     async def _embed_with_retry(self, record: StoredMessage) -> str:
         if record.role != RAG_SOURCE_ROLE:
             return record.qdrant_point_id or ""
+        return await self._index_with_retries(record)
+
+    async def _index_with_retries(self, record: StoredMessage) -> str:
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
@@ -95,4 +100,6 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
             # unboundedly and starve the reply path.
             self._background.submit(lambda: self._index_in_background(record))
             return
-        asyncio.create_task(self._index_in_background(record))
+        task = asyncio.create_task(self._index_in_background(record))
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)

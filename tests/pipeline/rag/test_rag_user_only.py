@@ -11,8 +11,9 @@ def test_stored_block_to_context_skips_assistant_messages():
         ],
     )
 
+    last_user_id = 3
     assert block is not None
-    assert block.anchor_id == 3
+    assert block.anchor_id == last_user_id
     assert [message.id for message in block.messages] == [1, 3]
     assert all(message.role == "user" for message in block.messages)
 

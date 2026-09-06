@@ -1,12 +1,18 @@
-from vanessa.core.messages import ContextMessage
-from vanessa.knowledge.metrics.schema import PersonMetrics
+from dataclasses import replace
+
 from vanessa.pipeline.decision.context import DecisionContext, DecisionRule
-from vanessa.pipeline.decision.gate.compose_gate import ComposeGatePolicy
+from vanessa.pipeline.decision.engine_gate import (
+    apply_compose_gate,
+    resolve_eligibility_gate,
+)
+from vanessa.pipeline.decision.engine_rules import (
+    default_decision_rules,
+    first_matching_result,
+)
+from vanessa.pipeline.decision.gate.addressing.compose_gate import ComposeGatePolicy
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.gate.protocols import ReplyEligibilityProtocol
-from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
-from vanessa.pipeline.decision.metrics_rule import LowAttitudeRule, SenderMetricsRule
-from vanessa.pipeline.decision.models import DecisionReason, DecisionResult
+from vanessa.pipeline.decision.models import DecisionResult
 from vanessa.pipeline.decision.protocols import (
     IntentDetectorProtocol,
     NoiseFilterProtocol,
@@ -15,22 +21,7 @@ from vanessa.pipeline.decision.protocols import (
     SessionWindowProtocol,
     TriggerCheckerProtocol,
 )
-from vanessa.pipeline.decision.repeated_question import RepeatedQuestionRule
-from vanessa.pipeline.decision.rules import (
-    ConsecutiveReplyRule,
-    DirectAddressRule,
-    HardIgnoreRule,
-    IntentRule,
-    ListenWindowRule,
-    NoiseRule,
-    PlannerReplyRule,
-    PlannerYesRule,
-    RateLimitRule,
-    RelevanceRule,
-    TriggerRule,
-    _base,
-    _ignore,
-)
+from vanessa.pipeline.decision.rule_outcomes import _base
 
 
 class DecisionEngine:
@@ -55,34 +46,23 @@ class DecisionEngine:
         self._relevance = relevance_checker
         self._session = session_analyzer
         self._rate_limiter = rate_limiter
-        registry = ignore_registry or ChatIgnoreRegistry()
-        eligibility = reply_eligibility or ReplyEligibility(
+        eligibility, self._compose_gate = resolve_eligibility_gate(
             intent_detector,
             trigger_checker,
             noise_filter,
-            registry,
+            reply_eligibility=reply_eligibility,
+            ignore_registry=ignore_registry,
+            compose_gate=compose_gate,
         )
-        self._compose_gate = compose_gate or ComposeGatePolicy(eligibility)
-        self._rules = rules or [
-            RateLimitRule(rate_limiter),
-            NoiseRule(noise_filter),
-            HardIgnoreRule(eligibility),
-            RepeatedQuestionRule(),
-            LowAttitudeRule(),
-            DirectAddressRule(),
-            ConsecutiveReplyRule(
-                intent_detector,
-                trigger_checker,
-                enabled=block_consecutive_replies,
-            ),
-            ListenWindowRule(noise_filter),
-            PlannerReplyRule(),
-            PlannerYesRule(),
-            IntentRule(),
-            TriggerRule(),
-            SenderMetricsRule(),
-            RelevanceRule(relevance_threshold),
-        ]
+        self._rules = rules or default_decision_rules(
+            intent_detector,
+            trigger_checker,
+            rate_limiter,
+            noise_filter,
+            eligibility,
+            relevance_threshold=relevance_threshold,
+            block_consecutive_replies=block_consecutive_replies,
+        )
         self._pre_relevance_rules = [
             r for r in self._rules if not r.needs_relevance
         ]
@@ -93,99 +73,40 @@ class DecisionEngine:
 
     async def decide(
         self,
-        text: str,
-        telegram_chat_id: int,
-        recent_messages: list[ContextMessage],
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
-        *,
-        should_reply: bool | None = None,
-        mentions_bot: bool = False,
-        reply_to_bot: bool = False,
-        reply_to_other_user: bool = False,
-        in_listen_window: bool = False,
-        sender_telegram_id: int = 0,
-        sender_metrics: PersonMetrics | None = None,
-        humor_ok: bool = False,
-        loop_strength: int = 0,
-        annoyance: float = 0.0,
-    ) -> DecisionResult:
-        intent = self._intent.detect(text)
-        trigger = self._triggers.detect(text)
-        session_active = self._session.has_active_request(recent_messages)
-        base_context = DecisionContext(
-            text=text,
-            telegram_chat_id=telegram_chat_id,
-            recent_messages=recent_messages,
-            query_vector=query_vector,
-            intent=intent,
-            trigger=trigger,
-            session_active=session_active,
-            relevance_score=0.0,
-            should_reply=should_reply,
-            mentions_bot=mentions_bot,
-            reply_to_bot=reply_to_bot,
-            reply_to_other_user=reply_to_other_user,
-            in_listen_window=in_listen_window,
-            sender_telegram_id=sender_telegram_id,
-            sender_metrics=sender_metrics,
-            loop_strength=loop_strength,
-            annoyance=annoyance,
-        )
-        for rule in self._pre_relevance_rules:
-            result = rule.evaluate(base_context)
-            if result is not None:
-                return self._finalize(
-                    result,
-                    base_context,
-                    humor_ok=humor_ok,
-                )
-
-        relevance_score = await self._relevance.score(
-            text,
-            query_vector=query_vector,
-            search_text=search_text,
-        )
-        context = DecisionContext(
-            text=text,
-            telegram_chat_id=telegram_chat_id,
-            recent_messages=recent_messages,
-            query_vector=query_vector,
-            intent=intent,
-            trigger=trigger,
-            session_active=session_active,
-            relevance_score=relevance_score,
-            should_reply=should_reply,
-            mentions_bot=mentions_bot,
-            reply_to_bot=reply_to_bot,
-            reply_to_other_user=reply_to_other_user,
-            in_listen_window=in_listen_window,
-            sender_telegram_id=sender_telegram_id,
-            sender_metrics=sender_metrics,
-            loop_strength=loop_strength,
-            annoyance=annoyance,
-        )
-        for rule in self._relevance_rules:
-            result = rule.evaluate(context)
-            if result is not None:
-                return self._finalize(
-                    result,
-                    context,
-                    humor_ok=humor_ok,
-                )
-        return self._finalize(_base(context), context, humor_ok=humor_ok)
-
-    def _finalize(
-        self,
-        result: DecisionResult,
         context: DecisionContext,
         *,
-        humor_ok: bool,
+        search_text: str | None = None,
+        humor_ok: bool = False,
     ) -> DecisionResult:
-        if self._compose_gate.should_downgrade_to_ignore(
+        context = replace(
+            context,
+            intent=self._intent.detect(context.text),
+            trigger=self._triggers.detect(context.text),
+            session_active=self._session.has_active_request(
+                context.recent_messages,
+            ),
+        )
+        result = first_matching_result(self._pre_relevance_rules, context)
+        if result is not None:
+            return apply_compose_gate(
+                self._compose_gate,
+                result,
+                context,
+                humor_ok=humor_ok,
+            )
+
+        relevance_score = await self._relevance.score(
+            context.text,
+            query_vector=context.query_vector,
+            search_text=search_text,
+        )
+        context = replace(context, relevance_score=relevance_score)
+        result = first_matching_result(self._relevance_rules, context)
+        if result is None:
+            result = _base(context)
+        return apply_compose_gate(
+            self._compose_gate,
             result,
             context,
             humor_ok=humor_ok,
-        ):
-            return _ignore(context, DecisionReason.NOT_EXPECTED)
-        return result
+        )

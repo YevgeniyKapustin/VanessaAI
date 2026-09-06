@@ -1,12 +1,10 @@
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from vanessa.core.messages import ContextMessage
+from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentResult
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
 from vanessa.pipeline.decision.models import DecisionResult
-
-if TYPE_CHECKING:
-    from vanessa.knowledge.metrics.schema import PersonMetrics
 
 
 class IntentDetectorProtocol(Protocol):
@@ -45,22 +43,10 @@ class RelevanceCheckerProtocol(Protocol):
 class DecisionEngineProtocol(Protocol):
     async def decide(
         self,
-        text: str,
-        telegram_chat_id: int,
-        recent_messages: list[ContextMessage],
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
+        context: DecisionContext,
         *,
-        should_reply: bool | None = None,
-        mentions_bot: bool = False,
-        reply_to_bot: bool = False,
-        reply_to_other_user: bool = False,
-        in_listen_window: bool = False,
-        sender_telegram_id: int = 0,
-        sender_metrics: "PersonMetrics | None" = None,
+        search_text: str | None = None,
         humor_ok: bool = False,
-        loop_strength: int = 0,
-        annoyance: float = 0.0,
     ) -> DecisionResult: ...
 
     def record_reply(self, telegram_chat_id: int) -> None: ...

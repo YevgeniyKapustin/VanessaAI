@@ -1,3 +1,4 @@
+# Intentional Cyrillic chat fixtures — not lookalike Latin.
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,7 +8,9 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
 from services.bot.container import BotServices, create_bot_services
+from services.bot.handlers import create_router
 from services.bot.handlers.messages import (
+    _PREVIEW_LEN,
     _pick_photo_size,
     _preview,
     _send_photo,
@@ -23,12 +26,14 @@ from tests.bot.test_bot_message import make_telegram_message
 from vanessa.config.content import get_content, get_photo_placeholder
 from vanessa.config.settings import settings
 
+min_typing_pings = 2
+
 
 @pytest.mark.asyncio
 async def test_preview_truncates_long_text():
     text = "a" * 120
     assert _preview(text).endswith("...")
-    assert len(_preview(text)) <= 83
+    assert len(_preview(text)) <= _PREVIEW_LEN + len("...")
 
 
 def test_create_bot_services_wires_dependencies():
@@ -41,11 +46,10 @@ def test_create_bot_services_wires_dependencies():
 @pytest.mark.asyncio
 async def test_send_reply_falls_back_on_bad_html():
     message = make_telegram_message()
-    message.reply = AsyncMock(
-        side_effect=[TelegramBadRequest(MagicMock(), "bad"), None]
-    )
+    fallback_calls = [TelegramBadRequest(MagicMock(), "bad"), None]
+    message.reply = AsyncMock(side_effect=fallback_calls)
     await _send_reply(message, "plain text")
-    assert message.reply.await_count == 2
+    assert message.reply.await_count == len(fallback_calls)
     second_call = message.reply.await_args_list[1]
     assert second_call.args[0] == "plain text"
 
@@ -64,9 +68,10 @@ async def test_send_reply_messages_first_replies_rest_answer():
     message = make_telegram_message()
     message.reply = AsyncMock()
     message.answer = AsyncMock()
-    await _send_reply_messages(message, ["Один", "Два", "Три"], delay=0.0)
+    blocks = ["Один", "Два", "Три"]
+    await _send_reply_messages(message, blocks, delay=0.0)
     assert message.reply.await_count == 1
-    assert message.answer.await_count == 2
+    assert message.answer.await_count == len(blocks) - 1
     # only the first block is sent as a reply to the user's message
     assert message.reply.await_args.args[0] is not None
     assert message.answer.await_args.args[0] is not None
@@ -86,12 +91,11 @@ async def test_send_reply_messages_stops_on_hard_error():
 @pytest.mark.asyncio
 async def test_send_reply_messages_falls_back_to_plain_text():
     message = make_telegram_message()
-    message.reply = AsyncMock(
-        side_effect=[TelegramBadRequest(MagicMock(), "bad"), None]
-    )
+    fallback_calls = [TelegramBadRequest(MagicMock(), "bad"), None]
+    message.reply = AsyncMock(side_effect=fallback_calls)
     message.answer = AsyncMock()
     await _send_reply_messages(message, ["Один"], delay=0.0)
-    assert message.reply.await_count == 2
+    assert message.reply.await_count == len(fallback_calls)
     assert message.reply.await_args_list[1].args[0] == "Один"
 
 
@@ -101,8 +105,7 @@ def _services(
     api_result: ChatProcessResult | None = None,
     api_error: Exception | None = None,
     stickers=None,
-    message_delay_seconds: float = 0.7,
-    max_messages: int = 8,
+    send_limits: tuple[float, int] = (0.7, 8),
 ) -> BotServices:
     chat_client = AsyncMock()
     if api_error is not None:
@@ -132,8 +135,8 @@ def _services(
         access_guard=access_guard,
         texts=get_content().bot,
         stickers=stickers,
-        message_delay_seconds=message_delay_seconds,
-        max_messages=max_messages,
+        message_delay_seconds=send_limits[0],
+        max_messages=send_limits[1],
     )
 
 
@@ -212,7 +215,7 @@ async def test_handle_text_sends_multiple_reply_messages():
             messages=["Первая мысль", "Вторая мысль"],
             relevance_score=0.9,
         ),
-        message_delay_seconds=0.0,
+        send_limits=(0.0, 8),
     )
     await _call_text_handler(services, message)
     # the first block is a reply to the user, the rest are plain messages
@@ -233,8 +236,7 @@ async def test_handle_text_caps_reply_messages():
             messages=["1", "2", "3"],
             relevance_score=0.9,
         ),
-        message_delay_seconds=0.0,
-        max_messages=1,
+        send_limits=(0.0, 1),
     )
     await _call_text_handler(services, message)
     # the safety cap stops flooding: only the first block is delivered
@@ -463,8 +465,6 @@ async def test_handle_text_no_sticker_when_service_absent():
 
 
 def test_create_router_includes_messages():
-    from services.bot.handlers import create_router
-
     router = create_router(create_bot_services())
     assert router.sub_routers
 
@@ -478,7 +478,7 @@ async def test_typing_loop_refreshes_until_cancelled():
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert bot.send_chat_action.await_count >= 2
+    assert bot.send_chat_action.await_count >= min_typing_pings
 
 
 @pytest.mark.asyncio
@@ -492,7 +492,7 @@ async def test_typing_loop_survives_telegram_errors():
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert bot.send_chat_action.await_count >= 2
+    assert bot.send_chat_action.await_count >= min_typing_pings
 
 
 @pytest.mark.asyncio
@@ -505,17 +505,21 @@ async def test_typing_loop_recovers_after_transient_error():
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert bot.send_chat_action.await_count >= 2
+    assert bot.send_chat_action.await_count >= min_typing_pings
 
 
 @pytest.mark.asyncio
 async def test_typing_on_signal_cancels_on_error():
     bot = MagicMock()
     bot.send_chat_action = AsyncMock()
-    with pytest.raises(RuntimeError):
+
+    async def _trigger_then_fail() -> None:
         async with _typing_on_signal(bot, -100123) as start_typing:
             await start_typing()
             raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await _trigger_then_fail()
     # The trigger was fired so the first ping was sent, then the block error
     # propagated and the refresh loop was cancelled on exit.
     assert bot.send_chat_action.await_count >= 1
@@ -607,7 +611,7 @@ async def test_handle_text_pings_typing_again_before_reply():
     # typing is refreshed right before the reply is delivered (start ping plus
     # the pre-reply ping), so the indicator never dies in the tail of the
     # pipeline.
-    assert message.bot.send_chat_action.await_count >= 2
+    assert message.bot.send_chat_action.await_count >= min_typing_pings
 
 
 def test_pick_photo_size_prefers_largest_within_cap():
@@ -639,7 +643,7 @@ async def test_handle_photo_downloads_and_sends_image_to_api():
         MagicMock(file_id="large", file_size=50_000),
     ]
     message.bot.download = AsyncMock(
-        side_effect=lambda photo, destination=None: destination.write(b"fakejpegbytes")
+        side_effect=lambda _photo, destination=None: destination.write(b"fakejpegbytes")
     )
     message.reply = AsyncMock()
     services = _services(
@@ -670,7 +674,7 @@ async def test_handle_photo_uses_caption_as_text():
     message.caption = "смотри что за зверь"
     message.photo = [MagicMock(file_id="p1", file_size=1000)]
     message.bot.download = AsyncMock(
-        side_effect=lambda photo, destination=None: destination.write(b"fakejpegbytes")
+        side_effect=lambda _photo, destination=None: destination.write(b"fakejpegbytes")
     )
     message.reply = AsyncMock()
     services = _services(
@@ -749,7 +753,7 @@ async def test_handle_photo_media_group_buffers_into_one_turn(monkeypatch):
         message.caption = caption
         message.photo = [MagicMock(file_id=file_id, file_size=1000)]
         message.bot.download = AsyncMock(
-            side_effect=lambda photo, destination=None: destination.write(
+            side_effect=lambda _photo, destination=None: destination.write(
                 b"fakejpegbytes"
             )
         )
@@ -767,7 +771,8 @@ async def test_handle_photo_media_group_buffers_into_one_turn(monkeypatch):
     incoming = services.chat_client.process.await_args.args[0]
     # The caption comes from the album's primary photo; both images are attached.
     assert incoming.text == "Ванесса сравни картины кто красивее"
-    assert len(incoming.images) == 2
+    album_ids = {"p1", "p2"}
+    assert len(incoming.images) == len(album_ids)
     assert {image.telegram_file_id for image in incoming.images} == {"p1", "p2"}
 
 
@@ -827,16 +832,15 @@ async def test_send_photo_falls_back_to_upload_from_data_url():
     """A stale Telegram file_id must not lose the photo: fall back to uploading
     the stored bytes (data_url) instead of silently leaving a fake 'sent'."""
     message = make_telegram_message()
-    message.bot.send_photo = AsyncMock(
-        side_effect=[RuntimeError("stale file_id"), None]
-    )
+    retries = [RuntimeError("stale file_id"), None]
+    message.bot.send_photo = AsyncMock(side_effect=retries)
     sent = await _send_photo(
         message,
         "file-1",
         data_url="data:image/jpeg;base64,aGVsbG8=",  # base64("hello")
     )
     assert sent is True
-    assert message.bot.send_photo.await_count == 2
+    assert message.bot.send_photo.await_count == len(retries)
     # The second call re-uploads the decoded bytes, not the stale file_id.
     second_args = message.bot.send_photo.await_args_list[1]
     assert second_args.kwargs["photo"] is not None
@@ -859,9 +863,8 @@ async def test_send_photo_sends_text_fallback_when_no_data_url():
 @pytest.mark.asyncio
 async def test_send_photo_sends_text_fallback_when_upload_also_fails():
     message = make_telegram_message()
-    message.bot.send_photo = AsyncMock(
-        side_effect=[RuntimeError("stale file_id"), RuntimeError("upload failed")]
-    )
+    retries = [RuntimeError("stale file_id"), RuntimeError("upload failed")]
+    message.bot.send_photo = AsyncMock(side_effect=retries)
     message.reply = AsyncMock()
     sent = await _send_photo(
         message,
@@ -869,5 +872,5 @@ async def test_send_photo_sends_text_fallback_when_upload_also_fails():
         data_url="data:image/jpeg;base64,aGVsbG8=",
     )
     assert sent is False
-    assert message.bot.send_photo.await_count == 2
+    assert message.bot.send_photo.await_count == len(retries)
     message.reply.assert_awaited_once()

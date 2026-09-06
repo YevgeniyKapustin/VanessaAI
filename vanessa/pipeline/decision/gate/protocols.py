@@ -1,26 +1,18 @@
 from typing import Protocol
 
 from vanessa.core.messages import ContextMessage
-from vanessa.pipeline.decision.detectors.intent import IntentResult
-from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilterResult
-from vanessa.pipeline.decision.gate.reaction_gate import ReactionGateResult
-from vanessa.pipeline.decision.gate.reply_eligibility import HardIgnoreResult, PrefilterVerdict
+from vanessa.pipeline.decision.context import DecisionContext
+from vanessa.pipeline.decision.gate.eligibility.prefilter import PlannerPrefilterResult
+from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
+    HardIgnoreResult,
+    PrefilterVerdict,
+)
+from vanessa.pipeline.decision.gate.reaction.reaction_gate import ReactionGateResult
 from vanessa.pipeline.decision.turn_plan import TurnPlan
 
 
 class ReplyEligibilityProtocol(Protocol):
-    def hard_ignore(
-        self,
-        text: str,
-        recent_messages: list[ContextMessage],
-        *,
-        telegram_chat_id: int = 0,
-        sender_telegram_id: int = 0,
-        mentions_bot: bool = False,
-        reply_to_bot: bool = False,
-        reply_to_other_user: bool = False,
-        intent: IntentResult | None = None,
-    ) -> HardIgnoreResult | None: ...
+    def hard_ignore(self, context: DecisionContext) -> HardIgnoreResult | None: ...
 
     def evaluate_prefilter(
         self,
@@ -36,18 +28,9 @@ class ReplyEligibilityProtocol(Protocol):
 
     def should_block_compose(
         self,
-        text: str,
+        context: DecisionContext,
         *,
-        recent_messages: list[ContextMessage] | None = None,
-        sender_telegram_id: int = 0,
-        mentions_bot: bool = False,
-        reply_to_bot: bool = False,
-        reply_to_other_user: bool = False,
-        should_reply: bool | None = None,
-        in_listen_window: bool = False,
         humor_ok: bool = False,
-        trigger_detected: bool = False,
-        intent: IntentResult | None = None,
     ) -> bool: ...
 
 
@@ -98,4 +81,3 @@ class ReactionGateProtocol(Protocol):
         in_listen_window: bool = False,
         sender_telegram_id: int | None = None,
     ) -> ReactionGateResult: ...
-

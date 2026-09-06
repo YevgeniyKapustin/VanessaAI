@@ -17,6 +17,46 @@ class TelegramUserProfile:
     last_name: str | None
 
 
+def _profile_from_payload(
+    telegram_id: int, payload: dict
+) -> TelegramUserProfile | None:
+    if not payload.get("ok"):
+        logger.debug(
+            "getChat failed telegram_id=%s error=%s",
+            telegram_id,
+            payload.get("description"),
+        )
+        return None
+    chat = payload["result"]
+    return TelegramUserProfile(
+        telegram_id=telegram_id,
+        username=chat.get("username"),
+        first_name=chat.get("first_name"),
+        last_name=chat.get("last_name"),
+    )
+
+
+async def _get_chat_profile(
+    client: httpx.AsyncClient, url: str, telegram_id: int
+) -> TelegramUserProfile | None:
+    try:
+        response = await client.get(url, params={"chat_id": telegram_id})
+        payload = response.json()
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "getChat request failed telegram_id=%s error=%s",
+            telegram_id,
+            exc,
+        )
+        return None
+    return _profile_from_payload(telegram_id, payload)
+
+
+async def _close_if_owned(client: httpx.AsyncClient, *, owned: bool) -> None:
+    if owned:
+        await client.aclose()
+
+
 async def fetch_telegram_user(
     telegram_id: int,
     bot_token: str,
@@ -32,28 +72,9 @@ async def fetch_telegram_user(
         client = httpx.AsyncClient(timeout=15.0)
 
     try:
-        response = await client.get(url, params={"chat_id": telegram_id})
-        payload = response.json()
-        if not payload.get("ok"):
-            logger.debug(
-                "getChat failed telegram_id=%s error=%s",
-                telegram_id,
-                payload.get("description"),
-            )
-            return None
-        chat = payload["result"]
-        return TelegramUserProfile(
-            telegram_id=telegram_id,
-            username=chat.get("username"),
-            first_name=chat.get("first_name"),
-            last_name=chat.get("last_name"),
-        )
-    except httpx.HTTPError as exc:
-        logger.warning("getChat request failed telegram_id=%s error=%s", telegram_id, exc)
-        return None
+        return await _get_chat_profile(client, url, telegram_id)
     finally:
-        if owns_client:
-            await client.aclose()
+        await _close_if_owned(client, owned=owns_client)
 
 
 async def fetch_telegram_users(

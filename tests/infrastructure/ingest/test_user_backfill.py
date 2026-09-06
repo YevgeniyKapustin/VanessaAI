@@ -1,7 +1,10 @@
 import pytest
 
 from vanessa.infrastructure.ingest.telegram_users import TelegramUserProfile
-from vanessa.infrastructure.ingest.user_backfill import UserBackfillResult, UserBackfillService
+from vanessa.infrastructure.ingest.user_backfill import (
+    UserBackfillResult,
+    UserBackfillService,
+)
 
 
 class FakeUow:
@@ -23,9 +26,10 @@ class FakeUserRepo:
 
     async def upsert_profile(self, telegram_id: int, **kwargs):
         self.calls.append({"telegram_id": telegram_id, **kwargs})
-        if telegram_id == 1:
+        created_id, updated_id = 1, 2
+        if telegram_id == created_id:
             return object(), "created"
-        if telegram_id == 2:
+        if telegram_id == updated_id:
             return object(), "updated"
         return object(), "unchanged"
 

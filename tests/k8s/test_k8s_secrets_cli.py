@@ -31,7 +31,8 @@ def test_cli_check_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
 def test_cli_check_missing(tmp_path: Path):
     env = tmp_path / ".env"
     env.write_text("TELEGRAM_BOT_TOKEN=tg-token\n", encoding="utf-8")
-    assert main(["--from-env", str(env), "check"]) == 2
+    check_failed = 2
+    assert main(["--from-env", str(env), "check"]) == check_failed
 
 
 def test_cli_example_prints_catalog(capsys: pytest.CaptureFixture[str]):
@@ -66,7 +67,8 @@ def test_cli_apply_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         ]
     )
     assert code == 0
-    assert len(seen) == 2
+    secret_and_config = 2
+    assert len(seen) == secret_and_config
     assert "host.docker.internal" in seen[0]
     assert "@redis:" not in seen[0]
     assert "kind: Secret" in seen[0]
@@ -129,7 +131,8 @@ def test_cli_apply_ensures_namespace(
         ]
     )
     assert code == 0
-    assert len(seen) == 3
+    namespace_secret_config = 3
+    assert len(seen) == namespace_secret_config
     assert "kind: Namespace" in seen[0]
     assert "name: vanessa-secrets" in seen[1]
     assert "kind: ConfigMap" in seen[2]
@@ -165,7 +168,8 @@ def test_cli_apply_refuses_missing_required(
         raise AssertionError("kubectl must not be called")
 
     monkeypatch.setattr("scripts.k8s_secrets._run_kubectl", boom)
-    assert main(["--from-env", str(env), "apply"]) == 2
+    apply_failed = 2
+    assert main(["--from-env", str(env), "apply"]) == apply_failed
 
 
 def test_cli_missing_env_file(tmp_path: Path):

@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from vanessa.knowledge.format import today
+from vanessa.knowledge.metrics.schema_clamp import clamp_int as _clamp_int
 
 
 class Distance(StrEnum):
@@ -31,20 +32,6 @@ def _clamp_float(value: object, lo: float, hi: float) -> float | None:
     except (TypeError, ValueError):
         return None
     return max(lo, min(hi, number))
-
-
-def _clamp_int(value: object, lo: int, hi: int | None = None) -> int | None:
-    if value is None or value == "":
-        return None
-    try:
-        number = int(float(value))
-    except (TypeError, ValueError):
-        return None
-    if hi is not None:
-        number = max(lo, min(hi, number))
-    elif number < lo:
-        number = lo
-    return number
 
 
 def _parse_distance(value: object) -> Distance | None:

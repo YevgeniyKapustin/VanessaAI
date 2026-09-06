@@ -16,15 +16,15 @@ import asyncio
 import sys
 from pathlib import Path
 
+from vanessa.config.settings import settings
+from vanessa.knowledge.store.vault import KnowledgeVault
+from vanessa.knowledge.vectors import KnowledgeVectorIndexer
+from vanessa.pipeline.rag.embeddings.local_embeddings import LocalEmbeddingProvider
+from vanessa.pipeline.rag.qdrant_client import KnowledgeQdrantStore
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-from vanessa.config.settings import settings
-from vanessa.knowledge.vault import KnowledgeVault
-from vanessa.knowledge.vector_index import KnowledgeVectorIndexer
-from vanessa.pipeline.rag.embeddings.local_embeddings import LocalEmbeddingProvider
-from vanessa.pipeline.rag.qdrant_client import KnowledgeQdrantStore
 
 
 async def main() -> int:

@@ -8,7 +8,7 @@ from vanessa.pipeline.rag.text import truncate_for_embedding
 
 _embed_lock = asyncio.Lock()
 
-_embed_executor: ThreadPoolExecutor | None = None
+_embed_executor: list[ThreadPoolExecutor | None] = [None]
 
 
 def _get_embed_executor() -> ThreadPoolExecutor:
@@ -18,18 +18,19 @@ def _get_embed_executor() -> ThreadPoolExecutor:
     starves other ``asyncio.to_thread`` callers and its concurrency stays
     bounded (see ``EMBEDDING_THREADS``).
     """
-    global _embed_executor
-    if _embed_executor is None:
-        _embed_executor = ThreadPoolExecutor(
+    pool = _embed_executor[0]
+    if pool is None:
+        pool = ThreadPoolExecutor(
             max_workers=max(1, settings.embedding_threads),
             thread_name_prefix="embed",
         )
-    return _embed_executor
+        _embed_executor[0] = pool
+    return pool
 
 
 @lru_cache(maxsize=1)
 def _load_model():
-    from sentence_transformers import SentenceTransformer
+    from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
     return SentenceTransformer(settings.embedding_model_name)
 

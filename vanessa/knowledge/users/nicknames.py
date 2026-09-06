@@ -2,22 +2,32 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from functools import lru_cache
 from pathlib import Path
 
 from vanessa.config.settings import settings
 from vanessa.infrastructure.ingest.user_backfill import load_nicknames
 from vanessa.knowledge.format import PEOPLE
+from vanessa.knowledge.users.alias_extract import (
+    aliases_from_notes,
+)
+from vanessa.knowledge.users.alias_extract import (
+    normalize_alias as _normalize,
+)
+from vanessa.knowledge.users.nickname_format import (
+    build_variants,
+    match_nicknames_in_text,
+    render_aliases_for_prompt,
+    render_nicknames_for_planner,
+)
+from vanessa.knowledge.users.people_notes import (
+    iter_people_notes_fs as _iter_people_notes_fs,
+)
+from vanessa.knowledge.users.people_notes import (
+    people_signature_fs as _people_signature_fs,
+)
 
-_SPACE_RE = re.compile(r"\s+")
 logger = logging.getLogger(__name__)
-
-
-def _normalize(text: str) -> str:
-    # A leading '@' is stripped so a Telegram username (@nu_ya) and its bare form
-    # (nu_ya) normalize to the same key.
-    return _SPACE_RE.sub(" ", text.replace("ё", "е").lower().lstrip("@")).strip()
 
 
 def resolve_nicknames_path() -> Path:
@@ -44,16 +54,6 @@ def get_chat_nicknames() -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 
 
-def _people_dir() -> Path | None:
-    """Path to the vault People folder, or None when the vault is unconfigured."""
-    raw = settings.knowledge_path.strip() if settings.knowledge_path else ""
-    if not raw:
-        return None
-    root = Path(raw).resolve()
-    people = root / "People"
-    return people if people.is_dir() else None
-
-
 def _event_loop_running() -> bool:
     try:
         asyncio.get_running_loop()
@@ -62,34 +62,8 @@ def _event_loop_running() -> bool:
     return True
 
 
-def _iter_people_notes_fs():
-    people = _people_dir()
-    if people is None:
-        return []
-    from vanessa.knowledge.format import parse_frontmatter
-    from vanessa.knowledge.schema import VaultNote
-
-    notes = []
-    for md in sorted(people.glob("*.md")):
-        try:
-            meta, body = parse_frontmatter(md.read_text(encoding="utf-8"))
-        except OSError:
-            continue
-        if not isinstance(meta, dict):
-            continue
-        notes.append(
-            VaultNote(
-                relative_path=md.as_posix(),
-                meta=meta,
-                body=body,
-                updated_at=md.stat().st_mtime,
-            )
-        )
-    return notes
-
-
 def _iter_people_notes():
-    from vanessa.knowledge.vault import KnowledgeVault
+    from vanessa.knowledge.store.vault import KnowledgeVault  # noqa: PLC0415
 
     vault = KnowledgeVault()
     if vault.is_configured:
@@ -97,25 +71,9 @@ def _iter_people_notes():
     return _iter_people_notes_fs()
 
 
-def _people_signature_fs() -> tuple:
-    people = _people_dir()
-    if people is None:
-        return ()
-    signature: list = []
-    for md in sorted(people.glob("*.md")):
-        if md.name == "_index.yaml":
-            continue
-        try:
-            stat = md.stat()
-        except OSError:
-            continue
-        signature.append((md.as_posix(), stat.st_mtime, stat.st_size))
-    return tuple(signature)
-
-
 def _people_signature() -> tuple:
     """Per-note identity so People-card edits invalidate the cache."""
-    from vanessa.knowledge.vault import KnowledgeVault
+    from vanessa.knowledge.store.vault import KnowledgeVault  # noqa: PLC0415
 
     vault = KnowledgeVault()
     if vault.is_configured:
@@ -124,38 +82,7 @@ def _people_signature() -> tuple:
 
 
 def _aliases_from_notes(notes) -> dict[str, tuple[str, ...]]:
-    if not notes:
-        return {}
-    roster = load_nicknames(resolve_nicknames_path())
-    result: dict[str, tuple[str, ...]] = {}
-    for note in notes:
-        meta = note.meta
-        if not isinstance(meta, dict):
-            continue
-        canonical = _canonical_for_card(meta, roster)
-        if not canonical:
-            continue
-        aliases: list[str] = []
-        seen: set[str] = set()
-        for field in ("aliases", "names"):
-            for raw in _as_list(meta.get(field)):
-                alias = str(raw).strip()
-                key = _normalize(alias)
-                if not key or key in seen or key == _normalize(canonical):
-                    continue
-                seen.add(key)
-                aliases.append(alias)
-        for field in ("telegram_username", "username"):
-            username = str(meta.get(field) or "").strip()
-            if not username:
-                continue
-            key = _normalize(username)
-            if key and key not in seen and key != _normalize(canonical):
-                seen.add(key)
-                aliases.append(username)
-        if aliases:
-            result[canonical] = tuple(aliases)
-    return result
+    return aliases_from_notes(notes, load_nicknames(resolve_nicknames_path()))
 
 
 def _load_vault_aliases() -> dict[str, tuple[str, ...]]:
@@ -164,8 +91,8 @@ def _load_vault_aliases() -> dict[str, tuple[str, ...]]:
 
 async def ensure_people_alias_cache() -> None:
     """Load People aliases on the running loop (Postgres is async-only)."""
-    global _ALIAS_CACHE
-    from vanessa.knowledge.vault import KnowledgeVault
+    global _ALIAS_CACHE  # noqa: PLW0603 - tests reset this module cache
+    from vanessa.knowledge.store.vault import KnowledgeVault  # noqa: PLC0415
 
     try:
         vault = KnowledgeVault()
@@ -182,33 +109,12 @@ async def ensure_people_alias_cache() -> None:
             _ALIAS_CACHE = ((), {})
 
 
-def _canonical_for_card(meta: dict, roster: dict[int, str]) -> str:
-    """Canonical display name for a People card (roster by telegram_id first)."""
-    telegram_id = meta.get("telegram_id")
-    if telegram_id is not None:
-        try:
-            roster_name = roster.get(int(telegram_id))
-        except (TypeError, ValueError):
-            roster_name = None
-        if roster_name:
-            return str(roster_name)
-    return str(meta.get("nickname") or meta.get("id") or "").strip()
-
-
-def _as_list(value: object) -> list:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return list(value)
-    return [value]
-
-
 _ALIAS_CACHE: tuple[tuple, dict[str, tuple[str, ...]]] | None = None
 
 
 def get_chat_aliases() -> dict[str, tuple[str, ...]]:
     """Alias map (canonical name -> aliases), cached by People-card mtimes."""
-    global _ALIAS_CACHE
+    global _ALIAS_CACHE  # noqa: PLW0603 - tests reset this module cache
     if _event_loop_running():
         return {} if _ALIAS_CACHE is None else _ALIAS_CACHE[1]
     signature = _people_signature()
@@ -220,22 +126,7 @@ def get_chat_aliases() -> dict[str, tuple[str, ...]]:
 
 
 def _build_variants(aliases: dict[str, tuple[str, ...]]) -> dict[str, str]:
-    """Map every normalized name (canonical + aliases) to the canonical name.
-
-    ``"ну я"`` (a Telegram nickname) and ``"Гриша"`` (the name people actually
-    use) both map to the canonical ``"Гриша"``. The canonical name itself is
-    included so an already-canonical sender resolves to itself.
-    """
-    variants: dict[str, str] = {}
-    for canonical, alias_list in aliases.items():
-        variants[_normalize(canonical)] = canonical
-        for alias in alias_list:
-            variants.setdefault(_normalize(alias), canonical)
-    # Fall back to the nicknames roster for canonical names that have no People
-    # card: they must still canonicalize to themselves.
-    for nickname in get_chat_nicknames():
-        variants.setdefault(_normalize(nickname), nickname)
-    return variants
+    return build_variants(aliases, get_chat_nicknames())
 
 
 def get_canonical_variants() -> dict[str, str]:
@@ -255,52 +146,13 @@ def canonical_name_for(alias: str | None) -> str | None:
 
 
 def find_nicknames_in_text(text: str) -> list[str]:
-    normalized_text = _normalize(text)
-    if not normalized_text:
-        return []
-
-    found: list[str] = []
-    seen: set[str] = set()
-    for nickname in get_chat_nicknames():
-        normalized_name = _normalize(nickname)
-        if len(normalized_name) < 3:
-            continue
-        matched = (
-            normalized_name in normalized_text
-            or any(
-                token.startswith(normalized_name)
-                for token in normalized_text.split()
-            )
-        )
-        if matched and normalized_name not in seen:
-            seen.add(normalized_name)
-            found.append(nickname)
-
-    # Also match aliases (e.g. «ну я» -> canonical «Гриша»), so mentions by a
-    # nickname the chat actually uses still resolve to the canonical person.
-    for alias, canonical in get_canonical_variants().items():
-        if len(alias) < 3 or canonical in found:
-            continue
-        matched = (
-            alias in normalized_text
-            or any(token.startswith(alias) for token in normalized_text.split())
-        )
-        if matched and alias not in seen:
-            seen.add(alias)
-            found.append(canonical)
-    return found
+    return match_nicknames_in_text(
+        text, get_chat_nicknames(), get_canonical_variants()
+    )
 
 
 def format_nicknames_for_planner() -> str:
-    nicknames = get_chat_nicknames()
-    if not nicknames:
-        return "(не заданы)"
-    # Several Telegram accounts can share one display name (e.g. three different
-    # users are all «Котгаст»). The planner prompt only needs each name once;
-    # the full ID→name mapping still lives in get_chat_nicknames() for mention
-    # detection, so detection is unaffected by this dedup.
-    unique = dict.fromkeys(nicknames)
-    return ", ".join(sorted(unique, key=str.lower))
+    return render_nicknames_for_planner(get_chat_nicknames())
 
 
 def format_aliases_for_prompt() -> str:
@@ -309,22 +161,4 @@ def format_aliases_for_prompt() -> str:
     Only aliases that differ from the canonical name are shown, so the bot knows
     «ну я» and «Гриша» are the same person without repeating the name.
     """
-    aliases = get_chat_aliases()
-    if not aliases:
-        return ""
-    lines: list[str] = []
-    for canonical in sorted(aliases, key=str.lower):
-        # Keep one representative per normalized form so «Ну я» and «ну я» are
-        # not shown twice; drop aliases equal to the canonical name itself.
-        seen: set[str] = set()
-        others: list[str] = []
-        for alias in aliases[canonical]:
-            key = _normalize(alias)
-            if key in seen or key == _normalize(canonical):
-                continue
-            seen.add(key)
-            others.append(alias)
-        if not others:
-            continue
-        lines.append(f"{canonical} = {', '.join(others)}")
-    return "\n".join(lines)
+    return render_aliases_for_prompt(get_chat_aliases())

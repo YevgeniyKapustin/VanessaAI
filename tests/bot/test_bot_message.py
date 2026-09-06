@@ -4,18 +4,22 @@ from aiogram.enums import ChatType
 
 from services.bot.messages import IncomingMessage
 
+TEST_CHAT_ID = -100123
+TEST_SENDER_ID = 42
+TEST_REPLY_MESSAGE_ID = 555
+
 
 def make_telegram_message(
     text: str = "Привет",
     chat_type: ChatType = ChatType.GROUP,
 ) -> MagicMock:
     message = MagicMock()
-    message.chat.id = -100123
+    message.chat.id = TEST_CHAT_ID
     message.chat.type = chat_type
     message.chat.title = "Test chat"
     message.message_id = 99
     message.text = text
-    message.from_user.id = 42
+    message.from_user.id = TEST_SENDER_ID
     message.from_user.username = "tester"
     message.from_user.first_name = "Test"
     message.from_user.last_name = "User"
@@ -28,9 +32,9 @@ def make_telegram_message(
 def test_from_telegram_maps_fields():
     incoming = IncomingMessage.from_telegram(make_telegram_message())
 
-    assert incoming.telegram_chat_id == -100123
+    assert incoming.telegram_chat_id == TEST_CHAT_ID
     assert incoming.text == "Привет"
-    assert incoming.sender_telegram_id == 42
+    assert incoming.sender_telegram_id == TEST_SENDER_ID
     assert incoming.chat_type == ChatType.GROUP.value
     assert incoming.chat_title == "Test chat"
 
@@ -49,15 +53,15 @@ def test_to_api_payload_contains_chat_context():
 
     payload = incoming.to_api_payload()
 
-    assert payload["telegram_chat_id"] == -100123
+    assert payload["telegram_chat_id"] == TEST_CHAT_ID
     assert payload["message"] == "Привет"
-    assert payload["sender_telegram_id"] == 42
+    assert payload["sender_telegram_id"] == TEST_SENDER_ID
 
 
 def test_to_api_payload_contains_reply_context():
     message = make_telegram_message()
     reply = MagicMock()
-    reply.message_id = 555
+    reply.message_id = TEST_REPLY_MESSAGE_ID
     reply.text = "Личь не делает карты"
     reply.caption = None
     reply.sticker = None
@@ -70,7 +74,7 @@ def test_to_api_payload_contains_reply_context():
     incoming = IncomingMessage.from_telegram(message)
     payload = incoming.to_api_payload()
 
-    assert payload["reply_to_message_id"] == 555
+    assert payload["reply_to_message_id"] == TEST_REPLY_MESSAGE_ID
     assert payload["reply_to_text"] == "Личь не делает карты"
     assert payload["reply_to_sender_name"] == "lich"
     assert payload["reply_to_other_user"] is True

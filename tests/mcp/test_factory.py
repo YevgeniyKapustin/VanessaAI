@@ -1,11 +1,10 @@
+from vanessa.config.settings import settings
 from vanessa.infrastructure.mcp.websearch import McpWebSearch
 from vanessa.infrastructure.websearch.factory import create_web_search
 from vanessa.infrastructure.websearch.tavily import TavilySearch
 
 
 def test_factory_uses_mcp_when_url_set(monkeypatch) -> None:
-    from vanessa.config.settings import settings
-
     monkeypatch.setattr(settings, "mcp_websearch_url", "http://mcp-websearch:8101/mcp")
     monkeypatch.setattr(settings, "web_search_enabled", True)
     result = create_web_search()
@@ -13,8 +12,6 @@ def test_factory_uses_mcp_when_url_set(monkeypatch) -> None:
 
 
 def test_factory_mcp_server_skips_mcp_url(monkeypatch) -> None:
-    from vanessa.config.settings import settings
-
     monkeypatch.setattr(settings, "mcp_websearch_url", "http://mcp-websearch:8101/mcp")
     monkeypatch.setattr(settings, "web_search_enabled", True)
     monkeypatch.setattr(settings, "web_search_provider", "tavily")
@@ -23,8 +20,6 @@ def test_factory_mcp_server_skips_mcp_url(monkeypatch) -> None:
 
 
 def test_factory_in_process_when_no_mcp_url(monkeypatch) -> None:
-    from vanessa.config.settings import settings
-
     monkeypatch.setattr(settings, "mcp_websearch_url", "")
     monkeypatch.setattr(settings, "web_search_enabled", True)
     monkeypatch.setattr(settings, "web_search_provider", "tavily")
@@ -33,8 +28,6 @@ def test_factory_in_process_when_no_mcp_url(monkeypatch) -> None:
 
 
 def test_factory_none_when_disabled(monkeypatch) -> None:
-    from vanessa.config.settings import settings
-
     monkeypatch.setattr(settings, "mcp_websearch_url", "")
     monkeypatch.setattr(settings, "web_search_enabled", False)
     assert create_web_search() is None

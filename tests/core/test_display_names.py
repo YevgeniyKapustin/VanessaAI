@@ -1,7 +1,9 @@
+# Intentional Cyrillic display names and comments — not lookalike Latin.
 from datetime import UTC, datetime
 
 from vanessa.core.messages import ContextMessage
 from vanessa.infrastructure.ingest.user_backfill import load_nicknames
+from vanessa.knowledge.users import nicknames
 from vanessa.knowledge.users.display_names import (
     resolve_sender_display_name,
     resolve_user_display_name,
@@ -57,8 +59,6 @@ def test_resolve_sender_uses_vault_telegram_username(monkeypatch, tmp_path):
     # The People card declares that the Telegram @username «nu_ya» (and the
     # display name «Ну я») are the same person as «Гриша» — the sender renders
     # consistently from the vault (the single source of truth).
-
-    from vanessa.knowledge.users import nicknames
 
     people = tmp_path / "People"
     people.mkdir(parents=True, exist_ok=True)

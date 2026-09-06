@@ -1,7 +1,7 @@
 import pytest
 
 from vanessa.knowledge.portraits import PortraitBuilder, PortraitPlanner
-from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.store.vault import KnowledgeVault
 
 
 class FakePlanner:
@@ -75,7 +75,8 @@ async def test_builder_regenerates_when_dossier_changes(tmp_path):
         note.body + "- 2026-08-26: Переехал в Грузию.\n",
     )
     assert await builder.run() == 1
-    assert planner.calls == 2
+    expected_runs = 2
+    assert planner.calls == expected_runs
 
 
 @pytest.mark.asyncio
@@ -107,7 +108,8 @@ async def test_builder_force_rebuilds_everything(tmp_path):
 
     assert await builder.run() == 1
     assert await builder.run(force=True) == 1
-    assert planner.calls == 2
+    expected_runs = 2
+    assert planner.calls == expected_runs
 
 
 @pytest.mark.asyncio
@@ -124,6 +126,7 @@ async def test_planner_formats_prompt_and_returns_clean_portrait():
             self.prompt = ""
 
         async def complete(self, model, messages, *, kind, **kwargs):
+            _ = model, kind, kwargs
             self.prompt = messages[0]["content"]
             return (
                 "  Крабер — отшельник из Екатеринбурга.\n"
@@ -157,6 +160,7 @@ async def test_planner_includes_previous_portrait_in_prompt():
             self.prompt = ""
 
         async def complete(self, model, messages, *, kind, **kwargs):
+            _ = model, kind, kwargs
             self.prompt = messages[0]["content"]
             return "портрет"
 
@@ -178,6 +182,7 @@ async def test_planner_includes_previous_portrait_in_prompt():
 async def test_planner_strips_markdown_fence():
     class FakeCompleter:
         async def complete(self, model, messages, *, kind, **kwargs):
+            _ = model, messages, kind, kwargs
             return "```text\nПортрет без рамок.\n```"
 
     planner = PortraitPlanner(llm_client=FakeCompleter(), llm_model="test-model")

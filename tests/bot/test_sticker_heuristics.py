@@ -1,3 +1,4 @@
+# Intentional Cyrillic reply fixtures — not lookalike Latin.
 from services.bot.stickers.heuristics import is_sticker_request, reply_tags
 
 

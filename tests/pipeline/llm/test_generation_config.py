@@ -1,19 +1,32 @@
 from vanessa.config.content import get_content
+from vanessa.config.conversation_config import load_conversation_config
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
+
+COMPOSER_TEMPERATURE = 0.8
+COMPOSER_TOP_P = 0.9
+COMPOSER_MAX_TOKENS = 2048
+COMPOSER_PRESENCE_PENALTY = 0.4
+COMPOSER_FREQUENCY_PENALTY = 0.35
+PLANNER_TEMPERATURE = 0.1
+PLANNER_TOP_P = 0.85
+PLANNER_MAX_TOKENS = 2048
+SESSION_WINDOW_SIZE = 20
+SESSION_IDLE_SECONDS = 300.0
+POST_REPLY_LISTEN_COUNT = 4
 
 
 def test_composer_generation_loaded_from_content():
     content = get_content()
     params = content.llm.generation.composer.to_params()
     assert isinstance(params, LLMGenerationParams)
-    assert params.temperature == 0.8
-    assert params.top_p == 0.9
+    assert params.temperature == COMPOSER_TEMPERATURE
+    assert params.top_p == COMPOSER_TOP_P
     # The composer runs on a reasoning (V4) model whose chain-of-thought counts
     # against max_tokens — the budget must cover reasoning + [answer] tag + the
     # reply itself, not just the final message.
-    assert params.max_tokens == 2048
-    assert params.presence_penalty == 0.4
-    assert params.frequency_penalty == 0.35
+    assert params.max_tokens == COMPOSER_MAX_TOKENS
+    assert params.presence_penalty == COMPOSER_PRESENCE_PENALTY
+    assert params.frequency_penalty == COMPOSER_FREQUENCY_PENALTY
     # The composer runs a medium chain of thought on every reply — the default
     # tradeoff vs low (faster) and high (more careful, slower). reasoning_effort
     # is forwarded to the DeepSeek V4 API.
@@ -23,11 +36,11 @@ def test_composer_generation_loaded_from_content():
 
 def test_planner_generation_is_more_deterministic():
     params = get_content().llm.generation.planner.to_params()
-    assert params.temperature == 0.1
-    assert params.top_p == 0.85
+    assert params.temperature == PLANNER_TEMPERATURE
+    assert params.top_p == PLANNER_TOP_P
     # The planner is a fast classification step (strict JSON, ~300 tokens) that
     # deliberately runs WITHOUT reasoning — 2048 comfortably covers the JSON.
-    assert params.max_tokens == 2048
+    assert params.max_tokens == PLANNER_MAX_TOKENS
     assert params.reasoning_effort is None
     assert "reasoning_effort" not in params.to_llm_kwargs()
 
@@ -64,9 +77,8 @@ def test_reasoning_effort_sent_when_configured():
 
 
 def test_conversation_config_from_content():
-    from vanessa.config.conversation_config import load_conversation_config
 
     config = load_conversation_config()
-    assert config.session_window_size == 20
-    assert config.session_idle_seconds == 300.0
-    assert config.post_reply_listen_count == 4
+    assert config.session_window_size == SESSION_WINDOW_SIZE
+    assert config.session_idle_seconds == SESSION_IDLE_SECONDS
+    assert config.post_reply_listen_count == POST_REPLY_LISTEN_COUNT

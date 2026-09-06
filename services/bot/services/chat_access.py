@@ -48,14 +48,28 @@ class ChatAccessGuard:
         }
 
     async def ensure_access(self, message: IncomingMessage) -> str | None:
-        if self._allowed_chat_id and message.telegram_chat_id != self._allowed_chat_id:
-            return self._messages.wrong_chat.strip()
+        denial = self._static_access_denial(message)
+        if denial:
+            return denial
+        if not await self.required_user_in_chat(message):
+            return self._messages.required_user_missing.strip()
+        return None
+
+    def _static_access_denial(self, message: IncomingMessage) -> str | None:
+        wrong = self._wrong_chat(message)
+        if wrong:
+            return wrong
         if not self.is_group_chat(message):
             return self._messages.private_chat.strip()
         if not self._required_user_id:
             return self._messages.required_user_not_configured.strip()
-        if not await self.required_user_in_chat(message):
-            return self._messages.required_user_missing.strip()
+        return None
+
+    def _wrong_chat(self, message: IncomingMessage) -> str | None:
+        if not self._allowed_chat_id:
+            return None
+        if message.telegram_chat_id != self._allowed_chat_id:
+            return self._messages.wrong_chat.strip()
         return None
 
     def is_private_chat(self, message: IncomingMessage) -> bool:

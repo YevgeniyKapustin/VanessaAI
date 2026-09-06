@@ -12,34 +12,38 @@ from vanessa.infrastructure.db.models import Message
 
 def test_message_to_stored_maps_fields():
     created = datetime(2024, 1, 1, tzinfo=UTC)
+    sender_id = 42
+    reply_message_id = 555
+    reply_sender_id = 99
     message = Message(
         id=1,
         role="user",
         content="hello",
-        sender_telegram_id=42,
+        sender_telegram_id=sender_id,
         telegram_message_id=99,
         qdrant_point_id="pt-1",
         created_at=created,
-        reply_to_message_id=555,
+        reply_to_message_id=reply_message_id,
         reply_to_text="Личь не делает карты",
-        reply_to_sender_telegram_id=99,
+        reply_to_sender_telegram_id=reply_sender_id,
         reply_to_sender_name="Личь",
     )
     stored = message_to_stored(message)
     assert stored.id == 1
-    assert stored.sender_telegram_id == 42
+    assert stored.sender_telegram_id == sender_id
     assert stored.created_at == created
-    assert stored.reply_to_message_id == 555
+    assert stored.reply_to_message_id == reply_message_id
     assert stored.reply_to_text == "Личь не делает карты"
-    assert stored.reply_to_sender_telegram_id == 99
+    assert stored.reply_to_sender_telegram_id == reply_sender_id
     assert stored.reply_to_sender_name == "Личь"
 
 
 def test_message_to_context():
-    message = Message(id=2, role="user", content="ctx")
+    message_id = 2
+    message = Message(id=message_id, role="user", content="ctx")
     context = message_to_context(message)
     assert isinstance(context, ContextMessage)
-    assert context.id == 2
+    assert context.id == message_id
     assert context.content == "ctx"
 
 
@@ -58,7 +62,7 @@ def test_messages_stored_to_context_batch():
         StoredMessage(id=4, role="user", content="y"),
     ]
     contexts = messages_stored_to_context(stored)
-    assert len(contexts) == 2
+    assert len(contexts) == len(stored)
     assert contexts[1].content == "y"
 
 

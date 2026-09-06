@@ -66,22 +66,35 @@ class TavilySearch:
         return "tavily"
 
 
+def _stripped(item: dict[str, Any], key: str) -> str:
+    return str(item.get(key) or "").strip()
+
+
+def _published_date(item: dict[str, Any]) -> str | None:
+    return _stripped(item, "published_date") or None
+
+
+def _parse_result_item(item: dict[str, Any]) -> WebResult | None:
+    url = _stripped(item, "url")
+    title = _stripped(item, "title")
+    content = _stripped(item, "content")
+    if not url:
+        return None
+    if not title and not content:
+        return None
+    return WebResult(
+        title=title,
+        url=url,
+        snippet=content,
+        published_date=_published_date(item),
+    )
+
+
 def _parse_results(data: dict[str, Any]) -> list[WebResult]:
     results: list[WebResult] = []
     for item in data.get("results") or []:
-        url = str(item.get("url") or "").strip()
-        title = str(item.get("title") or "").strip()
-        content = str(item.get("content") or "").strip()
-        if not url or not (title or content):
+        parsed = _parse_result_item(item)
+        if parsed is None:
             continue
-        results.append(
-            WebResult(
-                title=title,
-                url=url,
-                snippet=content,
-                published_date=(
-                    str(item.get("published_date") or "").strip() or None
-                ),
-            )
-        )
+        results.append(parsed)
     return results

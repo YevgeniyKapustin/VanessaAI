@@ -1,16 +1,20 @@
+# Intentional Cyrillic vault fixtures — not lookalike Latin.
 import inspect
 import socket
 import threading
+import time
 
 import uvicorn
 
 from services.mcp import knowledge, vision, websearch
 from vanessa.core.messages import WebResult
-from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.infrastructure.mcp.client import StreamableHttpMcpClient
+from vanessa.knowledge.store.vault import KnowledgeVault
 
 
 class _FakeSearch:
     async def search(self, query, *, limit=5):
+        _ = (query, limit)
         return [
             WebResult(
                 title="Title",
@@ -52,7 +56,7 @@ async def test_servers_have_distinct_names() -> None:
         vision.build_server(),
     ]
     names = {server.name for server in servers}
-    assert len(names) == 3
+    assert len(names) == len(servers)
 
 
 def _free_port() -> int:
@@ -62,8 +66,6 @@ def _free_port() -> int:
 
 
 def _wait_port(port: int, timeout: float = 10.0) -> None:
-    import time
-
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         with socket.socket() as s:
@@ -78,8 +80,6 @@ def _wait_port(port: int, timeout: float = 10.0) -> None:
 
 async def test_knowledge_vault_find_over_http(tmp_path) -> None:
     """MCP contract test: the knowledge server resolves a person alias over the wire."""
-
-    from vanessa.infrastructure.mcp.client import StreamableHttpMcpClient
 
     vault = KnowledgeVault(root_path=str(tmp_path))
     await vault.ensure_structure()

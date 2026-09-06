@@ -17,6 +17,17 @@ from vanessa.llm.json_text import normalize_llm_json
 logger = logging.getLogger(__name__)
 
 
+def _snapshots_payload(payload: object) -> list | None:
+    if not isinstance(payload, dict):
+        return None
+    snapshots = payload.get("snapshots")
+    if not isinstance(snapshots, list):
+        snapshots = payload.get("updates")
+    if not isinstance(snapshots, list):
+        return None
+    return snapshots
+
+
 class MetricsPlanner:
     def __init__(
         self,
@@ -62,31 +73,32 @@ class MetricsPlanner:
             payload = json.loads(normalized)
         except json.JSONDecodeError:
             return ()
-        if not isinstance(payload, dict):
+        snapshots = _snapshots_payload(payload)
+        if snapshots is None:
             return ()
-        snapshots = payload.get("snapshots")
-        if not isinstance(snapshots, list):
-            snapshots = payload.get("updates")
-        if not isinstance(snapshots, list):
-            return ()
+        return self._collect_snapshots(snapshots)
+
+    def _collect_snapshots(self, snapshots: list) -> tuple[MetricsSnapshot, ...]:
         result: list[MetricsSnapshot] = []
         for item in snapshots:
-            if not isinstance(item, dict):
-                continue
-            person = str(item.get("person") or "").strip()
-            if not person:
-                continue
-            metrics_data = item.get("metrics")
-            if not isinstance(metrics_data, dict):
-                continue
-            telegram_id = item.get("telegram_id")
-            result.append(
-                MetricsSnapshot(
-                    person=person,
-                    metrics=PersonMetrics.from_dict(metrics_data),
-                    telegram_id=(
-                        int(telegram_id) if telegram_id is not None else None
-                    ),
-                )
-            )
+            snapshot = self._snapshot_from_item(item)
+            if snapshot is not None:
+                result.append(snapshot)
         return tuple(result)
+
+    @staticmethod
+    def _snapshot_from_item(item: object) -> MetricsSnapshot | None:
+        if not isinstance(item, dict):
+            return None
+        person = str(item.get("person") or "").strip()
+        if not person:
+            return None
+        metrics_data = item.get("metrics")
+        if not isinstance(metrics_data, dict):
+            return None
+        telegram_id = item.get("telegram_id")
+        return MetricsSnapshot(
+            person=person,
+            metrics=PersonMetrics.from_dict(metrics_data),
+            telegram_id=(int(telegram_id) if telegram_id is not None else None),
+        )

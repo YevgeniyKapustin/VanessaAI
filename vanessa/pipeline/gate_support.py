@@ -10,9 +10,13 @@ from vanessa.core.protocols import (
 from vanessa.core.request_context import get_request_id
 from vanessa.core.turn import ConversationTurnResult
 from vanessa.pipeline.context import TurnPipelineContext
-from vanessa.pipeline.decision.gate.ignore_registry_protocol import ChatIgnoreRegistryProtocol
-from vanessa.pipeline.decision.gate.reply_eligibility import prefilter_tag_to_decision_reason
-from vanessa.pipeline.decision.gate.user_ignore import (
+from vanessa.pipeline.decision.gate.eligibility.ignore_registry_protocol import (
+    ChatIgnoreRegistryProtocol,
+)
+from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
+    prefilter_tag_to_decision_reason,
+)
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import (
     apply_owner_ignore_command,
 )
 from vanessa.pipeline.decision.models import DecisionAction

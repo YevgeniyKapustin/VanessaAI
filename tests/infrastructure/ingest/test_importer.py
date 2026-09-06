@@ -50,6 +50,7 @@ class FakeUsers:
         self.calls: list[int] = []
 
     async def get_or_create(self, telegram_id: int, **kwargs) -> object:
+        _ = kwargs
         self.calls.append(telegram_id)
         return object()
 
@@ -98,14 +99,18 @@ async def test_importer_imports_and_embeds_batch():
         unit_of_work=uow,
         batch_size=2,
     )
+    parsed = [_parsed(1), _parsed(2), _parsed(3)]
     imported, skipped = await importer.import_messages(
-        [_parsed(1), _parsed(2), _parsed(3)],
+        parsed,
         embed=True,
     )
-    assert imported == 3
+    assert imported == len(parsed)
     assert skipped == 0
-    assert len(users.calls) == 3
-    assert uow.commits == 2
+    assert len(users.calls) == len(parsed)
+    expected_commits = (
+        len(parsed) + importer._batch_size - 1
+    ) // importer._batch_size
+    assert uow.commits == expected_commits
     assert messages.point_updates == [(1, "pt-1"), (2, "pt-2"), (3, "pt-3")]
 
 

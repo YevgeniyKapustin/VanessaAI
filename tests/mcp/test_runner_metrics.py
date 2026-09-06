@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -15,8 +17,8 @@ async def test_mcp_metrics_open_when_token_off(monkeypatch) -> None:
     ) as client:
         health = await client.get("/health")
         metrics = await client.get("/metrics")
-    assert health.status_code == 200
-    assert metrics.status_code == 200
+    assert health.status_code == HTTPStatus.OK
+    assert metrics.status_code == HTTPStatus.OK
     assert "text/plain" in metrics.headers["content-type"]
 
 
@@ -39,7 +41,7 @@ async def test_mcp_metrics_requires_token(monkeypatch) -> None:
             headers={"Authorization": "Bearer secret"},
         )
         health = await client.get("/health")
-    assert denied.status_code == 401
-    assert allowed.status_code == 200
-    assert bearer.status_code == 200
-    assert health.status_code == 200
+    assert denied.status_code == HTTPStatus.UNAUTHORIZED
+    assert allowed.status_code == HTTPStatus.OK
+    assert bearer.status_code == HTTPStatus.OK
+    assert health.status_code == HTTPStatus.OK

@@ -9,7 +9,7 @@ from services.bot import main as bot_main
 def _stub_metrics_http_server(monkeypatch):
     monkeypatch.setattr(
         "vanessa.infrastructure.observability.metrics.start_metrics_http_server",
-        lambda port, addr="0.0.0.0": MagicMock(),
+        lambda _port, _addr="0.0.0.0": MagicMock(),
     )
 
 
@@ -28,7 +28,11 @@ async def test_main_starts_polling(monkeypatch):
     mock_services = MagicMock()
     mock_services.stickers = None
 
-    monkeypatch.setattr(bot_main, "Bot", lambda token: mock_bot)
+    def _bot(token):
+        _ = token
+        return mock_bot
+
+    monkeypatch.setattr(bot_main, "Bot", _bot)
     monkeypatch.setattr(bot_main, "Dispatcher", lambda: mock_dp)
     monkeypatch.setattr(bot_main, "create_bot_services", lambda: mock_services)
     monkeypatch.setattr(bot_main, "create_router", lambda _: mock_router)
@@ -57,7 +61,11 @@ async def test_main_resolves_sticker_file_ids(monkeypatch):
     mock_services.knowledge.ensure_structure = AsyncMock()
     mock_services.stickers = mock_stickers
 
-    monkeypatch.setattr(bot_main, "Bot", lambda token: mock_bot)
+    def _bot(token):
+        _ = token
+        return mock_bot
+
+    monkeypatch.setattr(bot_main, "Bot", _bot)
     monkeypatch.setattr(bot_main, "Dispatcher", lambda: mock_dp)
     monkeypatch.setattr(bot_main, "create_bot_services", lambda: mock_services)
     monkeypatch.setattr(bot_main, "create_router", lambda _: mock_router)

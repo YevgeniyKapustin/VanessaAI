@@ -8,8 +8,15 @@ from vanessa.config.settings import settings
 from vanessa.core.messages import ContextMessage
 from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext
-from vanessa.pipeline.decision.detectors.intent import IntentResult
-from vanessa.pipeline.decision.detectors.triggers import TriggerResult
+from vanessa.pipeline.decision.detectors.intent import IntentDetector, IntentResult
+from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
+from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
+from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
+from vanessa.pipeline.decision.detectors.triggers import (
+    TriggerKeywordChecker,
+    TriggerResult,
+)
+from vanessa.pipeline.decision.engine import DecisionEngine
 from vanessa.pipeline.decision.metrics_rule import LowAttitudeRule, is_low_attitude
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.decision.repeated_loop import (
@@ -77,13 +84,14 @@ def test_detect_loop_strength_two_priors_is_a_loop():
         "как сделать меш в unity",
         "ну как сделать меш в unity",
     )
+    expected_strength = 2
     assert (
         detect_loop_strength(
             "сделать меш в unity",
             recent,
             sender_telegram_id=42,
         )
-        == 2
+        == expected_strength
     )
 
 
@@ -130,15 +138,16 @@ def test_detect_loop_strength_planner_level_one_ignored():
 
 
 def test_detect_loop_strength_planner_signal():
+    max_loop_level = 3
     assert (
         detect_loop_strength(
             "ну что там с мешем",
             [],
             sender_telegram_id=42,
             planner_repeated=True,
-            planner_loop_level=3,
+            planner_loop_level=max_loop_level,
         )
-        == 3
+        == max_loop_level
     )
     assert (
         detect_loop_strength(
@@ -148,7 +157,7 @@ def test_detect_loop_strength_planner_signal():
             planner_repeated=True,
             planner_loop_level=9,
         )
-        == 3
+        == max_loop_level
     )
 
 
@@ -169,8 +178,10 @@ def test_registry_annoyance_only_on_real_loop():
         "сделать меш в unity",
         _recent("как сделать меш в unity", "ну как сделать меш в unity"),
     )
-    assert looped.loop_strength == 2
-    assert looped.annoyance >= 0.5
+    expected_strength = 2
+    annoyance_floor = 0.5
+    assert looped.loop_strength == expected_strength
+    assert looped.annoyance >= annoyance_floor
     fresh = registry.update(
         42,
         "что там по работе у лича",
@@ -347,15 +358,10 @@ def test_low_attitude_rule_never_for_owner():
 
 @pytest.mark.asyncio
 async def test_engine_low_attitude_ignores_weak_message():
-    from vanessa.pipeline.decision.detectors.intent import IntentDetector
-    from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-    from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
-    from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
-    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
-    from vanessa.pipeline.decision.engine import DecisionEngine
 
     class FakeRelevance:
         async def score(self, text, query_vector=None, search_text=None) -> float:
+            _ = text, query_vector, search_text
             return 0.1
 
     engine = DecisionEngine(
@@ -371,12 +377,14 @@ async def test_engine_low_attitude_ignores_weak_message():
         block_consecutive_replies=False,
     )
     result = await engine.decide(
-        text="просто болтовня без смысла",
-        telegram_chat_id=1,
-        recent_messages=[],
-        should_reply=False,
-        sender_telegram_id=42,
-        annoyance=0.9,
+        DecisionContext(
+            text="просто болтовня без смысла",
+            telegram_chat_id=1,
+            recent_messages=[],
+            should_reply=False,
+            sender_telegram_id=42,
+            annoyance=0.9,
+        )
     )
     assert result.action == DecisionAction.IGNORE
     assert result.reason == DecisionReason.LOW_ATTITUDE
@@ -384,15 +392,10 @@ async def test_engine_low_attitude_ignores_weak_message():
 
 @pytest.mark.asyncio
 async def test_engine_low_attitude_still_replies_to_direct_question():
-    from vanessa.pipeline.decision.detectors.intent import IntentDetector
-    from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
-    from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
-    from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
-    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
-    from vanessa.pipeline.decision.engine import DecisionEngine
 
     class FakeRelevance:
         async def score(self, text, query_vector=None, search_text=None) -> float:
+            _ = text, query_vector, search_text
             return 0.9
 
     engine = DecisionEngine(
@@ -408,13 +411,15 @@ async def test_engine_low_attitude_still_replies_to_direct_question():
         block_consecutive_replies=False,
     )
     result = await engine.decide(
-        text="ванесса, почему небо синее?",
-        telegram_chat_id=1,
-        recent_messages=[],
-        mentions_bot=True,
-        should_reply=True,
-        sender_telegram_id=42,
-        annoyance=0.9,
+        DecisionContext(
+            text="ванесса, почему небо синее?",
+            telegram_chat_id=1,
+            recent_messages=[],
+            mentions_bot=True,
+            should_reply=True,
+            sender_telegram_id=42,
+            annoyance=0.9,
+        )
     )
     # A direct question is still answered (coldly via the compose note), never
     # suppressed by the low-attitude rule.

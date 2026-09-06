@@ -9,5 +9,6 @@ def test_merge_vector_search_hits_keeps_best_score():
         ]
     )
 
+    best_score = 0.8
     assert [int(hit["message_id"]) for hit in hits] == [1, 2, 3]
-    assert float(hits[0]["score"]) == 0.8
+    assert float(hits[0]["score"]) == best_score

@@ -12,9 +12,9 @@ import logging
 from dataclasses import dataclass
 
 from vanessa.knowledge.format import PEOPLE
-from vanessa.knowledge.index import KnowledgeIndex
+from vanessa.knowledge.index.index import KnowledgeIndex
 from vanessa.knowledge.metrics.schema import PersonMetrics
-from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.store.vault import KnowledgeVault
 
 logger = logging.getLogger(__name__)
 

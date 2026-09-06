@@ -2,21 +2,11 @@ from dataclasses import dataclass
 
 from vanessa.core.messages import ContextMessage, stored_to_context
 from vanessa.core.protocols import MessageRepositoryProtocol
-from vanessa.core.session.session_trim import seconds_since_last_role, trim_session_by_idle_gap
-
-
-def _is_dismissal_request(text: str) -> bool:
-    """Lazy import that breaks the ``chat_session_state -> decision.gate`` cycle.
-
-    ``vanessa.pipeline.decision`` eagerly imports its whole gate chain (engine -> protocols ->
-    prefilter), which back-imports this module. A top-level import here would
-    deadlock when ``vanessa.pipeline`` is imported first (as the services tests do);
-    importing inside the call keeps this core session module free of the decision
-    dependency until a function actually runs.
-    """
-    from vanessa.pipeline.decision.gate.reply_expectation import is_dismissal_request
-
-    return is_dismissal_request(text)
+from vanessa.core.session.dismissal import is_dismissal_request
+from vanessa.core.session.session_trim import (
+    seconds_since_last_role,
+    trim_session_by_idle_gap,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,27 +22,68 @@ class ChatSessionState:
         return self.messages
 
 
+def _listen_idle_blocks(
+    recent_messages: list[ContextMessage],
+    max_idle_seconds: float,
+) -> bool:
+    if max_idle_seconds <= 0:
+        return False
+    idle = seconds_since_last_role(recent_messages, "assistant")
+    if idle is None:
+        return False
+    return idle > max_idle_seconds
+
+
+def _listen_preconditions(
+    recent_messages: list[ContextMessage],
+    *,
+    max_messages: int,
+    max_idle_seconds: float,
+) -> bool:
+    if max_messages <= 0:
+        return False
+    if not recent_messages:
+        return False
+    return not _listen_idle_blocks(recent_messages, max_idle_seconds)
+
+
+def _listen_user_tally(message: ContextMessage, user_count: int) -> int | None:
+    if message.role != "user":
+        return user_count
+    if is_dismissal_request(message.content):
+        return None
+    return user_count + 1
+
+
+def _users_since_last_assistant(
+    recent_messages: list[ContextMessage],
+) -> int | None:
+    user_count = 0
+    for message in reversed(recent_messages):
+        if message.role == "assistant":
+            return user_count
+        user_count = _listen_user_tally(message, user_count)
+        if user_count is None:
+            return None
+    return None
+
+
 def in_post_reply_listen_window(
     recent_messages: list[ContextMessage],
     *,
     max_messages: int,
     max_idle_seconds: float = 0,
 ) -> bool:
-    if max_messages <= 0 or not recent_messages:
+    if not _listen_preconditions(
+        recent_messages,
+        max_messages=max_messages,
+        max_idle_seconds=max_idle_seconds,
+    ):
         return False
-    if max_idle_seconds > 0:
-        idle = seconds_since_last_role(recent_messages, "assistant")
-        if idle is not None and idle > max_idle_seconds:
-            return False
-    user_count = 0
-    for message in reversed(recent_messages):
-        if message.role == "assistant":
-            return 0 < user_count <= max_messages
-        if message.role == "user":
-            if _is_dismissal_request(message.content):
-                return False
-            user_count += 1
-    return False
+    user_count = _users_since_last_assistant(recent_messages)
+    if user_count is None:
+        return False
+    return 0 < user_count <= max_messages
 
 
 def build_chat_session_state(
@@ -77,7 +108,7 @@ def build_chat_session_state(
         max_idle_seconds=max_idle_seconds,
     )
     has_dismissal = any(
-        message.role == "user" and _is_dismissal_request(message.content)
+        message.role == "user" and is_dismissal_request(message.content)
         for message in trimmed
     )
     return ChatSessionState(

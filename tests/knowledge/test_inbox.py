@@ -4,7 +4,7 @@ from vanessa.knowledge.inbox import InboxNoteError, save_inbox_note
 
 
 class _Vault:
-    def __init__(self, configured: bool = True) -> None:
+    def __init__(self, *, configured: bool = True) -> None:
         self.is_configured = configured
         self.notes: list[tuple[str, dict, str]] = []
         self.attachments: list[tuple[str, bytes]] = []

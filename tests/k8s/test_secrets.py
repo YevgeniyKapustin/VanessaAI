@@ -10,11 +10,13 @@ from vanessa.k8s.configmap import (
 )
 from vanessa.k8s.secrets import (
     ALWAYS_REQUIRED,
+    IMAGE,
     SECRET_KEYS,
     SECRET_NAME,
     SecretsValidationError,
     build_opaque_secret,
     example_env_text,
+    fill_broker_url,
     load_env_file,
     plan_secrets,
     render_yaml,
@@ -47,8 +49,6 @@ def test_rewrite_broker_host_overrides_password():
 
 
 def test_fill_broker_url_from_redis_auth():
-    from vanessa.k8s.secrets import fill_broker_url
-
     filled = fill_broker_url({"REDIS_AUTH": "s3cret"})
     assert filled["BROKER_REDIS_URL"] == "redis://:s3cret@redis:6379/0"
     existing = fill_broker_url(
@@ -199,7 +199,7 @@ def test_build_opaque_secret_yaml_roundtrip():
 
 
 def test_build_opaque_secret_rejects_empty():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="must not be empty"):
         build_opaque_secret(namespace="vanessa", values={})
 
 
@@ -223,8 +223,6 @@ def test_kustomization_does_not_include_secrets():
 
 
 def test_workloads_pin_local_image_and_secretref():
-    from vanessa.k8s.secrets import IMAGE
-
     for name in (
         "20-agent.yaml",
         "21-bot.yaml",

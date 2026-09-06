@@ -5,6 +5,7 @@ from vanessa.pipeline.decision.detectors.relevance import QdrantRelevanceChecker
 
 class FakeEmbeddings:
     async def embed(self, text: str) -> list[float]:
+        _ = text
         return [0.1, 0.2, 0.3]
 
 
@@ -14,6 +15,7 @@ class FakeVectorStore:
         self.last_vector: list[float] | None = None
 
     async def search(self, vector: list[float], limit: int = 30) -> list[dict]:
+        _ = limit
         self.last_vector = vector
         return self._hits
 
@@ -35,11 +37,12 @@ async def test_relevance_uses_search_text_and_embedding():
 
 @pytest.mark.asyncio
 async def test_relevance_uses_provided_vector():
-    store = FakeVectorStore([{"message_id": 2, "score": 0.5}])
+    expected_score = 0.5
+    store = FakeVectorStore([{"message_id": 2, "score": expected_score}])
     checker = QdrantRelevanceChecker(FakeEmbeddings(), store)
     vector = [0.9, 0.1]
     score = await checker.score("text", query_vector=vector)
-    assert score == 0.5
+    assert score == expected_score
     assert store.last_vector == vector
 
 

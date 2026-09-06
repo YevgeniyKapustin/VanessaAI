@@ -1,3 +1,4 @@
+from vanessa.knowledge.metrics.feedback import render_annoyance_note
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
 
 
@@ -37,7 +38,6 @@ def test_build_user_prompt_without_attitude_note():
 
 
 def test_render_annoyance_note_formats_template():
-    from vanessa.knowledge.metrics.feedback import render_annoyance_note
 
     note = render_annoyance_note(name="крабер", annoyance=0.85)
     assert note is not None

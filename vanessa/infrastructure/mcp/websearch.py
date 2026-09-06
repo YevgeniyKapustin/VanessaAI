@@ -29,24 +29,33 @@ class McpWebSearch:
         return _parse_results(raw)
 
 
-def _parse_results(raw: str) -> list[WebResult]:
+def _load_search_payload(raw: str) -> object:
     try:
-        data = json.loads(raw or "[]")
+        return json.loads(raw or "[]")
     except json.JSONDecodeError:
         logger.warning("mcp_web_search_unparseable raw=%r", raw[:200])
-        return []
+        return None
+
+
+def _web_result(item: object) -> WebResult | None:
+    if not isinstance(item, dict):
+        return None
+    return WebResult(
+        title=str(item.get("title", "")),
+        url=str(item.get("url", "")),
+        snippet=str(item.get("snippet", "")),
+        published_date=item.get("published_date"),
+    )
+
+
+def _parse_results(raw: str) -> list[WebResult]:
+    data = _load_search_payload(raw)
     if not isinstance(data, list):
         return []
     results: list[WebResult] = []
     for item in data:
-        if not isinstance(item, dict):
+        result = _web_result(item)
+        if result is None:
             continue
-        results.append(
-            WebResult(
-                title=str(item.get("title", "")),
-                url=str(item.get("url", "")),
-                snippet=str(item.get("snippet", "")),
-                published_date=item.get("published_date"),
-            )
-        )
+        results.append(result)
     return results

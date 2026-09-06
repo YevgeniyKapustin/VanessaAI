@@ -47,7 +47,8 @@ _MID = (
 # An explicit "any" request where the photo noun is left implicit
 # («пришли любую» / «любую отправить» — the reported «просил любую отправить»).
 # NOTE: always wrap in (?:...) when interpolating — a bare alternation would
-# make «\bлюбую» a standalone alternative (matching "любую" anywhere).
+# make the word-bounded ANY token a standalone alternative (matching that word
+# anywhere).
 _ANY = r"любую|какую[- ]нибудь|какую\s+угодно"
 
 _EN_VERBS = r"send|show|return|give"

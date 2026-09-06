@@ -1,5 +1,10 @@
 from vanessa.infrastructure.db.base import Base
-from vanessa.infrastructure.db.models import KnowledgeDocument, KnowledgeNodeRow, Message, User
+from vanessa.infrastructure.db.models import (
+    KnowledgeDocument,
+    KnowledgeNodeRow,
+    Message,
+    User,
+)
 from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
 from vanessa.infrastructure.db.session import async_session_factory, engine, get_session
 

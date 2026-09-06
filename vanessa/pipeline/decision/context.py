@@ -1,24 +1,29 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from vanessa.core.messages import ContextMessage
 from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.detectors.intent import IntentResult
 from vanessa.pipeline.decision.detectors.triggers import TriggerResult
-from vanessa.pipeline.decision.gate.reply_expectation import mention_warrants_reply
+from vanessa.pipeline.decision.gate.expectation.reply_expectation import (
+    mention_warrants_reply,
+)
 from vanessa.pipeline.decision.models import DecisionResult
+
+_EMPTY_INTENT = IntentResult(detected=False)
+_EMPTY_TRIGGER = TriggerResult(detected=False)
 
 
 @dataclass(frozen=True, slots=True)
 class DecisionContext:
     text: str
-    telegram_chat_id: int
-    recent_messages: list[ContextMessage]
-    query_vector: list[float] | None
-    intent: IntentResult
-    trigger: TriggerResult
-    session_active: bool
-    relevance_score: float
+    telegram_chat_id: int = 0
+    recent_messages: list[ContextMessage] = field(default_factory=list)
+    query_vector: list[float] | None = None
+    intent: IntentResult = _EMPTY_INTENT
+    trigger: TriggerResult = _EMPTY_TRIGGER
+    session_active: bool = False
+    relevance_score: float = 0.0
     should_reply: bool | None = None
     mentions_bot: bool = False
     reply_to_bot: bool = False

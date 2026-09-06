@@ -6,6 +6,9 @@ from vanessa.infrastructure.observability.metrics import (
     sticker_tagged_total,
     sticker_unknown_tags_total,
 )
+from vanessa.pipeline.llm.format.code_fences import (
+    map_outside_fences as _map_outside_fences,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +48,55 @@ def _catalog_tag_aliases() -> dict[str, str]:
 # Soft fallback for tags the model invents but the pack doesn't have.
 TAG_ALIASES = _catalog_tag_aliases()
 
-_FENCED_CODE = re.compile(r"```[\s\S]*?```", re.DOTALL)
 _MARKER = re.compile(
     r"\[sticker\s*:\s*([a-zA-Z0-9_-]+)\s*\]",
     re.IGNORECASE,
 )
+
+
+def _keep_first_tag(tag: str, found: list[str]) -> None:
+    if not found:
+        found.append(tag)
+
+
+def _keep_known_tag(candidate: str, found: list[str]) -> None:
+    sticker_tagged_total.labels(tag=candidate).inc()
+    _keep_first_tag(candidate, found)
+
+
+def _keep_mapped_tag(candidate: str, mapped: str, found: list[str]) -> None:
+    sticker_unknown_tags_total.labels(action="mapped").inc()
+    sticker_tagged_total.labels(tag=mapped).inc()
+    logger.info(
+        "sticker_unknown_tag raw=%s action=mapped target=%s",
+        candidate,
+        mapped,
+    )
+    _keep_first_tag(mapped, found)
+
+
+def _drop_unknown_tag(candidate: str) -> None:
+    sticker_unknown_tags_total.labels(action="dropped").inc()
+    logger.info(
+        "sticker_unknown_tag raw=%s action=dropped target=-",
+        candidate,
+    )
+
+
+def _record_sticker_match(candidate: str, found: list[str]) -> None:
+    if candidate in KNOWN_STICKER_TAGS:
+        _keep_known_tag(candidate, found)
+        return
+    mapped = TAG_ALIASES.get(candidate)
+    if mapped is not None:
+        _keep_mapped_tag(candidate, mapped, found)
+        return
+    _drop_unknown_tag(candidate)
+
+
+def _sticker_repl(match: re.Match[str], found: list[str]) -> str:
+    _record_sticker_match(match.group(1).lower(), found)
+    return ""
 
 
 def _strip_markers(segment: str) -> tuple[str, str | None]:
@@ -60,37 +107,16 @@ def _strip_markers(segment: str) -> tuple[str, str | None]:
     alias exists, otherwise they are dropped. Unknown tags never leak into the
     reply text and are logged + counted so model drift stays visible.
     """
-    found: str | None = None
+    found: list[str] = []
+    cleaned = _MARKER.sub(lambda match: _sticker_repl(match, found), segment)
+    return cleaned, found[0] if found else None
 
-    def repl(match: re.Match[str]) -> str:
-        nonlocal found
-        candidate = match.group(1).lower()
-        if candidate in KNOWN_STICKER_TAGS:
-            sticker_tagged_total.labels(tag=candidate).inc()
-            if found is None:
-                found = candidate
-            return ""
-        mapped = TAG_ALIASES.get(candidate)
-        if mapped is not None:
-            sticker_unknown_tags_total.labels(action="mapped").inc()
-            sticker_tagged_total.labels(tag=mapped).inc()
-            logger.info(
-                "sticker_unknown_tag raw=%s action=mapped target=%s",
-                candidate,
-                mapped,
-            )
-            if found is None:
-                found = mapped
-        else:
-            sticker_unknown_tags_total.labels(action="dropped").inc()
-            logger.info(
-                "sticker_unknown_tag raw=%s action=dropped target=-",
-                candidate,
-            )
-        return ""
 
-    cleaned = _MARKER.sub(repl, segment)
-    return cleaned, found
+def _append_stripped(segment: str, found: list[str]) -> str:
+    cleaned, tag = _strip_markers(segment)
+    if tag is not None and not found:
+        found.append(tag)
+    return cleaned
 
 
 def extract_sticker_tag(reply: str) -> tuple[str, str | None]:
@@ -106,25 +132,11 @@ def extract_sticker_tag(reply: str) -> tuple[str, str | None]:
     if not reply:
         return reply, None
 
-    parts: list[str] = []
-    tag: str | None = None
-    last = 0
-    for match in _FENCED_CODE.finditer(reply):
-        if match.start() > last:
-            cleaned, found = _strip_markers(reply[last : match.start()])
-            parts.append(cleaned)
-            if tag is None and found is not None:
-                tag = found
-        parts.append(match.group(0))
-        last = match.end()
-
-    if last < len(reply):
-        cleaned, found = _strip_markers(reply[last:])
-        parts.append(cleaned)
-        if tag is None and found is not None:
-            tag = found
-
-    result = "".join(parts) if parts else reply
+    found: list[str] = []
+    result = _map_outside_fences(
+        reply, lambda segment: _append_stripped(segment, found)
+    )
+    tag = found[0] if found else None
     # The marker is meant to sit on its own final line; drop the leftover newline.
     if tag is not None:
         result = result.rstrip("\r\n ")

@@ -1,7 +1,10 @@
 import pytest
 
-from vanessa.knowledge.vault import KnowledgeVault
-from vanessa.knowledge.vector_index import KnowledgeVectorIndexer, knowledge_kind_for_path
+from vanessa.knowledge.store.vault import KnowledgeVault
+from vanessa.knowledge.vectors import (
+    KnowledgeVectorIndexer,
+    knowledge_kind_for_path,
+)
 
 
 class FakeEmbeddings:
@@ -52,7 +55,7 @@ class FakeKnowledgeStore:
         chunks: list[tuple[int, str]],
         vectors: list[list[float]],
     ) -> list[str]:
-        for (index, _), vector in zip(chunks, vectors):
+        for (index, _), vector in zip(chunks, vectors, strict=True):
             self.chunk_points[(path, index)] = (kind, title, vector)
         return [f"{path}#{index}" for index, _ in chunks]
 
@@ -126,7 +129,8 @@ async def test_index_all_embeds_semantic_notes(tmp_path):
 
     count = await indexer.index_all()
 
-    assert count == 4
+    expected_notes = 4
+    assert count == expected_notes
     assert store.ensured is True
     assert set(store.notes) == {
         "People/личь.md",
@@ -164,7 +168,8 @@ async def test_embed_text_is_capped(tmp_path):
 
     text = indexer._embed_text("people", "личь", "x" * 200)
 
-    assert len(text) == 30
+    max_chars = 30
+    assert len(text) == max_chars
 
 
 @ pytest.mark.asyncio

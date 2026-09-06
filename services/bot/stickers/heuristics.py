@@ -10,7 +10,10 @@ _FAREWELL = re.compile(
     r"\b(пока|до\s+связи|до\s+завтра|бывай|бывайте|удачи|покедова|бай)\b",
     re.IGNORECASE,
 )
-_LAUGH = re.compile(r"(лол|хах|ахах|хихи|хех|ржу|😂|🤣)", re.IGNORECASE)
+_LAUGH = re.compile(
+    r"(лол|хах|ахах|хихи|хех|ржу|😂|🤣)",
+    re.IGNORECASE,
+)
 _SHRUG = re.compile(
     r"\b(хз|не\s+знаю|понятия\s+не\s+имею|без\s+понятия)\b",
     re.IGNORECASE,
@@ -26,6 +29,15 @@ _FACEPALM = re.compile(
 _APPROVAL = re.compile(
     r"^\s*(да\b|именно\b|точно\b|верно\b|согласна?\b|естественно\b)",
     re.IGNORECASE,
+)
+_TAG_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (_GREETING, "greeting"),
+    (_FAREWELL, "farewell"),
+    (_LAUGH, "delight"),
+    (_SHRUG, "thinking"),
+    (_THINKING, "thinking"),
+    (_FACEPALM, "irritation"),
+    (_APPROVAL, "love"),
 )
 
 # Explicit user requests to send a sticker. When matched the sticker gate is
@@ -66,22 +78,4 @@ def reply_tags(reply: str | None) -> list[str]:
     if not reply:
         return []
     text = reply.strip()
-    tags: list[str] = []
-    if _GREETING.search(text):
-        tags.append("greeting")
-    if _FAREWELL.search(text):
-        tags.append("farewell")
-    if _LAUGH.search(text):
-        tags.append("delight")
-    if _SHRUG.search(text):
-        # no dedicated shrug sticker → the thinking 🤔 sticker fits «хз/не знаю»
-        tags.append("thinking")
-    if _THINKING.search(text):
-        tags.append("thinking")
-    if _FACEPALM.search(text):
-        # no dedicated facepalm sticker → the burning 😮‍💨 sticker fits «блин/капец»
-        tags.append("irritation")
-    if _APPROVAL.search(text):
-        # no dedicated approval sticker → the heart ❤️ sticker fits «да/согласна»
-        tags.append("love")
-    return tags
+    return [tag for pattern, tag in _TAG_RULES if pattern.search(text)]

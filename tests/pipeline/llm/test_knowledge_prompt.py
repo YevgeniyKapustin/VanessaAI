@@ -1,3 +1,5 @@
+import xml.etree.ElementTree as ET
+
 from vanessa.config.content import get_content
 from vanessa.knowledge.schema import KnowledgeBlock
 from vanessa.pipeline.llm.prompts.prompt_builder import PromptBuilder
@@ -31,7 +33,6 @@ def test_build_user_prompt_without_knowledge():
 
 def test_system_prompt_stickers_list_only_catalog_tags():
     """The Stickers section must advertise exactly the tags that have stickers."""
-    import xml.etree.ElementTree as ET
 
     builder = PromptBuilder()
     prompt = builder.system_prompt

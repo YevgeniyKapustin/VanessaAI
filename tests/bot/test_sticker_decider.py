@@ -1,3 +1,4 @@
+# Intentional Cyrillic reply fixtures — not lookalike Latin.
 from services.bot.stickers.decider import StickerDecider
 from services.bot.stickers.models import StickerCatalog, StickerDef
 
@@ -12,6 +13,7 @@ class _Rng:
         return self._value
 
     def choices(self, population, weights=None, *, k=1, cum_weights=None):
+        _ = (weights, k, cum_weights)
         return [population[0]]
 
 
@@ -60,7 +62,8 @@ def test_first_reply_may_carry_a_sticker():
 
 
 def test_cooldown_blocks_until_enough_replies():
-    decider = _decider(min_messages_between=10)
+    cooldown = 10
+    decider = _decider(min_messages_between=cooldown)
     assert decider.decide(1, tag="sarcasm") is not None
 
     # after a sticker the counter resets; 5 replies is not enough yet
@@ -72,7 +75,7 @@ def test_cooldown_blocks_until_enough_replies():
     # after 10 replies since the sticker the sticker is allowed again
     for _ in range(5):
         decider.register_reply(1)
-    assert decider.messages_since_sticker(1) == 10
+    assert decider.messages_since_sticker(1) == cooldown
     assert decider.decide(1, tag="sarcasm") is not None
 
 
@@ -119,10 +122,11 @@ def test_empty_catalog_returns_none():
 
 
 def test_counter_starts_eligible():
-    decider = _decider(min_messages_between=10)
-    assert decider.messages_since_sticker(1) == 10
+    cooldown = 10
+    decider = _decider(min_messages_between=cooldown)
+    assert decider.messages_since_sticker(1) == cooldown
     decider.register_reply(1)
-    assert decider.messages_since_sticker(1) == 11
+    assert decider.messages_since_sticker(1) == cooldown + 1
 
 
 def test_force_bypasses_cooldown():

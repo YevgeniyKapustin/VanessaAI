@@ -1,5 +1,7 @@
+# Intentional Cyrillic nicknames and comments — not lookalike Latin.
 from pathlib import Path
 
+from vanessa.knowledge.schema import VaultNote
 from vanessa.knowledge.users import nicknames
 
 
@@ -260,11 +262,11 @@ async def test_ensure_people_alias_cache_uses_async_vault(monkeypatch):
         is_configured = True
 
         async def notes_signature(self, folder):
+            _ = folder
             return ("sig",)
 
         async def list_notes(self, folder):
-            from vanessa.knowledge.schema import VaultNote
-
+            _ = folder
             return [
                 VaultNote(
                     relative_path="People/гриша.md",
@@ -283,8 +285,8 @@ async def test_ensure_people_alias_cache_uses_async_vault(monkeypatch):
         lambda _: {1071793838: "Гриша"},
     )
     monkeypatch.setattr(
-        "vanessa.knowledge.vault.KnowledgeVault",
-        lambda *a, **k: _Vault(),
+        "vanessa.knowledge.store.vault.KnowledgeVault",
+        lambda *_a, **_k: _Vault(),
     )
     nicknames._ALIAS_CACHE = None
     await nicknames.ensure_people_alias_cache()

@@ -30,6 +30,25 @@ def get_noise_heuristics() -> NoiseHeuristics:
     )
 
 
+def _is_empty_or_ack(normalized: str) -> bool:
+    if not normalized:
+        return True
+    return bool(_ACK_RE.match(normalized))
+
+
+def _is_letter_or_number(char: str) -> bool:
+    if char.isspace():
+        return False
+    category = unicodedata.category(char)
+    if category.startswith(("P", "S")):
+        return False
+    return category.startswith(("L", "N"))
+
+
+def _has_letter_or_number(text: str) -> bool:
+    return any(_is_letter_or_number(char) for char in text)
+
+
 class NoiseFilter:
     def __init__(self, heuristics: NoiseHeuristics | None = None) -> None:
         self._rules = heuristics or get_noise_heuristics()
@@ -37,20 +56,12 @@ class NoiseFilter:
 
     def is_noise(self, text: str) -> bool:
         normalized = text.strip()
-        if not normalized:
-            return True
-        if _ACK_RE.match(normalized):
+        if _is_empty_or_ack(normalized):
             return True
         if self._looks_substantive(normalized):
             return False
-
-        words = normalized.split()
-        if (
-            len(words) <= self._rules.max_words
-            and len(normalized) <= self._rules.max_chars
-        ):
+        if self._is_short_noise(normalized):
             return True
-
         return self._is_reaction_only(normalized)
 
     def is_definite_noise(self, text: str) -> bool:
@@ -74,33 +85,50 @@ class NoiseFilter:
             return True
         return bool(self._substantive_re.search(text))
 
+    def _is_short_noise(self, normalized: str) -> bool:
+        words = normalized.split()
+        return (
+            len(words) <= self._rules.max_words
+            and len(normalized) <= self._rules.max_chars
+        )
+
     def _is_reaction_only(self, text: str) -> bool:
         if len(text) > self._rules.max_chars:
             return False
-        for char in text:
-            if char.isspace():
-                continue
-            category = unicodedata.category(char)
-            if category.startswith(("P", "S")):
-                continue
-            if category.startswith(("L", "N")):
-                return False
+        if _has_letter_or_number(text):
+            return False
         return bool(text.strip())
+
+
+def _word_boundary_union(words: list[str] | tuple[str, ...] | None) -> str | None:
+    if not words:
+        return None
+    joined = "|".join(re.escape(word) for word in words)
+    return rf"\b({joined})\b"
+
+
+def _modal_li_pattern(modals: list[str] | tuple[str, ...] | None) -> str | None:
+    if not modals:
+        return None
+    modal = "|".join(re.escape(word) for word in modals)
+    return rf"\b({modal})\s+ли\b"
+
+
+def _substantive_parts() -> list[str]:
+    parts: list[str] = []
+    for part in (
+        _word_boundary_union(get_question_words()),
+        _word_boundary_union(get_trigger_keywords()),
+        _modal_li_pattern(get_modal_verbs()),
+    ):
+        if part:
+            parts.append(part)
+    return parts
 
 
 @lru_cache
 def _substantive_pattern() -> re.Pattern[str] | None:
-    words = get_question_words()
-    triggers = get_trigger_keywords()
-    modals = get_modal_verbs()
-    parts: list[str] = []
-    if words:
-        parts.append(rf"\b({'|'.join(re.escape(w) for w in words)})\b")
-    if triggers:
-        parts.append(rf"\b({'|'.join(re.escape(w) for w in triggers)})\b")
-    if modals:
-        modal = "|".join(re.escape(w) for w in modals)
-        parts.append(rf"\b({modal})\s+ли\b")
+    parts = _substantive_parts()
     if not parts:
         return None
     return re.compile("|".join(parts), re.IGNORECASE)

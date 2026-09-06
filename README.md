@@ -46,9 +46,9 @@ Python 3.12, aiogram, Postgres, Qdrant, Redis. DeepSeek by
 default, Claude if you switch it. Embeddings on local CPU on purpose —
 I didn't want another paid LLM API. Bot, agent, and a worker are
 separate processes. Turns never go through an HTTP API. Tests in
-`tests/`, CI fails under 90% coverage. Metrics and
-Grafana exist and stay off until you turn them on
-([observability](docs/observability.md)).
+`tests/`, CI fails under 90% coverage. Why Ruff looks like this:
+[linting](docs/linting.md). Metrics and Grafana exist and stay off
+until you turn them on ([observability](docs/observability.md)).
 
 There's a k8s lab setup. I am not pretending this runs at scale.
 

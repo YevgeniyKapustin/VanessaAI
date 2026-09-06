@@ -1,11 +1,13 @@
 import pytest
 
 from vanessa.core.messages import ContextMessage
+from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
 from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
 from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
 from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
+from vanessa.pipeline.decision.engine import DecisionEngine
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.decision.repeated_question import (
     RepeatedQuestionRule,
@@ -26,12 +28,12 @@ class FakeRelevance:
         query_vector: list[float] | None = None,
         search_text: str | None = None,
     ) -> float:
+        _ = text, query_vector, search_text
         return self._score
 
 
 @pytest.fixture
 def engine():
-    from vanessa.pipeline.decision.engine import DecisionEngine
 
     intent = IntentDetector()
     trigger = TriggerKeywordChecker(("помоги", "объясни", "найди", "расскажи"))
@@ -83,9 +85,6 @@ def test_rule_ignores_unanswered_repeat():
         ContextMessage(id=1, role="user", content="ванесса как починить импорт в unity"),
         ContextMessage(id=2, role="user", content="и ещё вопрос"),
     ]
-    from vanessa.pipeline.decision.context import DecisionContext
-    from vanessa.pipeline.decision.detectors.intent import IntentDetector
-    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
 
     intent = IntentDetector().detect("ванесса как починить импорт в unity")
     trigger = TriggerKeywordChecker(()).detect("ванесса как починить импорт в unity")
@@ -147,9 +146,6 @@ def test_is_repeated_message_normalizes_punctuation_case():
 
 def test_rule_ignores_short_repeat_burst():
     rule = RepeatedQuestionRule()
-    from vanessa.pipeline.decision.context import DecisionContext
-    from vanessa.pipeline.decision.detectors.intent import IntentDetector
-    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
 
     recent = [
         ContextMessage(id=1, role="user", content="ванесса", sender_telegram_id=7),
@@ -176,9 +172,6 @@ def test_rule_ignores_short_repeat_burst():
 
 def test_rule_defers_burst_when_planner_wants_reply():
     rule = RepeatedQuestionRule()
-    from vanessa.pipeline.decision.context import DecisionContext
-    from vanessa.pipeline.decision.detectors.intent import IntentDetector
-    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
 
     recent = [
         ContextMessage(id=1, role="user", content="чек", sender_telegram_id=7),
@@ -212,11 +205,13 @@ async def test_engine_ignores_repeated_question(engine):
     ]
 
     result = await engine.decide(
-        text="ванесса как починить импорт в unity",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса как починить импорт в unity",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -231,11 +226,13 @@ async def test_engine_ignores_shortened_repeat(engine):
     ]
 
     result = await engine.decide(
-        text="ванесса как починить импорт unity",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса как починить импорт unity",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -250,11 +247,13 @@ async def test_engine_replies_expanded_follow_up(engine):
     ]
 
     result = await engine.decide(
-        text="ванесса как починить импорт в unity и выложить в плей маркет",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса как починить импорт в unity и выложить в плей маркет",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -268,11 +267,13 @@ async def test_engine_does_not_ignore_repeat_without_prior_answer(engine):
     ]
 
     result = await engine.decide(
-        text="ванесса как починить импорт в unity",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса как починить импорт в unity",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -288,12 +289,14 @@ async def test_engine_ignores_same_sender_short_burst(engine):
     ]
 
     result = await engine.decide(
-        text="ванесса",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=True,
-        should_reply=None,
-        sender_telegram_id=7,
+        DecisionContext(
+            text="ванесса",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=True,
+            should_reply=None,
+            sender_telegram_id=7,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -308,12 +311,14 @@ async def test_engine_replies_short_burst_when_planner_says_yes(engine):
     ]
 
     result = await engine.decide(
-        text="чек",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=False,
-        should_reply=True,
-        sender_telegram_id=7,
+        DecisionContext(
+            text="чек",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=False,
+            should_reply=True,
+            sender_telegram_id=7,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -329,12 +334,14 @@ async def test_engine_does_not_suppress_other_senders_similar_message(engine):
     ]
 
     result = await engine.decide(
-        text="ванесса ну чё",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        mentions_bot=True,
-        should_reply=None,
-        sender_telegram_id=9,
+        DecisionContext(
+            text="ванесса ну чё",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            mentions_bot=True,
+            should_reply=None,
+            sender_telegram_id=9,
+        )
     )
 
     assert result.action == DecisionAction.REPLY

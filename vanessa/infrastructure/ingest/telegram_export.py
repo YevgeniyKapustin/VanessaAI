@@ -17,22 +17,42 @@ class ParsedExportMessage:
     created_at: datetime
 
 
-def export_id_to_chat_id(chat_type: str, export_id: int) -> int:
-    if chat_type in {
-        "private_supergroup",
-        "public_supergroup",
-        "supergroup",
-        "private_channel",
-        "public_channel",
-    }:
-        if export_id > 0:
-            return int(f"-100{export_id}")
-        return export_id
-    if chat_type in {"private_group", "group"}:
-        if export_id > 0:
-            return -export_id
-        return export_id
+_SUPERGROUP_EXPORT_TYPES = {
+    "private_supergroup",
+    "public_supergroup",
+    "supergroup",
+    "private_channel",
+    "public_channel",
+}
+_GROUP_EXPORT_TYPES = {"private_group", "group"}
+
+
+def _supergroup_chat_id(export_id: int) -> int:
+    if export_id > 0:
+        return int(f"-100{export_id}")
     return export_id
+
+
+def _group_chat_id(export_id: int) -> int:
+    if export_id > 0:
+        return -export_id
+    return export_id
+
+
+def export_id_to_chat_id(chat_type: str, export_id: int) -> int:
+    if chat_type in _SUPERGROUP_EXPORT_TYPES:
+        return _supergroup_chat_id(export_id)
+    if chat_type in _GROUP_EXPORT_TYPES:
+        return _group_chat_id(export_id)
+    return export_id
+
+
+def _flatten_part(item: Any) -> str:
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        return str(item.get("text", ""))
+    return ""
 
 
 def flatten_text(value: Any) -> str:
@@ -40,13 +60,14 @@ def flatten_text(value: Any) -> str:
         return value
     if not isinstance(value, list):
         return ""
-    parts: list[str] = []
-    for item in value:
-        if isinstance(item, str):
-            parts.append(item)
-        elif isinstance(item, dict):
-            parts.append(str(item.get("text", "")))
-    return "".join(parts).strip()
+    return "".join(_flatten_part(item) for item in value).strip()
+
+
+def _sender_id_from_string(from_id: str) -> int | None:
+    digits = "".join(ch for ch in from_id if ch.isdigit())
+    if not digits:
+        return None
+    return int(digits)
 
 
 def parse_sender_id(from_id: Any) -> int | None:
@@ -56,10 +77,7 @@ def parse_sender_id(from_id: Any) -> int | None:
         return from_id
     if not isinstance(from_id, str):
         return None
-    digits = "".join(ch for ch in from_id if ch.isdigit())
-    if not digits:
-        return None
-    return int(digits)
+    return _sender_id_from_string(from_id)
 
 
 def _parse_sender_display_name(value: Any) -> str | None:

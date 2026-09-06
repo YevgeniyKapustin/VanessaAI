@@ -1,4 +1,4 @@
-from vanessa.pipeline.decision.gate.reply_expectation import (
+from vanessa.pipeline.decision.gate.expectation.reply_expectation import (
     expects_follow_up_after_bot,
     is_contextual_vocative_address,
     is_conversation_closure,

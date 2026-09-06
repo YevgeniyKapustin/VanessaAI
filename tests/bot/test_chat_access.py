@@ -11,6 +11,7 @@ from vanessa.config.content import get_content
 def make_incoming(
     chat_type: ChatType = ChatType.GROUP,
     chat_id: int = -100123,
+    *,
     user_in_chat: bool = True,
 ) -> IncomingMessage:
     bot = AsyncMock()

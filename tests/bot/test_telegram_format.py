@@ -1,3 +1,4 @@
+# Intentional Cyrillic fixtures — not lookalike Latin.
 from services.bot.telegram_format import markdown_to_telegram_html
 from vanessa.pipeline.llm.format.reply_format import capitalize_sentences
 
@@ -14,7 +15,7 @@ def test_markdown_fenced_code_block():
 def test_markdown_inline_code():
     html = markdown_to_telegram_html("Вызови `generate_mesh()` и всё")
 
-    assert "Вызови <code>generate_mesh()</code> и всё" == html
+    assert html == "Вызови <code>generate_mesh()</code> и всё"
 
 
 def test_markdown_escapes_html_in_prose():

@@ -6,7 +6,7 @@ from vanessa.config.content import (
     get_modal_verbs,
     get_question_words,
 )
-from vanessa.pipeline.decision.gate.bot_names import compile_bot_name_pattern
+from vanessa.pipeline.decision.gate.addressing.bot_names import compile_bot_name_pattern
 
 
 @dataclass(frozen=True, slots=True)

@@ -115,27 +115,46 @@ def test_desktop_overlay_does_not_patch_configmap() -> None:
     ).exists()
 
 
+def _pod_spec(doc: dict) -> dict:
+    return doc["spec"]["template"]["spec"]
+
+
+def _seq(mapping: dict, key: str) -> list:
+    return mapping.get(key) or []
+
+
+def _assert_readonly_rootfs(container: dict) -> None:
+    ctx = container.get("securityContext") or {}
+    assert ctx.get("readOnlyRootFilesystem") is True
+
+
+def _assert_tmp_mount(container: dict) -> None:
+    mounts = container.get("volumeMounts") or []
+    assert any(item.get("mountPath") == "/tmp" for item in mounts)
+
+
+def _assert_deployment_readonly_rootfs(doc: dict) -> None:
+    spec = _pod_spec(doc)
+    assert any(item.get("name") == "tmp" for item in _seq(spec, "volumes"))
+    for container in _seq(spec, "containers"):
+        _assert_readonly_rootfs(container)
+        _assert_tmp_mount(container)
+    for container in _seq(spec, "initContainers"):
+        _assert_readonly_rootfs(container)
+
+
 def test_workloads_use_readonly_rootfs() -> None:
-    for name in (
+    names = (
         "20-agent.yaml",
         "21-bot.yaml",
         "22-worker.yaml",
         "23-mcp-servers.yaml",
-    ):
+    )
+    for name in names:
         for doc in _docs(Path("deploy/k8s/base") / name):
             if doc.get("kind") != "Deployment":
                 continue
-            spec = doc["spec"]["template"]["spec"]
-            volumes = spec.get("volumes") or []
-            assert any(item.get("name") == "tmp" for item in volumes)
-            for container in spec.get("containers") or []:
-                ctx = container.get("securityContext") or {}
-                assert ctx.get("readOnlyRootFilesystem") is True
-                mounts = container.get("volumeMounts") or []
-                assert any(item.get("mountPath") == "/tmp" for item in mounts)
-            for container in spec.get("initContainers") or []:
-                ctx = container.get("securityContext") or {}
-                assert ctx.get("readOnlyRootFilesystem") is True
+            _assert_deployment_readonly_rootfs(doc)
 
 
 def test_postgres_networkpolicy_allows_mcp_knowledge() -> None:

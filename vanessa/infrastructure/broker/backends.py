@@ -83,25 +83,49 @@ async def consume_forever(
             await asyncio.sleep(poll_seconds)
 
 
-async def _process_one(
+async def _already_handled(dedup: DedupGuard, delivery: Delivery) -> bool:
+    try:
+        return not await dedup.acquire(delivery.message.message_id)
+    except Exception:
+        logger.exception(
+            "dedup_lookup_failed stream=%s id=%s",
+            delivery.stream,
+            delivery.stream_id,
+        )
+        return True
+
+
+async def _should_skip_delivery(
+    delivery: Delivery,
+    dedup: DedupGuard | None,
+) -> bool:
+    if dedup is None:
+        return False
+    return await _already_handled(dedup, delivery)
+
+
+async def _reject_delivery(
+    backend: StreamBackend,
+    group: str,
+    delivery: Delivery,
+    exc: BaseException,
+) -> None:
+    try:
+        await backend.reject(delivery.stream, group, delivery, exc)
+    except Exception:
+        logger.exception(
+            "broker_reject_failed stream=%s id=%s",
+            delivery.stream,
+            delivery.stream_id,
+        )
+
+
+async def _run_handler(
     backend: StreamBackend,
     group: str,
     delivery: Delivery,
     handler: MessageHandler,
-    dedup: DedupGuard | None,
 ) -> None:
-    if dedup is not None:
-        try:
-            if not await dedup.acquire(delivery.message.message_id):
-                # Already handled by a previous delivery; ack and skip.
-                await backend.ack(delivery.stream, group, delivery.stream_id)
-                return
-        except Exception:
-            logger.exception(
-                "dedup_lookup_failed stream=%s id=%s", delivery.stream, delivery.stream_id
-            )
-            await backend.ack(delivery.stream, group, delivery.stream_id)
-            return
     try:
         await handler(delivery)
         await backend.ack(delivery.stream, group, delivery.stream_id)
@@ -109,11 +133,22 @@ async def _process_one(
         raise
     except Exception as exc:
         logger.exception(
-            "consumer_handler_failed stream=%s id=%s", delivery.stream, delivery.stream_id
+            "consumer_handler_failed stream=%s id=%s",
+            delivery.stream,
+            delivery.stream_id,
         )
-        try:
-            await backend.reject(delivery.stream, group, delivery, exc)
-        except Exception:
-            logger.exception(
-                "broker_reject_failed stream=%s id=%s", delivery.stream, delivery.stream_id
-            )
+        await _reject_delivery(backend, group, delivery, exc)
+
+
+async def _process_one(
+    backend: StreamBackend,
+    group: str,
+    delivery: Delivery,
+    handler: MessageHandler,
+    dedup: DedupGuard | None,
+) -> None:
+    if await _should_skip_delivery(delivery, dedup):
+        # Duplicate or failed dedup lookup: ack and skip the handler.
+        await backend.ack(delivery.stream, group, delivery.stream_id)
+        return
+    await _run_handler(backend, group, delivery, handler)

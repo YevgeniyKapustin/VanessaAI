@@ -14,11 +14,16 @@ from services.agent.runtime.warmup import WarmupRuntime
 
 @asynccontextmanager
 async def lifespan(container: AppContainer) -> AsyncIterator[None]:
+    runtimes = (
+        StorageRuntime(),
+        WarmupRuntime(container),
+        JobsRuntime(container),
+        AlertRuntime(),
+        KnowledgeRuntime(container),
+        BrokerRuntime(container),
+    )
+
     async with AsyncExitStack() as stack:
-        await stack.enter_async_context(StorageRuntime())
-        await stack.enter_async_context(WarmupRuntime(container))
-        await stack.enter_async_context(JobsRuntime(container))
-        await stack.enter_async_context(AlertRuntime())
-        await stack.enter_async_context(KnowledgeRuntime(container))
-        await stack.enter_async_context(BrokerRuntime(container))
+        for runtime in runtimes:
+            await stack.enter_async_context(runtime)
         yield

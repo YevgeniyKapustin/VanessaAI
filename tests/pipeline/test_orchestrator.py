@@ -3,17 +3,31 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from vanessa.config.content import get_photo_placeholder
 from vanessa.config.settings import settings
-from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment, StoredMessage
+from vanessa.core.generate_request import as_generate_request
+from vanessa.core.messages import (
+    ContextBlock,
+    ContextMessage,
+    ImageAttachment,
+    StoredMessage,
+)
 from vanessa.core.turn import ChatTurnInput
 from vanessa.knowledge.metrics.retriever import SenderProfile
 from vanessa.knowledge.schema import KnowledgeBlock
+from vanessa.pipeline.background import BackgroundExecutor
 from vanessa.pipeline.context import TurnPipelineContext
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
-from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.decision.models import (
+    DecisionAction,
+    DecisionReason,
+    DecisionResult,
+)
 from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.pipeline.humor_pipeline import HumorPipeline
-from vanessa.pipeline.orchestrator.conversation_orchestrator import ConversationOrchestrator
+from vanessa.pipeline.orchestrator.conversation_orchestrator import (
+    ConversationOrchestrator,
+)
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.stages import (
@@ -45,6 +59,7 @@ class FakeMessageRepo:
         reply_to_sender_name: str | None = None,
         attachments: list[dict] | None = None,
     ) -> StoredMessage:
+        _ = created_at
         message = StoredMessage(
             id=self._next_id,
             role=role,
@@ -66,6 +81,7 @@ class FakeMessageRepo:
         return list(self._messages.values())[-limit:]
 
     async def fulltext_search(self, query: str, limit: int = 30) -> list[StoredMessage]:
+        _ = query, limit
         return []
 
     async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]:
@@ -75,6 +91,7 @@ class FakeMessageRepo:
         self,
         telegram_message_ids: list[int],
     ) -> set[int]:
+        _ = telegram_message_ids
         return set()
 
     async def update_qdrant_point_id(self, message_id: int, point_id: str) -> None:
@@ -112,6 +129,7 @@ class FakeMessageRepo:
         query: str,
         limit: int = 30,
     ) -> list[StoredMessage]:
+        _ = query
         return [m for m in self._messages.values() if m.attachments][:limit]
 
 
@@ -123,11 +141,13 @@ class FakeUser:
 
 class FakeUserRepo:
     async def get_or_create(self, **kwargs) -> FakeUser:
+        _ = kwargs
         return FakeUser()
 
 
 class FakeTurnQuery:
     async def embed_query(self, query: str) -> list[float]:
+        _ = query
         return [0.1, 0.2, 0.3]
 
 
@@ -140,6 +160,7 @@ class FakeContextRetriever:
         query: str,
         top_k: int | None = None,
         query_vector: list[float] | None = None,
+        *,
         skip_fts: bool = False,
         anchor_max: int | None = None,
         fts_query: str | None = None,
@@ -147,6 +168,7 @@ class FakeContextRetriever:
         window_before: int | None = None,
         window_after: int | None = None,
     ) -> list[ContextBlock]:
+        _ = query_vector, skip_fts
         self.calls.append(
             {
                 "query": query,
@@ -193,6 +215,41 @@ class FakeIndexing:
         self.scheduled.append(record)
 
 
+class _BlockingMemory:
+    def __init__(self, release: asyncio.Event) -> None:
+        self.finished = False
+        self._release = release
+
+    async def run(
+        self,
+        *,
+        recent_messages: list,
+        source_message_ids: list[int] | None = None,
+        telegram_chat_id: int | None = None,
+    ) -> int:
+        _ = recent_messages, source_message_ids, telegram_chat_id
+        await self._release.wait()
+        self.finished = True
+        return 0
+
+
+class _RecordingTurnMetrics:
+    def __init__(self) -> None:
+        self.ran = False
+
+    async def run(
+        self,
+        repo,
+        *,
+        semantic: bool = False,
+        batch=None,
+        only_senders: set[int] | None = None,
+    ) -> int:
+        _ = repo, semantic, batch, only_senders
+        self.ran = True
+        return 0
+
+
 class FakeLLM:
     def __init__(self) -> None:
         self.last_humor_quotes: list[str] | None = None
@@ -210,53 +267,28 @@ class FakeLLM:
         self.last_sender_name: str | None = None
         self.last_web_blocks: list | None = None
 
-    async def generate(
-        self,
-        user_message: str,
-        context_blocks: list[ContextBlock],
-        session_messages: list[ContextMessage] | None = None,
-        humor_quotes: list[str] | None = None,
-        knowledge_blocks: list[KnowledgeBlock] | None = None,
-        web_blocks: list | None = None,
-        meme_blocks: list | None = None,
-        meme_menu: list | None = None,
-        metrics_block: str | None = None,
-        attitude_note: str | None = None,
-        sender_telegram_id: int | None = None,
-        sender_name: str | None = None,
-        system_prompt: str | None = None,
-        tone: str | None = None,
-        needs_clarification: bool = False,
-        clarification_hint: str = "",
-        detail: str = "normal",
-        uses_pro_model: bool = False,
-        reply_to_text: str | None = None,
-        reply_to_sender_telegram_id: int | None = None,
-        reply_to_sender_name: str | None = None,
-        images: list | None = None,
-        photo_candidates: list | None = None,
-        current_images: list | None = None,
-    ) -> str:
-        self.last_metrics_block = metrics_block
-        self.last_humor_quotes = humor_quotes
-        self.last_knowledge_blocks = knowledge_blocks
-        self.last_web_blocks = web_blocks
-        self.last_meme_blocks = meme_blocks
-        self.last_meme_menu = meme_menu
-        self.last_attitude_note = attitude_note
-        self.last_sender_name = sender_name
-        self.last_tone = tone
-        self.last_needs_clarification = needs_clarification
-        self.last_clarification_hint = clarification_hint
-        self.last_detail = detail
-        self.last_uses_pro_model = uses_pro_model
-        self.last_reply_to_text = reply_to_text
-        self.last_reply_to_sender_telegram_id = reply_to_sender_telegram_id
-        self.last_reply_to_sender_name = reply_to_sender_name
-        self.last_images = images
-        self.last_photo_candidates = photo_candidates
-        self.last_current_images = current_images
-        return f"echo: {user_message}"
+    async def generate(self, user_message, context_blocks=None, **kwargs) -> str:
+        request = as_generate_request(user_message, context_blocks, **kwargs)
+        self.last_metrics_block = request.metrics_block
+        self.last_humor_quotes = request.humor_quotes
+        self.last_knowledge_blocks = request.knowledge_blocks
+        self.last_web_blocks = request.web_blocks
+        self.last_meme_blocks = request.meme_blocks
+        self.last_meme_menu = request.meme_menu
+        self.last_attitude_note = request.attitude_note
+        self.last_sender_name = request.sender_name
+        self.last_tone = request.tone
+        self.last_needs_clarification = request.needs_clarification
+        self.last_clarification_hint = request.clarification_hint
+        self.last_detail = request.detail
+        self.last_uses_pro_model = request.uses_pro_model
+        self.last_reply_to_text = request.reply_to_text
+        self.last_reply_to_sender_telegram_id = request.reply_to_sender_telegram_id
+        self.last_reply_to_sender_name = request.reply_to_sender_name
+        self.last_images = request.images
+        self.last_photo_candidates = request.photo_candidates
+        self.last_current_images = request.current_images
+        return f"echo: {request.user_message}"
 
 
 class FakeDecisionEngine:
@@ -267,23 +299,12 @@ class FakeDecisionEngine:
 
     async def decide(
         self,
-        text: str,
-        telegram_chat_id: int,
-        recent_messages: list[ContextMessage],
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
+        context: object,
         *,
-        should_reply: bool | None = None,
-        mentions_bot: bool = False,
-        reply_to_bot: bool = False,
-        reply_to_other_user: bool = False,
-        in_listen_window: bool = False,
-        sender_telegram_id: int = 0,
-        sender_metrics: object | None = None,
+        search_text: str | None = None,
         humor_ok: bool = False,
-        loop_strength: int = 0,
-        annoyance: float = 0.0,
     ) -> DecisionResult:
+        _ = context, search_text, humor_ok
         self.decide_calls += 1
         return DecisionResult(
             action=self._action,
@@ -344,6 +365,51 @@ def _build_orchestrator(
     )
 
 
+def _memory_metrics_orchestrator(
+    *,
+    messages: FakeMessageRepo,
+    indexing: FakeIndexing,
+    decision: FakeDecisionEngine,
+    memory: _BlockingMemory,
+    metrics: _RecordingTurnMetrics,
+    background: BackgroundExecutor,
+) -> ConversationOrchestrator:
+    retriever = FakeContextRetriever()
+    llm = FakeLLM()
+    turn_metrics = TurnMetrics()
+    config = OrchestratorConfig(
+        session_window_size=10,
+        session_idle_seconds=300.0,
+        post_reply_listen_count=5,
+        planner_prefilter_enabled=False,
+        defer_index_on_ignore=False,
+    )
+    humor = HumorPipeline(retriever, FakeTurnQuery(), config)
+    registry = ChatIgnoreRegistry()
+    gate = GateStage(
+        QueryRewriter(use_llm=False),
+        decision,
+        None,
+        config,
+        turn_metrics,
+        messages,
+        indexing,
+        registry,
+    )
+    return ConversationOrchestrator(
+        messages=messages,
+        users=FakeUserRepo(),
+        config=config,
+        gate=gate,
+        retrieve=RetrieveStage(retriever, humor, None),
+        compose=ComposeStage(llm),
+        finalize=FinalizeStage(messages, indexing, decision, config, turn_metrics),
+        memory=memory,
+        metrics=metrics,
+        background=background,
+    )
+
+
 @pytest.mark.asyncio
 async def test_orchestrator_replies_and_indexes_both_messages():
     messages = FakeMessageRepo()
@@ -367,7 +433,8 @@ async def test_orchestrator_replies_and_indexes_both_messages():
     assert result.action == DecisionAction.REPLY
     assert result.reply == "echo: Vanessa, привет"
     assert result.context_count == 1
-    assert len(messages._messages) == 2
+    stored_user_and_reply = 2
+    assert len(messages._messages) == stored_user_and_reply
     assert len(indexing.scheduled) == 1
     assert decision.recorded_chats == [-1001]
 
@@ -431,7 +498,8 @@ async def test_orchestrator_runs_humor_rag_when_planner_requests_it():
     )
 
     assert result.reply == "echo: ну ладно поработаю"
-    assert len(retriever.calls) == 2
+    expected_retriever_calls = 2
+    assert len(retriever.calls) == expected_retriever_calls
     assert retriever.calls[1]["query"] == "личь работа"
     assert llm.last_humor_quotes == ["найди работу"]
 
@@ -444,6 +512,7 @@ async def test_orchestrator_splits_reply_into_blocks():
 
     class BlockLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "Первая мысль\n[next]\nВторая мысль\n[next]\nТретья"
 
     orchestrator = _build_orchestrator(
@@ -478,6 +547,7 @@ async def test_orchestrator_strips_trailing_periods_from_each_block():
 
     class PeriodLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "Первая мысль.\n[next]\nВторая мысль.\n[next]\nТретья мысль."
 
     orchestrator = _build_orchestrator(
@@ -512,6 +582,7 @@ async def test_orchestrator_extracts_sticker_tag_from_reply():
 
     class StickerLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "Успех!\n[sticker:delight]"
 
     orchestrator = _build_orchestrator(
@@ -564,7 +635,9 @@ async def test_orchestrator_passes_reply_context_to_llm():
     )
 
     assert result.action == DecisionAction.REPLY
-    assert llm.last_reply_to_sender_telegram_id == 99
+    quoted_sender_id = 99
+    quoted_message_id = 555
+    assert llm.last_reply_to_sender_telegram_id == quoted_sender_id
     assert llm.last_reply_to_text == "Личь не делает карты"
     assert llm.last_reply_to_sender_name == "Личь"
 
@@ -572,87 +645,27 @@ async def test_orchestrator_passes_reply_context_to_llm():
     # turn can render it inside the recent/session block
     user_stored = [m for m in messages._messages.values() if m.role == "user"]
     assert len(user_stored) == 1
-    assert user_stored[0].reply_to_message_id == 555
+    assert user_stored[0].reply_to_message_id == quoted_message_id
     assert user_stored[0].reply_to_text == "Личь не делает карты"
-    assert user_stored[0].reply_to_sender_telegram_id == 99
+    assert user_stored[0].reply_to_sender_telegram_id == quoted_sender_id
     assert user_stored[0].reply_to_sender_name == "Личь"
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_returns_reply_before_background_memory_metrics():
-    from vanessa.pipeline.background import BackgroundExecutor
-
     messages = FakeMessageRepo()
     indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     release = asyncio.Event()
-
-    class BlockingMemory:
-        def __init__(self) -> None:
-            self.finished = False
-
-        async def run(
-            self,
-            *,
-            recent_messages: list,
-            source_message_ids: list[int] | None = None,
-            telegram_chat_id: int | None = None,
-        ) -> int:
-            await release.wait()
-            self.finished = True
-            return 0
-
-    class RecordingMetrics:
-        def __init__(self) -> None:
-            self.ran = False
-
-        async def run(
-            self,
-            repo,
-            *,
-            semantic: bool = False,
-            batch=None,
-            only_senders: set[int] | None = None,
-        ) -> int:
-            self.ran = True
-            return 0
-
-    memory = BlockingMemory()
-    metrics = RecordingMetrics()
-
-    retriever = FakeContextRetriever()
-    llm = FakeLLM()
-    turn_metrics = TurnMetrics()
-    config = OrchestratorConfig(
-        session_window_size=10,
-        session_idle_seconds=300.0,
-        post_reply_listen_count=5,
-        planner_prefilter_enabled=False,
-        defer_index_on_ignore=False,
-    )
-    humor = HumorPipeline(retriever, FakeTurnQuery(), config)
-    registry = ChatIgnoreRegistry()
-    gate = GateStage(
-        QueryRewriter(use_llm=False),
-        decision,
-        None,
-        config,
-        turn_metrics,
-        messages,
-        indexing,
-        registry,
-    )
+    memory = _BlockingMemory(release)
+    metrics = _RecordingTurnMetrics()
     background = BackgroundExecutor(maxsize=10, workers=1)
     background.start()
     try:
-        orchestrator = ConversationOrchestrator(
+        orchestrator = _memory_metrics_orchestrator(
             messages=messages,
-            users=FakeUserRepo(),
-            config=config,
-            gate=gate,
-            retrieve=RetrieveStage(retriever, humor, None),
-            compose=ComposeStage(llm),
-            finalize=FinalizeStage(messages, indexing, decision, config, turn_metrics),
+            indexing=indexing,
+            decision=decision,
             memory=memory,
             metrics=metrics,
             background=background,
@@ -1066,7 +1079,7 @@ async def test_compose_stage_forwards_photo_candidates_and_resolves_marker():
 
     class MarkerLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
-            self.last_photo_candidates = kwargs.get("photo_candidates")
+            await super().generate(*args, **kwargs)
             return "Держи\n[photo:1]"
 
     llm = MarkerLLM()
@@ -1124,6 +1137,7 @@ async def test_compose_stage_photo_request_without_marker_resolves_nothing():
 
     class NoMarkerLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "у меня нет такого фото"
 
     llm = NoMarkerLLM()
@@ -1174,6 +1188,7 @@ async def test_compose_stage_out_of_range_marker_resolves_nothing():
 
     class BadMarkerLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "Держи\n[photo:9]"
 
     llm = BadMarkerLLM()
@@ -1223,6 +1238,7 @@ async def test_compose_stage_searches_photos_by_meaning_not_literal_text():
         async def search_photo_messages(
             self, query: str, limit: int = 30
         ) -> list[StoredMessage]:
+            _ = limit
             self.last_photo_query = query
             return [
                 StoredMessage(
@@ -1246,7 +1262,7 @@ async def test_compose_stage_searches_photos_by_meaning_not_literal_text():
 
     class MeaningLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
-            self.last_photo_candidates = kwargs.get("photo_candidates")
+            await super().generate(*args, **kwargs)
             return "Держи\n[photo:1]"
 
     llm = MeaningLLM()
@@ -1301,6 +1317,7 @@ async def test_compose_builds_album_for_image_turn_excluding_current():
         async def search_photo_messages(
             self, query: str, limit: int = 30
         ) -> list[StoredMessage]:
+            _ = query, limit
             self.search_calls += 1
             return [
                 StoredMessage(
@@ -1324,7 +1341,7 @@ async def test_compose_builds_album_for_image_turn_excluding_current():
 
     class AlbumLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
-            self.last_photo_candidates = kwargs.get("photo_candidates")
+            await super().generate(*args, **kwargs)
             return "обе картины хороши"
 
     llm = AlbumLLM()
@@ -1388,7 +1405,6 @@ def test_photo_candidates_exclude_current_turn_images():
 
 def test_photo_candidates_do_not_treat_user_caption_as_description():
     """Telegram caption is the user's words, not a visual description."""
-    from vanessa.config.content import get_photo_placeholder
 
     photo = ImageAttachment(
         data_url="data:image/jpeg;base64,AAAA",
@@ -1462,6 +1478,7 @@ class SilentLLM(FakeLLM):
     """Compose model following the prompt — "reply with nothing" for a repeat."""
 
     async def generate(self, *args, **kwargs):
+        _ = args, kwargs
         return ""
 
 
@@ -1471,6 +1488,7 @@ class CountingLLM(FakeLLM):
         self.calls = 0
 
     async def generate(self, *args, **kwargs):
+        _ = args, kwargs
         self.calls += 1
         return "echo"
 
@@ -1547,7 +1565,8 @@ async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm
     assert llm.calls == 0
     # User message still indexed; only user messages exist (no assistant reply).
     assert len(indexing.scheduled) == 1
-    assert len(messages._messages) == 2
+    stored_user_and_reply = 2
+    assert len(messages._messages) == stored_user_and_reply
 
 
 @pytest.mark.asyncio
@@ -1583,6 +1602,7 @@ async def test_orchestrator_compose_refuse_can_be_disabled():
 async def test_orchestrator_compose_refuses_ignore_marker():
     class IgnoreMarkerLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "[ignore]"
 
     messages = FakeMessageRepo()
@@ -1622,6 +1642,7 @@ async def test_orchestrator_compose_refuses_ignore_marker_with_reason():
     # reaches the chat, the DB or the result reply.
     class IgnoreMarkerWithReasonLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "[ignore] повтор того же вопроса"
 
     messages = FakeMessageRepo()
@@ -1656,6 +1677,7 @@ async def test_orchestrator_compose_refuses_ignore_marker_with_reason():
 async def test_orchestrator_does_not_refuse_when_marker_inside_reply():
     class MarkerInSentenceLLM(FakeLLM):
         async def generate(self, *args, **kwargs):
+            _ = args, kwargs
             return "он написал [ignore] в чате, я молчу"
 
     messages = FakeMessageRepo()

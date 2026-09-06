@@ -46,7 +46,7 @@ priority = "explicit"
 pytest = ">=8.3.0"
 pytest-asyncio = ">=0.24.0"
 pytest-cov = "^7.1.0"
-ruff = ">=0.16.0,<0.17"
+ruff = ">=0.16.0,<0.17"  # lint rules: ruff.toml
 # In-memory Redis for broker tests (no server required).
 fakeredis = ">=2.23"
 
@@ -65,19 +65,3 @@ source = ["vanessa", "services"]
 show_missing = true
 precision = 0
 fail_under = 90
-
-[tool.ruff]
-target-version = "py312"
-line-length = 100
-
-[tool.ruff.lint.isort]
-known-first-party = ["vanessa", "services"]
-
-[tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
-
-[tool.ruff.lint.per-file-ignores]
-"scripts/**" = ["E402", "BLE001", "I001", "EXE001"]
-"alembic/env.py" = ["F401"]
-"services/bot/handlers/**" = ["BLE001"]
-"services/worker/**" = ["BLE001"]

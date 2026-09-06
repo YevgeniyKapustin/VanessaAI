@@ -79,7 +79,7 @@ def _clean(fragment: str) -> str:
 
 def _parse_results(page: str, *, limit: int) -> list[WebResult]:
     links = _RESULT_LINK_RE.findall(page)
-    snippets = [m for m in _SNIPPET_RE.findall(page)]
+    snippets = list(_SNIPPET_RE.findall(page))
     results: list[WebResult] = []
     for index, (href, title_html) in enumerate(links[:limit]):
         url = html.unescape(href)

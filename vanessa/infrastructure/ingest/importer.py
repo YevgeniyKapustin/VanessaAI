@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class HistoryImporter:
     def __init__(
         self,
+        *,
         messages: MessageRepositoryProtocol,
         users: UserRepository,
         embeddings: EmbeddingProviderProtocol,
@@ -36,6 +37,7 @@ class HistoryImporter:
     async def import_messages(
         self,
         parsed_messages: Iterable[ParsedExportMessage],
+        *,
         embed: bool = True,
     ) -> tuple[int, int]:
         await self._vector_store.ensure_collection()
@@ -44,68 +46,94 @@ class HistoryImporter:
         skipped = 0
         batch: list[ParsedExportMessage] = []
 
-        async def flush_batch() -> None:
-            nonlocal imported, skipped
-            if not batch:
-                return
-
-            telegram_ids = [item.telegram_message_id for item in batch]
-            existing = await self._messages.get_existing_telegram_message_ids(
-                telegram_ids,
-            )
-            pending = [
-                item for item in batch if item.telegram_message_id not in existing
-            ]
-            skipped += len(batch) - len(pending)
-            batch.clear()
-
-            if not pending:
-                return
-
-            stored: list[StoredMessage] = []
-            for item in pending:
-                if item.sender_telegram_id is not None:
-                    await self._users.get_or_create(
-                        telegram_id=item.sender_telegram_id,
-                        first_name=item.sender_display_name,
-                    )
-                message = await self._messages.create(
-                    role="user",
-                    content=item.content,
-                    sender_telegram_id=item.sender_telegram_id,
-                    created_at=item.created_at,
-                    telegram_message_id=item.telegram_message_id,
-                )
-                stored.append(message)
-
-            if embed:
-                vectors = await self._embeddings.embed_batch(
-                    [message.content for message in stored]
-                )
-                point_ids = await self._vector_store.upsert_batch(
-                    [
-                        (message.id, vector, message.qdrant_point_id)
-                        for message, vector in zip(stored, vectors, strict=True)
-                    ],
-                )
-                for message, point_id in zip(stored, point_ids, strict=True):
-                    await self._messages.update_qdrant_point_id(
-                        message.id,
-                        point_id,
-                    )
-
-            await self._uow.commit()
-            imported += len(stored)
-            logger.info(
-                "Imported %s messages (%s skipped so far)",
-                imported,
-                skipped,
-            )
-
         for message in parsed_messages:
             batch.append(message)
             if len(batch) >= self._batch_size:
-                await flush_batch()
+                imported, skipped = await self._flush_batch(
+                    batch, imported, skipped, embed=embed
+                )
 
-        await flush_batch()
+        return await self._flush_batch(batch, imported, skipped, embed=embed)
+
+    async def _take_pending(
+        self, batch: list[ParsedExportMessage]
+    ) -> tuple[list[ParsedExportMessage], int]:
+        telegram_ids = [item.telegram_message_id for item in batch]
+        existing = await self._messages.get_existing_telegram_message_ids(
+            telegram_ids,
+        )
+        pending = [
+            item for item in batch if item.telegram_message_id not in existing
+        ]
+        skipped_count = len(batch) - len(pending)
+        batch.clear()
+        return pending, skipped_count
+
+    async def _ensure_sender(self, item: ParsedExportMessage) -> None:
+        if item.sender_telegram_id is None:
+            return
+        await self._users.get_or_create(
+            telegram_id=item.sender_telegram_id,
+            first_name=item.sender_display_name,
+        )
+
+    async def _store_pending(
+        self, pending: list[ParsedExportMessage]
+    ) -> list[StoredMessage]:
+        stored: list[StoredMessage] = []
+        for item in pending:
+            await self._ensure_sender(item)
+            message = await self._messages.create(
+                role="user",
+                content=item.content,
+                sender_telegram_id=item.sender_telegram_id,
+                created_at=item.created_at,
+                telegram_message_id=item.telegram_message_id,
+            )
+            stored.append(message)
+        return stored
+
+    async def _embed_stored(self, stored: list[StoredMessage]) -> None:
+        vectors = await self._embeddings.embed_batch(
+            [message.content for message in stored]
+        )
+        point_ids = await self._vector_store.upsert_batch(
+            [
+                (message.id, vector, message.qdrant_point_id)
+                for message, vector in zip(stored, vectors, strict=True)
+            ],
+        )
+        for message, point_id in zip(stored, point_ids, strict=True):
+            await self._messages.update_qdrant_point_id(
+                message.id,
+                point_id,
+            )
+
+    async def _flush_batch(
+        self,
+        batch: list[ParsedExportMessage],
+        imported: int,
+        skipped: int,
+        *,
+        embed: bool,
+    ) -> tuple[int, int]:
+        if not batch:
+            return imported, skipped
+
+        pending, extra_skipped = await self._take_pending(batch)
+        skipped += extra_skipped
+        if not pending:
+            return imported, skipped
+
+        stored = await self._store_pending(pending)
+        if embed:
+            await self._embed_stored(stored)
+
+        await self._uow.commit()
+        imported += len(stored)
+        logger.info(
+            "Imported %s messages (%s skipped so far)",
+            imported,
+            skipped,
+        )
         return imported, skipped

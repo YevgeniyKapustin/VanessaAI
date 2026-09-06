@@ -18,29 +18,37 @@ def merge_vector_search_hits(
     return sorted(best.values(), key=lambda hit: float(hit["score"]), reverse=True)
 
 
+def _reciprocal_rank_scores(
+    vector_hits: list[Mapping[str, object]],
+    fts_hits: list[StoredMessage],
+) -> dict[int, float]:
+    scored: dict[int, float] = {}
+    for rank, hit in enumerate(vector_hits):
+        mid = int(hit["message_id"])
+        scored[mid] = scored.get(mid, 0.0) + (1.0 / (rank + 1))
+    for rank, message in enumerate(fts_hits):
+        scored[message.id] = scored.get(message.id, 0.0) + (1.0 / (rank + 1))
+    return scored
+
+
+def _take_context_ids(
+    sorted_ids: list[int],
+    context_min: int,
+    context_max: int,
+) -> list[int]:
+    if not sorted_ids:
+        return []
+    if len(sorted_ids) < context_min:
+        return sorted_ids
+    return sorted_ids[: min(len(sorted_ids), context_max)]
+
+
 def merge_hybrid_results(
     vector_hits: list[Mapping[str, object]],
     fts_hits: list[StoredMessage],
     context_min: int = settings.rag_context_min,
     context_max: int = settings.rag_context_max,
 ) -> list[int]:
-    scored: dict[int, float] = {}
-
-    for rank, hit in enumerate(vector_hits):
-        mid = int(hit["message_id"])
-        scored[mid] = scored.get(mid, 0.0) + (1.0 / (rank + 1))
-
-    for rank, message in enumerate(fts_hits):
-        scored[message.id] = scored.get(message.id, 0.0) + (1.0 / (rank + 1))
-
+    scored = _reciprocal_rank_scores(vector_hits, fts_hits)
     sorted_ids = sorted(scored, key=scored.get, reverse=True)
-    if not sorted_ids:
-        return []
-
-    target = min(len(sorted_ids), context_max)
-    if len(sorted_ids) >= context_min:
-        target = min(len(sorted_ids), context_max)
-    else:
-        target = len(sorted_ids)
-
-    return sorted_ids[:target]
+    return _take_context_ids(sorted_ids, context_min, context_max)

@@ -1,0 +1,80 @@
+# Linter config. Why these families: docs/linting.md
+# Ruff version is still pinned in pyproject.toml (Poetry).
+
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear (common design flaws & bugs)
+    "C90",   # mccabe (cyclomatic complexity)
+    "BLE",   # flake8-blind-except (catches bare except:)
+    "FBT",   # flake8-boolean-trap (prevents boolean positional arguments)
+    "A",     # flake8-builtins (prevents shadowing built-in names)
+    "C4",    # flake8-comprehensions (better list/dict/set comprehensions)
+    "T10",   # flake8-debugger (detects forgotten breakpoints)
+    "T20",   # flake8-print (no debug print(); CLI scripts ignore T201)
+    "ISC",   # flake8-implicit-str-concat (catches implicit string concatenation)
+    "ICN",   # flake8-import-conventions (enforces standard import aliases like pd, np)
+    "PIE",   # flake8-pie (misc lints for better code)
+    "PT",    # flake8-pytest-style (cleaner pytest fixtures & tests)
+    "Q",     # flake8-quotes (enforces consistent quote styles)
+    "RET",   # flake8-return (enforces clean return statements and guard clauses)
+    "SIM",   # flake8-simplify (simplifies bloated code and conditions)
+    "TID",   # flake8-tidy-imports (manages relative imports and banned APIs)
+    "ARG",   # flake8-unused-arguments (detects unused function arguments)
+    "PTH",   # flake8-use-pathlib (enforces pathlib over os.path)
+    "ERA",   # eradicate (detects commented-out code)
+    "PL",    # pylint checks (logical errors and code smells)
+    "RUF",   # ruff-specific rules
+    "DTZ",   # flake8-datetimez (naive datetime in logs/outbox/history)
+    "ASYNC", # flake8-async (blocking calls in aiogram/Redis/LLM)
+    "S",     # flake8-bandit (SQL/subprocess/xml; noisy codes ignored)
+    "LOG",   # flake8-logging (root logger)
+    "G",     # flake8-logging-format (f-string in logger.* breaks Loki)
+]
+ignore = [
+    "E501",     # Line length handled by line-length / formatter
+    "PLR0913",  # Pipeline/provider/protocol DI constructors
+    "PLR0917",  # Same, too many positional arguments
+    "RUF001",   # Cyrillic in gates/regex is domain, not mixed-script typo
+    "RUF002",
+    "RUF003",
+    "ASYNC109", # timeout= in Redis RPC / MCP is contract, not asyncio.timeout
+    "S101",     # assert as post-gate invariant, not leftover debug
+    "S104",     # bind 0.0.0.0 for /health /metrics in k8s
+    "S105",     # false positives on token/password names (LLM metrics, pydantic)
+    "S106",
+    "S311",     # random for stickers and sampling, not cryptography
+]
+
+[lint.mccabe]
+max-complexity = 4
+
+[lint.isort]
+known-first-party = ["vanessa", "services"]
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.per-file-ignores]
+"tests/**/*" = [
+    "ARG001",  # fixtures and callbacks
+    "S108",    # /tmp in manifest tests
+    "S310",    # urlopen to local /metrics
+    "S314",    # ElementTree in sticker/prompt XML tests
+]
+"scripts/**/*" = [
+    "T201",     # CLI prints to stdout
+    "S603",     # subprocess in k8s_secrets
+    "ASYNC240", # pathlib.read_text in async CLI, not anyio
+]
+"services/bot/handlers/**" = [
+    "ARG001",  # aiogram signatures (message/bot/state not always used)
+]

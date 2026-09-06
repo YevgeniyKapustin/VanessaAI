@@ -8,8 +8,15 @@ from vanessa.pipeline.decision.detectors.intent import IntentDetector, IntentRes
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
 from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
 from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
-from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker, TriggerResult
-from vanessa.pipeline.decision.metrics_rule import SenderMetricsRule, should_ignore_for_toxicity
+from vanessa.pipeline.decision.detectors.triggers import (
+    TriggerKeywordChecker,
+    TriggerResult,
+)
+from vanessa.pipeline.decision.engine import DecisionEngine
+from vanessa.pipeline.decision.metrics_rule import (
+    SenderMetricsRule,
+    should_ignore_for_toxicity,
+)
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 
 TOXIC_METRICS = PersonMetrics(toxicity=0.95, trust_score=10)
@@ -124,11 +131,11 @@ def test_rule_guard_listen_window():
 
 class FakeRelevance:
     async def score(self, text, query_vector=None, search_text=None) -> float:
+        _ = text, query_vector, search_text
         return 0.9
 
 
 def build_engine(intent_detector, trigger_checker):
-    from vanessa.pipeline.decision.engine import DecisionEngine
 
     return DecisionEngine(
         intent_detector=intent_detector,
@@ -146,12 +153,14 @@ def build_engine(intent_detector, trigger_checker):
 async def test_engine_ignores_toxic_low_trust_sender():
     engine = build_engine(IntentDetector(), TriggerKeywordChecker(()))
     result = await engine.decide(
-        text="просто болтовня без смысла",
-        telegram_chat_id=1,
-        recent_messages=[],
-        should_reply=None,
-        sender_telegram_id=42,
-        sender_metrics=TOXIC_METRICS,
+        DecisionContext(
+            text="просто болтовня без смысла",
+            telegram_chat_id=1,
+            recent_messages=[],
+            should_reply=None,
+            sender_telegram_id=42,
+            sender_metrics=TOXIC_METRICS,
+        )
     )
     assert result.action == DecisionAction.IGNORE
     assert result.reason == DecisionReason.TOXIC
@@ -165,12 +174,14 @@ async def test_engine_never_suppresses_neutral_sender():
         ContextMessage(id=2, role="assistant", content="давай"),
     ]
     result = await engine.decide(
-        text="а почему?",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=None,
-        sender_telegram_id=42,
-        sender_metrics=NEUTRAL_METRICS,
+        DecisionContext(
+            text="а почему?",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=None,
+            sender_telegram_id=42,
+            sender_metrics=NEUTRAL_METRICS,
+        )
     )
     # a neutral profile must never trigger the toxic suppression
     assert result.reason != DecisionReason.TOXIC
@@ -181,11 +192,13 @@ async def test_engine_owner_is_never_suppressed():
     owner_id = settings.required_user_telegram_id or 999
     engine = build_engine(IntentDetector(), TriggerKeywordChecker(()))
     result = await engine.decide(
-        text="просто болтовня без смысла",
-        telegram_chat_id=1,
-        recent_messages=[],
-        should_reply=None,
-        sender_telegram_id=owner_id,
-        sender_metrics=TOXIC_METRICS,
+        DecisionContext(
+            text="просто болтовня без смысла",
+            telegram_chat_id=1,
+            recent_messages=[],
+            should_reply=None,
+            sender_telegram_id=owner_id,
+            sender_metrics=TOXIC_METRICS,
+        )
     )
     assert result.reason != DecisionReason.TOXIC

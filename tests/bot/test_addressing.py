@@ -1,3 +1,4 @@
+# Intentional Cyrillic chat fixtures — not lookalike Latin.
 from dataclasses import dataclass
 
 from services.bot.addressing import _bot_username, extract_addressing
@@ -68,13 +69,15 @@ def test_extract_addressing_reply_to_other_user():
 
 
 def test_extract_addressing_captures_replied_text_and_sender():
-    other = FakeUser(id=99, username="lich")
+    sender_id = 99
+    reply_message_id = 555
+    other = FakeUser(id=sender_id, username="lich")
     reply = type(
         "Reply",
         (),
         {
             "from_user": other,
-            "message_id": 555,
+            "message_id": reply_message_id,
             "text": "Личь не делает карты",
         },
     )()
@@ -91,10 +94,10 @@ def test_extract_addressing_captures_replied_text_and_sender():
 
     signals = extract_addressing(message)  # type: ignore[arg-type]
 
-    assert signals.reply_to_message_id == 555
+    assert signals.reply_to_message_id == reply_message_id
     assert signals.reply_to_text == "Личь не делает карты"
     assert signals.reply_to_sender_name == "lich"
-    assert signals.reply_to_sender_telegram_id == 99
+    assert signals.reply_to_sender_telegram_id == sender_id
 
 
 def test_extract_addressing_reply_without_text_is_none():

@@ -1,0 +1,8 @@
+# Temporary debt: application Python modules over the 200-line CI budget.
+# Format: <posix-path> <baseline-newline-count>
+#
+# Scope: vanessa/, services/, scripts/. Tests are not in this gate.
+# New files and files not listed here must stay at or under 200 lines.
+# An allowlisted file must not grow past its baseline.
+# Remove a path when that file is at or under 200 lines, or deleted.
+# Do not add new paths — split the module instead.

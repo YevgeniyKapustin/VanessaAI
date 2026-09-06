@@ -136,7 +136,8 @@ def test_check_and_alert_sends_only_new_alerts(monkeypatch) -> None:
 
     fired = asyncio.run(manager.check_and_alert())
     assert "llm_error_rate" in fired
-    assert sent and "llm_error_rate" in sent[0]
+    assert sent
+    assert "llm_error_rate" in sent[0]
 
     # Cooldown now active -> the rule does not fire again immediately.
     fired_again = asyncio.run(manager.check_and_alert())

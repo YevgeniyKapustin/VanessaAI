@@ -4,6 +4,7 @@ from typing import Self
 import pytest
 
 from vanessa.core.messages import StoredMessage
+from vanessa.pipeline.background import BackgroundExecutor
 from vanessa.pipeline.indexing.message_indexing import MessageIndexingService
 
 
@@ -18,6 +19,7 @@ class FakeIndexer:
         content: str,
         point_id: str | None = None,
     ) -> str:
+        _ = role, content, point_id
         self.calls.append(message_id)
         return f"point-{message_id}"
 
@@ -30,12 +32,28 @@ class FakeRepo:
         self.updated.append((message_id, point_id))
 
 
-@pytest.mark.asyncio
-async def test_background_indexing_commits_in_separate_session(monkeypatch):
-    indexer = FakeIndexer()
-    committed: list[bool] = []
-    updated: list[tuple[int, str]] = []
+class _CommitSession:
+    def __init__(self, committed: list[bool]) -> None:
+        self._committed = committed
 
+    async def commit(self) -> None:
+        self._committed.append(True)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+
+def _session_factory_for(committed: list[bool]):
+    def session_factory() -> _CommitSession:
+        return _CommitSession(committed)
+
+    return session_factory
+
+
+def _point_id_repository_cls(updated: list[tuple[int, str]]):
     class FakeMessageRepository:
         def __init__(self, session: object) -> None:
             self._session = session
@@ -47,27 +65,23 @@ async def test_background_indexing_commits_in_separate_session(monkeypatch):
         ) -> None:
             updated.append((message_id, point_id))
 
-    class FakeSession:
-        async def commit(self) -> None:
-            committed.append(True)
+    return FakeMessageRepository
 
-        async def __aenter__(self) -> Self:
-            return self
 
-        async def __aexit__(self, *args: object) -> None:
-            return None
-
-    def session_factory() -> FakeSession:
-        return FakeSession()
+@pytest.mark.asyncio
+async def test_background_indexing_commits_in_separate_session(monkeypatch):
+    indexer = FakeIndexer()
+    committed: list[bool] = []
+    updated: list[tuple[int, str]] = []
 
     monkeypatch.setattr(
         "vanessa.pipeline.indexing.message_indexing.MessageRepository",
-        FakeMessageRepository,
+        _point_id_repository_cls(updated),
     )
     service = MessageIndexingService(
         indexer=indexer,
         messages=FakeRepo(),
-        session_factory=session_factory,
+        session_factory=_session_factory_for(committed),
         max_retries=0,
     )
     record = StoredMessage(id=7, role="user", content="hello")
@@ -127,6 +141,7 @@ async def test_embed_with_retry_retries_then_succeeds():
             content: str,
             point_id: str | None = None,
         ) -> str:
+            _ = message_id, role, content, point_id
             calls["count"] += 1
             if calls["count"] == 1:
                 raise RuntimeError("temporary")
@@ -143,13 +158,15 @@ async def test_embed_with_retry_retries_then_succeeds():
     point_id = await service._embed_with_retry(record)
 
     assert point_id == "point-ok"
-    assert calls["count"] == 2
+    expected_attempts = 2
+    assert calls["count"] == expected_attempts
 
 
 @pytest.mark.asyncio
 async def test_embed_with_retry_returns_existing_point_for_non_user():
     class NeverIndexer:
         async def index(self, *args: object, **kwargs: object) -> str:
+            _ = args, kwargs
             raise AssertionError("should not index")
 
     service = MessageIndexingService(
@@ -216,6 +233,7 @@ async def test_schedule_skips_non_user_role():
 async def test_index_now_logs_and_swallows_errors(caplog):
     class FailingIndexer:
         async def index(self, *args: object, **kwargs: object) -> str:
+            _ = args, kwargs
             raise RuntimeError("embed failed")
 
     repo = FakeRepo()
@@ -236,6 +254,7 @@ async def test_index_now_logs_and_swallows_errors(caplog):
 async def test_background_indexing_swallows_errors(monkeypatch):
     class FailingIndexer:
         async def index(self, *args: object, **kwargs: object) -> str:
+            _ = args, kwargs
             raise RuntimeError("background fail")
 
     service = MessageIndexingService(
@@ -251,39 +270,13 @@ async def test_background_indexing_swallows_errors(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_schedule_submits_to_background_executor(monkeypatch):
-    from vanessa.pipeline.background import BackgroundExecutor
-
     indexer = FakeIndexer()
     updated: list[tuple[int, str]] = []
     committed: list[bool] = []
 
-    class FakeMessageRepository:
-        def __init__(self, session: object) -> None:
-            pass
-
-        async def update_qdrant_point_id(
-            self,
-            message_id: int,
-            point_id: str,
-        ) -> None:
-            updated.append((message_id, point_id))
-
-    class FakeSession:
-        async def commit(self) -> None:
-            committed.append(True)
-
-        async def __aenter__(self) -> Self:
-            return self
-
-        async def __aexit__(self, *args: object) -> None:
-            return None
-
-    def session_factory() -> FakeSession:
-        return FakeSession()
-
     monkeypatch.setattr(
         "vanessa.pipeline.indexing.message_indexing.MessageRepository",
-        FakeMessageRepository,
+        _point_id_repository_cls(updated),
     )
     executor = BackgroundExecutor(maxsize=10, workers=1)
     executor.start()
@@ -291,7 +284,7 @@ async def test_schedule_submits_to_background_executor(monkeypatch):
         service = MessageIndexingService(
             indexer=indexer,
             messages=FakeRepo(),
-            session_factory=session_factory,
+            session_factory=_session_factory_for(committed),
             max_retries=0,
             background=executor,
         )

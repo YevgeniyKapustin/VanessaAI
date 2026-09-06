@@ -1,12 +1,19 @@
 import pytest
 
 from vanessa.core.messages import ContextMessage
+from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
 from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
-from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
+    ReplyEligibility,
+)
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionReason
+
+
+def _ctx(text: str, **kwargs) -> DecisionContext:
+    return DecisionContext(text=text, **kwargs)
 
 
 @pytest.fixture
@@ -20,7 +27,7 @@ def eligibility() -> ReplyEligibility:
 
 
 def test_hard_ignore_dismissal(eligibility: ReplyEligibility):
-    result = eligibility.hard_ignore("сгинь", [])
+    result = eligibility.hard_ignore(_ctx("сгинь"))
 
     assert result is not None
     assert result.tag == "dismissal"
@@ -31,7 +38,9 @@ def test_hard_ignore_quote_echo(eligibility: ReplyEligibility):
     line = "повтор цитаты бота один в один"
     recent = [ContextMessage(id=1, role="assistant", content=line)]
 
-    result = eligibility.hard_ignore(line, recent, reply_to_bot=True)
+    result = eligibility.hard_ignore(
+        _ctx(line, recent_messages=recent, reply_to_bot=True)
+    )
 
     assert result is not None
     assert result.tag == "quote_echo"
@@ -41,10 +50,7 @@ def test_hard_ignore_ignored_user(eligibility: ReplyEligibility):
     eligibility._ignore_registry.ignore(1, 42)
 
     result = eligibility.hard_ignore(
-        "привет",
-        [],
-        telegram_chat_id=1,
-        sender_telegram_id=42,
+        _ctx("привет", telegram_chat_id=1, sender_telegram_id=42)
     )
 
     assert result is not None
@@ -70,16 +76,14 @@ def test_prefilter_defers_question_to_reaction_gate(eligibility: ReplyEligibilit
 
 def test_allows_compose_humor_ok(eligibility: ReplyEligibility):
     assert eligibility.allows_compose(
-        "любой текст",
+        _ctx("любой текст"),
         humor_ok=True,
     ) is True
 
 
 def test_allows_compose_blocks_reply_to_other(eligibility: ReplyEligibility):
     assert eligibility.allows_compose(
-        "ответ другому",
-        reply_to_other_user=True,
-        should_reply=True,
+        _ctx("ответ другому", reply_to_other_user=True, should_reply=True),
     ) is False
 
 
@@ -87,9 +91,7 @@ def test_should_block_compose_allows_listen_window_follow_up(
     eligibility: ReplyEligibility,
 ):
     assert eligibility.should_block_compose(
-        "втф чё с тобой",
-        in_listen_window=True,
-        should_reply=None,
+        _ctx("втф чё с тобой", in_listen_window=True, should_reply=None),
     ) is False
 
 
@@ -97,9 +99,11 @@ def test_should_block_compose_blocks_outside_listen_window(
     eligibility: ReplyEligibility,
 ):
     assert eligibility.should_block_compose(
-        "Гриша меш гексы поле боя генерация",
-        in_listen_window=False,
-        should_reply=None,
+        _ctx(
+            "Гриша меш гексы поле боя генерация",
+            in_listen_window=False,
+            should_reply=None,
+        ),
     ) is True
 
 
@@ -109,17 +113,13 @@ def test_should_block_compose_allows_question_outside_window(
     # A question in an active conversation is a compose candidate even outside
     # the listen window, so a session-approved question is not downgraded.
     assert eligibility.should_block_compose(
-        "что думаешь про тик така",
-        in_listen_window=False,
-        should_reply=None,
+        _ctx("что думаешь про тик така", in_listen_window=False, should_reply=None),
     ) is False
 
 
 def test_should_block_compose_blocks_reply_to_other(eligibility: ReplyEligibility):
     assert eligibility.should_block_compose(
-        "ответ другому",
-        reply_to_other_user=True,
-        should_reply=True,
+        _ctx("ответ другому", reply_to_other_user=True, should_reply=True),
     ) is True
 
 
@@ -127,9 +127,7 @@ def test_should_block_compose_blocks_planner_veto_in_listen_window(
     eligibility: ReplyEligibility,
 ):
     assert eligibility.should_block_compose(
-        "втф чё с тобой",
-        in_listen_window=True,
-        should_reply=False,
+        _ctx("втф чё с тобой", in_listen_window=True, should_reply=False),
     ) is True
 
 
@@ -140,25 +138,31 @@ def test_should_block_compose_allows_direct_address_despite_planner_veto(
     # it as "общение между собой" (should_reply=False), but the deterministic
     # intent layer knows the bot was addressed — the veto must not silence it.
     assert eligibility.should_block_compose(
-        "ванесса не тормози я написал",
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса не тормози я написал",
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is False
     assert eligibility.should_block_compose(
-        "ванесса отвечай",
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса отвечай",
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is False
     assert eligibility.should_block_compose(
-        "ванесса, не молчи",
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса, не молчи",
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is False
 
 
@@ -169,11 +173,13 @@ def test_should_block_compose_still_blocks_status_remark_despite_name(
     # работает") is NOT a direct address and stays silent even though the name
     # is present — the veto and the unsolicited-remark filter still hold.
     assert eligibility.should_block_compose(
-        "ванесса работает",
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса работает",
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is True
 
 
@@ -188,25 +194,29 @@ def test_should_block_compose_honors_planner_veto_on_repeated_message(
         ContextMessage(id=2, role="user", content="ванесса не тормози я написал", sender_telegram_id=7),
     ]
     assert eligibility.should_block_compose(
-        "ванесса не тормози я написал",
-        recent_messages=recent,
-        sender_telegram_id=7,
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса не тормози я написал",
+            recent_messages=recent,
+            sender_telegram_id=7,
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is True
     assert eligibility.should_block_compose(
-        "ванесса отвечай",
-        recent_messages=[
-            ContextMessage(id=1, role="user", content="ванесса отвечай", sender_telegram_id=7),
-            ContextMessage(id=2, role="user", content="ванесса отвечай", sender_telegram_id=7),
-        ],
-        sender_telegram_id=7,
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса отвечай",
+            recent_messages=[
+                ContextMessage(id=1, role="user", content="ванесса отвечай", sender_telegram_id=7),
+                ContextMessage(id=2, role="user", content="ванесса отвечай", sender_telegram_id=7),
+            ],
+            sender_telegram_id=7,
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is True
 
 
@@ -220,13 +230,15 @@ def test_should_block_compose_does_not_block_non_repeat_direct_address_with_rece
         ContextMessage(id=1, role="user", content="ванесса не тормози я написал", sender_telegram_id=7),
     ]
     assert eligibility.should_block_compose(
-        "ванесса не тормози я написал",
-        recent_messages=recent,
-        sender_telegram_id=7,
-        mentions_bot=False,
-        reply_to_bot=False,
-        should_reply=False,
-        in_listen_window=False,
+        _ctx(
+            "ванесса не тормози я написал",
+            recent_messages=recent,
+            sender_telegram_id=7,
+            mentions_bot=False,
+            reply_to_bot=False,
+            should_reply=False,
+            in_listen_window=False,
+        ),
     ) is False
 
 

@@ -1,13 +1,17 @@
 import pytest
 
 from vanessa.config.settings import settings
+from vanessa.llm.completers import run_instrumented_completion
 from vanessa.pipeline.llm.providers import (
     ClaudeLLMProvider,
     DeepSeekLLMProvider,
     create_chat_completer,
     create_llm_provider,
 )
-from vanessa.pipeline.llm.providers.protocols import ClaudeChatCompleter, DeepSeekChatCompleter
+from vanessa.pipeline.llm.providers.protocols import (
+    ClaudeChatCompleter,
+    DeepSeekChatCompleter,
+)
 
 
 class _FakeGeneration:
@@ -46,7 +50,7 @@ class _RecordingTracer:
         *,
         name: str,
         model=None,
-        input=None,
+        input=None,  # noqa: A002
         output=None,
         usage=None,
         metadata=None,
@@ -64,12 +68,6 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
     on exit) dropped the planner's output — the final compose request showed
     output in the trace but the planner did not.
     """
-    from vanessa.llm.completers import _InstrumentedCompleterMixin
-
-    class _FakeCompleter(_InstrumentedCompleterMixin):
-        @property
-        def provider(self) -> str:
-            return "fake"
 
     async def call():
         return "planner json output", {
@@ -81,7 +79,8 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
     tracer = _RecordingTracer()
     monkeypatch.setattr("vanessa.llm.completers.get_tracer", lambda: tracer)
 
-    text = await _FakeCompleter()._run_completion(
+    text = await run_instrumented_completion(
+        "fake",
         "deepseek-chat",
         [{"role": "user", "content": "plan it"}],
         "planner",
@@ -100,12 +99,6 @@ async def test_completer_records_generation_output_before_close(monkeypatch) -> 
 async def test_completer_records_reasoning_content(monkeypatch) -> None:
     """The completer (planner) must surface DeepSeek V4's chain of thought on the
     observation so it is debuggable in Langfuse, mirroring the composer provider."""
-    from vanessa.llm.completers import _InstrumentedCompleterMixin
-
-    class _FakeCompleter(_InstrumentedCompleterMixin):
-        @property
-        def provider(self) -> str:
-            return "fake"
 
     async def call():
         return "planner json output", {
@@ -117,7 +110,8 @@ async def test_completer_records_reasoning_content(monkeypatch) -> None:
     tracer = _RecordingTracer()
     monkeypatch.setattr("vanessa.llm.completers.get_tracer", lambda: tracer)
 
-    text = await _FakeCompleter()._run_completion(
+    text = await run_instrumented_completion(
+        "fake",
         "deepseek-chat",
         [{"role": "user", "content": "plan it"}],
         "planner",
@@ -138,7 +132,7 @@ async def test_completer_records_reasoning_content(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    "provider_setting, expected",
+    ("provider_setting", "expected"),
     [
         ("deepseek", DeepSeekLLMProvider),
         ("claude", ClaudeLLMProvider),
@@ -155,7 +149,7 @@ def test_create_llm_provider_selects_backend(
 
 
 @pytest.mark.parametrize(
-    "provider_setting, expected",
+    ("provider_setting", "expected"),
     [
         ("deepseek", DeepSeekChatCompleter),
         ("claude", ClaudeChatCompleter),

@@ -1,5 +1,5 @@
 # Compose Loki + Vector. Omit this file on Docker Desktop Kubernetes
-# (cluster logging stack + LOKI_URL=http://host.docker.internal:3100).
+# (cluster logging stack + LOKI_URL=http://kubernetes.docker.internal:3100).
 services:
   loki:
     image: grafana/loki:3.4.2

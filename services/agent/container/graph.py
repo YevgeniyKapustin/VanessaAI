@@ -3,16 +3,19 @@ from __future__ import annotations
 from services.agent.container.background import BackgroundJobs
 from services.agent.container.broker import BrokerResources
 from services.agent.container.decision import DecisionStack
-from services.agent.container.knowledge import KnowledgeGraph
-from services.agent.container.memes import MemeStack
 from services.agent.container.metrics import Metrics
-from services.agent.container.retrieval import RetrievalStack
+from services.agent.container.retrieval import (
+    KnowledgeGraph,
+    MemeStack,
+    RetrievalStack,
+)
 from services.agent.container.role import ProcessRole
 
 
 class ProcessGraph:
     def __init__(
         self,
+        *,
         decision: DecisionStack | None = None,
         retrieval: RetrievalStack | None = None,
         memes: MemeStack | None = None,

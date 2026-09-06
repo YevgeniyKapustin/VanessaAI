@@ -14,9 +14,9 @@ class TurnPlan:
     deep_search: bool = False
     knowledge_indexes: tuple[str, ...] = ()
     knowledge_query: str = ""
-    # True when the user asks a concrete fact about a person ("во что играет
-    # Крабер?") -> the compose prompt injects the raw dossier; False (default)
-    # injects only the compact LLM portrait as background context.
+    # True when the user asks a concrete fact about a person (what they play,
+    # where they work) -> the compose prompt injects the raw dossier; False
+    # (default) injects only the compact LLM portrait as background context.
     knowledge_detail: bool = False
     # Live web search (the "googling" skill): when true, the Retrieve stage
     # runs a search API with ``web_query`` and injects the results into the
@@ -35,11 +35,11 @@ class TurnPlan:
     # (planner skip=true means stay silent; the parser forces should_reply=false).
     reason: str = ""
     # Loop-repetition signal: the SAME sender keeps asking about the SAME TOPIC
-    # in the recent context (different phrasings, same meaning — a loop «по
-    # кругу»). ``repeated_topic`` is the boolean verdict; ``loop_level`` 0..3 is
-    # how deep the loop is (1 = re-asked once, 2 = several times, 3 = stuck in a
-    # constant loop). Feeds Vanessa's annoyance mechanic: a high loop level drops
-    # her attitude, raises her ignore tendency and turns her replies cold.
+    # in the recent context (different phrasings, same meaning — a loop going
+    # in circles). ``repeated_topic`` is the boolean verdict; ``loop_level`` 0..3
+    # is how deep the loop is (1 = re-asked once, 2 = several times, 3 = stuck
+    # in a constant loop). Feeds Vanessa's annoyance mechanic: a high loop level
+    # drops her attitude, raises her ignore tendency and turns her replies cold.
     repeated_topic: bool = False
     loop_level: int = 0
     # Desired reply length chosen by the planner + the deterministic heuristic:

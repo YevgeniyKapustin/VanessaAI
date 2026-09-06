@@ -108,6 +108,7 @@ class _FakeCompleter:
         self.prompt: str | None = None
 
     async def complete(self, model, messages, **kwargs):
+        _ = model, kwargs
         self.prompt = messages[0]["content"]
         return '{"search_query": "личь сварщик", "skip": false, "humor_ok": false, "humor_query": ""}'
 

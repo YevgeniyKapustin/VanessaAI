@@ -1,3 +1,4 @@
+# Intentional Cyrillic message fixtures — not lookalike Latin.
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -78,8 +79,9 @@ async def test_user_get_or_create_inserts_new_user():
 
     session.flush = AsyncMock(side_effect=flush)
     repo = UserRepository(session)
-    user = await repo.get_or_create(99, first_name="Ann", nickname="A")
-    assert user.telegram_id == 99
+    telegram_id = 99
+    user = await repo.get_or_create(telegram_id, first_name="Ann", nickname="A")
+    assert user.telegram_id == telegram_id
     assert user.nickname == "A"
     session.add.assert_called_once()
 
@@ -103,12 +105,13 @@ async def test_user_upsert_profile_force_nickname():
 async def test_message_create_assigns_id_and_updates_fts():
     session = AsyncMock()
     session.execute = AsyncMock()
+    assigned_id = 10
 
     async def flush() -> None:
         for call in session.add.call_args_list:
             message = call.args[0]
             if isinstance(message, Message):
-                message.id = 10
+                message.id = assigned_id
 
     session.flush = AsyncMock(side_effect=flush)
     repo = MessageRepository(session)
@@ -117,7 +120,7 @@ async def test_message_create_assigns_id_and_updates_fts():
         content="привет",
         sender_telegram_id=1,
     )
-    assert stored.id == 10
+    assert stored.id == assigned_id
     assert session.execute.await_count == 1
 
 
@@ -125,12 +128,15 @@ async def test_message_create_assigns_id_and_updates_fts():
 async def test_message_create_persists_reply_context():
     session = AsyncMock()
     session.execute = AsyncMock()
+    assigned_id = 11
+    reply_message_id = 555
+    reply_sender_id = 99
 
     async def flush() -> None:
         for call in session.add.call_args_list:
             message = call.args[0]
             if isinstance(message, Message):
-                message.id = 11
+                message.id = assigned_id
 
     session.flush = AsyncMock(side_effect=flush)
     repo = MessageRepository(session)
@@ -138,17 +144,17 @@ async def test_message_create_persists_reply_context():
         role=RAG_SOURCE_ROLE,
         content="а я про то и говорю",
         sender_telegram_id=1,
-        reply_to_message_id=555,
+        reply_to_message_id=reply_message_id,
         reply_to_text="Личь не делает карты",
-        reply_to_sender_telegram_id=99,
+        reply_to_sender_telegram_id=reply_sender_id,
         reply_to_sender_name="Личь",
     )
-    assert stored.id == 11
+    assert stored.id == assigned_id
     added = session.add.call_args.args[0]
     assert isinstance(added, Message)
-    assert added.reply_to_message_id == 555
+    assert added.reply_to_message_id == reply_message_id
     assert added.reply_to_text == "Личь не делает карты"
-    assert added.reply_to_sender_telegram_id == 99
+    assert added.reply_to_sender_telegram_id == reply_sender_id
     assert added.reply_to_sender_name == "Личь"
     assert stored.reply_to_text == "Личь не делает карты"
     assert stored.reply_to_sender_name == "Личь"
@@ -206,9 +212,10 @@ async def test_user_upsert_profile_creates_new():
 
     session.flush = AsyncMock(side_effect=flush)
     repo = UserRepository(session)
-    user, change = await repo.upsert_profile(7, username="u")
+    telegram_id = 7
+    user, change = await repo.upsert_profile(telegram_id, username="u")
     assert change == "created"
-    assert user.telegram_id == 7
+    assert user.telegram_id == telegram_id
 
 
 @pytest.mark.asyncio
@@ -252,12 +259,13 @@ async def test_message_get_existing_ids():
 @pytest.mark.asyncio
 async def test_message_get_by_id():
     session = AsyncMock()
-    message = Message(id=5, role="user", content="x")
+    message_id = 5
+    message = Message(id=message_id, role="user", content="x")
     session.execute = AsyncMock(return_value=_scalar_result(message))
     repo = MessageRepository(session)
-    stored = await repo.get_by_id(5)
+    stored = await repo.get_by_id(message_id)
     assert stored is not None
-    assert stored.id == 5
+    assert stored.id == message_id
 
 
 @pytest.mark.asyncio
@@ -437,14 +445,15 @@ async def test_conversation_window_blocks_respects_max_total():
         ]
 
     repo._window_for_anchor = AsyncMock(side_effect=fake_window)
+    max_total = 4
     blocks = await repo.get_conversation_window_blocks(
         [1, 2, 3],
         before=2,
         after=2,
-        max_total=4,
+        max_total=max_total,
     )
     assert len(blocks) == 1
-    assert len(blocks[0][1]) == 4
+    assert len(blocks[0][1]) == max_total
 
 
 @pytest.mark.asyncio

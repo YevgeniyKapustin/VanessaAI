@@ -11,7 +11,11 @@ from __future__ import annotations
 from vanessa.config.settings import settings
 from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext
-from vanessa.pipeline.decision.models import DecisionAction, DecisionReason, DecisionResult
+from vanessa.pipeline.decision.models import (
+    DecisionAction,
+    DecisionReason,
+    DecisionResult,
+)
 
 
 def should_ignore_for_toxicity(
@@ -61,6 +65,33 @@ def is_low_attitude(
     return trust <= trust_threshold and sympathy <= sympathy_threshold
 
 
+def _owner_exempt(context: DecisionContext) -> bool:
+    owner = settings.required_user_telegram_id
+    return bool(owner and context.sender_telegram_id == owner)
+
+
+def _low_attitude_essential(context: DecisionContext) -> bool:
+    if context.in_listen_window:
+        return True
+    if context.addressed_with_expectation:
+        return True
+    return context.should_reply is True
+
+
+def _skip_low_attitude(context: DecisionContext) -> bool:
+    if _owner_exempt(context):
+        return True
+    if not is_low_attitude(
+        annoyance=context.annoyance,
+        sender_metrics=context.sender_metrics,
+        annoyance_threshold=settings.decision_annoyance_ignore_threshold,
+        trust_threshold=settings.decision_low_attitude_trust_threshold,
+        sympathy_threshold=settings.decision_low_attitude_sympathy_threshold,
+    ):
+        return True
+    return _low_attitude_essential(context)
+
+
 class LowAttitudeRule:
     """Maximal ignore tendency for a sender Vanessa's attitude to has collapsed.
 
@@ -72,30 +103,12 @@ class LowAttitudeRule:
     note turns the tone unkind).
     """
 
-    @property
-    def needs_relevance(self) -> bool:
-        return False
+    needs_relevance = False
 
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not settings.decision_low_attitude_rule_enabled:
             return None
-        owner = settings.required_user_telegram_id
-        if owner and context.sender_telegram_id == owner:
-            return None
-        if not is_low_attitude(
-            annoyance=context.annoyance,
-            sender_metrics=context.sender_metrics,
-            annoyance_threshold=settings.decision_annoyance_ignore_threshold,
-            trust_threshold=settings.decision_low_attitude_trust_threshold,
-            sympathy_threshold=settings.decision_low_attitude_sympathy_threshold,
-        ):
-            return None
-        # Essential cases are still answered (coldly), not ignored.
-        if context.in_listen_window:
-            return None
-        if context.addressed_with_expectation:
-            return None
-        if context.should_reply is True:
+        if _skip_low_attitude(context):
             return None
         return DecisionResult(
             action=DecisionAction.IGNORE,
@@ -107,39 +120,54 @@ class LowAttitudeRule:
         )
 
 
+def _metrics_address_guard(context: DecisionContext) -> bool:
+    if context.directly_addressed:
+        return True
+    if context.addressed_with_expectation:
+        return True
+    return context.intent.mentions_bot
+
+
+def _metrics_reply_guard(context: DecisionContext) -> bool:
+    if context.trigger.detected:
+        return True
+    if context.in_listen_window:
+        return True
+    return context.should_reply is True
+
+
+def _metrics_guarded(context: DecisionContext) -> bool:
+    if _metrics_address_guard(context):
+        return True
+    return _metrics_reply_guard(context)
+
+
+def _toxic_ignore_result(context: DecisionContext) -> DecisionResult | None:
+    metrics = context.sender_metrics
+    if metrics is None:
+        return None
+    if _metrics_guarded(context):
+        return None
+    if not should_ignore_for_toxicity(
+        metrics,
+        sender_telegram_id=context.sender_telegram_id,
+        owner_telegram_id=settings.required_user_telegram_id,
+    ):
+        return None
+    return DecisionResult(
+        action=DecisionAction.IGNORE,
+        reason=DecisionReason.TOXIC,
+        relevance_score=context.relevance_score,
+        intent_detected=context.intent.detected,
+        trigger_detected=context.trigger.detected,
+        session_active=context.session_active,
+    )
+
+
 class SenderMetricsRule:
-    @property
-    def needs_relevance(self) -> bool:
-        return False
+    needs_relevance = False
 
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not settings.decision_metrics_rule_enabled:
             return None
-        metrics = context.sender_metrics
-        if metrics is None:
-            return None
-        # Guards: never suppress direct/expected replies, triggers, or the owner.
-        if context.directly_addressed or context.addressed_with_expectation:
-            return None
-        if context.intent.mentions_bot:
-            return None
-        if context.trigger.detected:
-            return None
-        if context.in_listen_window:
-            return None
-        if context.should_reply is True:
-            return None
-        if should_ignore_for_toxicity(
-            metrics,
-            sender_telegram_id=context.sender_telegram_id,
-            owner_telegram_id=settings.required_user_telegram_id,
-        ):
-            return DecisionResult(
-                action=DecisionAction.IGNORE,
-                reason=DecisionReason.TOXIC,
-                relevance_score=context.relevance_score,
-                intent_detected=context.intent.detected,
-                trigger_detected=context.trigger.detected,
-                session_active=context.session_active,
-            )
-        return None
+        return _toxic_ignore_result(context)

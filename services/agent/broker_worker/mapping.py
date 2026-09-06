@@ -1,9 +1,10 @@
+from vanessa.contracts.messages import TurnRequest
 from vanessa.core.messages import ImageAttachment
 from vanessa.core.turn import ChatTurnInput
 
 
 class TurnMapper:
-    def to_turn(self, source) -> ChatTurnInput:
+    def to_turn(self, source: TurnRequest) -> ChatTurnInput:
         return ChatTurnInput(
             telegram_chat_id=source.telegram_chat_id,
             message=source.message,

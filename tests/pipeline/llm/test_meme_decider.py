@@ -23,7 +23,8 @@ def test_first_reply_may_offer_a_meme():
 
 
 def test_cooldown_blocks_until_enough_replies():
-    decider = _decider(min_messages_between=10)
+    min_messages_between = 10
+    decider = _decider(min_messages_between=min_messages_between)
     assert decider.decide(1) is True
 
     # after a meme the counter resets; 5 replies is not enough yet
@@ -35,7 +36,7 @@ def test_cooldown_blocks_until_enough_replies():
     # after 10 replies since the meme it is allowed again
     for _ in range(5):
         decider.register_reply(1)
-    assert decider.messages_since_meme(1) == 10
+    assert decider.messages_since_meme(1) == min_messages_between
     assert decider.decide(1) is True
 
 
@@ -62,7 +63,8 @@ def test_counter_is_per_chat():
 
 
 def test_counter_starts_eligible():
-    decider = _decider(min_messages_between=10)
-    assert decider.messages_since_meme(1) == 10
+    min_messages_between = 10
+    decider = _decider(min_messages_between=min_messages_between)
+    assert decider.messages_since_meme(1) == min_messages_between
     decider.register_reply(1)
-    assert decider.messages_since_meme(1) == 11
+    assert decider.messages_since_meme(1) == min_messages_between + 1

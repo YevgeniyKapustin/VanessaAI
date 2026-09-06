@@ -5,9 +5,11 @@ from vanessa.core.session.chat_session_state import ChatSessionState
 from vanessa.core.turn import ChatTurnInput
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision import IntentDetector, NoiseFilter, TriggerKeywordChecker
-from vanessa.pipeline.decision.gate.prefilter import PlannerPrefilter
-from vanessa.pipeline.decision.gate.reply_eligibility import ReplyEligibility
-from vanessa.pipeline.decision.gate.user_ignore import ChatIgnoreRegistry
+from vanessa.pipeline.decision.gate.eligibility.prefilter import PlannerPrefilter
+from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
+    ReplyEligibility,
+)
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.rag.query_rewriter import QueryRewriter
@@ -17,7 +19,7 @@ from vanessa.pipeline.turn_metrics import TurnMetrics
 
 class FakeMessageRepo:
     async def create(self, **kwargs: object):
-        return None
+        _ = kwargs
 
 
 class FakeIndexing:
@@ -30,6 +32,7 @@ class FakeIndexing:
 
 class NoDecision:
     async def decide(self, *args: object, **kwargs: object):
+        _ = args, kwargs
         raise AssertionError("decision should not run")
 
 

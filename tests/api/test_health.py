@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from unittest.mock import MagicMock
 from urllib.error import HTTPError
 from urllib.request import urlopen
@@ -14,7 +15,7 @@ def test_health_and_live_ok() -> None:
         host, port = server.server_address
         for path in ("/health", "/health/live", "/health/ready"):
             with urlopen(f"http://{host}:{port}{path}", timeout=2) as response:
-                assert response.status == 200
+                assert response.status == HTTPStatus.OK
                 assert response.read() == b"ok\n"
     finally:
         server.shutdown()
@@ -29,9 +30,9 @@ def test_readiness_unavailable_when_check_fails() -> None:
         host, port = server.server_address
         with pytest.raises(HTTPError) as caught:
             urlopen(f"http://{host}:{port}/health/ready", timeout=2)
-        assert caught.value.code == 503
+        assert caught.value.code == HTTPStatus.SERVICE_UNAVAILABLE
         with urlopen(f"http://{host}:{port}/health", timeout=2) as response:
-            assert response.status == 200
+            assert response.status == HTTPStatus.OK
     finally:
         server.shutdown()
         server.server_close()

@@ -6,6 +6,7 @@ from typing import Any
 
 from vanessa.config.content import AppContent
 
+# Cyrillic ranges are intentional (Russian tokens).
 _WORD_CHARS = r"a-zA-Zа-яёА-ЯЁ0-9_"
 _TOKEN_PATTERN = re.compile(
     rf"(?<![{_WORD_CHARS}])([а-яё]+(?:-[а-яё]+)?)(?![{_WORD_CHARS}])",
@@ -50,13 +51,24 @@ _INFLECTION_GRAMMEMES = frozenset(
 
 @lru_cache(maxsize=1)
 def _get_morph() -> Any:
-    from pymorphy3 import MorphAnalyzer
+    from pymorphy3 import MorphAnalyzer  # noqa: PLC0415 - lazy-load MorphAnalyzer
 
     return MorphAnalyzer()
 
 
 def _normalize_key(word: str) -> str:
     return word.replace("ё", "е").lower()
+
+
+def _inflect_with(morph: Any, target_lemma: str, grammemes: set[str]) -> str | None:
+    if not grammemes:
+        return None
+    frozen = frozenset(grammemes)
+    for target_parse in morph.parse(target_lemma):
+        inflected = target_parse.inflect(frozen)
+        if inflected is not None:
+            return inflected.word
+    return None
 
 
 class ProfanitySubstitutor:
@@ -114,18 +126,14 @@ class ProfanitySubstitutor:
     def _inflect_target(self, source_parse: Any, target_lemma: str) -> str:
         morph = _get_morph()
         grammemes = self._extract_grammemes(source_parse.tag)
-        grammeme_sets = (
-            grammemes,
-            grammemes - _GENDER_GRAMMEMES,
+        inflected = _inflect_with(morph, target_lemma, grammemes)
+        if inflected is not None:
+            return inflected
+        inflected = _inflect_with(
+            morph, target_lemma, grammemes - _GENDER_GRAMMEMES
         )
-        for grammeme_set in grammeme_sets:
-            if not grammeme_set:
-                continue
-            frozen = frozenset(grammeme_set)
-            for target_parse in morph.parse(target_lemma):
-                inflected = target_parse.inflect(frozen)
-                if inflected is not None:
-                    return inflected.word
+        if inflected is not None:
+            return inflected
         return target_lemma
 
     def _lookup_target_lemma(self, source_parse: Any) -> str | None:

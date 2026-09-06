@@ -3,7 +3,7 @@ import pytest
 from vanessa.knowledge.format import PEOPLE
 from vanessa.knowledge.index import KnowledgeIndex
 from vanessa.knowledge.retriever import KnowledgeRetriever
-from vanessa.knowledge.vault import KnowledgeVault
+from vanessa.knowledge.store.vault import KnowledgeVault
 
 
 class FakeEmbeddings:
@@ -23,6 +23,7 @@ class FakeStore:
         self.hits = hits
 
     async def search(self, vector: list[float], limit: int = 30) -> list[dict]:
+        _ = vector
         return self.hits[:limit]
 
 
@@ -348,7 +349,8 @@ async def test_fetch_semantic_people_detail_returns_top_chunks(tmp_path):
         people_detail=True,
     )
 
-    assert len(blocks) == 5
+    expected_chunks = 5
+    assert len(blocks) == expected_chunks
     contents = [block.content for block in blocks]
     assert any("долларов" in content for content in contents)
     # Chunk blocks keep a fragment label and a chunk index for dedup.

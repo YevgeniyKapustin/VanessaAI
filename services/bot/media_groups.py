@@ -82,29 +82,44 @@ class MediaGroupBuffer:
         flushed immediately instead of waiting out the debounce.
         """
         key = (chat_id, media_group_id)
-        flush_now = False
+        entry = await self._buffer_locked(
+            key, message, images, on_flush
+        )
+        if len(entry.images) >= self._max_photos:
+            await self._flush(key, expected=entry)
+        return True
+
+    async def _buffer_locked(
+        self,
+        key: tuple[int, str],
+        message: TelegramMessage,
+        images: list[ImageAttachment],
+        on_flush: MediaGroupFlushCallback,
+    ) -> MediaGroupEntry:
         async with self._lock:
             entry = self._groups.get(key)
             if entry is None:
                 entry = MediaGroupEntry(
-                    chat_id=chat_id,
-                    media_group_id=media_group_id,
+                    chat_id=key[0],
+                    media_group_id=key[1],
                     on_flush=on_flush,
                 )
                 self._groups[key] = entry
             entry.images.extend(images)
             entry.messages.append(message)
-            # Every arrival restarts the timer so the flush waits for the last
-            # photo of the group, not for the first.
-            if entry.task is not None:
-                entry.task.cancel()
-            if len(entry.images) >= self._max_photos:
-                flush_now = True
-            else:
-                entry.task = asyncio.create_task(self._timer(key, entry))
-        if flush_now:
-            await self._flush(key, expected=entry)
-        return True
+            self._restart_timer(key, entry)
+            return entry
+
+    def _restart_timer(
+        self, key: tuple[int, str], entry: MediaGroupEntry
+    ) -> None:
+        # Every arrival restarts the timer so the flush waits for the last
+        # photo of the group, not for the first.
+        if entry.task is not None:
+            entry.task.cancel()
+        if len(entry.images) >= self._max_photos:
+            return
+        entry.task = asyncio.create_task(self._timer(key, entry))
 
     async def _timer(self, key: tuple[int, str], entry: MediaGroupEntry) -> None:
         try:
@@ -120,25 +135,43 @@ class MediaGroupBuffer:
         *,
         expected: MediaGroupEntry | None = None,
     ) -> None:
+        entry = await self._take_entry(key, expected=expected)
+        if entry is None:
+            return
+        await self._run_flush(entry)
+
+    async def _take_entry(
+        self,
+        key: tuple[int, str],
+        *,
+        expected: MediaGroupEntry | None,
+    ) -> MediaGroupEntry | None:
         async with self._lock:
             entry = self._groups.get(key)
             if entry is None:
-                return
+                return None
             if expected is not None and entry is not expected:
                 # A newer group replaced this one; its own timer handles it.
-                return
+                return None
             self._groups.pop(key, None)
             # Cancel a still-pending debounce timer (e.g. a cap flush while the
             # timer is still sleeping). When this flush IS the timer task, do
             # NOT cancel it — cancelling the current task would interrupt the
             # ``on_flush`` below and silently drop the whole album (no turn is
             # ever created, nothing reaches the pipeline / Langfuse).
-            if (
-                entry.task is not None
-                and entry.task is not asyncio.current_task()
-                and not entry.task.done()
-            ):
-                entry.task.cancel()
+            self._cancel_debounce(entry)
+            return entry
+
+    def _cancel_debounce(self, entry: MediaGroupEntry) -> None:
+        if entry.task is None:
+            return
+        if entry.task is asyncio.current_task():
+            return
+        if entry.task.done():
+            return
+        entry.task.cancel()
+
+    async def _run_flush(self, entry: MediaGroupEntry) -> None:
         if entry.on_flush is None:
             return
         try:

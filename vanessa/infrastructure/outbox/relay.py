@@ -61,6 +61,19 @@ class OutboxRelay:
             await session.commit()
         return published
 
+    async def _flush_logged(self) -> None:
+        published = await self.flush_once()
+        if published:
+            logger.info("outbox_relay_published count=%s", published)
+
+    async def _poll_once(self) -> None:
+        try:
+            await self._flush_logged()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("outbox_relay_flush_failed")
+
     async def run_forever(self) -> None:
         """Poll and publish pending events until cancelled."""
         logger.info(
@@ -69,12 +82,5 @@ class OutboxRelay:
             self._batch_size,
         )
         while True:
-            try:
-                published = await self.flush_once()
-                if published:
-                    logger.info("outbox_relay_published count=%s", published)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("outbox_relay_flush_failed")
+            await self._poll_once()
             await asyncio.sleep(self._poll_seconds)

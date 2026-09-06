@@ -1,7 +1,11 @@
 import pytest
 
+from vanessa.config.content import get_content
 from vanessa.core.messages import ContextMessage
-from vanessa.pipeline.decision.gate.reaction_gate import ReactionGate
+from vanessa.pipeline.decision.gate.reaction.reaction_gate import (
+    DEFAULT_REACTION_GATE_PROMPT,
+    ReactionGate,
+)
 
 TEST_PROMPT = (
     "Message: {message}\n"
@@ -393,14 +397,15 @@ async def test_error_fails_open_to_respond():
 @pytest.mark.asyncio
 async def test_uses_fast_model_and_tiny_max_tokens_budget():
     completer = FakeCompleter("NO")
-    gate = _gate(completer, model="deepseek-chat", max_tokens=5)
+    max_tokens = 5
+    gate = _gate(completer, model="deepseek-chat", max_tokens=max_tokens)
 
     await gate.evaluate("я думаю ванесса с этим справится", _recent())
 
     model, _messages, kind, kwargs = completer.calls[0]
     assert model == "deepseek-chat"
     assert kind == "reaction_gate"
-    assert kwargs["max_tokens"] == 5
+    assert kwargs["max_tokens"] == max_tokens
     assert kwargs["temperature"] == 0.0
 
 
@@ -440,7 +445,6 @@ async def test_tier1_direct_address_with_imperative_is_yes_without_llm():
 
 
 def test_configured_prompt_teaches_imperative_is_direct_address():
-    from vanessa.config.content import get_content
 
     prompt = get_content().decision.reaction_gate_prompt
     assert "ванесса, не тормози, я написал" in prompt
@@ -449,7 +453,6 @@ def test_configured_prompt_teaches_imperative_is_direct_address():
 
 
 def test_default_prompt_teaches_imperative_is_direct_address():
-    from vanessa.pipeline.decision.gate.reaction_gate import DEFAULT_REACTION_GATE_PROMPT
 
     assert "ванесса, не тормози, я написал" in DEFAULT_REACTION_GATE_PROMPT
     assert "Общение между собой" in DEFAULT_REACTION_GATE_PROMPT

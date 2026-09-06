@@ -2,7 +2,10 @@ import pytest
 
 from vanessa.core.messages import ContextBlock, ContextMessage
 from vanessa.pipeline.decision.turn_plan import TurnPlan
-from vanessa.pipeline.rag.search.react_retriever import derive_follow_up_query, retrieve_with_react
+from vanessa.pipeline.rag.search.react_retriever import (
+    derive_follow_up_query,
+    retrieve_with_react,
+)
 
 
 class FakeRetriever:
@@ -11,6 +14,7 @@ class FakeRetriever:
         self.calls = 0
 
     async def search(self, **kwargs) -> list[ContextBlock]:
+        _ = kwargs
         self.calls += 1
         if not self._results:
             return []
@@ -49,8 +53,10 @@ async def test_retrieve_with_react_multi_step_when_deep():
 
     blocks = await retrieve_with_react(retriever, plan.original, plan, max_steps=3)
 
-    assert len(blocks) == 2
-    assert retriever.calls >= 2
+    expected_blocks = 2
+    expected_calls = 2
+    assert len(blocks) == expected_blocks
+    assert retriever.calls >= expected_calls
 
 
 def test_derive_follow_up_returns_unused_token():

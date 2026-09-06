@@ -15,12 +15,12 @@ import asyncio
 import sys
 from pathlib import Path
 
+from vanessa.knowledge.index import KnowledgeIndex
+from vanessa.knowledge.store.vault import KnowledgeVault
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-from vanessa.knowledge.index import KnowledgeIndex
-from vanessa.knowledge.vault import KnowledgeVault
 
 
 async def main() -> int:

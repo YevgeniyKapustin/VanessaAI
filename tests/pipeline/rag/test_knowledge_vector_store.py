@@ -80,8 +80,9 @@ async def test_upsert_note_chunks_returns_distinct_point_ids():
         [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
     )
 
-    assert len(ids) == 2
-    assert len(set(ids)) == 2
+    expected_ids = 2
+    assert len(ids) == expected_ids
+    assert len(set(ids)) == expected_ids
     assert all(_is_uuid(pid) for pid in ids)
     assert ids[0] == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 0)
     assert ids[1] == KnowledgeQdrantStore.chunk_point_id("People/личь.md", 1)

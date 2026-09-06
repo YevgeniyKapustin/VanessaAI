@@ -1,8 +1,8 @@
 
 from vanessa.core.messages import ContextMessage
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
-from vanessa.pipeline.decision.gate.bot_names import text_mentions_bot_name
-from vanessa.pipeline.decision.gate.user_ignore import (
+from vanessa.pipeline.decision.gate.addressing.bot_names import text_mentions_bot_name
+from vanessa.pipeline.decision.gate.eligibility.user_ignore import (
     ChatIgnoreRegistry,
     apply_owner_ignore_command,
     is_ignore_user_command,
@@ -32,13 +32,14 @@ def test_ignore_registry_tracks_users():
 
 
 def test_resolve_ignore_target_from_reply():
+    reply_sender_id = 99
     target = resolve_ignore_target(
         "игнорируй его",
         [],
-        reply_to_sender_id=99,
+        reply_to_sender_id=reply_sender_id,
         owner_id=1,
     )
-    assert target == 99
+    assert target == reply_sender_id
 
 
 def test_apply_owner_ignore_command_registers_target():

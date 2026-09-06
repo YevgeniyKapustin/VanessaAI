@@ -11,22 +11,26 @@ Writes are fail-open and serialized through the vault's shared asyncio lock.
 
 from __future__ import annotations
 
-import logging
-from dataclasses import replace
-
 from vanessa.knowledge.format import (
     PEOPLE,
     TYPE_PERSON,
-    slugify,
     today,
 )
-from vanessa.knowledge.index import KnowledgeIndex
+from vanessa.knowledge.index.index import KnowledgeIndex
 from vanessa.knowledge.metrics.schema import MetricsSnapshot, PersonMetrics
-from vanessa.knowledge.people import canonical_name_for_telegram_id, canonicalize_person
+from vanessa.knowledge.metrics.store_resolve import (
+    fallback_person_id,
+    id_from_telegram_index,
+    valid_telegram_id,
+)
+from vanessa.knowledge.metrics.store_write import (
+    log_snapshot_stored,
+    snapshot_paths,
+    zero_if_new,
+)
+from vanessa.knowledge.people.people import canonicalize_person
 from vanessa.knowledge.schema import VaultNote
-from vanessa.knowledge.vault import KnowledgeVault
-
-logger = logging.getLogger(__name__)
+from vanessa.knowledge.store.vault import KnowledgeVault
 
 
 class MetricsStore:
@@ -47,28 +51,11 @@ class MetricsStore:
             return None
         rel = f"{PEOPLE}/{person_id}.md"
         note = await self._vault.read_note(rel)
-        if note is None:
-            # Brand-new participant: start from a zero baseline so every chat
-            # member has metrics from their very first message. Vanessa may then
-            # move values off zero through the semantic metrics planner.
-            snapshot = replace(
-                snapshot,
-                metrics=PersonMetrics.zero().merged(snapshot.metrics),
-            )
-        paths: list[str] = []
+        snapshot = zero_if_new(snapshot, note)
         card, created_card = await self._store_card_snapshot(
             person_id, snapshot, note
         )
-        if card:
-            paths.append(card)
-            if created_card:
-                paths.append(f"{PEOPLE}/_index.yaml")
-        if paths:
-            logger.info(
-                "metrics_snapshot_stored person=%s paths=%s",
-                person_id,
-                len(paths),
-            )
+        log_snapshot_stored(person_id, snapshot_paths(card, created_card=created_card))
         return card
 
     async def _resolve_person(self, snapshot: MetricsSnapshot) -> str:
@@ -152,25 +139,10 @@ class MetricsStore:
         fallback. The fallback guarantees even a brand-new participant resolves
         to a card that will hold their zero-baseline metrics after one message.
         """
-        if telegram_id is None or telegram_id <= 0:
+        if not valid_telegram_id(telegram_id):
             return ""
         people_index = await self._index.load_folder(PEOPLE)
-        entry = people_index.get("telegram_id", {}).get(str(telegram_id))
-        if isinstance(entry, dict):
-            person_id = entry.get("id")
-            if person_id:
-                return str(person_id)
-        nickname = canonical_name_for_telegram_id(telegram_id)
-        if nickname:
-            return slugify(nickname)
-        if name and name.strip():
-            # Reuse a dossier the memory stage may already have created under
-            # this display name (instead of duplicating it).
-            alias_map = people_index.get("aliases")
-            if isinstance(alias_map, dict):
-                entry = alias_map.get(name.strip().lower())
-                if isinstance(entry, dict):
-                    person_id = entry.get("id")
-                    if person_id:
-                        return str(person_id)
-        return f"user-{telegram_id}"
+        person_id = id_from_telegram_index(people_index, telegram_id)
+        if person_id:
+            return person_id
+        return fallback_person_id(people_index, telegram_id, name)

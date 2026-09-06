@@ -3,6 +3,7 @@ import logging
 import sys
 from pathlib import Path
 
+from vanessa.config import settings
 from vanessa.core import logging_setup
 from vanessa.core.logging_setup import (
     JsonFormatter,
@@ -91,7 +92,7 @@ def test_loguru_formatter_includes_exception_traceback():
         raise ValueError("boom")
     except ValueError:
         record = logging.LogRecord(
-            name="vanessa.knowledge.writer",
+            name="vanessa.knowledge.memory.writer",
             level=logging.ERROR,
             pathname=__file__,
             lineno=143,
@@ -186,7 +187,8 @@ def test_json_formatter_includes_extra_fields() -> None:
     record.node_id = "People/андрей-матов.md"
     record.node_type = "person"
     record.mutation_source = "post_reply_extract"
-    record.duration_ms = 42.5
+    duration_ms = 42.5
+    record.duration_ms = duration_ms
 
     payload = json.loads(formatter.format(record))
 
@@ -194,7 +196,7 @@ def test_json_formatter_includes_extra_fields() -> None:
     assert payload["node_id"] == "People/андрей-матов.md"
     assert payload["node_type"] == "person"
     assert payload["mutation_source"] == "post_reply_extract"
-    assert payload["duration_ms"] == 42.5
+    assert payload["duration_ms"] == duration_ms
     assert payload["request_id"] == "req_9f83b1a"
 
 
@@ -225,8 +227,6 @@ def test_json_formatter_includes_exception() -> None:
 def test_configure_logging_json_to_stdout(monkeypatch, capsys) -> None:
     logging_setup._configured_service_name = None
     logging.getLogger().handlers.clear()
-    from vanessa.config import settings
-
     monkeypatch.setattr(settings, "log_json", True)
     monkeypatch.setattr(settings, "log_file_enabled", False)
     try:

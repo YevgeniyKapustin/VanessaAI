@@ -105,6 +105,79 @@ def test_grafana_has_loki_datasource() -> None:
     assert "url: $LOKI_URL" in text
 
 
+def _datasource_uid(item: dict) -> str | None:
+    ds = item.get("datasource") or {}
+    if not isinstance(ds, dict):
+        return None
+    uid = ds.get("uid")
+    if not uid:
+        return None
+    return str(uid)
+
+
+def _target_datasource_uids(panel: dict) -> list[str]:
+    found: list[str] = []
+    for target in panel.get("targets") or []:
+        uid = _datasource_uid(target)
+        if uid is None:
+            continue
+        found.append(uid)
+    return found
+
+
+def _datasource_uids(panels: list) -> list[str]:
+    found: list[str] = []
+    for panel in panels:
+        uid = _datasource_uid(panel)
+        if uid is not None:
+            found.append(uid)
+        found.extend(_target_datasource_uids(panel))
+        found.extend(_datasource_uids(panel.get("panels") or []))
+    return found
+
+
+def _assert_logs_dashboard_variables(dashboard: dict) -> None:
+    names = [item["name"] for item in dashboard["templating"]["list"]]
+    assert names == ["loki", "service", "level", "search"]
+    search = dashboard["templating"]["list"][3]
+    assert search["type"] == "textbox"
+    assert search["current"]["value"] == ""
+    assert search["query"] == ""
+    level = dashboard["templating"]["list"][2]
+    assert set(level["current"]["value"]) == {"info", "warn", "error", "fatal"}
+    assert "debug" not in level["current"]["value"]
+    assert level["allValue"] == ".+"
+    assert dashboard["templating"]["list"][1]["allValue"] == ".+"
+
+
+def _assert_logs_dashboard_panels(dashboard: dict) -> None:
+    logs_max_lines = 200
+    knowledge_max_lines = 100
+    by_id = {panel["id"]: panel for panel in dashboard["panels"]}
+    assert by_id[2]["type"] == "text"
+    assert by_id[10]["type"] == "row"
+    assert by_id[10]["collapsed"] is False
+    logs = by_id[3]
+    assert logs["targets"][0]["maxLines"] == logs_max_lines
+    expr = logs["targets"][0]["expr"]
+    assert '|= "${search:doublequote}"' in expr
+    assert "| json | drop __error__" in expr
+    assert "|~" not in expr
+    knowledge = by_id[4]
+    assert knowledge["title"] == "Knowledge node updates"
+    assert knowledge["datasource"]["uid"] == "${loki}"
+    assert knowledge["targets"][0]["datasource"]["uid"] == "${loki}"
+    know_expr = knowledge["targets"][0]["expr"]
+    assert "${service:pipe}" in know_expr
+    assert "${level:pipe}" in know_expr
+    assert "| json" in know_expr
+    assert 'event="knowledge_node_updated"' in know_expr
+    logs_pos = logs["gridPos"]
+    know_pos = knowledge["gridPos"]
+    assert know_pos["y"] >= logs_pos["y"] + logs_pos["h"] + 1
+    assert knowledge["targets"][0]["maxLines"] == knowledge_max_lines
+
+
 def test_logs_dashboard_is_portable_and_bounded() -> None:
     dashboard = json.loads(
         Path("grafana/dashboards/logs.json").read_text(encoding="utf-8"),
@@ -122,55 +195,9 @@ def test_logs_dashboard_is_portable_and_bounded() -> None:
     assert "30s" in dashboard["timepicker"]["refresh_intervals"]
     assert "1m" in dashboard["timepicker"]["refresh_intervals"]
     assert dashboard["templating"]["list"][0]["type"] == "datasource"
-    names = [item["name"] for item in dashboard["templating"]["list"]]
-    assert names == ["loki", "service", "level", "search"]
-    search = dashboard["templating"]["list"][3]
-    assert search["type"] == "textbox"
-    assert search["current"]["value"] == ""
-    assert search["query"] == ""
-    level = dashboard["templating"]["list"][2]
-    assert set(level["current"]["value"]) == {"info", "warn", "error", "fatal"}
-    assert "debug" not in level["current"]["value"]
-    assert level["allValue"] == ".+"
-    assert dashboard["templating"]["list"][1]["allValue"] == ".+"
-
-    def datasource_uids(panels: list) -> list[str]:
-        found: list[str] = []
-        for panel in panels:
-            ds = panel.get("datasource") or {}
-            if isinstance(ds, dict) and ds.get("uid"):
-                found.append(str(ds["uid"]))
-            for target in panel.get("targets") or []:
-                tds = target.get("datasource") or {}
-                if isinstance(tds, dict) and tds.get("uid"):
-                    found.append(str(tds["uid"]))
-            found.extend(datasource_uids(panel.get("panels") or []))
-        return found
-
-    assert set(datasource_uids(dashboard["panels"])) == {"${loki}"}
-    by_id = {panel["id"]: panel for panel in dashboard["panels"]}
-    assert by_id[2]["type"] == "text"
-    assert by_id[10]["type"] == "row"
-    assert by_id[10]["collapsed"] is False
-    logs = by_id[3]
-    assert logs["targets"][0]["maxLines"] == 200
-    expr = logs["targets"][0]["expr"]
-    assert '|= "${search:doublequote}"' in expr
-    assert "| json | drop __error__" in expr
-    assert "|~" not in expr
-    knowledge = by_id[4]
-    assert knowledge["title"] == "Knowledge node updates"
-    assert knowledge["datasource"]["uid"] == "${loki}"
-    assert knowledge["targets"][0]["datasource"]["uid"] == "${loki}"
-    know_expr = knowledge["targets"][0]["expr"]
-    assert "${service:pipe}" in know_expr
-    assert "${level:pipe}" in know_expr
-    assert "| json" in know_expr
-    assert 'event="knowledge_node_updated"' in know_expr
-    logs_pos = logs["gridPos"]
-    know_pos = knowledge["gridPos"]
-    assert know_pos["y"] >= logs_pos["y"] + logs_pos["h"] + 1
-    assert knowledge["targets"][0]["maxLines"] == 100
+    _assert_logs_dashboard_variables(dashboard)
+    assert set(_datasource_uids(dashboard["panels"])) == {"${loki}"}
+    _assert_logs_dashboard_panels(dashboard)
 
 
 def test_nginx_latency_uses_prometheus_histogram() -> None:
@@ -186,13 +213,13 @@ def test_nginx_latency_uses_prometheus_histogram() -> None:
     assert "type: log_to_metric" in compose
     assert "type: prometheus_exporter" in compose
     assert 'level: "{{ level }}"' in compose
-    assert "event: \"{{ event }}\"" not in compose.split("sinks:")[1]
+    assert 'event: "{{ event }}"' not in compose.split("sinks:")[1]
     assert "type: log_to_metric" not in cluster
     assert "type: prometheus_exporter" in cluster
     assert "inputs: [internal_metrics]" in cluster
     assert "inputs: [nginx_metrics]" not in cluster
     assert 'level: "{{ level }}"' in cluster
-    assert "event: \"{{ event }}\"" not in cluster.split("sinks:")[1]
+    assert 'event: "{{ event }}"' not in cluster.split("sinks:")[1]
     prometheus = Path("prometheus/prometheus.yml").read_text(encoding="utf-8")
     assert "vector:9598" in prometheus
     assert "agent:8000" in prometheus

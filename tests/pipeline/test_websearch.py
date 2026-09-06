@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 # Imported before ``vanessa.pipeline``: ``app/services/__init__.py`` eagerly pulls
@@ -12,6 +13,7 @@ import vanessa.pipeline.decision  # noqa: F401
 from vanessa.config.settings import settings
 from vanessa.core.messages import WebResult
 from vanessa.core.turn import ChatTurnInput
+from vanessa.infrastructure.observability import metrics as m
 from vanessa.infrastructure.websearch.duckduckgo import DuckDuckGoSearch
 from vanessa.infrastructure.websearch.factory import create_web_search
 from vanessa.infrastructure.websearch.serper import SerperSearch
@@ -48,7 +50,8 @@ async def test_tavily_parses_results_and_forwards_payload():
         }
     )
     service = TavilySearch(api_key="secret", client=client)
-    results = await service.search("bitcoin цена", limit=3)
+    result_limit = 3
+    results = await service.search("bitcoin цена", limit=result_limit)
 
     assert len(results) == 1
     result = results[0]
@@ -59,7 +62,7 @@ async def test_tavily_parses_results_and_forwards_payload():
 
     call = client.post.await_args
     assert call.kwargs["json"]["query"] == "bitcoin цена"
-    assert call.kwargs["json"]["max_results"] == 3
+    assert call.kwargs["json"]["max_results"] == result_limit
     assert call.kwargs["json"]["api_key"] == "secret"
     assert call.kwargs["json"]["search_depth"] == "basic"
 
@@ -140,7 +143,8 @@ async def test_duckduckgo_parses_html_results():
     service = DuckDuckGoSearch(client=client)
     results = await service.search("bitcoin", limit=5)
 
-    assert len(results) == 2
+    expected_results = 2
+    assert len(results) == expected_results
     assert results[0].title == "Bitcoin - Wikipedia"
     assert results[0].url == "https://en.wikipedia.org/wiki/Bitcoin"
     assert results[0].snippet == "Bitcoin is a decentralized digital currency."
@@ -149,7 +153,6 @@ async def test_duckduckgo_parses_html_results():
 
 @pytest.mark.asyncio
 async def test_duckduckgo_fails_open_on_http_error():
-    import httpx
 
     client = AsyncMock()
     response = MagicMock()
@@ -276,7 +279,6 @@ async def test_retrieve_stage_fails_open_on_search_error(monkeypatch):
 
 
 def test_record_web_search_metric_registered():
-    from vanessa.infrastructure.observability import metrics as m
 
     m.record_web_search("found", 12.3)
     m.record_web_search("error", 0.1)

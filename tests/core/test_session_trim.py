@@ -27,7 +27,7 @@ def test_trim_session_keeps_contiguous_block():
 
     trimmed = trim_session_by_idle_gap(messages, max_idle_seconds=300)
 
-    assert len(trimmed) == 3
+    assert len(trimmed) == len(messages)
 
 
 def test_trim_session_drops_messages_after_idle_gap():
@@ -50,7 +50,8 @@ def test_trim_session_drops_messages_after_idle_gap():
 
     trimmed = trim_session_by_idle_gap(messages, max_idle_seconds=300)
 
-    assert len(trimmed) == 2
+    kept = messages[1:]
+    assert len(trimmed) == len(kept)
     assert trimmed[0].content == "reply"
 
 
@@ -71,4 +72,5 @@ def test_seconds_since_last_bot():
         ),
     ]
 
-    assert seconds_since_last_role(messages, "assistant", now=now) == 120.0
+    idle_seconds = 120.0
+    assert seconds_since_last_role(messages, "assistant", now=now) == idle_seconds

@@ -17,6 +17,7 @@ class _Rng:
         return self._value
 
     def choices(self, population, weights=None, *, k=1, cum_weights=None):
+        _ = (weights, k, cum_weights)
         return [population[0]]
 
 
@@ -85,7 +86,7 @@ async def test_send_if_any_sends_sticker():
     message.bot.send_sticker.assert_awaited_once()
     args = message.bot.send_sticker.await_args.args
     kwargs = message.bot.send_sticker.await_args.kwargs
-    assert args[0] == -100123
+    assert args[0] == message.chat.id
     assert args[1] == "f:sarcasm"
     # Stickers are sent bare — no reply to the original message.
     assert "reply_to_message_id" not in kwargs

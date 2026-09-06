@@ -1,6 +1,7 @@
 import pytest
 
 from vanessa.core.messages import ContextMessage
+from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter, NoiseHeuristics
 from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
@@ -107,6 +108,7 @@ class FakeRelevance:
         query_vector: list[float] | None = None,
         search_text: str | None = None,
     ) -> float:
+        _ = text, query_vector, search_text
         self.calls += 1
         return self._score
 
@@ -160,11 +162,13 @@ async def test_decision_engine_replies_in_listen_window_when_planner_affirms(
     ]
 
     result = await engine.decide(
-        text="а про текстуры?",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=True,
-        in_listen_window=True,
+        DecisionContext(
+            text="а про текстуры?",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=True,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -184,11 +188,13 @@ async def test_decision_engine_replies_listen_window_follow_up_without_planner(
     ]
 
     result = await engine.decide(
-        text="втф чё с тобой",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=None,
-        in_listen_window=True,
+        DecisionContext(
+            text="втф чё с тобой",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=None,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -206,11 +212,13 @@ async def test_decision_engine_replies_bot_pronoun_in_listen_window(
     ]
 
     result = await engine.decide(
-        text="Я её уважаю",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=None,
-        in_listen_window=True,
+        DecisionContext(
+            text="Я её уважаю",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=None,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -242,12 +250,14 @@ async def test_decision_engine_replies_partner_continuation_in_listen_window(
     ]
 
     result = await engine.decide(
-        text="ну чет ваще мало",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=False,
-        in_listen_window=True,
-        sender_telegram_id=7,
+        DecisionContext(
+            text="ну чет ваще мало",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=False,
+            in_listen_window=True,
+            sender_telegram_id=7,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -269,11 +279,13 @@ async def test_decision_engine_replies_question_in_listen_window_neutral_planner
     ]
 
     result = await engine.decide(
-        text="а про текстуры?",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=None,
-        in_listen_window=True,
+        DecisionContext(
+            text="а про текстуры?",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=None,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -300,11 +312,13 @@ async def test_decision_engine_replies_out_of_window_question_in_active_session(
     ]
 
     result = await engine.decide(
-        text="хочешь закурить?",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=None,
-        in_listen_window=False,
+        DecisionContext(
+            text="хочешь закурить?",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=None,
+            in_listen_window=False,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -332,11 +346,13 @@ async def test_decision_engine_ignores_side_talk_in_listen_window(
     ]
 
     result = await engine.decide(
-        text="Гриша меш гексы поле боя генерация",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=False,
-        in_listen_window=True,
+        DecisionContext(
+            text="Гриша меш гексы поле боя генерация",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=False,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -360,11 +376,13 @@ async def test_decision_engine_ignores_listen_window_without_planner_affirm(
     ]
 
     result = await engine.decide(
-        text="Гриша меш гексы поле боя генерация",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=False,
-        in_listen_window=True,
+        DecisionContext(
+            text="Гриша меш гексы поле боя генерация",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=False,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -384,11 +402,13 @@ async def test_decision_engine_ignores_status_remark_in_listen_window(
     ]
 
     result = await engine.decide(
-        text="гомункул работает",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=False,
-        in_listen_window=True,
+        DecisionContext(
+            text="гомункул работает",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=False,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -407,11 +427,13 @@ async def test_decision_engine_ignores_third_party_gossip_in_listen_window(
     ]
 
     result = await engine.decide(
-        text="почему она меня игнорирует",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=True,
-        in_listen_window=True,
+        DecisionContext(
+            text="почему она меня игнорирует",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=True,
+            in_listen_window=True,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -425,11 +447,13 @@ async def test_decision_engine_ignores_dismissal_even_when_addressed(
 ):
     engine = build_engine(intent_detector, trigger_checker, 1.0)
     result = await engine.decide(
-        text="ванесса хватит",
-        telegram_chat_id=1,
-        recent_messages=[],
-        mentions_bot=True,
-        should_reply=True,
+        DecisionContext(
+            text="ванесса хватит",
+            telegram_chat_id=1,
+            recent_messages=[],
+            mentions_bot=True,
+            should_reply=True,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -438,9 +462,6 @@ async def test_decision_engine_ignores_dismissal_even_when_addressed(
 
 @pytest.mark.asyncio
 async def test_decision_engine_ignores_side_talk_when_planner_says_no():
-    from vanessa.pipeline.decision.detectors.intent import IntentDetector
-    from vanessa.pipeline.decision.detectors.triggers import TriggerKeywordChecker
-    from vanessa.pipeline.decision.engine import DecisionEngine
 
     engine = DecisionEngine(
         intent_detector=IntentDetector(),
@@ -453,10 +474,12 @@ async def test_decision_engine_ignores_side_talk_when_planner_says_no():
     )
 
     result = await engine.decide(
-        text="что думаешь про тик така",
-        telegram_chat_id=1,
-        recent_messages=[],
-        should_reply=False,
+        DecisionContext(
+            text="что думаешь про тик така",
+            telegram_chat_id=1,
+            recent_messages=[],
+            should_reply=False,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -470,10 +493,12 @@ async def test_decision_engine_replies_when_planner_says_yes_without_mention(
 ):
     engine = build_engine(intent_detector, trigger_checker, 0.1)
     result = await engine.decide(
-        text="модест",
-        telegram_chat_id=1,
-        recent_messages=[],
-        should_reply=True,
+        DecisionContext(
+            text="модест",
+            telegram_chat_id=1,
+            recent_messages=[],
+            should_reply=True,
+        )
     )
     assert result.action == DecisionAction.REPLY
     assert result.reason == DecisionReason.PLANNER
@@ -490,10 +515,12 @@ async def test_decision_engine_replies_direct_address_despite_planner_veto(
     engine = build_engine(intent_detector, trigger_checker, 0.1)
 
     result = await engine.decide(
-        text="ванесса не тормози я написал",
-        telegram_chat_id=1,
-        recent_messages=[],
-        should_reply=False,
+        DecisionContext(
+            text="ванесса не тормози я написал",
+            telegram_chat_id=1,
+            recent_messages=[],
+            should_reply=False,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -508,11 +535,13 @@ async def test_decision_engine_replies_on_reply_to_bot(
     engine = build_engine(intent_detector, trigger_checker, 0.1)
 
     result = await engine.decide(
-        text="да именно",
-        telegram_chat_id=1,
-        recent_messages=[],
-        reply_to_bot=True,
-        should_reply=False,
+        DecisionContext(
+            text="да именно",
+            telegram_chat_id=1,
+            recent_messages=[],
+            reply_to_bot=True,
+            should_reply=False,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -527,9 +556,11 @@ async def test_decision_engine_reply_on_intent(
     engine = build_engine(intent_detector, trigger_checker, 0.1)
 
     result = await engine.decide(
-        text="Vanessa, что нового?",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="Vanessa, что нового?",
+            telegram_chat_id=1,
+            recent_messages=[],
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -544,9 +575,11 @@ async def test_decision_engine_reply_on_trigger(
     engine = build_engine(intent_detector, trigger_checker, 0.1)
 
     result = await engine.decide(
-        text="Помоги с отчётом",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="Помоги с отчётом",
+            telegram_chat_id=1,
+            recent_messages=[],
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -559,7 +592,6 @@ async def test_decision_engine_skips_relevance_for_trigger(
     trigger_checker: TriggerKeywordChecker,
 ):
     relevance = FakeRelevance(0.99)
-    from vanessa.pipeline.decision.engine import DecisionEngine
 
     engine = DecisionEngine(
         intent_detector=intent_detector,
@@ -572,9 +604,11 @@ async def test_decision_engine_skips_relevance_for_trigger(
     )
 
     result = await engine.decide(
-        text="расскажи про крабера",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="расскажи про крабера",
+            telegram_chat_id=1,
+            recent_messages=[],
+        ),
         search_text="крабер",
     )
 
@@ -596,9 +630,11 @@ async def test_decision_engine_reply_on_relevance_with_session(
     ]
 
     result = await engine.decide(
-        text="про токены тоже интересно",
-        telegram_chat_id=1,
-        recent_messages=recent,
+        DecisionContext(
+            text="про токены тоже интересно",
+            telegram_chat_id=1,
+            recent_messages=recent,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -613,9 +649,11 @@ async def test_decision_engine_ignores_irrelevant_small_talk(
     engine = build_engine(intent_detector, trigger_checker, 0.2)
 
     result = await engine.decide(
-        text="ага",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="ага",
+            telegram_chat_id=1,
+            recent_messages=[],
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -629,9 +667,11 @@ async def test_decision_engine_ignores_noise(
     engine = build_engine(intent_detector, trigger_checker, 0.9)
 
     result = await engine.decide(
-        text="ок",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="ок",
+            telegram_chat_id=1,
+            recent_messages=[],
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -646,9 +686,11 @@ async def test_decision_engine_does_not_hard_drop_short_maybe(
     engine = build_engine(intent_detector, trigger_checker, 0.9)
 
     result = await engine.decide(
-        text="го",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="го",
+            telegram_chat_id=1,
+            recent_messages=[],
+        )
     )
 
     # A short but possibly meaningful message ("го") is no longer hard-dropped
@@ -675,11 +717,13 @@ async def test_decision_engine_listen_window_short_maybe_replies_when_planner_af
     ]
 
     result = await engine.decide(
-        text="го",
-        telegram_chat_id=1,
-        recent_messages=recent,
-        should_reply=True,
-        in_listen_window=True,
+        DecisionContext(
+            text="го",
+            telegram_chat_id=1,
+            recent_messages=recent,
+            should_reply=True,
+            in_listen_window=True,
+        )
     )
 
     # In a post-reply listen window a short demand ("го") is not dropped as
@@ -696,9 +740,11 @@ async def test_decision_engine_skips_noise_when_trigger_present(
     engine = build_engine(intent_detector, trigger_checker, 0.1)
 
     result = await engine.decide(
-        text="помоги",
-        telegram_chat_id=1,
-        recent_messages=[],
+        DecisionContext(
+            text="помоги",
+            telegram_chat_id=1,
+            recent_messages=[],
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -716,9 +762,11 @@ async def test_decision_engine_blocks_consecutive_replies(
     ]
 
     result = await engine.decide(
-        text="продолжай мысль",
-        telegram_chat_id=1,
-        recent_messages=recent,
+        DecisionContext(
+            text="продолжай мысль",
+            telegram_chat_id=1,
+            recent_messages=recent,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -742,9 +790,11 @@ async def test_decision_engine_ignores_closure_after_bot_chat(
     ]
 
     result = await engine.decide(
-        text="ну ладно надо будет поработать пойти",
-        telegram_chat_id=1,
-        recent_messages=recent,
+        DecisionContext(
+            text="ну ладно надо будет поработать пойти",
+            telegram_chat_id=1,
+            recent_messages=recent,
+        ),
         search_text="работа",
     )
 
@@ -766,11 +816,13 @@ async def test_decision_engine_ignores_quote_echo_reply_to_bot(
     ]
 
     result = await engine.decide(
-        text=bot_line,
-        telegram_chat_id=1,
-        recent_messages=recent,
-        reply_to_bot=True,
-        should_reply=True,
+        DecisionContext(
+            text=bot_line,
+            telegram_chat_id=1,
+            recent_messages=recent,
+            reply_to_bot=True,
+            should_reply=True,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -785,11 +837,13 @@ async def test_decision_engine_replies_on_bare_mention(
     engine = build_engine(intent_detector, trigger_checker, 0.9)
 
     result = await engine.decide(
-        text="ванесса",
-        telegram_chat_id=1,
-        recent_messages=[],
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса",
+            telegram_chat_id=1,
+            recent_messages=[],
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.REPLY
@@ -804,11 +858,13 @@ async def test_decision_engine_ignores_status_remark_mention(
     engine = build_engine(intent_detector, trigger_checker, 0.9)
 
     result = await engine.decide(
-        text="ванесса работает",
-        telegram_chat_id=1,
-        recent_messages=[],
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса работает",
+            telegram_chat_id=1,
+            recent_messages=[],
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.IGNORE
@@ -822,11 +878,13 @@ async def test_decision_engine_replies_on_mention_with_question(
     engine = build_engine(intent_detector, trigger_checker, 0.1)
 
     result = await engine.decide(
-        text="ванесса, ты тут?",
-        telegram_chat_id=1,
-        recent_messages=[],
-        mentions_bot=True,
-        should_reply=None,
+        DecisionContext(
+            text="ванесса, ты тут?",
+            telegram_chat_id=1,
+            recent_messages=[],
+            mentions_bot=True,
+            should_reply=None,
+        )
     )
 
     assert result.action == DecisionAction.REPLY

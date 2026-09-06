@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from services.agent.container.role import ProcessRole
 from vanessa.config.settings import settings
+from vanessa.infrastructure.broker.dispatcher import BrokerTaskDispatcher
+from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
+from vanessa.infrastructure.broker.streams import BrokerStreams
 
 
 class BrokerResources:
@@ -14,17 +18,11 @@ class BrokerResources:
         self._client = client
         self._dispatcher = dispatcher
         if dispatch_tasks is None:
-            from services.agent.container.role import ProcessRole
-
             dispatch_tasks = ProcessRole.from_settings().dispatches_tasks
         self._dispatch_tasks = dispatch_tasks
 
     def ensure_client(self):
         if self._client is None:
-            from vanessa.infrastructure.broker.redis_streams import (
-                RedisStreamBroker,
-            )
-
             self._client = RedisStreamBroker(
                 settings.broker_redis_url,
                 stream_maxlen=settings.broker_stream_maxlen,
@@ -36,11 +34,6 @@ class BrokerResources:
         if not self._dispatch_tasks:
             return None
         if self._dispatcher is None:
-            from vanessa.infrastructure.broker.dispatcher import (
-                BrokerTaskDispatcher,
-            )
-            from vanessa.infrastructure.broker.streams import BrokerStreams
-
             streams = BrokerStreams.from_settings(settings)
             self._dispatcher = BrokerTaskDispatcher(
                 self.ensure_client(),

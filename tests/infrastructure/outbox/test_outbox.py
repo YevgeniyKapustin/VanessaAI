@@ -47,8 +47,9 @@ async def test_mark_failed_retries_then_fails() -> None:
     event = OutboxEvent(id=1, attempts=4, status="pending")
     session.get = AsyncMock(return_value=event)
     repo = OutboxRepository(session)
-    await repo.mark_failed(1, "boom", max_attempts=5)
-    assert event.attempts == 5
+    max_attempts = 5
+    await repo.mark_failed(1, "boom", max_attempts=max_attempts)
+    assert event.attempts == max_attempts
     assert event.status == "failed"
     assert event.last_error == "boom"
 
@@ -66,10 +67,11 @@ async def test_mark_failed_keeps_pending_below_cap() -> None:
 async def test_count_pending() -> None:
     session = AsyncMock()
     result = MagicMock()
-    result.scalars.return_value.all.return_value = [1, 2, 3]
+    pending = [1, 2, 3]
+    result.scalars.return_value.all.return_value = pending
     session.execute = AsyncMock(return_value=result)
     repo = OutboxRepository(session)
-    assert await repo.count_pending() == 3
+    assert await repo.count_pending() == len(pending)
 
 
 # --- relay ---------------------------------------------------------------------
@@ -95,7 +97,7 @@ class _FakeSession:
 
 
 def _relay(monkeypatch, *, repo, publish):
-    monkeypatch.setattr("vanessa.infrastructure.outbox.relay.OutboxRepository", lambda session: repo)
+    monkeypatch.setattr("vanessa.infrastructure.outbox.relay.OutboxRepository", lambda _session: repo)
     broker = MagicMock()
     broker.publish = publish
     session = _FakeSession()

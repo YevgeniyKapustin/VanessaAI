@@ -12,6 +12,7 @@ class _FakeCompleter:
         self.calls: list[tuple[str, str, dict]] = []
 
     async def complete(self, model: str, messages: list[dict], *, kind: str = "completion", **kwargs):
+        _ = messages
         self.calls.append((model, kind, kwargs))
         if self._error is not None:
             raise self._error
@@ -44,8 +45,9 @@ def test_evaluate_records_scores() -> None:
 
 
 def test_evaluate_clamps_out_of_range_scores() -> None:
+    mid = 0.4
     raw = json.dumps(
-        {"context_relevance": 2.5, "groundedness": -1.0, "answer_relevance": 0.4}
+        {"context_relevance": 2.5, "groundedness": -1.0, "answer_relevance": mid}
     )
     evaluator = RagTriadEvaluator(
         completer=_FakeCompleter(raw=raw), enabled=True, sample_rate=1.0
@@ -53,7 +55,7 @@ def test_evaluate_clamps_out_of_range_scores() -> None:
     scores = _run(evaluator.evaluate(question="q", answer="a", context="ctx"))
     assert scores["context_relevance"] == 1.0
     assert scores["groundedness"] == 0.0
-    assert scores["answer_relevance"] == 0.4
+    assert scores["answer_relevance"] == mid
 
 
 def test_evaluate_fails_open_on_judge_error() -> None:

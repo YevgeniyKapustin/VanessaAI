@@ -58,7 +58,7 @@ def test_marker_after_code_block():
 def test_known_tags_match_catalog_single_source_of_truth():
     """Allowed tags must equal the tags that actually have a sticker in the pack."""
     catalog_tags = frozenset(get_content().stickers.available_tags)
-    assert KNOWN_STICKER_TAGS == catalog_tags
+    assert catalog_tags == KNOWN_STICKER_TAGS
 
 
 def test_tag_without_catalog_sticker_is_dropped():

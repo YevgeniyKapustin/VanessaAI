@@ -2,3 +2,6 @@
 deploy/k8s/logging/*.yaml text eol=lf
 deploy/loki/*.yaml text eol=lf
 deploy/vector/*.yaml text eol=lf
+# Bash CI scripts must stay LF; CRLF breaks shebangs on ubuntu-latest.
+scripts/*.sh text eol=lf
+scripts/python_file_length_allowlist.txt text eol=lf

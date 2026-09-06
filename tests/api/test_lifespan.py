@@ -28,7 +28,7 @@ def _patch_knowledge_flags(monkeypatch) -> None:
     monkeypatch.setattr(f"{KNOWLEDGE}.settings.knowledge_sweep_enabled", False)
     monkeypatch.setattr(f"{KNOWLEDGE}.settings.knowledge_portrait_enabled", False)
     monkeypatch.setattr(
-        "vanessa.knowledge.compaction.compact_all_person_cards",
+        "vanessa.knowledge.memory.compaction.compact_all_person_cards",
         AsyncMock(),
     )
 

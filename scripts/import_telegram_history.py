@@ -7,10 +7,9 @@ import logging
 import sys
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+from alembic.config import Config
 
+from alembic import command
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
@@ -21,6 +20,10 @@ from vanessa.infrastructure.ingest.telegram_export import parse_telegram_export
 from vanessa.pipeline.rag.embeddings.embeddings import LocalEmbeddingProvider
 from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
 from vanessa.pipeline.rag.qdrant_client import QdrantVectorStore
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 configure_logging("import")
 logger = logging.getLogger(__name__)
@@ -51,25 +54,27 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def apply_migrations() -> None:
-    from alembic.config import Config
-
-    from alembic import command
-
     logger.info("Applying database migrations...")
     alembic_cfg = Config(_PROJECT_ROOT / "alembic.ini")
     command.upgrade(alembic_cfg, "head")
 
 
-async def run(args: argparse.Namespace) -> int:
-    export_path: Path = args.export
+def _load_messages(export_path: Path):
     if not export_path.is_file():
         logger.error("Export file not found: %s", export_path)
-        return 1
-
+        return None
     metadata, messages = parse_telegram_export(export_path)
     if not messages:
         logger.error("No text messages found in export")
+        return None
+    return metadata, messages
+
+
+async def run(args: argparse.Namespace) -> int:
+    loaded = _load_messages(args.export)
+    if loaded is None:
         return 1
+    metadata, messages = loaded
 
     logger.info(
         "Preparing import: %s messages from %r",

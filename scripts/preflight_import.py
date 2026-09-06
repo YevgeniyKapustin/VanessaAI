@@ -15,14 +15,25 @@ import logging
 import sys
 from pathlib import Path
 
+import httpx
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
+from sqlalchemy import func, select
+
+from scripts.preflight_import_report import (
+    load_export,
+    log_export_summary,
+    sender_names,
+)
+from vanessa.config import settings
+from vanessa.core.logging_setup import configure_logging
+from vanessa.infrastructure.db.models import Message
+from vanessa.infrastructure.db.session import async_session_factory
+from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-from vanessa.config import settings
-from vanessa.core.logging_setup import configure_logging
-from vanessa.infrastructure.db.session import async_session_factory
-from vanessa.infrastructure.ingest.telegram_export import parse_telegram_export
 
 configure_logging("preflight")
 logger = logging.getLogger(__name__)
@@ -50,18 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def check_model() -> None:
-    from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
-
     logger.info("Preloading embedding model %r ...", settings.embedding_model_name)
     await asyncio.to_thread(preload_embedding_model)
     logger.info("Embedding model is ready.")
 
 
 async def check_db(telegram_ids: set[int]) -> None:
-    from sqlalchemy import func, select
-
-    from vanessa.infrastructure.db.models import Message
-
     async with async_session_factory() as session:
         total = (
             await session.execute(select(func.count(Message.id)))
@@ -102,8 +107,6 @@ async def check_db(telegram_ids: set[int]) -> None:
 
 
 async def check_qdrant() -> None:
-    from qdrant_client import AsyncQdrantClient
-
     client = AsyncQdrantClient(url=settings.qdrant_url)
     try:
         info = await client.get_collection(settings.qdrant_collection)
@@ -113,56 +116,31 @@ async def check_qdrant() -> None:
             info.points_count,
             info.status,
         )
-    except Exception as exc:  # pragma: no cover - best-effort diagnostics
+    except (
+        OSError,
+        TimeoutError,
+        UnexpectedResponse,
+        ResponseHandlingException,
+        httpx.HTTPError,
+    ) as exc:
         logger.warning("Could not read Qdrant collection: %s", exc)
     finally:
         await client.close()
 
 
 async def run(args: argparse.Namespace) -> int:
-    export_path: Path = args.export
-    if not export_path.is_file():
-        logger.error("Export file not found: %s", export_path)
+    loaded = load_export(args.export, logger)
+    if loaded is None:
         return 1
-
-    logger.info("Parsing export: %s", export_path)
-    metadata, messages = parse_telegram_export(export_path)
-    if not messages:
-        logger.error("No text messages found in export")
-        return 1
-
+    metadata, messages = loaded
     ids = {message.telegram_message_id for message in messages}
-    senders = sorted(
-        {message.sender_display_name for message in messages if message.sender_display_name}
-    )
+    senders = sender_names(messages)
     dates = [message.created_at for message in messages]
-
-    logger.info(
-        "Export %r: raw messages=%s, parsed text=%s, distinct ids=%s, senders=%s",
-        metadata.get("name"),
-        len(metadata.get("messages", [])),
-        len(messages),
-        len(ids),
-        len(senders),
-    )
-    if senders:
-        shown = ", ".join(senders[:20])
-        if len(senders) > 20:
-            shown += ", ..."
-        logger.info("Senders: %s", shown)
-    if dates:
-        logger.info(
-            "Date range: %s .. %s",
-            min(dates).isoformat(),
-            max(dates).isoformat(),
-        )
-
+    log_export_summary(metadata, messages, ids, senders, dates, logger)
     await check_qdrant()
     await check_db(ids)
-
     if args.check_model:
         await check_model()
-
     return 0
 
 

@@ -1,5 +1,6 @@
 import asyncio
 
+import fakeredis.aioredis
 import pytest
 
 from vanessa.contracts.messages import (
@@ -11,13 +12,14 @@ from vanessa.contracts.messages import (
 )
 from vanessa.infrastructure.broker.backends import Delivery
 from vanessa.infrastructure.broker.errors import BrokerTimeoutError
-from vanessa.infrastructure.broker.redis_streams import RedisDedupGuard, RedisStreamBroker
+from vanessa.infrastructure.broker.redis_streams import (
+    RedisDedupGuard,
+    RedisStreamBroker,
+)
 
 
 @pytest.fixture
 def broker():
-    import fakeredis.aioredis
-
     client = fakeredis.aioredis.FakeRedis()
     instance = RedisStreamBroker("redis://localhost:6379/0", client=client)
     yield instance

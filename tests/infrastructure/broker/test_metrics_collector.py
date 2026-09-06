@@ -4,6 +4,7 @@ from vanessa.contracts.messages import TaskKind, TaskMessage
 from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
+from vanessa.infrastructure.observability import metrics
 
 
 async def test_collector_reports_stream_and_lag() -> None:
@@ -21,8 +22,6 @@ async def test_collector_reports_stream_and_lag() -> None:
         groups=[("vanessa:turns", "agent"), ("vanessa:tasks", "worker")],
     )
     await collector.update_once()
-
-    from vanessa.infrastructure.observability import metrics
 
     assert metrics.broker_stream_length.labels(stream="vanessa:tasks")._value.get() == 1
     assert metrics.broker_stream_length.labels(stream="vanessa:turns")._value.get() == 0

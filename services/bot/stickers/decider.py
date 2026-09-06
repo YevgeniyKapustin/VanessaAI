@@ -2,7 +2,13 @@ import logging
 import random
 from collections.abc import Mapping
 
-from services.bot.stickers.heuristics import reply_tags
+from services.bot.stickers.decide_predicates import (
+    cooldown_blocks,
+    delivery_disabled,
+    probability_blocks,
+)
+from services.bot.stickers.decide_resolve import resolve_candidate
+from services.bot.stickers.decider_pick import pick_random, pick_weighted
 from services.bot.stickers.models import StickerCatalog, StickerPick
 
 logger = logging.getLogger(__name__)
@@ -66,50 +72,90 @@ class StickerDecider:
         are then bypassed so a direct request is always honoured. If no tag was
         resolved (no LLM tag and no heuristic hit) a random sticker is sent.
         """
-        if not self._enabled or not self._catalog.has_resolved_files:
+        if delivery_disabled(
+            enabled=self._enabled,
+            has_resolved_files=self._catalog.has_resolved_files,
+        ):
             logger.info(
                 "sticker_skip chat_id=%s tag=%r reason=disabled_or_no_files",
                 chat_id,
                 tag,
             )
             return None
-        if not force and self.messages_since_sticker(chat_id) < self._min_messages_between:
-            logger.info(
-                "sticker_skip chat_id=%s tag=%r reason=cooldown "
-                "messages_since=%s",
-                chat_id,
-                tag,
-                self.messages_since_sticker(chat_id),
-            )
+        if self._blocked_by_cooldown(chat_id, tag, force=force):
             return None
+        return self._decide_candidate(chat_id, tag, reply_text, force=force)
 
+    def _blocked_by_cooldown(
+        self, chat_id: int, tag: str | None, *, force: bool
+    ) -> bool:
+        messages_since = self.messages_since_sticker(chat_id)
+        if not cooldown_blocks(
+            force=force,
+            messages_since=messages_since,
+            min_messages_between=self._min_messages_between,
+        ):
+            return False
+        logger.info(
+            "sticker_skip chat_id=%s tag=%r reason=cooldown "
+            "messages_since=%s",
+            chat_id,
+            tag,
+            messages_since,
+        )
+        return True
+
+    def _decide_candidate(
+        self,
+        chat_id: int,
+        tag: str | None,
+        reply_text: str | None,
+        *,
+        force: bool,
+    ) -> StickerPick | None:
         resolved = self._resolve_candidate(tag, reply_text)
         if resolved is None:
-            if force:
-                return self._pick_random(chat_id, tag)
+            return self._unresolved(chat_id, tag, force=force)
+        chosen_tag, from_llm = resolved
+        return self._pick_if_probable(
+            chat_id, tag, chosen_tag, from_llm=from_llm, force=force
+        )
+
+    def _unresolved(
+        self, chat_id: int, tag: str | None, *, force: bool
+    ) -> StickerPick | None:
+        if force:
+            return pick_random(self._catalog, self._rng, chat_id, tag)
+        logger.info(
+            "sticker_skip chat_id=%s tag=%r reason=no_resolvable_tag",
+            chat_id,
+            tag,
+        )
+        return None
+
+    def _pick_if_probable(
+        self,
+        chat_id: int,
+        tag: str | None,
+        chosen_tag: str,
+        *,
+        from_llm: bool,
+        force: bool,
+    ) -> StickerPick | None:
+        base = self._probability if from_llm else self._heuristic_probability
+        probability = self._tag_probability.get(chosen_tag, base)
+        if probability_blocks(self._rng, probability, force=force):
             logger.info(
-                "sticker_skip chat_id=%s tag=%r reason=no_resolvable_tag",
+                "sticker_skip chat_id=%s tag=%r reason=probability "
+                "p=%.2f base=%.2f tag_probability=%s",
                 chat_id,
                 tag,
+                probability,
+                base,
+                chosen_tag in self._tag_probability,
             )
             return None
-        chosen_tag, from_llm = resolved
-
-        if not force:
-            base = self._probability if from_llm else self._heuristic_probability
-            probability = self._tag_probability.get(chosen_tag, base)
-            if self._rng.random() >= probability:
-                logger.info(
-                    "sticker_skip chat_id=%s tag=%r reason=probability "
-                    "p=%.2f base=%.2f tag_probability=%s",
-                    chat_id,
-                    tag,
-                    probability,
-                    base,
-                    chosen_tag in self._tag_probability,
-                )
-                return None
-        return self._pick(chosen_tag)
+        return pick_weighted(self._catalog, self._rng, chosen_tag)
 
     def _resolve_candidate(
         self,
@@ -117,47 +163,4 @@ class StickerDecider:
         reply_text: str | None,
     ) -> tuple[str, bool] | None:
         """Pick the primary tag: LLM tag wins, heuristics are the fallback."""
-        if tag:
-            normalized = tag.lower()
-            if self._catalog.stickers_for_tag(normalized):
-                return normalized, True
-        for heuristic_tag in reply_tags(reply_text):
-            if self._catalog.stickers_for_tag(heuristic_tag):
-                return heuristic_tag, False
-        return None
-
-    def _pick(self, tag: str) -> StickerPick | None:
-        candidates = self._catalog.stickers_for_tag(tag)
-        if not candidates:
-            return None
-        weights = [max(candidate.weight, 0.0) for candidate in candidates]
-        if sum(weights) <= 0:
-            weights = [1.0] * len(candidates)
-        chosen = self._rng.choices(candidates, weights=weights, k=1)[0]
-        assert chosen.available_file_id is not None
-        return StickerPick(tag=tag, file_id=chosen.available_file_id)
-
-    def _pick_random(self, chat_id: int, tag: str | None) -> StickerPick | None:
-        """Force path fallback: user asked for a sticker but no tag resolved."""
-        candidates = [
-            sticker
-            for sticker in self._catalog.stickers
-            if sticker.available_file_id
-        ]
-        if not candidates:
-            logger.info(
-                "sticker_skip chat_id=%s tag=%r reason=no_available_stickers",
-                chat_id,
-                tag,
-            )
-            return None
-        chosen = self._rng.choices(candidates, k=1)[0]
-        assert chosen.available_file_id is not None
-        chosen_tag = chosen.tags[0] if chosen.tags else "any"
-        logger.info(
-            "sticker_force_random chat_id=%s requested_tag=%r chosen_tag=%s",
-            chat_id,
-            tag,
-            chosen_tag,
-        )
-        return StickerPick(tag=chosen_tag, file_id=chosen.available_file_id)
+        return resolve_candidate(self._catalog, tag, reply_text)

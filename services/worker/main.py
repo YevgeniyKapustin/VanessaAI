@@ -18,19 +18,19 @@ from services.worker.app import WorkerApp
 from services.worker.handlers import build_worker_handlers
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
+from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
 from vanessa.infrastructure.db.session import async_session_factory
+from vanessa.infrastructure.observability.metrics import start_metrics_http_server
+from vanessa.knowledge.memory import SweepWorker
 from vanessa.knowledge.portraits import PortraitWorker
-from vanessa.knowledge.sweep import SweepWorker
 
 configure_logging("worker")
 logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    from vanessa.infrastructure.observability.metrics import start_metrics_http_server
-
     start_metrics_http_server(settings.worker_metrics_port)
     logger.info(
         "worker health/metrics endpoint started on :%s",
@@ -43,8 +43,6 @@ async def main() -> None:
         stream_maxlen=settings.broker_stream_maxlen,
         dlq_enabled=settings.broker_dlq_enabled,
     )
-    from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
-
     broker_metrics = BrokerMetricsCollector(
         broker,
         streams,

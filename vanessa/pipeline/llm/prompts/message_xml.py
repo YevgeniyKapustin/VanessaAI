@@ -15,7 +15,7 @@ The compose prompt follows a "Markdown system + XML input" architecture:
       <msg id="2" sender="bot" time="04.07.2026 08:09">
         <text>вот фото модели в наличии</text>
         <attachment type="photo">
-          <description>чёрная футболка оверсайз с принтом</description>
+          <description>black oversized t-shirt with a print</description>
         </attachment>
       </msg>
     </messages>
@@ -72,6 +72,39 @@ def render_attachment(description: str | None = None) -> str:
     return '  <attachment type="photo" />'
 
 
+def _msg_attrs(
+    *,
+    sender: str,
+    time: str,
+    msg_id: int | None,
+    anchor: bool,
+    reply_to: int | None,
+) -> list[str]:
+    attrs: list[str] = []
+    if msg_id is not None:
+        attrs.append(f'id="{msg_id}"')
+    attrs.append(f'sender="{xml_attr(sender)}"')
+    attrs.append(f'time="{xml_attr(time)}"')
+    if anchor:
+        attrs.append('anchor="true"')
+    if reply_to is not None:
+        attrs.append(f'reply_to="{reply_to}"')
+    return attrs
+
+
+def _msg_children(
+    content: str,
+    reply_text: str | None,
+    attachments: list[str] | None,
+) -> list[str]:
+    lines: list[str] = []
+    if reply_text and reply_text.strip():
+        lines.append(f"  <reply_text>{xml_text(reply_text)}</reply_text>")
+    lines.append(f"  <text>{xml_text(content)}</text>")
+    lines.extend(attachments or [])
+    return lines
+
+
 def render_msg(
     *,
     content: str,
@@ -89,20 +122,15 @@ def render_msg(
     any ``<attachment>`` string). ``reply_text`` is shown in ``<reply_text>``
     before ``<text>``; ``reply_to`` links to the ``<msg id>`` it quotes.
     """
-    attrs: list[str] = []
-    if msg_id is not None:
-        attrs.append(f'id="{msg_id}"')
-    attrs.append(f'sender="{xml_attr(sender)}"')
-    attrs.append(f'time="{xml_attr(time)}"')
-    if anchor:
-        attrs.append('anchor="true"')
-    if reply_to is not None:
-        attrs.append(f'reply_to="{reply_to}"')
+    attrs = _msg_attrs(
+        sender=sender,
+        time=time,
+        msg_id=msg_id,
+        anchor=anchor,
+        reply_to=reply_to,
+    )
     lines = [f"<msg {' '.join(attrs)}>"]
-    if reply_text and reply_text.strip():
-        lines.append(f"  <reply_text>{xml_text(reply_text)}</reply_text>")
-    lines.append(f"  <text>{xml_text(content)}</text>")
-    lines.extend(attachments or [])
+    lines.extend(_msg_children(content, reply_text, attachments))
     lines.append("</msg>")
     return "\n".join(lines)
 

@@ -87,7 +87,8 @@ def test_hash_identifier_stable_and_private() -> None:
     a = hash_identifier(123, salt="s")
     b = hash_identifier(123, salt="s")
     assert a == b
-    assert len(a) == 16
+    digest_len = 16
+    assert len(a) == digest_len
     assert "123" not in a
     assert hash_identifier(None) == "anonymous"
 

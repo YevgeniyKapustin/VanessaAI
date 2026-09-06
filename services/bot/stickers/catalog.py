@@ -12,6 +12,23 @@ def build_catalog(content: StickersContent | None = None) -> StickerCatalog:
     return StickerCatalog(set_name=content.sticker_set_name, stickers=stickers)
 
 
+def _sticker_at(remote, index):
+    if index is None:
+        return None
+    if not 0 <= index < len(remote):
+        return None
+    return remote[index]
+
+
+def _unique_emoji_match(remote, emoji):
+    if not emoji:
+        return None
+    candidates = [candidate for candidate in remote if candidate.emoji == emoji]
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
 def _match_remote(remote, index, emoji):
     """Find the live sticker for a config entry.
 
@@ -22,15 +39,13 @@ def _match_remote(remote, index, emoji):
        never binds a config sticker to the wrong remote image;
     3. positional ``index`` fallback.
     """
-    if index is not None and 0 <= index < len(remote) and remote[index].emoji == emoji:
-        return remote[index]
-    if emoji:
-        candidates = [candidate for candidate in remote if candidate.emoji == emoji]
-        if len(candidates) == 1:
-            return candidates[0]
-    if index is not None and 0 <= index < len(remote):
-        return remote[index]
-    return None
+    positional = _sticker_at(remote, index)
+    if positional is not None and positional.emoji == emoji:
+        return positional
+    unique = _unique_emoji_match(remote, emoji)
+    if unique is not None:
+        return unique
+    return positional
 
 
 async def resolve_file_ids(catalog: StickerCatalog, bot) -> None:
@@ -44,17 +59,32 @@ async def resolve_file_ids(catalog: StickerCatalog, bot) -> None:
     """
     if not catalog.set_name or not catalog.stickers:
         return
+    remote = await _fetch_remote_stickers(catalog.set_name, bot)
+    if remote is None:
+        return
+    resolved = _apply_remote_file_ids(catalog, remote)
+    logger.info(
+        "sticker_set_resolved set_name=%s resolved=%s/%s",
+        catalog.set_name,
+        resolved,
+        len(catalog.stickers),
+    )
+
+
+async def _fetch_remote_stickers(set_name: str, bot):
     try:
-        sticker_set = await bot.get_sticker_set(catalog.set_name)
+        sticker_set = await bot.get_sticker_set(set_name)
     except Exception:
         logger.warning(
             "sticker_set_resolve_failed set_name=%s — stickers disabled",
-            catalog.set_name,
+            set_name,
             exc_info=True,
         )
-        return
+        return None
+    return sticker_set.stickers
 
-    remote = sticker_set.stickers
+
+def _apply_remote_file_ids(catalog: StickerCatalog, remote) -> int:
     resolved = 0
     for sticker in catalog.stickers:
         match = _match_remote(remote, sticker.index, sticker.emoji)
@@ -62,9 +92,4 @@ async def resolve_file_ids(catalog: StickerCatalog, bot) -> None:
             sticker.file_id = match.file_id
             sticker.resolved_file_id = None
             resolved += 1
-    logger.info(
-        "sticker_set_resolved set_name=%s resolved=%s/%s",
-        catalog.set_name,
-        resolved,
-        len(catalog.stickers),
-    )
+    return resolved

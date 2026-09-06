@@ -17,6 +17,10 @@ reply-to > knowledge > web > session > context > metrics > humor > memes.
 from __future__ import annotations
 
 from vanessa.config.content import PromptBudgetContent
+from vanessa.infrastructure.observability.metrics import (
+    record_prompt_budget,
+    record_prompt_truncation,
+)
 
 # Priority of a section in the prompt; higher survives truncation.
 PRIORITY_CURRENT = 100
@@ -64,6 +68,53 @@ def _section_cap(budget: PromptBudgetContent, section: str) -> int:
         return 0
 
 
+def _budget_inactive(*, enabled: bool, budget: PromptBudgetContent | None) -> bool:
+    return not enabled or budget is None
+
+
+def _trim_section(
+    priority: int,
+    section: str,
+    body: str,
+    budget: PromptBudgetContent,
+) -> BudgetPart | None:
+    cap = _section_cap(budget, section)
+    trimmed = body
+    if cap > 0 and len(body) > cap:
+        trimmed = truncate_body(body, cap)
+    if not trimmed.strip():
+        return None
+    return (priority, section, trimmed)
+
+
+def _apply_section_caps(
+    parts: list[BudgetPart],
+    budget: PromptBudgetContent,
+) -> list[BudgetPart]:
+    result: list[BudgetPart] = []
+    for priority, section, body in parts:
+        trimmed = _trim_section(priority, section, body, budget)
+        if trimmed is not None:
+            result.append(trimmed)
+    return result
+
+
+def _apply_global_cap(
+    result: list[BudgetPart],
+    budget: PromptBudgetContent,
+) -> list[BudgetPart]:
+    if budget.max_chars > 0:
+        return _enforce_global_cap(result, budget.max_chars)
+    return result
+
+
+def _record_kept_sections(result: list[BudgetPart], *, record: bool) -> None:
+    if not record:
+        return
+    for _, section, body in result:
+        record_prompt_budget(section, len(body))
+
+
 def apply_budget(
     parts: list[BudgetPart],
     budget: PromptBudgetContent,
@@ -76,25 +127,57 @@ def apply_budget(
     When ``record`` is true, each kept section's final length and every
     truncation are reported to the observability metrics.
     """
-    if not enabled or budget is None:
+    if _budget_inactive(enabled=enabled, budget=budget):
         return parts
 
+    result = _apply_section_caps(parts, budget)
+    result = _apply_global_cap(result, budget)
+    _record_kept_sections(result, record=record)
+    return result
+
+
+def _claim_chars(length: int, remaining: int) -> tuple[int, int]:
+    if remaining <= 0:
+        return 0, remaining
+    take = min(length, remaining)
+    return take, remaining - take
+
+
+def _allocate_keep(parts: list[BudgetPart], max_chars: int) -> dict[int, int]:
+    keep: dict[int, int] = {}
+    remaining = max_chars
+    ranked = sorted(
+        enumerate(parts), key=lambda pair: pair[1][0], reverse=True
+    )
+    for idx, (_priority, _, body) in ranked:
+        take, remaining = _claim_chars(len(body), remaining)
+        keep[idx] = take
+    return keep
+
+
+def _kept_body(section: str, body: str, take: int) -> str | None:
+    if take <= 0:
+        record_prompt_truncation(section)
+        return None
+    trimmed = body
+    if take < len(body):
+        trimmed = truncate_body(body, take)
+        record_prompt_truncation(section)
+    if not trimmed.strip():
+        return None
+    return trimmed
+
+
+def _apply_allocation(
+    parts: list[BudgetPart],
+    keep: dict[int, int],
+) -> list[BudgetPart]:
     result: list[BudgetPart] = []
-    for priority, section, body in parts:
-        cap = _section_cap(budget, section)
-        if cap > 0 and len(body) > cap:
-            body = truncate_body(body, cap)
-        if body.strip():
-            result.append((priority, section, body))
-
-    if budget.max_chars > 0:
-        result = _enforce_global_cap(result, budget.max_chars)
-
-    if record:
-        from vanessa.infrastructure.observability.metrics import record_prompt_budget
-
-        for _, section, body in result:
-            record_prompt_budget(section, len(body))
+    for idx, (priority, section, body) in enumerate(parts):
+        trimmed = _kept_body(section, body, keep[idx])
+        if trimmed is None:
+            continue
+        result.append((priority, section, trimmed))
     return result
 
 
@@ -106,29 +189,5 @@ def _enforce_global_cap(parts: list[BudgetPart], max_chars: int) -> list[BudgetP
 
     # Allocate the budget from the highest priority down; when it runs out
     # mid-section, that section is truncated and everything lower is dropped.
-    keep: dict[int, int] = {}
-    remaining = max_chars
-    for idx, (priority, _, body) in sorted(
-        enumerate(parts), key=lambda pair: pair[1][0], reverse=True
-    ):
-        if remaining <= 0:
-            keep[idx] = 0
-            continue
-        take = min(len(body), remaining)
-        keep[idx] = take
-        remaining -= take
-
-    from vanessa.infrastructure.observability.metrics import record_prompt_truncation
-
-    result: list[BudgetPart] = []
-    for idx, (priority, section, body) in enumerate(parts):
-        take = keep[idx]
-        if take <= 0:
-            record_prompt_truncation(section)
-            continue
-        if take < len(body):
-            body = truncate_body(body, take)
-            record_prompt_truncation(section)
-        if body.strip():
-            result.append((priority, section, body))
-    return result
+    keep = _allocate_keep(parts, max_chars)
+    return _apply_allocation(parts, keep)

@@ -25,6 +25,10 @@ class BotMixin:
     bot_message_delay_seconds: float = 0.7
     bot_max_messages: int = 8
 
+    # Telegram TTS stays off unless channel YAML or env flips it.
+    speech_enabled: bool = False
+    speech_send: str = "voice_and_text"
+
     # Port for the bot process Prometheus HTTP endpoint.
     bot_metrics_port: int = 9101
 

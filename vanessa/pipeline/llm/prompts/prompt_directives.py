@@ -4,6 +4,7 @@ from vanessa.core.messages import PhotoCandidate, WebResult
 from vanessa.knowledge.users.nicknames import format_aliases_for_prompt
 from vanessa.pipeline.llm.prompts.budget import (
     PRIORITY_DIRECTIVES,
+    PRIORITY_SCENE,
     PRIORITY_WEB,
     BudgetPart,
     truncate_body,
@@ -134,3 +135,20 @@ def photo_empty_parts(
     if not note:
         return []
     return [(PRIORITY_DIRECTIVES, "directives", note)]
+
+
+_SCENE_DIRECTIVE = (
+    "The <scene> block is what you see right now through your eyes. "
+    "Treat it as current sight, not chat history. Do not invent people, "
+    "objects, or text that are not in the block."
+)
+
+
+def scene_parts(scene_description: str | None) -> list[BudgetPart]:
+    if not scene_description or not scene_description.strip():
+        return []
+    body = f"<scene>\n{scene_description.strip()}\n</scene>"
+    return [
+        (PRIORITY_SCENE, "scene", body),
+        (PRIORITY_DIRECTIVES, "directives", _SCENE_DIRECTIVE),
+    ]

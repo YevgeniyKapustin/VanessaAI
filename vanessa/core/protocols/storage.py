@@ -24,12 +24,16 @@ class MessageRepositoryProtocol(Protocol):
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
         attachments: list[dict] | None = None,
+        channel: str = "telegram",
+        sender_display_name: str | None = None,
     ) -> StoredMessage: ...
 
     async def fulltext_search(
         self,
         query: str,
         limit: int = 30,
+        *,
+        channel: str = "telegram",
     ) -> list[StoredMessage]: ...
 
     async def get_by_ids(self, message_ids: list[int]) -> list[StoredMessage]: ...
@@ -54,7 +58,12 @@ class MessageRepositoryProtocol(Protocol):
         limit: int = 5000,
     ) -> list[StoredMessage]: ...
 
-    async def get_recent(self, limit: int = 50) -> list[StoredMessage]: ...
+    async def get_recent(
+        self,
+        limit: int = 50,
+        *,
+        channel: str = "telegram",
+    ) -> list[StoredMessage]: ...
 
     async def get_existing_telegram_message_ids(
         self,
@@ -77,6 +86,8 @@ class MessageRepositoryProtocol(Protocol):
         self,
         query: str,
         limit: int = 30,
+        *,
+        channel: str = "telegram",
     ) -> list[StoredMessage]: ...
 
 

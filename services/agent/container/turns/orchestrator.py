@@ -24,6 +24,7 @@ from vanessa.pipeline.stages import (
     GateStage,
     RetrieveStage,
 )
+from vanessa.pipeline.vision.scene import SceneStage
 
 if TYPE_CHECKING:
     from services.agent.container.turns.turns import TurnWiring
@@ -98,4 +99,5 @@ class OrchestratorFactory:
             eval=engines.eval,
             photo_captioner=engines.photo,
             dispatcher=self._turns.indexing.task_dispatcher(),
+            scene=SceneStage(engines.scene_describer),
         )

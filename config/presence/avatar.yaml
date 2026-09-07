@@ -1,0 +1,41 @@
+# VRChat avatar OSC map for services/presence.
+# Gesture table only — not IK / MediaPipe / webcam tracking.
+# Parameter names must match exposed OSC parameters on the avatar.
+
+speaker_name: You
+
+osc:
+  host: 127.0.0.1
+  port: 9000
+  listen_port: 9001
+
+parameters:
+  jaw_open: JawOpen
+  voice: Voice
+  breath: Breath
+  look_horizontal: LookHorizontal
+
+idle:
+  enabled: true
+  breath_period_seconds: 4.0
+  look_period_seconds: 7.0
+  look_amplitude: 0.12
+
+gestures:
+  wave:
+    parameter: GestureWave
+    value: 1
+    hold_seconds: 1.5
+  nod:
+    parameter: GestureNod
+    value: 1
+    hold_seconds: 1.0
+
+# Substring (lowercase) in the reply → gesture name above.
+emotion_map:
+  hello: wave
+  hi: wave
+  привет: wave
+  "yes": nod
+  "да": nod
+  ок: nod

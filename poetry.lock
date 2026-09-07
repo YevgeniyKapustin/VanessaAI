@@ -1101,6 +1101,29 @@ docs = ["pydoctor (>=25.4.0)"]
 test = ["pytest"]
 
 [[package]]
+name = "elevenlabs"
+version = "2.66.0"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
+files = [
+    {file = "elevenlabs-2.66.0-py3-none-any.whl", hash = "sha256:c7bcc1b616887d2e2482e07a2c91640897fc9b7e24d930940abe7336485ba706"},
+    {file = "elevenlabs-2.66.0.tar.gz", hash = "sha256:6372efd76710e82013a388585a6b8a1aada2f8c91046ee0105afe67565cea291"},
+]
+
+[package.dependencies]
+httpx = ">=0.21.2"
+pydantic = ">=1.9.2"
+pydantic-core = ">=2.18.2"
+requests = ">=2.20"
+typing_extensions = ">=4.0.0"
+websockets = ">=13.0"
+
+[package.extras]
+pyaudio = ["pyaudio (>=0.2.14)"]
+
+[[package]]
 name = "fakeredis"
 version = "2.37.1"
 description = "Python implementation of redis API, can be used for testing purposes."
@@ -3434,6 +3457,18 @@ files = [
 ]
 
 [[package]]
+name = "python-osc"
+version = "1.10.2"
+description = "Open Sound Control server and client implementations in pure Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "python_osc-1.10.2-py3-none-any.whl", hash = "sha256:018b28e1cc06427c2c3d695f4e8d87d0caecfe604ff889acc45235cfd94183a2"},
+    {file = "python_osc-1.10.2.tar.gz", hash = "sha256:732548f4f467dda9f890a6b0b3bfb085ab117f4bd38a45a58d2ca0f3bd6a546d"},
+]
+
+[[package]]
 name = "pywin32"
 version = "312"
 description = "Python for Windows Extensions"
@@ -5117,4 +5152,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "5120c7063fc5150f7f56944bf01b445e4dd78907cc61ebc0103b13d238a45b65"
+content-hash = "96a018b016e8daf0a204a341c05cead71a63e8114de9e3ddec30100b2a5406a3"

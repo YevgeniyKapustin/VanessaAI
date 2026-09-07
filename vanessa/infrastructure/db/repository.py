@@ -46,6 +46,8 @@ class MessageRepository:
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
         attachments: list[dict] | None = None,
+        channel: str = "telegram",
+        sender_display_name: str | None = None,
     ) -> StoredMessage:
         message = Message(
             sender_telegram_id=sender_telegram_id,
@@ -58,6 +60,8 @@ class MessageRepository:
             reply_to_sender_telegram_id=reply_to_sender_telegram_id,
             reply_to_sender_name=reply_to_sender_name,
             attachments=attachments,
+            channel=channel,
+            sender_display_name=sender_display_name,
         )
         if created_at is not None:
             message.created_at = created_at

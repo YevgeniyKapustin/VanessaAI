@@ -3,6 +3,7 @@ import time
 
 from vanessa.config.settings import settings
 from vanessa.core.request_context import get_request_id
+from vanessa.core.session.channel_keys import dialogue_session_key, turn_channel
 from vanessa.infrastructure.observability.metrics import record_web_search
 from vanessa.pipeline.context import TurnPipelineContext
 
@@ -25,7 +26,10 @@ class _RetrieveExtrasMixin:
         self._offer_memes(ctx, catalog, decider)
 
     def _offer_memes(self, ctx: TurnPipelineContext, catalog, decider) -> None:
-        chat_id = ctx.turn.telegram_chat_id
+        chat_id = dialogue_session_key(
+            channel=turn_channel(ctx.turn),
+            telegram_chat_id=ctx.turn.telegram_chat_id,
+        )
         matched = catalog.match(ctx.turn.message)
         if matched:
             self._assign_matched_memes(ctx, chat_id, matched, decider)

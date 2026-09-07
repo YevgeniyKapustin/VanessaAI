@@ -1,0 +1,9 @@
+channel: telegram
+stickers: true
+photos: true
+split_messages: true
+scene: false
+speech: false
+listen_window: "current"
+addressing: telegram
+prompt_addendum: ""

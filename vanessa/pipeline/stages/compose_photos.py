@@ -45,6 +45,13 @@ class _ComposePhotoMixin:
             )
         return metrics_block, attitude_note
 
+    def _photo_search_ready(self, ctx: TurnPipelineContext) -> bool:
+        if not settings.vision_enabled or self._messages is None:
+            return False
+        if not ctx.profile.photos:
+            return False
+        return ctx.turn_plan is not None
+
     async def _meaning_photo_messages(
         self, ctx: TurnPipelineContext
     ) -> list[ContextMessage]:
@@ -56,10 +63,9 @@ class _ComposePhotoMixin:
         # not by the literal words the user typed. Fail-open: a search error
         # must never block the reply. The current turn's own photos are excluded
         # inside ``_collect_photo_candidates`` (they are already attached).
-        if not settings.vision_enabled or self._messages is None:
+        if not self._photo_search_ready(ctx):
             return []
-        if ctx.turn_plan is None:
-            return []
+        assert ctx.turn_plan is not None
         meaning_query = _semantic_query(ctx.turn_plan, ctx.turn.message)
         try:
             stored = await self._messages.search_photo_messages(

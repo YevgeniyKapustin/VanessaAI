@@ -111,6 +111,7 @@ class StoredMessage:
     attachments: list[dict[str, Any]] | None = None
     # Short generated label of the photo (photo_caption column), searchable by RAG.
     photo_caption: str | None = None
+    channel: str = "telegram"
 
 
 def stored_to_context(

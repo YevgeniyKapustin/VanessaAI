@@ -29,7 +29,10 @@ from vanessa.pipeline.gate_support import (
     finish_decision_ignore,
 )
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.stages.gate_decision import decision_context_from_pipeline
+from vanessa.pipeline.stages.gate_decision import (
+    decision_context_from_pipeline,
+    pipeline_in_listen_window,
+)
 from vanessa.pipeline.stages.gate_filters import _GateFilterMixin
 from vanessa.pipeline.stages.gate_vision import _GateVisionMixin
 
@@ -86,7 +89,7 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
-            in_listen_window=ctx.session.in_listen_window,
+            in_listen_window=pipeline_in_listen_window(ctx),
             sender_name=ctx.sender_name,
         )
         ctx.plan_ms = (time.perf_counter() - rewrite_started) * 1000
@@ -142,7 +145,7 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
             ctx.turn_plan.humor_ok,
             ctx.turn_plan.humor_query,
             ctx.turn_plan.deep_search,
-            ctx.session.in_listen_window,
+            pipeline_in_listen_window(ctx),
             ctx.turn_plan.needs_clarification,
             ctx.turn_plan.detail,
             ctx.reaction_gate_ms,

@@ -4,27 +4,15 @@ from collections.abc import Awaitable, Callable
 from aiogram.types import Message as TelegramMessage
 
 from services.bot.container import BotServices
+from services.bot.handlers.message_preview import _preview
 from services.bot.handlers.message_process import _process_incoming, _should_ignore
-from services.bot.handlers.message_send import (
-    _send_photo,
-    _send_reply,
-    _send_reply_messages,
-)
+from services.bot.handlers.message_send import _send_reply
+from services.bot.handlers.message_tagged import _deliver_tagged_reply
 from services.bot.handlers.message_typing import _ping_typing, _typing_on_signal
 from services.bot.messages import IncomingMessage
 from services.bot.messages.response import ChatProcessResult
-from services.bot.stickers.heuristics import is_sticker_request
 
 logger = logging.getLogger("services.bot.handlers.messages")
-
-_PREVIEW_LEN = 80
-
-
-def _preview(text: str) -> str:
-    normalized = text.replace("\n", " ").strip()
-    if len(normalized) <= _PREVIEW_LEN:
-        return normalized
-    return f"{normalized[:_PREVIEW_LEN]}..."
 
 
 async def _reject_if_no_access(
@@ -77,57 +65,6 @@ async def _deliver_sticker_only(
         incoming.telegram_chat_id,
         result.sticker_tag,
     )
-
-
-async def _deliver_tagged_reply(
-    telegram_message: TelegramMessage,
-    incoming: IncomingMessage,
-    services: BotServices,
-    result: ChatProcessResult,
-) -> None:
-    await _ping_typing(
-        telegram_message.bot, incoming.telegram_chat_id, "pre_reply"
-    )
-    blocks = result.messages or ([result.reply] if result.reply else [])
-    if services.max_messages > 0 and len(blocks) > services.max_messages:
-        logger.warning(
-            "reply_blocks_capped chat_id=%s blocks=%s cap=%s",
-            incoming.telegram_chat_id,
-            len(blocks),
-            services.max_messages,
-        )
-        blocks = blocks[: services.max_messages]
-    await _send_reply_messages(
-        telegram_message,
-        blocks,
-        delay=services.message_delay_seconds,
-    )
-    logger.info(
-        "reply_sent chat_id=%s reply_len=%s messages=%s",
-        incoming.telegram_chat_id,
-        len(result.reply or ""),
-        len(blocks),
-    )
-    if result.photo_file_id:
-        sent = await _send_photo(
-            telegram_message,
-            result.photo_file_id,
-            data_url=result.photo_data_url,
-        )
-        logger.info(
-            "photo_sent chat_id=%s file_id=%s sent=%s",
-            incoming.telegram_chat_id,
-            result.photo_file_id,
-            sent,
-        )
-    if services.stickers is not None:
-        services.stickers.register_reply(incoming.telegram_chat_id)
-        await services.stickers.send_if_any(
-            telegram_message,
-            sticker_tag=result.sticker_tag,
-            reply_text=result.reply,
-            force=is_sticker_request(incoming.text),
-        )
 
 
 async def _run_with_typing(

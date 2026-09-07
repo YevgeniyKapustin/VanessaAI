@@ -62,11 +62,24 @@ class Message(Base):
     # Short generated label of a photo message (vision captioner); included in
     # the FTS search_vector so a bare photo is findable "by meaning" in RAG.
     photo_caption: Mapped[str | None] = mapped_column(Text)
+    channel: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="telegram",
+        server_default="telegram",
+    )
+    sender_display_name: Mapped[str | None] = mapped_column(String(255))
 
     __table_args__ = (
         Index("ix_messages_search_vector", "search_vector", postgresql_using="gin"),
         Index("ix_messages_created_at", "created_at"),
         Index("ix_messages_telegram_message_id", "telegram_message_id"),
+        Index(
+            "ix_messages_channel_created_at_id",
+            text("channel"),
+            text("created_at DESC"),
+            text("id DESC"),
+        ),
     )
 
 

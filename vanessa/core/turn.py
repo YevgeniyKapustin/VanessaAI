@@ -5,9 +5,9 @@ from vanessa.core.messages import ImageAttachment
 
 @dataclass(frozen=True, slots=True)
 class ChatTurnInput:
-    telegram_chat_id: int
+    telegram_chat_id: int | None
     message: str
-    sender_telegram_id: int
+    sender_telegram_id: int | None
     chat_title: str | None = None
     chat_type: str | None = None
     sender_username: str | None = None
@@ -21,7 +21,10 @@ class ChatTurnInput:
     reply_to_text: str | None = None
     reply_to_sender_name: str | None = None
     # Images attached to this turn (vision). Empty for plain text turns.
+    # VRChat screenshots live in ``scene_image``, never here.
     images: tuple[ImageAttachment, ...] = ()
+    scene_image: ImageAttachment | None = None
+    channel: str = "telegram"
 
     @property
     def has_image(self) -> bool:

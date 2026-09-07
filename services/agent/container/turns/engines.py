@@ -7,7 +7,7 @@ from services.agent.container.graph import ProcessGraph
 from services.agent.container.role import ProcessRole
 from services.agent.container.turns.search import Search
 from vanessa.config.settings import settings
-from vanessa.core.protocols import LLMProviderProtocol
+from vanessa.core.protocols import LLMProviderProtocol, SceneDescriberProtocol
 from vanessa.infrastructure.observability.eval import RagTriadEvaluator
 from vanessa.infrastructure.websearch.factory import create_web_search
 from vanessa.infrastructure.websearch.protocols import WebSearchService
@@ -20,6 +20,7 @@ from vanessa.pipeline.llm.photo_captioner import PhotoCaptioner
 from vanessa.pipeline.llm.providers import create_llm_provider
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.rag.query_rewriter import QueryRewriter
+from vanessa.pipeline.vision.describer import SceneDescriber
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class TurnEngines:
     config: OrchestratorConfig
     knowledge: KnowledgeRetriever
     metrics_retriever: MetricsRetriever
+    scene_describer: SceneDescriberProtocol
 
     @classmethod
     def build(
@@ -67,4 +69,5 @@ class TurnEngines:
             config=OrchestratorConfig.from_settings(),
             knowledge=knowledge.retriever(),
             metrics_retriever=knowledge.metrics_retriever(),
+            scene_describer=SceneDescriber(),
         )

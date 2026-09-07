@@ -126,10 +126,14 @@ async def load_chat_session_state(
     window_size: int,
     max_idle_seconds: float,
     listen_max_messages: int,
+    channel: str = "telegram",
 ) -> ChatSessionState:
     raw = [
         stored_to_context(message)
-        for message in await messages_repo.get_recent(limit=window_size)
+        for message in await messages_repo.get_recent(
+            limit=window_size,
+            channel=channel,
+        )
     ]
     return build_chat_session_state(
         raw,

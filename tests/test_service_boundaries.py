@@ -15,6 +15,7 @@ def test_bot_does_not_import_data_plane_or_siblings() -> None:
         "services.agent",
         "services.worker",
         "services.mcp",
+        "services.presence",
     )
     for path in _python_sources("bot"):
         text = path.read_text(encoding="utf-8")
@@ -27,6 +28,7 @@ def test_worker_does_not_import_agent_or_bot() -> None:
         text = path.read_text(encoding="utf-8")
         assert "services.agent" not in text, path
         assert "services.bot" not in text, path
+        assert "services.presence" not in text, path
 
 
 def test_agent_does_not_import_worker_or_bot() -> None:
@@ -34,6 +36,23 @@ def test_agent_does_not_import_worker_or_bot() -> None:
         text = path.read_text(encoding="utf-8")
         assert "services.worker" not in text, path
         assert "services.bot" not in text, path
+        assert "services.presence" not in text, path
+
+
+def test_presence_does_not_import_data_plane_or_siblings() -> None:
+    forbidden = (
+        "vanessa.knowledge",
+        "vanessa.pipeline",
+        "vanessa.infrastructure.db",
+        "services.agent",
+        "services.bot",
+        "services.worker",
+        "services.mcp",
+    )
+    for path in _python_sources("presence"):
+        text = path.read_text(encoding="utf-8")
+        for token in forbidden:
+            assert token not in text, f"{path}: {token}"
 
 
 def test_agent_has_no_http_chat_route() -> None:

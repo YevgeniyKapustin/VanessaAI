@@ -219,6 +219,42 @@ async def test_schedule_creates_background_task(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_index_now_skips_vrchat_channel():
+    indexer = FakeIndexer()
+    repo = FakeRepo()
+    service = MessageIndexingService(
+        indexer=indexer,
+        messages=repo,
+        session_factory=None,
+        max_retries=0,
+    )
+    record = StoredMessage(
+        id=7,
+        role="user",
+        content="hello from vr",
+        channel="vrchat",
+    )
+
+    await service.index_now(record)
+
+    assert indexer.calls == []
+    assert repo.updated == []
+
+
+@pytest.mark.asyncio
+async def test_schedule_skips_vrchat_channel():
+    service = MessageIndexingService(
+        indexer=FakeIndexer(),
+        messages=FakeRepo(),
+        session_factory=lambda: None,
+        max_retries=0,
+    )
+    service.schedule(
+        StoredMessage(id=1, role="user", content="x", channel="vrchat")
+    )
+
+
+@pytest.mark.asyncio
 async def test_schedule_skips_non_user_role():
     service = MessageIndexingService(
         indexer=FakeIndexer(),

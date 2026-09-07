@@ -41,3 +41,19 @@ Files: `bot.yaml`, `persona.yaml`, `conversation.yaml`, `llm.yaml`,
 `profanity.yaml`, `memes.yaml`, `stickers.yaml`, `portrait.yaml`.
 
 Nicknames: `config/nicknames.yaml`.
+
+## `config/channels/`
+
+Per-turn `ChannelProfile` loaded from `TurnRequest.channel` — not a
+process-level orchestrator flag. One `config/content/` persona for every
+channel; VRChat adds a short `prompt_addendum` here.
+
+| Flag | telegram | vrchat |
+|------|----------|--------|
+| `stickers` / `photos` / `split_messages` | on | off |
+| `scene` | off | on |
+| `speech` | false | true |
+| `listen_window` | current session window | on |
+| `addressing` | telegram mention entity | addressed (no TG entity) |
+
+HTML, typing, `/note`, and access stay in the adapter, not this profile.

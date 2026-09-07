@@ -1,6 +1,7 @@
 import logging
 import time
 
+from vanessa.config.content import get_content
 from vanessa.config.settings import settings
 from vanessa.core.generate_request import GenerateRequest
 from vanessa.core.messages import ContextMessage, ImageAttachment, PhotoCandidate
@@ -10,6 +11,7 @@ from vanessa.infrastructure.observability.tracing import get_tracer
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionReason
 from vanessa.pipeline.llm.photo_request import is_photo_request
+from vanessa.pipeline.llm.prompts.prompt_system import build_system_prompt
 from vanessa.pipeline.llm.prompts.session_format import session_context_messages
 from vanessa.pipeline.stages.compose_photos import _ComposePhotoMixin
 from vanessa.pipeline.stages.compose_refuse import _ComposeRefuseMixin
@@ -39,8 +41,8 @@ def _compose_generate_request(
         humor_quotes=ctx.humor_quotes or None,
         knowledge_blocks=ctx.knowledge_blocks or None,
         web_blocks=ctx.web_blocks or None,
-        meme_blocks=ctx.meme_blocks or None,
-        meme_menu=ctx.meme_menu or None,
+        meme_blocks=(ctx.meme_blocks or None) if ctx.profile.stickers else None,
+        meme_menu=(ctx.meme_menu or None) if ctx.profile.stickers else None,
         metrics_block=metrics_block,
         attitude_note=attitude_note,
         sender_telegram_id=turn.sender_telegram_id,
@@ -60,6 +62,9 @@ def _compose_generate_request(
         # (incl. prior-session vision) stays separate — it feeds the vision
         # model, not the current <msg>.
         current_images=list(turn.images) or None,
+        scene_description=ctx.scene_description,
+        channel_profile=ctx.profile,
+        system_prompt=build_system_prompt(get_content(), profile=ctx.profile),
     )
 
 

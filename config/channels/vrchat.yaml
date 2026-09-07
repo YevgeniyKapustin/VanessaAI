@@ -1,0 +1,12 @@
+channel: vrchat
+stickers: false
+photos: false
+split_messages: false
+scene: true
+speech: true
+listen_window: "on"
+addressing: addressed
+prompt_addendum: |
+  You are in VRChat, speaking out loud through an avatar. Keep replies short
+  enough to say in one breath. Do not offer stickers, photos, or split messages.
+  React to what you can see in the current scene; do not invent people off-camera.

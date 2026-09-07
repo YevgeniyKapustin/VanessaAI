@@ -44,6 +44,12 @@ class PhotoCaptionerProtocol(Protocol):
     async def generate(self, attachment: ImageAttachment) -> str | None: ...
 
 
+class SceneDescriberProtocol(Protocol):
+    """Turns a VRChat screenshot into a short scene description for compose."""
+
+    async def describe(self, image: ImageAttachment) -> str | None: ...
+
+
 class IncomingTurnHandlerProtocol(Protocol):
     async def handle_incoming(
         self,

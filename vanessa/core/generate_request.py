@@ -1,6 +1,7 @@
 from dataclasses import dataclass, fields
 from typing import Any
 
+from vanessa.config.channels import ChannelProfile
 from vanessa.config.content import MemeDefContent
 from vanessa.core.knowledge_dto import KnowledgeBlock
 from vanessa.core.messages import (
@@ -40,6 +41,8 @@ class GenerateRequest:
     images: list[ImageAttachment] | None = None
     photo_candidates: list[PhotoCandidate] | None = None
     current_images: list[ImageAttachment] | None = None
+    scene_description: str | None = None
+    channel_profile: ChannelProfile | None = None
 
 
 _REQUEST_FIELDS = {field.name for field in fields(GenerateRequest)}

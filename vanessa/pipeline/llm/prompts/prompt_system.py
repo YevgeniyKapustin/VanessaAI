@@ -1,4 +1,11 @@
+from vanessa.config.channels import ChannelProfile
 from vanessa.config.content import AppContent
+
+_SPLIT_OFF_NOTE = (
+    "## Reply shape\n"
+    "Reply as a single spoken message. Do not split the answer "
+    "and do not emit [next] block markers."
+)
 
 
 def _base_system_sections(content: AppContent) -> list[str]:
@@ -36,8 +43,18 @@ def _sticker_chunks(content: AppContent) -> list[str]:
     return sections
 
 
-def _sticker_section(content: AppContent) -> str | None:
-    if not content.stickers.enabled:
+def _stickers_enabled(
+    content: AppContent, profile: ChannelProfile | None
+) -> bool:
+    if profile is not None and not profile.stickers:
+        return False
+    return content.stickers.enabled
+
+
+def _sticker_section(
+    content: AppContent, profile: ChannelProfile | None
+) -> str | None:
+    if not _stickers_enabled(content, profile):
         return None
     chunks = _sticker_chunks(content)
     if not chunks:
@@ -45,19 +62,47 @@ def _sticker_section(content: AppContent) -> str | None:
     return "## Stickers\n" + "\n\n".join(chunks)
 
 
-def build_system_prompt(content: AppContent) -> str:
+def _split_section(profile: ChannelProfile | None) -> str | None:
+    if profile is None or profile.split_messages:
+        return None
+    return _SPLIT_OFF_NOTE
+
+
+def _channel_addendum(profile: ChannelProfile | None) -> str | None:
+    if profile is None:
+        return None
+    text = profile.prompt_addendum.strip()
+    if not text:
+        return None
+    return f"## Channel\n{text}"
+
+
+def _profile_sections(
+    content: AppContent, profile: ChannelProfile | None
+) -> list[str]:
+    parts: list[str] = []
+    for section in (
+        _profanity_section(content),
+        _sticker_section(content, profile),
+        _split_section(profile),
+        _channel_addendum(profile),
+    ):
+        if section is not None:
+            parts.append(section)
+    return parts
+
+
+def build_system_prompt(
+    content: AppContent,
+    profile: ChannelProfile | None = None,
+) -> str:
     # Recommended block order for the system message (blocks 1-3):
     #   role/persona -> constraints/rules -> few-shot examples.
     # The examples close the system message so they sit right before the
     # dynamic input data that opens the user prompt (block 4) and the final
     # task that closes it (block 5).
     parts = _base_system_sections(content)
-    profanity = _profanity_section(content)
-    if profanity is not None:
-        parts.append(profanity)
-    stickers = _sticker_section(content)
-    if stickers is not None:
-        parts.append(stickers)
+    parts.extend(_profile_sections(content, profile))
     # Few-shot examples — their own block, after every constraint (the
     # recommended "lower middle" position). The yaml block already carries
     # its own "## Examples" header, so it is appended whole.

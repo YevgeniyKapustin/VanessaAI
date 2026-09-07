@@ -42,6 +42,13 @@ class SharedSettings(BaseSettings):
     content_config_path: str = "config/content"
     nicknames_config_path: str = "config/nicknames.yaml"
 
+    # --- Speech (ElevenLabs TTS in adapters; wav never on Redis) -----------
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = ""
+    elevenlabs_model_id: str = "eleven_multilingual_v2"
+    elevenlabs_output_format: str = "pcm_24000"
+    elevenlabs_timeout_seconds: float = 30.0
+
     # --- HTTP (health / metrics on the agent process) ------------------------
     api_host: str = "0.0.0.0"
     api_port: int = 8000

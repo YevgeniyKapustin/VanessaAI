@@ -18,6 +18,7 @@ _EMPTY_TRIGGER = TriggerResult(detected=False)
 class DecisionContext:
     text: str
     telegram_chat_id: int = 0
+    channel: str | None = None
     recent_messages: list[ContextMessage] = field(default_factory=list)
     query_vector: list[float] | None = None
     intent: IntentResult = _EMPTY_INTENT
@@ -36,6 +37,7 @@ class DecisionContext:
     # feeds LowAttitudeRule (maximal ignore tendency) and the cold compose note.
     loop_strength: int = 0
     annoyance: float = 0.0
+    addressing: str = "telegram"
 
     @property
     def directly_addressed(self) -> bool:
@@ -59,7 +61,13 @@ class DecisionContext:
     def telegram_addressed_with_expectation(self) -> bool:
         """Like ``addressed_with_expectation`` but only for Telegram-level
         mention entities / replies, not for the bot name merely appearing in
-        the text."""
+        the text.
+
+        ``addressing=addressed`` (VRChat) does not require a Telegram mention
+        entity: name-in-text and adapter ``mentions_bot`` both count.
+        """
+        if self.addressing == "addressed":
+            return self.addressed_with_expectation
         if not (self.mentions_bot or self.reply_to_bot):
             return False
         return self._mention_warrants_reply()

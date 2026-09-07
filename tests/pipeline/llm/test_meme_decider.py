@@ -68,3 +68,12 @@ def test_counter_starts_eligible():
     assert decider.messages_since_meme(1) == min_messages_between
     decider.register_reply(1)
     assert decider.messages_since_meme(1) == min_messages_between + 1
+
+
+def test_vrchat_cooldown_is_not_int_zero():
+    decider = _decider(min_messages_between=3)
+    decider.register_meme(0)
+    decider.register_reply("vrchat")
+    assert decider.decide(0) is False
+    assert decider.decide("vrchat") is False
+    assert decider.decide(1) is True

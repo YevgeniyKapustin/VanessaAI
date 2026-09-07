@@ -19,6 +19,55 @@ from vanessa.pipeline.llm.prompts.budget import PRIORITY_DIRECTIVES, apply_budge
 from vanessa.pipeline.llm.prompts.prompt_system import build_system_prompt
 
 
+def _photos_on(request: GenerateRequest) -> bool:
+    profile = request.channel_profile
+    return profile is None or profile.photos
+
+
+def _stickers_on(request: GenerateRequest) -> bool:
+    profile = request.channel_profile
+    return profile is None or profile.stickers
+
+
+def _photo_empty_parts(
+    content: AppContent, request: GenerateRequest, *, photo_requested: bool
+):
+    if not _photos_on(request):
+        return []
+    return prompt_directives.photo_empty_parts(
+        content,
+        request.photo_candidates,
+        photo_requested=photo_requested,
+    )
+
+
+def _meme_parts(content: AppContent, request: GenerateRequest):
+    if not _stickers_on(request):
+        return []
+    return prompt_context.meme_parts(
+        content, request.meme_blocks, request.meme_menu
+    )
+
+
+def _photo_album_parts(
+    content: AppContent, request: GenerateRequest, *, photo_requested: bool
+):
+    if not _photos_on(request):
+        return []
+    return prompt_context.photo_album_parts(
+        content,
+        request.photo_candidates,
+        photo_requested=photo_requested,
+    )
+
+
+def _final_task_parts(content: AppContent):
+    final_task = content.llm.final_task_text()
+    if not final_task:
+        return []
+    return [(PRIORITY_DIRECTIVES, "final_task", final_task)]
+
+
 class PromptBuilder:
     """Assemble the compose prompt following the recommended block order:
 
@@ -87,10 +136,8 @@ class PromptBuilder:
             )
         )
         parts.extend(
-            prompt_directives.photo_empty_parts(
-                content,
-                request.photo_candidates,
-                photo_requested=photo_requested,
+            _photo_empty_parts(
+                content, request, photo_requested=photo_requested
             )
         )
         parts.extend(
@@ -99,18 +146,15 @@ class PromptBuilder:
             )
         )
         parts.extend(prompt_context.knowledge_parts(content, request.knowledge_blocks))
+        parts.extend(prompt_directives.scene_parts(request.scene_description))
         parts.extend(prompt_directives.web_parts(content, request.web_blocks))
         parts.extend(prompt_context.humor_parts(content, request.humor_quotes))
-        parts.extend(
-            prompt_context.meme_parts(content, request.meme_blocks, request.meme_menu)
-        )
+        parts.extend(_meme_parts(content, request))
         parts.extend(prompt_context.metrics_parts(content, request.metrics_block))
         parts.extend(prompt_context.session_parts(content, request.session_messages))
         parts.extend(
-            prompt_context.photo_album_parts(
-                content,
-                request.photo_candidates,
-                photo_requested=photo_requested,
+            _photo_album_parts(
+                content, request, photo_requested=photo_requested
             )
         )
         parts.extend(
@@ -124,9 +168,7 @@ class PromptBuilder:
                 format_current_message=prompt_format.format_current_message,
             )
         )
-        final_task = content.llm.final_task_text()
-        if final_task:
-            parts.append((PRIORITY_DIRECTIVES, "final_task", final_task))
+        parts.extend(_final_task_parts(content))
         budget = content.llm.budget
         enabled = bool(settings.compose_budget_enabled and budget.enabled)
         parts = apply_budget(parts, budget, enabled=enabled)

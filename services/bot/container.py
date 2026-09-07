@@ -4,11 +4,14 @@ from dataclasses import dataclass
 from services.bot.services.broker_client import BrokerTurnClient
 from services.bot.services.chat_access import ChatAccessGuard
 from services.bot.services.protocols import ChatApiClientProtocol
+from services.bot.speech_settings import resolve_telegram_speech_enabled
 from services.bot.stickers import StickerDecider, StickerService, build_catalog
 from vanessa.config import settings
 from vanessa.config.content import BotMessagesContent, get_content
+from vanessa.core.protocols.speech import SpeechSynthesizer
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
+from vanessa.infrastructure.speech import create_speech_synthesizer
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,9 @@ class BotServices:
     typing_interval_seconds: float = 4.0
     message_delay_seconds: float = 0.7
     max_messages: int = 8
+    speech: SpeechSynthesizer | None = None
+    speech_enabled: bool = False
+    speech_send: str = "voice_and_text"
 
 
 def create_bot_services() -> BotServices:
@@ -49,6 +55,10 @@ def create_bot_services() -> BotServices:
         timeout=settings.broker_rpc_timeout_seconds,
     )
     logger.info("bot_transport=redis streams=%s", settings.broker_streams_prefix)
+    speech_enabled = resolve_telegram_speech_enabled(
+        default=settings.speech_enabled,
+    )
+    speech = create_speech_synthesizer() if speech_enabled else None
 
     return BotServices(
         chat_client=chat_client,
@@ -63,4 +73,7 @@ def create_bot_services() -> BotServices:
         typing_interval_seconds=settings.bot_typing_interval_seconds,
         message_delay_seconds=settings.bot_message_delay_seconds,
         max_messages=settings.bot_max_messages,
+        speech=speech,
+        speech_enabled=speech_enabled,
+        speech_send=settings.speech_send,
     )

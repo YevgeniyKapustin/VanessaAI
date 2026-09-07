@@ -9,6 +9,7 @@ from services.agent.broker_worker import TurnHandlerFactory, TurnMapper
 from vanessa.contracts.messages import (
     TaskKind,
     TaskMessage,
+    TurnImage,
     TurnReply,
     TurnRequest,
 )
@@ -40,6 +41,28 @@ def test_turn_mapper_copies_request_fields() -> None:
     assert turn.telegram_chat_id == telegram_chat_id
     assert turn.message == "hi"
     assert turn.sender_telegram_id == sender_telegram_id
+    assert turn.channel == "telegram"
+    assert turn.scene_image is None
+    assert turn.images == ()
+
+
+def test_turn_mapper_keeps_scene_out_of_images() -> None:
+    request = TurnRequest(
+        channel="vrchat",
+        message="look",
+        telegram_chat_id=None,
+        sender_telegram_id=None,
+        sender_first_name="Kapusta",
+        scene_image=TurnImage(data_url="data:image/jpeg;base64,abc"),
+    )
+    turn = TurnMapper().to_turn(request)
+    assert turn.channel == "vrchat"
+    assert turn.telegram_chat_id is None
+    assert turn.sender_telegram_id is None
+    assert turn.scene_image is not None
+    assert turn.scene_image.data_url == "data:image/jpeg;base64,abc"
+    assert turn.images == ()
+    assert turn.has_image is False
 
 
 class _FakeSessionCM:

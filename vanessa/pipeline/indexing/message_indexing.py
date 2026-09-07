@@ -10,11 +10,16 @@ from vanessa.core.protocols import (
     MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
 )
+from vanessa.core.session.channel_keys import CHANNEL_TELEGRAM
 from vanessa.infrastructure.broker.dispatcher import TaskDispatcher
 from vanessa.infrastructure.db.repository import MessageRepository
 from vanessa.pipeline.background import BackgroundExecutor
 
 logger = logging.getLogger(__name__)
+
+
+def _should_index(record: StoredMessage) -> bool:
+    return record.role == RAG_SOURCE_ROLE and record.channel == CHANNEL_TELEGRAM
 
 
 class MessageIndexingService(MessageIndexingSchedulerProtocol):
@@ -37,7 +42,7 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
         self._bg_tasks: set[asyncio.Task] = set()
 
     async def _embed_with_retry(self, record: StoredMessage) -> str:
-        if record.role != RAG_SOURCE_ROLE:
+        if not _should_index(record):
             return record.qdrant_point_id or ""
         return await self._index_with_retries(record)
 
@@ -60,7 +65,7 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
         raise last_error
 
     async def index_now(self, record: StoredMessage) -> None:
-        if record.role != RAG_SOURCE_ROLE:
+        if not _should_index(record):
             return
         try:
             point_id = await self._embed_with_retry(record)
@@ -79,7 +84,7 @@ class MessageIndexingService(MessageIndexingSchedulerProtocol):
             logger.exception("Background indexing failed for message %s", record.id)
 
     def schedule(self, record: StoredMessage) -> None:
-        if record.role != RAG_SOURCE_ROLE:
+        if not _should_index(record):
             return
         if self._dispatcher is not None:
             # Worker mode: hand the embedding off to the dedicated worker

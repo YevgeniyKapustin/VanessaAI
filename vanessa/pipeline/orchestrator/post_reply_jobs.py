@@ -34,31 +34,38 @@ class _PostReplyJobsMixin:
 
     def _build_metrics_job(self, ctx: TurnPipelineContext):
         sender_id = ctx.turn.sender_telegram_id
+        if sender_id is None or self._metrics is None:
+            return None
+        return self._sender_metrics_job(sender_id)
 
+    def _sender_metrics_job(self, sender_id: int):
         async def job() -> None:
             try:
-                assert self._metrics is not None
-                if self._session_factory is not None:
-                    # The request-scoped repo dies with the response, so metrics
-                    # must open its own session in the background.
-                    async with self._session_factory() as session:
-                        await self._metrics.run(
-                            MessageRepository(session),
-                            semantic=False,
-                            only_senders={sender_id},
-                        )
-                else:
-                    await self._metrics.run(
-                        self._messages,
-                        semantic=False,
-                        only_senders={sender_id},
-                    )
+                await self._run_sender_metrics(sender_id)
             except Exception:
                 logger.exception(
                     "metrics_stage_run_failed request_id=%s", get_request_id()
                 )
 
         return job
+
+    async def _run_sender_metrics(self, sender_id: int) -> None:
+        assert self._metrics is not None
+        if self._session_factory is not None:
+            # The request-scoped repo dies with the response, so metrics
+            # must open its own session in the background.
+            async with self._session_factory() as session:
+                await self._metrics.run(
+                    MessageRepository(session),
+                    semantic=False,
+                    only_senders={sender_id},
+                )
+            return
+        await self._metrics.run(
+            self._messages,
+            semantic=False,
+            only_senders={sender_id},
+        )
 
     def _build_eval_job(self, ctx: TurnPipelineContext):
         question = ctx.turn.message

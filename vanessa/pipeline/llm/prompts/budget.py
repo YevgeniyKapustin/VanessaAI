@@ -27,6 +27,9 @@ PRIORITY_CURRENT = 100
 PRIORITY_DIRECTIVES = 95
 PRIORITY_REPLY = 90
 PRIORITY_KNOWLEDGE = 80
+# VRChat first-person scene sits just below the archive: current sight is
+# more useful than old history, less than the utterance being answered.
+PRIORITY_SCENE = 79
 # Live web-search results sit just below the archive: fresh, external facts are
 # valuable for the answer but less authoritative than the bot's own memory.
 PRIORITY_WEB = 78

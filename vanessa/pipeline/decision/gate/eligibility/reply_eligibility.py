@@ -81,6 +81,8 @@ class ReplyEligibility:
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
+        addressing: str = "telegram",
+        force_listen_window: bool = False,
     ) -> PrefilterVerdict:
         context = DecisionContext(
             text=text,
@@ -91,6 +93,8 @@ class ReplyEligibility:
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
             reply_to_other_user=reply_to_other_user,
+            addressing=addressing,
+            in_listen_window=force_listen_window,
         )
         hard = self.hard_ignore(context)
         if hard is not None:

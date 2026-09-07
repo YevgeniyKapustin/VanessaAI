@@ -14,6 +14,7 @@ from vanessa.knowledge.metrics.pipeline import MetricsPipeline
 from vanessa.pipeline.background import BackgroundExecutor
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.orchestrator.post_reply import _PostReplyMixin
+from vanessa.pipeline.orchestrator.scene_join import join_retrieve_and_scene
 from vanessa.pipeline.orchestrator.turn_ingress import _TurnIngressMixin
 from vanessa.pipeline.orchestrator.turn_logging import _preview, _TurnLoggingMixin
 from vanessa.pipeline.protocols import FinalizeStageProtocol, PipelineStage
@@ -41,6 +42,7 @@ class ConversationOrchestrator(
         eval: RagTriadEvaluator | None = None,  # noqa: A002 — public constructor kwarg
         photo_captioner: PhotoCaptionerProtocol | None = None,
         dispatcher: TaskDispatcher | None = None,
+        scene: PipelineStage | None = None,
     ) -> None:
         self._messages = messages
         self._users = users
@@ -56,6 +58,7 @@ class ConversationOrchestrator(
         self._eval = eval
         self._photo_captioner = photo_captioner
         self._dispatcher = dispatcher
+        self._scene = scene
 
     async def handle_incoming(self, turn: ChatTurnInput) -> ConversationTurnResult:
         tracer = get_tracer()
@@ -65,6 +68,7 @@ class ConversationOrchestrator(
             session_id=str(turn.telegram_chat_id),
             metadata={
                 "request_id": get_request_id(),
+                "channel": turn.channel,
                 "chat_id": hash_identifier(turn.telegram_chat_id),
                 "message_preview": _preview(turn.message),
             },
@@ -92,7 +96,12 @@ class ConversationOrchestrator(
         # that got filtered out. Fail-open: a broken signal must not block the
         # turn.
         await self._notify_planning_started()
-        await self._run_stage("retrieve", self._retrieve.run(ctx))
+        await join_retrieve_and_scene(
+            ctx,
+            retrieve=self._retrieve,
+            scene=self._scene,
+            run_stage=self._run_stage,
+        )
         await self._run_stage("compose", self._compose.run(ctx))
 
         # The compose stage refused the answer (repeated same-sender message /

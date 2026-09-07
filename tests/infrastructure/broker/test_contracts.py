@@ -74,6 +74,48 @@ def test_schema_version_stamped() -> None:
     assert message.schema_version == SCHEMA_VERSION
 
 
+def test_turn_request_defaults_to_telegram_channel() -> None:
+    request = TurnRequest(telegram_chat_id=1, message="x", sender_telegram_id=2)
+    assert request.channel == "telegram"
+    assert request.scene_image is None
+
+
+def test_legacy_payload_without_channel_decodes_as_telegram() -> None:
+    telegram_chat_id = 1
+    sender_telegram_id = 2
+    request = TurnRequest(
+        telegram_chat_id=telegram_chat_id,
+        message="x",
+        sender_telegram_id=sender_telegram_id,
+    )
+    payload = request.model_dump(mode="json")
+    payload.pop("channel", None)
+    payload.pop("scene_image", None)
+    decoded = TurnRequest.model_validate(payload)
+    assert decoded.channel == "telegram"
+    assert decoded.scene_image is None
+    assert decoded.telegram_chat_id == telegram_chat_id
+    assert decoded.sender_telegram_id == sender_telegram_id
+
+
+def test_vrchat_turn_request_allows_null_telegram_ids() -> None:
+    request = TurnRequest(
+        channel="vrchat",
+        message="hello world",
+        telegram_chat_id=None,
+        sender_telegram_id=None,
+        scene_image=TurnImage(data_url="data:image/jpeg;base64,abc"),
+    )
+    decoded = decode(encode(request))
+    assert isinstance(decoded, TurnRequest)
+    assert decoded.channel == "vrchat"
+    assert decoded.telegram_chat_id is None
+    assert decoded.sender_telegram_id is None
+    assert decoded.scene_image is not None
+    assert decoded.images == []
+    assert decoded.schema_version == SCHEMA_VERSION
+
+
 def test_message_id_and_correlation_defaults_unique() -> None:
     a = TurnRequest(telegram_chat_id=1, message="x", sender_telegram_id=2)
     b = TurnRequest(telegram_chat_id=1, message="x", sender_telegram_id=2)

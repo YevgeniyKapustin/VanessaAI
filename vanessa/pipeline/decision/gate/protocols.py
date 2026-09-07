@@ -24,6 +24,8 @@ class ReplyEligibilityProtocol(Protocol):
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
+        addressing: str = "telegram",
+        force_listen_window: bool = False,
     ) -> PrefilterVerdict: ...
 
     def should_block_compose(
@@ -45,6 +47,8 @@ class PlannerPrefilterProtocol(Protocol):
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
+        addressing: str = "telegram",
+        force_listen_window: bool = False,
     ) -> PlannerPrefilterResult: ...
 
 

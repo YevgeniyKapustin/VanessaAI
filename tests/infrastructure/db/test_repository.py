@@ -305,6 +305,10 @@ async def test_message_fulltext_search():
     assert hits[0].content == "привет"
     assert hits[0].attachments is None
     assert hits[0].photo_caption is None
+    sql = session.execute.await_args.args[0].text
+    params = session.execute.await_args.args[1]
+    assert "channel = :channel" in sql
+    assert params["channel"] == "telegram"
 
 
 @pytest.mark.asyncio
@@ -325,6 +329,10 @@ async def test_message_get_recent():
     recent = await repo.get_recent(limit=1)
     assert len(recent) == 1
     assert recent[0].sender_name == "Ann"
+    sql = session.execute.await_args.args[0].text
+    params = session.execute.await_args.args[1]
+    assert "m.channel = :channel" in sql
+    assert params["channel"] == "telegram"
 
 
 @pytest.mark.asyncio
@@ -378,6 +386,8 @@ async def test_message_search_photo_messages_uses_savepoint_and_array_guard():
     # The query must tolerate malformed attachments data (non-array JSON).
     sql = session.execute.await_args.args[0].text
     assert "jsonb_typeof(m.attachments) = 'array'" in sql
+    assert "m.channel = :channel" in sql
+    assert session.execute.await_args.args[1]["channel"] == "telegram"
 
 
 def _window_row(msg_id: int, content: str) -> dict:
@@ -468,3 +478,80 @@ async def test_message_get_by_ids_empty():
     session = AsyncMock()
     repo = MessageRepository(session)
     assert await repo.get_by_ids([]) == []
+
+
+@pytest.mark.asyncio
+async def test_message_create_persists_channel_and_display_name():
+    session = AsyncMock()
+    session.execute = AsyncMock()
+
+    async def flush() -> None:
+        for call in session.add.call_args_list:
+            message = call.args[0]
+            if isinstance(message, Message):
+                message.id = 21
+
+    session.flush = AsyncMock(side_effect=flush)
+    repo = MessageRepository(session)
+    stored = await repo.create(
+        role=RAG_SOURCE_ROLE,
+        content="hello vrchat",
+        sender_telegram_id=None,
+        channel="vrchat",
+        sender_display_name="Alice",
+    )
+    added = session.add.call_args.args[0]
+    assert isinstance(added, Message)
+    assert added.channel == "vrchat"
+    assert added.sender_display_name == "Alice"
+    assert stored.channel == "vrchat"
+
+
+@pytest.mark.asyncio
+async def test_get_recent_vrchat_channel_param():
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_mappings_result([]))
+    repo = MessageRepository(session)
+    await repo.get_recent(limit=10, channel="vrchat")
+    params = session.execute.await_args.args[1]
+    assert params["channel"] == "vrchat"
+
+
+@pytest.mark.asyncio
+async def test_get_messages_since_does_not_filter_channel():
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_mappings_result([]))
+    repo = MessageRepository(session)
+    await repo.get_messages_since(days=7)
+    sql = session.execute.await_args.args[0].text
+    assert "channel =" not in sql
+
+
+@pytest.mark.asyncio
+async def test_window_for_anchor_filters_channel():
+    session = AsyncMock()
+    repo = MessageRepository(session)
+    created = datetime.now(UTC)
+    anchor = StoredMessage(
+        id=10,
+        role="user",
+        content="center",
+        created_at=created,
+        channel="telegram",
+    )
+    repo.get_by_id = AsyncMock(return_value=anchor)
+    before_result = _mappings_result([_window_row(9, "before")])
+    center_result = MagicMock()
+    center_result.mappings.return_value.first.return_value = _window_row(10, "center")
+    after_result = _mappings_result([_window_row(11, "after")])
+    session.execute = AsyncMock(
+        side_effect=[before_result, center_result, after_result]
+    )
+
+    await repo._window_for_anchor(10, before=1, after=1)
+
+    for call in session.execute.await_args_list:
+        sql = call.args[0].text
+        params = call.args[1]
+        assert "m.channel = :channel" in sql
+        assert params["channel"] == "telegram"

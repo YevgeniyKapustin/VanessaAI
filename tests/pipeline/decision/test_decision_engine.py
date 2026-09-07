@@ -97,6 +97,41 @@ def test_rate_limiter_blocks_after_max_replies():
     assert limiter.is_limited(1) is True
 
 
+def test_rate_limiter_vrchat_key_is_not_int_zero():
+    limiter = RateLimiter(max_replies=2, window_seconds=60)
+    limiter.record_reply(0)
+    limiter.record_reply("vrchat")
+    assert limiter.is_limited(0) is True
+    assert limiter.is_limited("vrchat") is True
+    assert limiter.is_limited(1) is False
+
+
+def test_rate_limiter_telegram_session_key_is_not_vrchat():
+    limiter = RateLimiter(max_replies=1, window_seconds=60)
+    limiter.record_reply("telegram:-1001")
+    assert limiter.is_limited("telegram:-1001") is True
+    assert limiter.is_limited("vrchat") is False
+
+
+def test_decision_engine_record_reply_uses_session_key(
+    intent_detector: IntentDetector,
+    trigger_checker: TriggerKeywordChecker,
+):
+    limiter = RateLimiter(max_replies=1, window_seconds=60)
+    engine = DecisionEngine(
+        intent_detector=intent_detector,
+        trigger_checker=trigger_checker,
+        relevance_checker=FakeRelevance(0.1),
+        session_analyzer=SessionWindowAnalyzer(10, intent_detector, trigger_checker),
+        rate_limiter=limiter,
+        noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
+        relevance_threshold=0.75,
+    )
+    engine.record_reply("vrchat")
+    assert limiter.is_limited("vrchat") is True
+    assert limiter.is_limited("telegram:-1001") is False
+
+
 class FakeRelevance:
     def __init__(self, score: float) -> None:
         self._score = score

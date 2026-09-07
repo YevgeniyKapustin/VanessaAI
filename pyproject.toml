@@ -36,6 +36,8 @@ pymorphy3 = "^2.0.6"
 # Observability
 prometheus-client = ">=0.21.0"
 langfuse = ">=2.50.0"
+elevenlabs = ">=1.0.0"
+python-osc = ">=1.8.0"
 
 [[tool.poetry.source]]
 name = "pytorch-cpu"

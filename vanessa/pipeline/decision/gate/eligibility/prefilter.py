@@ -44,6 +44,8 @@ class PlannerPrefilter:
         mentions_bot: bool = False,
         reply_to_bot: bool = False,
         reply_to_other_user: bool = False,
+        addressing: str = "telegram",
+        force_listen_window: bool = False,
     ) -> PlannerPrefilterResult:
         verdict = self._eligibility.evaluate_prefilter(
             text,
@@ -53,5 +55,7 @@ class PlannerPrefilter:
             mentions_bot=mentions_bot,
             reply_to_bot=reply_to_bot,
             reply_to_other_user=reply_to_other_user,
+            addressing=addressing,
+            force_listen_window=force_listen_window,
         )
         return PlannerPrefilterResult(verdict.run_planner, verdict.reason)

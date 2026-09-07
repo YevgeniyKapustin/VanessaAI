@@ -1,8 +1,16 @@
 # Architecture
 
-How VanessaAI turns a Telegram message into a reply — or silence. The
+How VanessaAI turns a message into a reply — or silence. The
 landing summary is in the [README](../README.md); this page is the
 pipeline, vault, mood metrics, and retrieval tracks.
+
+Telegram is the default adapter. VRChat is a second adapter
+(`services/presence`) of the same agent — a host process on the game
+PC, not a fifth server container. Do not add it to server
+`docker-compose`. Redis from that PC must reach the broker
+(`BROKER_REDIS_URL` is not the container's `127.0.0.1` if the PC is
+elsewhere). VRChat OSC Enable, UDP `9000`; VB-Cable/VoiceMeeter into
+the VRChat mic.
 
 ## Pipeline
 
@@ -10,29 +18,48 @@ pipeline, vault, mood metrics, and retrieval tracks.
 flowchart LR
   telegram[Telegram]
   bot[Bot]
+  presence[Presence]
+  vrchat[VRChat]
   broker[Redis Streams]
   core[agent]
   ingress[Ingress]
   gate[Gate]
   retrieve[Retrieve]
+  scene[Scene]
   compose[Compose]
   post[Post]
-  telegram --> bot --> broker --> core
-  core --> ingress --> gate --> retrieve --> compose --> post
+  telegram --> bot --> broker
+  vrchat --> presence --> broker
+  broker --> core
+  core --> ingress --> gate
+  gate --> retrieve
+  gate --> scene
+  retrieve --> compose
+  scene --> compose
+  compose --> post
 ```
 
 - **Ingress** — persist the message, load session, apply nicknames.
 - **Gate** — prefilter → Turn Planner → Decision Engine.
 - **Retrieve** — semantic vault RAG first, raw-message RAG fallback,
   optional ReAct, humor RAG + reflexion.
+- **Scene** — VRChat only: describe the current screenshot in parallel
+  with retrieve, join (2s timeout) before compose. Telegram is
+  zero-cost.
 - **Compose** — DeepSeek (default) or Claude via the provider adapter.
 - **Post** — Telegram formatting, profanity filter.
 
+Channel flags (`stickers`, `photos`, `split_messages`, `scene`,
+`speech`, `addressing`, `listen_window`) live in `config/channels/`
+and attach per turn on `TurnPipelineContext.profile`. They are not
+process-level `OrchestratorConfig`.
+
 Orchestrator stages live in `vanessa/pipeline/`; gate / retrieve / compose
-code is under `vanessa/pipeline/decision`, `rag`, and `llm`. Dependencies
-are wired through protocols (`vanessa/core/protocols.py`) so stages stay
-testable. Process entrypoints live under `services/` (`bot`, `agent`,
-`worker`, `mcp`). Wire contracts are `vanessa/contracts/`; Redis transport
+code is under `vanessa/pipeline/decision`, `rag`, and `llm`. Scene vision
+is `vanessa/pipeline/vision/`. Dependencies are wired through protocols
+(`vanessa/core/protocols`) so stages stay testable. Process entrypoints
+live under `services/` (`bot`, `agent`, `worker`, `mcp`, plus host
+`presence`). Wire contracts are `vanessa/contracts/`; Redis transport
 is `vanessa/infrastructure/broker/`. Postgres is `vanessa/infrastructure/db/`.
 
 ## Gate

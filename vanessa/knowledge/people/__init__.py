@@ -14,8 +14,14 @@ from vanessa.knowledge.people.people import (
     levenshtein,
     telegram_id_for_slug,
 )
+from vanessa.knowledge.people.vrchat_speaker import (
+    PersonCard,
+    resolve_person_card,
+    resolve_vrchat_speaker,
+)
 
 __all__ = [
+    "PersonCard",
     "canonical_name_for_telegram_id",
     "canonicalize_person",
     "identity_key",
@@ -27,5 +33,7 @@ __all__ = [
     "mentioned_people_in_text",
     "people_file_for_name",
     "resolve_mentioned_people",
+    "resolve_person_card",
+    "resolve_vrchat_speaker",
     "telegram_id_for_slug",
 ]

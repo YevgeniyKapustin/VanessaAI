@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass, field
 
+from vanessa.config.channels import ChannelProfile, load_channel_profile
 from vanessa.config.content import MemeDefContent
 from vanessa.core.messages import ContextBlock, ContextMessage, StoredMessage, WebResult
 from vanessa.core.session.chat_session_state import ChatSessionState
@@ -61,6 +62,11 @@ class TurnPipelineContext:
     humor_rag_ms: float = 0.0
     llm_ms: float = 0.0
     embed_ms: float = 0.0
+    scene_description: str | None = None
+
+    @property
+    def profile(self) -> ChannelProfile:
+        return load_channel_profile(self.turn.channel)
 
     @property
     def context_count(self) -> int:

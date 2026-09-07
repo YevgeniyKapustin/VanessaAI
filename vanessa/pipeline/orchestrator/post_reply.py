@@ -3,6 +3,7 @@ import logging
 from vanessa.contracts.messages import TaskKind
 from vanessa.core.messages import context_message_to_payload
 from vanessa.core.request_context import get_request_id
+from vanessa.core.session.channel_keys import memory_dedup_key, turn_channel
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.orchestrator.post_reply_jobs import _PostReplyJobsMixin
 
@@ -49,8 +50,9 @@ class _PostReplyMixin(_PostReplyJobsMixin):
         assert self._background is not None
         if self._memory is not None:
             self._background.submit(self._build_memory_job(ctx))
-        if self._metrics is not None:
-            self._background.submit(self._build_metrics_job(ctx))
+        metrics_job = self._build_metrics_job(ctx)
+        if metrics_job is not None:
+            self._background.submit(metrics_job)
 
     async def _run_inline_post_reply(
         self, ctx: TurnPipelineContext, caption_job
@@ -75,7 +77,7 @@ class _PostReplyMixin(_PostReplyJobsMixin):
             )
 
     async def _run_inline_metrics(self, ctx: TurnPipelineContext) -> None:
-        if self._metrics is None:
+        if self._metrics is None or ctx.turn.sender_telegram_id is None:
             return
         try:
             await self._metrics.run(
@@ -101,13 +103,18 @@ class _PostReplyMixin(_PostReplyJobsMixin):
                     context_message_to_payload(message) for message in ctx.recent
                 ],
             },
-            dedup_key=f"memory:{chat_id}:{user_id}",
+            dedup_key=memory_dedup_key(
+                channel=turn_channel(ctx.turn),
+                sender_telegram_id=ctx.turn.sender_telegram_id,
+                sender_name=ctx.sender_name,
+            ),
         )
-        self._dispatcher.submit(
-            TaskKind.METRICS_SNAPSHOT,
-            {"sender_telegram_id": ctx.turn.sender_telegram_id},
-            dedup_key=f"metrics:{chat_id}:{user_id}",
-        )
+        if ctx.turn.sender_telegram_id is not None:
+            self._dispatcher.submit(
+                TaskKind.METRICS_SNAPSHOT,
+                {"sender_telegram_id": ctx.turn.sender_telegram_id},
+                dedup_key=f"metrics:{chat_id}:{user_id}",
+            )
         if ctx.user_msg is not None and ctx.user_msg.attachments:
             first = ctx.user_msg.attachments[0]
             if isinstance(first, dict) and first.get("data_url"):

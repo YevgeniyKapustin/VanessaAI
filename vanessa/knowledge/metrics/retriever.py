@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from vanessa.knowledge.format import PEOPLE
 from vanessa.knowledge.index.index import KnowledgeIndex
 from vanessa.knowledge.metrics.schema import PersonMetrics
+from vanessa.knowledge.people.vrchat_speaker import resolve_vrchat_speaker
 from vanessa.knowledge.store.vault import KnowledgeVault
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,19 @@ class MetricsRetriever:
         if not self._vault.is_configured or not person_id:
             return None
         return await self._read_profile(f"{PEOPLE}/{person_id}.md", person_id)
+
+    async def get_by_vrchat_name(self, display_name: str) -> SenderProfile | None:
+        """Profile for a VRChat speaker; does not require telegram_id."""
+        if not self._vault.is_configured or not display_name.strip():
+            return None
+        people_index = await self._index.load_folder(PEOPLE)
+        card = resolve_vrchat_speaker(display_name, people_index)
+        if not card.person_id:
+            return None
+        profile = await self.get_by_person_id(card.person_id)
+        if profile is not None:
+            return profile
+        return SenderProfile(person_id=card.person_id, metrics=None)
 
     async def _read_profile(self, rel: str, person_id: str) -> SenderProfile | None:
         note = await self._vault.read_note(rel)

@@ -58,8 +58,10 @@ class FakeMessageRepo:
         reply_to_sender_telegram_id: int | None = None,
         reply_to_sender_name: str | None = None,
         attachments: list[dict] | None = None,
+        channel: str = "telegram",
+        sender_display_name: str | None = None,
     ) -> StoredMessage:
-        _ = created_at
+        _ = created_at, sender_display_name
         message = StoredMessage(
             id=self._next_id,
             role=role,
@@ -72,13 +74,24 @@ class FakeMessageRepo:
             reply_to_sender_telegram_id=reply_to_sender_telegram_id,
             reply_to_sender_name=reply_to_sender_name,
             attachments=attachments,
+            channel=channel,
         )
         self._messages[message.id] = message
         self._next_id += 1
         return message
 
-    async def get_recent(self, limit: int = 50) -> list[StoredMessage]:
-        return list(self._messages.values())[-limit:]
+    async def get_recent(
+        self,
+        limit: int = 50,
+        *,
+        channel: str = "telegram",
+    ) -> list[StoredMessage]:
+        rows = [
+            message
+            for message in self._messages.values()
+            if message.channel == channel
+        ]
+        return rows[-limit:]
 
     async def fulltext_search(self, query: str, limit: int = 30) -> list[StoredMessage]:
         _ = query, limit
@@ -266,6 +279,8 @@ class FakeLLM:
         self.last_attitude_note: str | None = None
         self.last_sender_name: str | None = None
         self.last_web_blocks: list | None = None
+        self.last_scene_description: str | None = None
+        self.last_system_prompt: str | None = None
 
     async def generate(self, user_message, context_blocks=None, **kwargs) -> str:
         request = as_generate_request(user_message, context_blocks, **kwargs)
@@ -288,13 +303,15 @@ class FakeLLM:
         self.last_images = request.images
         self.last_photo_candidates = request.photo_candidates
         self.last_current_images = request.current_images
+        self.last_scene_description = request.scene_description
+        self.last_system_prompt = request.system_prompt
         return f"echo: {request.user_message}"
 
 
 class FakeDecisionEngine:
     def __init__(self, action: DecisionAction) -> None:
         self._action = action
-        self.recorded_chats: list[int] = []
+        self.recorded_chats: list[int | str] = []
         self.decide_calls: int = 0
 
     async def decide(
@@ -315,8 +332,8 @@ class FakeDecisionEngine:
             ),
         )
 
-    def record_reply(self, telegram_chat_id: int) -> None:
-        self.recorded_chats.append(telegram_chat_id)
+    def record_reply(self, chat_id: int | str) -> None:
+        self.recorded_chats.append(chat_id)
 
 
 def _build_orchestrator(
@@ -436,7 +453,7 @@ async def test_orchestrator_replies_and_indexes_both_messages():
     stored_user_and_reply = 2
     assert len(messages._messages) == stored_user_and_reply
     assert len(indexing.scheduled) == 1
-    assert decision.recorded_chats == [-1001]
+    assert decision.recorded_chats == ["telegram:-1001"]
 
 
 @pytest.mark.asyncio
@@ -1595,7 +1612,7 @@ async def test_orchestrator_compose_refuse_can_be_disabled():
     # flows through the normal finalize path unchanged.
     assert result.action == DecisionAction.REPLY
     assert result.reply == ""
-    assert decision.recorded_chats == [-1001]
+    assert decision.recorded_chats == ["telegram:-1001"]
 
 
 @pytest.mark.asyncio

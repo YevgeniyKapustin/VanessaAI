@@ -18,16 +18,19 @@ Top-level is **role**. Inside a role, group by **capability**
 |------|------|
 | Protocols, DTOs, session, logging | `vanessa/core/` |
 | Redis/wire messages | `vanessa/contracts/` |
-| Turn stages | `vanessa/pipeline/` (`decision`, `rag`, `llm`, `orchestrator`, `stages`, `indexing`) |
+| Turn stages | `vanessa/pipeline/` (`decision`, `rag`, `llm`, `orchestrator`, `stages`, `indexing`, `vision`) |
 | Vault / nodes / portraits | `vanessa/knowledge/` |
 | Redis, Postgres, ingest, outbox, metrics | `vanessa/infrastructure/` |
 | Shared completers | `vanessa/llm/` (not compose-stage prompts) |
-| Settings / YAML loaders | `vanessa/config/` |
+| Settings / YAML loaders | `vanessa/config/` (`channels.py` loads `config/channels/`) |
 | Telegram adapter | `services/bot/` |
+| VRChat adapter (host, not server compose) | `services/presence/` |
 | Pipeline wiring; HTTP = health/metrics | `services/agent/` |
 | Async jobs / MCP | `services/worker/`, `services/mcp/` |
 
-Do not add a fifth process. Do not import sibling services.
+Pipeline roles stay four (adapter / agent / worker / mcp). Adapters may
+be several. `services/presence` is a second adapter, not a fifth server
+process — do not add it to server compose. Do not import sibling services.
 
 ```
 # GOOD — capability colocated
@@ -75,6 +78,7 @@ contracts, not sibling internals.
 | `vanessa.pipeline.decision` | `vanessa.pipeline.llm`, `vanessa.pipeline.rag`, `vanessa.infrastructure` |
 | `vanessa.knowledge` | `vanessa.pipeline` |
 | `services.bot` | `vanessa.pipeline`, `vanessa.knowledge`, `vanessa.infrastructure.db`, sibling services |
+| `services.presence` | same as `services.bot` |
 | any `services.*` | other `services.*` |
 
 Tests: `tests/test_layer_boundaries.py`, `tests/test_service_boundaries.py`.

@@ -50,6 +50,7 @@ class BrokerTurnClient:
         correlation_id = f"{message.telegram_chat_id}:{message.telegram_message_id}"
         request = TurnRequest(
             correlation_id=correlation_id,
+            channel="telegram",
             telegram_chat_id=message.telegram_chat_id,
             message=message.text,
             sender_telegram_id=message.sender_telegram_id,

@@ -4,6 +4,7 @@ from vanessa.core.protocols.compose import (
     LLMChatCompleter,
     LLMProviderProtocol,
     PhotoCaptionerProtocol,
+    SceneDescriberProtocol,
     TurnMetricsProtocol,
 )
 from vanessa.core.protocols.search import (
@@ -15,6 +16,7 @@ from vanessa.core.protocols.search import (
     VectorSearchHit,
     VectorStoreProtocol,
 )
+from vanessa.core.protocols.speech import SpeechAudio, SpeechSynthesizer
 from vanessa.core.protocols.storage import (
     ChatUserProtocol,
     MessageIndexerProtocol,
@@ -38,6 +40,9 @@ __all__ = [
     "MessageIndexingSchedulerProtocol",
     "MessageRepositoryProtocol",
     "PhotoCaptionerProtocol",
+    "SceneDescriberProtocol",
+    "SpeechAudio",
+    "SpeechSynthesizer",
     "TurnMetricsProtocol",
     "TurnQueryProtocol",
     "UnitOfWorkProtocol",

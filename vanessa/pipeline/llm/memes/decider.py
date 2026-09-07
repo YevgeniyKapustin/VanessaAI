@@ -1,6 +1,8 @@
 import logging
 import random
 
+from vanessa.core.session.channel_keys import as_session_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,37 +34,42 @@ class MemeDecider:
         self._probability = probability
         self._min_messages_between = max(1, int(min_messages_between))
         self._rng = rng or random.Random()
-        self._messages_since: dict[int, int] = {}
+        self._messages_since: dict[str, int] = {}
 
     @property
     def enabled(self) -> bool:
         return self._enabled
 
-    def register_reply(self, chat_id: int) -> None:
-        self._messages_since[chat_id] = self.messages_since_meme(chat_id) + 1
+    def register_reply(self, chat_id: int | str) -> None:
+        key = as_session_key(chat_id)
+        self._messages_since[key] = self.messages_since_meme(key) + 1
 
-    def register_meme(self, chat_id: int) -> None:
-        self._messages_since[chat_id] = 0
+    def register_meme(self, chat_id: int | str) -> None:
+        self._messages_since[as_session_key(chat_id)] = 0
 
-    def messages_since_meme(self, chat_id: int) -> int:
+    def messages_since_meme(self, chat_id: int | str) -> int:
         # Start eligible so the bot's very first reply may carry a meme.
-        return self._messages_since.get(chat_id, self._min_messages_between)
+        return self._messages_since.get(
+            as_session_key(chat_id),
+            self._min_messages_between,
+        )
 
-    def decide(self, chat_id: int) -> bool:
+    def decide(self, chat_id: int | str) -> bool:
+        key = as_session_key(chat_id)
         if not self._enabled:
-            logger.info("meme_skip chat_id=%s reason=disabled", chat_id)
+            logger.info("meme_skip chat_id=%s reason=disabled", key)
             return False
-        if self.messages_since_meme(chat_id) < self._min_messages_between:
+        if self.messages_since_meme(key) < self._min_messages_between:
             logger.info(
                 "meme_skip chat_id=%s reason=cooldown messages_since=%s",
-                chat_id,
-                self.messages_since_meme(chat_id),
+                key,
+                self.messages_since_meme(key),
             )
             return False
         if self._rng.random() >= self._probability:
             logger.info(
                 "meme_skip chat_id=%s reason=probability p=%.2f",
-                chat_id,
+                key,
                 self._probability,
             )
             return False

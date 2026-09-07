@@ -39,7 +39,7 @@ def soft_prefilter(
     directly_addressed = context.mentions_bot or context.reply_to_bot
     trigger = triggers.detect(text)
     follows_bot = _follows_bot(recent_messages)
-    in_listen_window = in_post_reply_listen_window(
+    in_listen_window = context.in_listen_window or in_post_reply_listen_window(
         recent_messages,
         max_messages=post_reply_listen_count,
         max_idle_seconds=post_reply_listen_idle_seconds,

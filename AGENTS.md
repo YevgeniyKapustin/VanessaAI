@@ -1,20 +1,23 @@
 # VanessaAI
 
-Telegram group bot. Default is silence. Domain lives in `vanessa/`;
-process entrypoints in `services/`. Longer docs: `README.md`,
-`docs/architecture.md`. Python style: `.cursor/rules/python-clean-code.mdc`.
+Telegram group bot (VRChat is a second adapter). Default is silence.
+Domain lives in `vanessa/`; process entrypoints in `services/`. Longer
+docs: `README.md`, `docs/architecture.md`. Python style:
+`.cursor/rules/python-clean-code.mdc`.
 Layout: `.cursor/rules/package-layout.mdc`.
 
 ## Runtime
 
-`telegram → bot → Redis Streams → agent → ingress → gate → retrieve → compose → post`
+`adapter → Redis Streams → agent → ingress → gate → retrieve ∥ scene → compose → post`
 
 Turns never go over HTTP. Agent HTTP is health/metrics only (`:8000`).
 Do not add chat/notes routes or FastAPI to the agent.
 
-Processes: `bot`, `agent`, `worker`, `mcp`. Do not add a fifth.
-Do not import sibling services. Bot stays a Telegram adapter: no
-`vanessa.pipeline`, `vanessa.knowledge`, or `vanessa.infrastructure.db`.
+Pipeline roles stay four: adapter, agent, worker, mcp. Adapters may be
+several (`services/bot` Telegram, `services/presence` VRChat). Presence
+is a host process — not in server compose. Do not import sibling
+services. Adapters stay adapters: no `vanessa.pipeline`,
+`vanessa.knowledge`, or `vanessa.infrastructure.db`.
 
 Wire stages through `vanessa/core` protocols and `vanessa/contracts`.
 `vanessa.core` must not import knowledge, pipeline, or infrastructure.
@@ -60,4 +63,5 @@ docker compose --env-file .env.defaults --env-file .env.local up -d --build
 ```
 
 Secrets go in `.env.local` (gitignored). Do not commit them.
-Persona/YAML: `config/content/`. Env keys: `.env.example`, `.env.defaults`.
+Persona/YAML: `config/content/` (one tree). Per-turn channel flags:
+`config/channels/`. Env keys: `.env.example`, `.env.defaults`.

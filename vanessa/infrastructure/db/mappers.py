@@ -17,6 +17,7 @@ def message_to_stored(message: Message) -> StoredMessage:
         reply_to_sender_name=message.reply_to_sender_name,
         attachments=message.attachments,
         photo_caption=message.photo_caption,
+        channel=message.channel,
     )
 
 

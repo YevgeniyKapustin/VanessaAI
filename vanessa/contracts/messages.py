@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -74,9 +74,10 @@ class TurnRequest(BrokerMessage):
 
     kind: ClassVar[str] = "turn_request"
 
-    telegram_chat_id: int
+    channel: Literal["telegram", "vrchat"] = "telegram"
+    telegram_chat_id: int | None = None
     message: str = Field(min_length=1, max_length=4096)
-    sender_telegram_id: int
+    sender_telegram_id: int | None = None
     chat_title: str | None = None
     chat_type: str | None = None
     sender_username: str | None = None
@@ -90,6 +91,9 @@ class TurnRequest(BrokerMessage):
     reply_to_text: str | None = Field(default=None, max_length=4096)
     reply_to_sender_name: str | None = None
     images: list[TurnImage] = Field(default_factory=list)
+    #: VRChat first-person screenshot. Never mixed into ``images`` (those are
+    #: user-attached Telegram photos for gate_vision / the album).
+    scene_image: TurnImage | None = None
 
 
 class TurnStarted(BrokerMessage):

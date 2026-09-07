@@ -1,23 +1,23 @@
-from vanessa.config.content import get_content
 from vanessa.core.protocols import (
     MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
     TurnMetricsProtocol,
 )
+from vanessa.core.session.channel_keys import dialogue_session_key, turn_channel
 from vanessa.core.turn import ConversationTurnResult
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionAction
 from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
 from vanessa.pipeline.gate_support import index_user_on_ignore
 from vanessa.pipeline.llm.format.answer_tag import strip_control_tags
-from vanessa.pipeline.llm.format.message_blocks import (
-    split_reply_into_blocks,
-    strip_block_markers,
-)
-from vanessa.pipeline.llm.format.reply_format import strip_trailing_periods
-from vanessa.pipeline.llm.format.sticker_tag import extract_sticker_tag
 from vanessa.pipeline.llm.memes import MemeDecider
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.pipeline.stages.finalize_delivery import (
+    delivery_messages,
+    marker_free_reply,
+    photo_fields,
+    sticker_from_reply,
+)
 
 
 class FinalizeStage:
@@ -70,38 +70,29 @@ class FinalizeStage:
         else:
             await self._indexing.index_now(ctx.user_msg)
 
-        clean_reply, sticker_tag = extract_sticker_tag(ctx.reply)
+        clean_reply, sticker_tag = sticker_from_reply(ctx, ctx.reply)
         # Final control-tag safety net: a reasoning model may emit [answer] /
         # <answer> / [ignore] in a form the provider's splitter missed — never
         # let a control tag reach the chat. The [next] block marker is left for
         # the block splitter below, which needs it to separate the messages.
         clean_reply = strip_control_tags(clean_reply)
-        # Split the reply into the individual Telegram messages to send (on the
-        # marker-containing text, so the model's explicit `[next]` blocks drive
-        # the split; a deterministic sentence-aware split is the fallback when
-        # the model skipped markers). The persona avoids a trailing period at the
-        # end of a message, so it is cut deterministically from EVERY delivered
-        # block (not just the overall reply); the marker-free full text is what
-        # stays in the DB and metrics.
-        marker = get_content().llm.block_marker
-        messages = [
-            block
-            for block in (
-                strip_trailing_periods(b)
-                for b in split_reply_into_blocks(clean_reply, marker=marker)
-            )
-            if block.strip()
-        ]
-        clean_reply = strip_block_markers(clean_reply, marker=marker)
+        messages = delivery_messages(ctx, clean_reply)
+        clean_reply = marker_free_reply(clean_reply)
         ctx.reply = clean_reply
+        photo_file_id, photo_data_url = photo_fields(ctx)
 
         await self._messages.create(
             role="assistant",
             content=clean_reply,
+            channel=turn_channel(ctx.turn),
         )
-        self._decision.record_reply(ctx.turn.telegram_chat_id)
+        session_key = dialogue_session_key(
+            channel=turn_channel(ctx.turn),
+            telegram_chat_id=ctx.turn.telegram_chat_id,
+        )
+        self._decision.record_reply(session_key)
         if self._meme_decider is not None:
-            self._meme_decider.register_reply(ctx.turn.telegram_chat_id)
+            self._meme_decider.register_reply(session_key)
 
         ctx.result = ConversationTurnResult(
             action=ctx.decision.action.value,
@@ -111,11 +102,8 @@ class FinalizeStage:
             context_count=ctx.context_count,
             relevance_score=ctx.decision.relevance_score,
             sticker_tag=sticker_tag,
-            # Photo the compose model asked to re-send (resolved from [photo:N]).
-            photo_file_id=ctx.photo_file_id,
-            # Stored bytes of the same photo, so the bot can fall back to an
-            # upload when the Telegram file_id is stale at delivery time.
-            photo_data_url=ctx.photo_data_url,
+            photo_file_id=photo_file_id,
+            photo_data_url=photo_data_url,
         )
         self._metrics.record_turn(
             action=ctx.result.action,

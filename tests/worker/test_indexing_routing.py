@@ -64,3 +64,17 @@ def test_schedule_skips_non_user_role() -> None:
     )
     svc.schedule(StoredMessage(id=8, role="assistant", content="x"))
     assert dispatcher.submissions == []
+
+
+def test_schedule_skips_vrchat_channel() -> None:
+    dispatcher = _FakeDispatcher()
+    svc = MessageIndexingService(
+        indexer=MagicMock(),
+        messages=MagicMock(),
+        session_factory=MagicMock(),
+        dispatcher=dispatcher,
+    )
+    svc.schedule(
+        StoredMessage(id=8, role="user", content="x", channel="vrchat")
+    )
+    assert dispatcher.submissions == []

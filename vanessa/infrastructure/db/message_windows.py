@@ -7,6 +7,7 @@ _BEFORE_SQL = (
     JOINED_MESSAGE_SQL
     + """
                     WHERE m.role = 'user'
+                      AND m.channel = :channel
                       AND (m.created_at, m.id) < (:created_at, :anchor_id)
                     ORDER BY m.created_at DESC, m.id DESC
                     LIMIT :limit
@@ -16,7 +17,7 @@ _BEFORE_SQL = (
 _CENTER_SQL = (
     JOINED_MESSAGE_SQL
     + """
-                WHERE m.id = :anchor_id
+                WHERE m.id = :anchor_id AND m.channel = :channel
                 """
 )
 
@@ -24,11 +25,28 @@ _AFTER_SQL = (
     JOINED_MESSAGE_SQL
     + """
                     WHERE m.role = 'user'
+                      AND m.channel = :channel
                       AND (m.created_at, m.id) > (:created_at, :anchor_id)
                     ORDER BY m.created_at ASC, m.id ASC
                     LIMIT :limit
                     """
 )
+
+
+def _window_params(
+    anchor: StoredMessage,
+    anchor_id: int,
+    *,
+    limit: int | None = None,
+) -> dict[str, object]:
+    params: dict[str, object] = {
+        "created_at": anchor.created_at,
+        "anchor_id": anchor_id,
+        "channel": anchor.channel,
+    }
+    if limit is not None:
+        params["limit"] = limit
+    return params
 
 
 async def _load_before(
@@ -41,17 +59,20 @@ async def _load_before(
         return []
     result = await session.execute(
         text(_BEFORE_SQL),
-        {
-            "created_at": anchor.created_at,
-            "anchor_id": anchor_id,
-            "limit": before,
-        },
+        _window_params(anchor, anchor_id, limit=before),
     )
     return [row_to_stored(row) for row in reversed(result.mappings().all())]
 
 
-async def _load_center(session, anchor_id: int) -> list[StoredMessage]:
-    anchor_row = await session.execute(text(_CENTER_SQL), {"anchor_id": anchor_id})
+async def _load_center(
+    session,
+    anchor: StoredMessage,
+    anchor_id: int,
+) -> list[StoredMessage]:
+    anchor_row = await session.execute(
+        text(_CENTER_SQL),
+        {"anchor_id": anchor_id, "channel": anchor.channel},
+    )
     anchor_message = anchor_row.mappings().first()
     if anchor_message is None:
         return []
@@ -68,11 +89,7 @@ async def _load_after(
         return []
     result = await session.execute(
         text(_AFTER_SQL),
-        {
-            "created_at": anchor.created_at,
-            "anchor_id": anchor_id,
-            "limit": after,
-        },
+        _window_params(anchor, anchor_id, limit=after),
     )
     return [row_to_stored(row) for row in result.mappings().all()]
 
@@ -88,7 +105,7 @@ async def _window_for_anchor(
         return []
 
     before_rows = await _load_before(self._session, anchor, anchor_id, before)
-    center = await _load_center(self._session, anchor_id)
+    center = await _load_center(self._session, anchor, anchor_id)
     if not center:
         return before_rows
     after_rows = await _load_after(self._session, anchor, anchor_id, after)

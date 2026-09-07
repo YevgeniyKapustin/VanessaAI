@@ -8,6 +8,7 @@ from vanessa.pipeline.gate_support import (
     decision_reason_from_prefilter_tag,
     finish_ignore_turn,
 )
+from vanessa.pipeline.stages.gate_decision import pipeline_in_listen_window
 
 logger = logging.getLogger("vanessa.pipeline.stages")
 
@@ -19,11 +20,13 @@ class _GateFilterMixin:
         prefilter = self._prefilter.evaluate(
             ctx.turn.message,
             ctx.recent,
-            telegram_chat_id=ctx.turn.telegram_chat_id,
-            sender_telegram_id=ctx.turn.sender_telegram_id,
+            telegram_chat_id=ctx.turn.telegram_chat_id or 0,
+            sender_telegram_id=ctx.turn.sender_telegram_id or 0,
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
+            addressing=ctx.profile.addressing,
+            force_listen_window=ctx.profile.listen_window == "on",
         )
         if prefilter.run_planner:
             return False
@@ -55,7 +58,7 @@ class _GateFilterMixin:
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
-            in_listen_window=ctx.session.in_listen_window,
+            in_listen_window=pipeline_in_listen_window(ctx),
             sender_telegram_id=ctx.turn.sender_telegram_id,
         )
         ctx.reaction_gate_ms = (time.perf_counter() - gate_started) * 1000

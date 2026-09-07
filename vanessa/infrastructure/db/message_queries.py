@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select, text
 
 from vanessa.core.messages import RAG_SOURCE_ROLE, StoredMessage
+from vanessa.core.session.channel_keys import CHANNEL_TELEGRAM
 from vanessa.infrastructure.db.message_rows import (
     JOINED_MESSAGE_SQL,
     JOINED_MESSAGE_WITH_REPLY_SQL,
@@ -11,16 +12,22 @@ from vanessa.infrastructure.db.message_rows import (
 from vanessa.infrastructure.db.models import Message
 
 
-async def get_recent(self, limit: int = 50) -> list[StoredMessage]:
+async def get_recent(
+    self,
+    limit: int = 50,
+    *,
+    channel: str = CHANNEL_TELEGRAM,
+) -> list[StoredMessage]:
     result = await self._session.execute(
         text(
             JOINED_MESSAGE_WITH_REPLY_SQL
             + """
+                WHERE m.channel = :channel
                 ORDER BY m.created_at DESC, m.id DESC
                 LIMIT :limit
                 """
         ),
-        {"limit": limit},
+        {"limit": limit, "channel": channel},
     )
     rows = list(reversed(result.mappings().all()))
     return [row_to_stored(row) for row in rows]
@@ -55,6 +62,7 @@ async def get_messages_since(
 
     Used by the deterministic metrics calculator (presence, activity,
     reactivity, counters) which needs interleaved messages across senders.
+    Shared across channels so VRChat activity still counts for a person.
     """
     since = datetime.now(UTC) - timedelta(days=days)
     result = await self._session.execute(
@@ -85,14 +93,18 @@ async def fulltext_search(
     self,
     query: str,
     limit: int = 30,
+    *,
+    channel: str = CHANNEL_TELEGRAM,
 ) -> list[StoredMessage]:
     result = await self._session.execute(
         text(
             """
                 SELECT id, sender_telegram_id, telegram_message_id, role, content,
-                       qdrant_point_id, created_at, attachments, photo_caption
+                       qdrant_point_id, created_at, attachments, photo_caption,
+                       channel
                 FROM messages
                 WHERE role = 'user'
+                  AND channel = :channel
                   AND search_vector @@ plainto_tsquery('russian', :query)
                 ORDER BY ts_rank(
                     search_vector,
@@ -101,7 +113,7 @@ async def fulltext_search(
                 LIMIT :limit
                 """
         ),
-        {"query": query, "limit": limit},
+        {"query": query, "limit": limit, "channel": channel},
     )
     return [row_to_stored(row) for row in result.mappings().all()]
 
@@ -110,6 +122,8 @@ async def search_photo_messages(
     self,
     query: str,
     limit: int = 30,
+    *,
+    channel: str = CHANNEL_TELEGRAM,
 ) -> list[StoredMessage]:
     """FTS over messages that carry a photo (attachments non-empty).
 
@@ -125,6 +139,7 @@ async def search_photo_messages(
                 JOINED_MESSAGE_SQL
                 + """
                     WHERE m.role = 'user'
+                      AND m.channel = :channel
                       AND m.attachments IS NOT NULL
                       AND jsonb_typeof(m.attachments) = 'array'
                       AND jsonb_array_length(m.attachments) > 0
@@ -136,6 +151,6 @@ async def search_photo_messages(
                     LIMIT :limit
                     """
             ),
-            {"query": query, "limit": limit},
+            {"query": query, "limit": limit, "channel": channel},
         )
         return [row_to_stored(row) for row in result.mappings().all()]

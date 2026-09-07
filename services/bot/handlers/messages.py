@@ -6,8 +6,6 @@ from aiogram.types import Message as TelegramMessage
 
 from services.bot.container import BotServices
 from services.bot.handlers.message_delivery import (
-    _PREVIEW_LEN,
-    _preview,
     _reject_if_no_access,
     _run_with_typing,
 )
@@ -15,6 +13,7 @@ from services.bot.handlers.message_photos import (
     _pick_photo_size,
     _register_photo_handler,
 )
+from services.bot.handlers.message_preview import _PREVIEW_LEN, _preview
 from services.bot.handlers.message_send import (
     _send_photo,
     _send_reply,

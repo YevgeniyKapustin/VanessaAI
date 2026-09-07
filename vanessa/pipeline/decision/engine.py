@@ -68,8 +68,8 @@ class DecisionEngine:
         ]
         self._relevance_rules = [r for r in self._rules if r.needs_relevance]
 
-    def record_reply(self, telegram_chat_id: int) -> None:
-        self._rate_limiter.record_reply(telegram_chat_id)
+    def record_reply(self, chat_id: int | str) -> None:
+        self._rate_limiter.record_reply(chat_id)
 
     async def decide(
         self,

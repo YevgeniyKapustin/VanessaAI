@@ -1,3 +1,4 @@
+from vanessa.core.session.channel_keys import dialogue_session_key
 from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.gate.protocols import ReplyEligibilityProtocol
 from vanessa.pipeline.decision.models import DecisionReason, DecisionResult
@@ -46,7 +47,11 @@ class RateLimitRule:
         self._rate_limiter = rate_limiter
 
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if not self._rate_limiter.is_limited(context.telegram_chat_id):
+        key = dialogue_session_key(
+            channel=context.channel,
+            telegram_chat_id=context.telegram_chat_id,
+        )
+        if not self._rate_limiter.is_limited(key):
             return None
         return _ignore(context, DecisionReason.RATE_LIMITED)
 

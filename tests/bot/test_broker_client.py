@@ -37,6 +37,7 @@ async def test_client_process_roundtrip(broker) -> None:
 
     async def agent_side(delivery: Delivery) -> None:
         req = delivery.message
+        assert req.channel == "telegram"
         await broker.publish(
             req.reply_to,
             TurnStarted(correlation_id=req.correlation_id),

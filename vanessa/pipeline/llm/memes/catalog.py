@@ -20,7 +20,7 @@ class MemeCatalog:
     A meme is a candidate only when one of its keywords appears as a whole token
     in the user's message. The catalog exposes the gate settings (``enabled``,
     ``probability``, ``min_messages_between``) so the pipeline and decider share
-    a single source of truth from ``config/content/memes.yaml``.
+    a single source of truth from ``config/behavior/humor/memes.yaml``.
     """
 
     def __init__(self, content: MemesContent) -> None:

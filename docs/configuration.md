@@ -1,6 +1,19 @@
 # Configuration
 
-Behavior lives in **`config/content/`** — one YAML file per concern.
+YAML defaults live in one git tree, **`config/`**. Loaders try the
+path as given (cwd), then the repo root. Empty slice env falls back
+to `{CONFIG_ROOT}/…`.
+
+| Slice | Who reads it | Env |
+|------|----------------|-----|
+| `behavior/` | agent, bot, worker | `BEHAVIOR_CONFIG_PATH` |
+| `channels/` | agent (per turn); bot `speech` flag | `CHANNELS_CONFIG_PATH` |
+| `nicknames.yaml`, `joins.yaml` | agent / worker | `NICKNAMES_CONFIG_PATH`, `JOINS_CONFIG_PATH` |
+| `presence/avatar.yaml` | host `services/presence` only | `PRESENCE_AVATAR_PATH` |
+
+Presence on the game PC does not need `behavior/` or `channels/`.
+Channel flags travel on the turn. Copy `avatar.yaml` next to VRChat
+if OSC names differ, then point `PRESENCE_AVATAR_PATH` at that file.
 
 **Env is not documented here.** Two files, nothing else:
 
@@ -13,7 +26,12 @@ Empty overlay values wipe defaults; leave a key unset unless you mean
 to override. Kubernetes secret names: [deploy/k8s/README.md](../deploy/k8s/README.md)
 and `deploy/k8s/secrets.env.example`.
 
-## `config/content/` keys
+`config/behavior/` is grouped like the pipeline: `compose/`, `gate/`,
+`retrieve/`, `knowledge/`, `humor/`. Persona, conversation, and bot copy stay
+at the root of `behavior/` (one file each). Compose copy is four files:
+system + layout + notes + generation (merged into `llm`).
+
+## `config/behavior/` keys
 
 | Key | Purpose |
 |------|---------|
@@ -36,16 +54,22 @@ and `deploy/k8s/secrets.env.example`.
 `presence_penalty` / `frequency_penalty` are stored for portability;
 DeepSeek API does not apply them today.
 
-Files: `bot.yaml`, `persona.yaml`, `conversation.yaml`, `llm.yaml`,
-`decision.yaml`, `memory.yaml`, `metrics.yaml`, `rag.yaml`,
-`profanity.yaml`, `memes.yaml`, `stickers.yaml`, `portrait.yaml`.
+Files under `behavior/`: `persona.yaml`, `conversation.yaml`, `bot.yaml`,
+`compose/system.yaml`, `compose/layout.yaml`, `compose/notes.yaml`,
+`compose/generation.yaml`, `gate/decision.yaml`,
+`gate/reaction_gate.yaml`, `gate/planner.yaml`, `retrieve/rag.yaml`,
+`knowledge/memory.yaml`, `knowledge/metrics.yaml`, `knowledge/mood.yaml`,
+`knowledge/portrait.yaml`, `humor/profanity.yaml`, `humor/memes.yaml`,
+`humor/stickers.yaml`.
 
-Nicknames: `config/nicknames.yaml`.
+A section may merge several files (system + layout + notes + generation
+→ `llm`; planner + retrieve knobs → `rag`; gate knobs + reaction prompt;
+metrics extract + mood).
 
 ## `config/channels/`
 
 Per-turn `ChannelProfile` loaded from `TurnRequest.channel` — not a
-process-level orchestrator flag. One `config/content/` persona for every
+process-level orchestrator flag. One `config/behavior/` persona for every
 channel; VRChat adds a short `prompt_addendum` here.
 
 | Flag | telegram | vrchat |
@@ -57,3 +81,15 @@ channel; VRChat adds a short `prompt_addendum` here.
 | `addressing` | telegram mention entity | addressed (no TG entity) |
 
 HTML, typing, `/note`, and access stay in the adapter, not this profile.
+
+## Identity
+
+`config/nicknames.yaml` is the Telegram roster (`telegram_id →` canonical
+name). `config/joins.yaml` binds VRChat display names to an existing
+People card. Names not listed there stay name-keyed; do not reverse-lookup
+the roster for VRChat speakers.
+
+## Presence (host)
+
+`config/presence/avatar.yaml` is a template for OSC / gestures on the
+game PC. Server images may contain it; the agent does not load it.

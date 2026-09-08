@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Dump the bot's Telegram sticker pack to fill config/content/stickers.yaml.
+"""Dump the bot's Telegram sticker pack to fill config/behavior/humor/stickers.yaml.
 
 Usage:
     python scripts/export_sticker_pack.py [set_name]            # print-only
@@ -9,7 +9,7 @@ Prints one line per sticker:
     index=<n> emoji=<e> file_id=<id>
 
 With ``--update`` the script also rewrites ``file_id`` / ``index`` of every
-sticker already present in config/content/stickers.yaml (matched by ``index`` or
+sticker already present in config/behavior/humor/stickers.yaml (matched by ``index`` or
 ``emoji``), preserving the rest of the file, and reports pack stickers that are
 not yet in the config so you can add them. The default set name comes from the
 config.
@@ -32,7 +32,11 @@ from scripts.export_sticker_pack_ops import (
     require_token,
     write_updates,
 )
-from vanessa.config.content import get_content, resolve_content_source
+from vanessa.config.content import (
+    CONTENT_SECTIONS,
+    get_content,
+    resolve_content_source,
+)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
@@ -55,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--update",
         action="store_true",
-        help="Rewrite file_id/index of known stickers in config/content/stickers.yaml",
+        help="Rewrite file_id/index of known stickers in config/behavior/humor/stickers.yaml",
     )
     parser.add_argument(
         "--dry-run",
@@ -69,7 +73,10 @@ def _resolve_stickers_yaml() -> Path:
     """Locate the stickers config file (single-file or per-section directory)."""
     source = resolve_content_source()
     if source.is_dir():
-        return source / "stickers.yaml"
+        relative = CONTENT_SECTIONS["stickers"]
+        if isinstance(relative, tuple):
+            relative = relative[0]
+        return source / relative
     return source
 
 

@@ -63,5 +63,7 @@ docker compose --env-file .env.defaults --env-file .env.local up -d --build
 ```
 
 Secrets go in `.env.local` (gitignored). Do not commit them.
-Persona/YAML: `config/content/` (one tree). Per-turn channel flags:
-`config/channels/`. Env keys: `.env.example`, `.env.defaults`.
+Persona/YAML: `config/` (one tree). `behavior/` (compose/gate/retrieve/…)
+and `channels/` are the server pipeline; nicknames/joins are identity;
+`presence/avatar.yaml` is host-only (`PRESENCE_AVATAR_PATH`). Env keys:
+`.env.example`, `.env.defaults`.

@@ -6,7 +6,7 @@ from re import Pattern
 
 from vanessa.core.messages import ContextMessage
 
-# Built-in fallback prompt (used only when config/content/decision.yaml does not
+# Built-in fallback prompt (used only when config/behavior/gate/reaction_gate.yaml does not
 # provide ``reaction_gate_prompt``). Kept deliberately tiny: the whole point is a
 # single fast, cheap YES/NO call, not a mini-planner.
 DEFAULT_REACTION_GATE_PROMPT = (

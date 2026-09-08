@@ -6,6 +6,9 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from vanessa.config.paths import resolve_settings_path
+from vanessa.config.settings import settings
+
 
 class OscSection(BaseModel):
     host: str = "127.0.0.1"
@@ -45,10 +48,12 @@ class AvatarConfig(BaseModel):
 def resolve_avatar_path(explicit: Path | None = None) -> Path:
     if explicit is not None:
         return explicit
-    env = os.environ.get("PRESENCE_AVATAR_PATH")
+    env = os.environ.get("PRESENCE_AVATAR_PATH", "").strip()
     if env:
         return Path(env)
-    return Path(__file__).resolve().parents[2] / "config" / "presence" / "avatar.yaml"
+    return resolve_settings_path(
+        settings.presence_avatar_path, "presence", "avatar.yaml"
+    )
 
 
 def load_avatar(path: Path | None = None) -> AvatarConfig:

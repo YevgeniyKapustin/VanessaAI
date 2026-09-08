@@ -1,3 +1,4 @@
+from vanessa.config.settings import settings
 from vanessa.knowledge.people.people import canonicalize_person
 from vanessa.knowledge.people.people_identity import (
     identity_similar,
@@ -126,6 +127,21 @@ def test_load_joins_missing_file_is_empty(tmp_path, monkeypatch) -> None:
     clear_vrchat_joins_cache()
     try:
         assert load_vrchat_joins() == {}
+    finally:
+        clear_vrchat_joins_cache()
+
+
+def test_joins_config_path_override(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "joins.yaml"
+    path.write_text(
+        f"- telegram_id: {ALEX_TG}\n  vrchat_names: [Ada]\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings, "joins_config_path", str(path))
+    clear_vrchat_joins_cache()
+    try:
+        table = load_vrchat_joins()
+        assert table[normalize_person_text("Ada")] == ALEX_TG
     finally:
         clear_vrchat_joins_cache()
 

@@ -86,7 +86,7 @@ class LLMContent(BaseModel):
     final_task: str = ""
     sticker_instruction: str = ""
     # Marker line the composer uses to split a long reply into several short
-    # messages (blocks) of 1-2 sentences each. The prompt (llm.yaml ``answer:``)
+    # messages (blocks) of 1-2 sentences each. The prompt (compose/system.yaml ``answer:``)
     # instructs the model to put this tag on its own line at the end of every
     # block except the last; message_blocks.py uses it as the single source of
     # truth when splitting the finished reply for delivery.

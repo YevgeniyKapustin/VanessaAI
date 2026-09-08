@@ -10,7 +10,8 @@ PC, not a fifth server container. Do not add it to server
 `docker-compose`. Redis from that PC must reach the broker
 (`BROKER_REDIS_URL` is not the container's `127.0.0.1` if the PC is
 elsewhere). VRChat OSC Enable, UDP `9000`; VB-Cable/VoiceMeeter into
-the VRChat mic.
+the VRChat mic. Presence reads `config/presence/avatar.yaml` (or
+`PRESENCE_AVATAR_PATH`); persona and channel YAML stay on the agent.
 
 ## Pipeline
 
@@ -162,7 +163,7 @@ rules.
 Vision (optional) captions images and OCR via a cheap DeepSeek vision
 model; captions stay in session for follow-ups. The composer can pick a
 meaning-relevant stored photo to re-send. Persona, nicknames, and
-Telegram HTML formatting are config-driven (`config/content/`).
+Telegram HTML formatting are config-driven (`config/behavior/`).
 
 See [Configuration](configuration.md) for YAML. Env keys:
 [`.env.defaults`](../.env.defaults) and [`.env.example`](../.env.example).

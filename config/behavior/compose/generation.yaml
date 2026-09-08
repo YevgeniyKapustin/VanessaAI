@@ -1,0 +1,46 @@
+# Sampling and prompt-size caps. System copy: system.yaml.
+generation:
+  composer:
+    temperature: 0.8
+    top_p: 0.9
+    # The composer runs on a reasoning (V4) model: for DeepSeek its
+    # chain-of-thought counts AGAINST max_tokens, so the budget must cover
+    # reasoning + [answer] tag + the reply itself — not just the final message.
+    # 1024 was too tight (a long CoT left too little for a multi-block reply and
+    # the model truncated right after `[next]`); 2048 keeps real headroom.
+    max_tokens: 2048
+    # DeepSeek V4 accepts reasoning_effort: low/medium/high. "medium" is the
+    # default tradeoff: enough chain of thought for careful replies without
+    # the latency/cost of high.
+    reasoning_effort: medium
+    presence_penalty: 0.4
+    frequency_penalty: 0.35
+  planner:
+    temperature: 0.1
+    top_p: 0.85
+    # The planner is a fast classification step (strict JSON output, ~300
+    # tokens) and deliberately runs WITHOUT reasoning: reasoning_effort is left
+    # unset (None → the API's default normal mode, the parameter is never sent).
+    # Forcing a chain of thought here (even "low") ate too much response time
+    # for a flag-classification task without a proportional gain in accuracy.
+    max_tokens: 2048
+    presence_penalty: 0.0
+    frequency_penalty: 0.0
+
+# Composer max_tokens override for "detailed" replies (TurnPlan.detail), so a
+# fuller answer — reasoning prefix + several blocks — is not truncated. 0 = use
+# the base composer max_tokens. 4096 is the practical ceiling for a multi-block
+# answer on top of the chain-of-thought.
+detailed_max_tokens: 4096
+
+budget:
+  enabled: true
+  max_chars: 24000
+  context_blocks: 16000
+  knowledge_blocks: 6000
+  web_blocks: 2000
+  session_messages: 6000
+  humor_quotes: 1200
+  meme_blocks: 1500
+  meme_menu: 2000
+  metrics_block: 1500

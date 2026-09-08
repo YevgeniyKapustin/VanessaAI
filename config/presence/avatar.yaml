@@ -1,5 +1,7 @@
-# VRChat avatar OSC map for services/presence.
-# Gesture table only — not IK / MediaPipe / webcam tracking.
+# Host-only template for services/presence (game PC, not server compose).
+# Presence does not read config/behavior or config/channels — those stay
+# on the agent. Copy this file locally if OSC names differ, then set
+# PRESENCE_AVATAR_PATH. Gesture table only — not IK / MediaPipe / webcam.
 # Parameter names must match exposed OSC parameters on the avatar.
 
 speaker_name: You

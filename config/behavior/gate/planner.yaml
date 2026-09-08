@@ -1,4 +1,4 @@
-vector_min_score: 0.35
+# Turn Planner LLM prompt (gate). Retrieve knobs live in retrieve/rag.yaml.
 turn_planner_prompt: |
   ## Task
   Plan search over chat history and Vanessa's archive (People, Lore, Culture,
@@ -73,7 +73,7 @@ turn_planner_prompt: |
      - chat history → search_query;
      - our people/lore/events → knowledge_indexes (+ knowledge_query), not web;
      - fresh/external facts the archive cannot hold → web_search=true;
-     - comparison / several threads → deep_search=true.
+     - comparison / several threads / technical analysis → deep_search=true.
      Do not stack web and knowledge unless both are required.
   4. Fill tone, humor_ok / humor_query, detail.
   5. uses_pro_model ONLY for coding / super-complex synthesis.

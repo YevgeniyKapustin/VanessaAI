@@ -22,7 +22,7 @@ Top-level is **role**. Inside a role, group by **capability**
 | Vault / nodes / portraits | `vanessa/knowledge/` |
 | Redis, Postgres, ingest, outbox, metrics | `vanessa/infrastructure/` |
 | Shared completers | `vanessa/llm/` (not compose-stage prompts) |
-| Settings / YAML loaders | `vanessa/config/` (`channels.py` loads `config/channels/`) |
+| Settings / YAML loaders | `vanessa/config/` (`paths.py` resolves `config/`; `channels.py` loads `config/channels/`) |
 | Telegram adapter | `services/bot/` |
 | VRChat adapter (host, not server compose) | `services/presence/` |
 | Pipeline wiring; HTTP = health/metrics | `services/agent/` |
@@ -31,6 +31,8 @@ Top-level is **role**. Inside a role, group by **capability**
 Pipeline roles stay four (adapter / agent / worker / mcp). Adapters may
 be several. `services/presence` is a second adapter, not a fifth server
 process — do not add it to server compose. Do not import sibling services.
+Presence reads `config/presence/avatar.yaml` (or `PRESENCE_AVATAR_PATH`)
+on the game PC. It does not load `config/behavior/` or `config/channels/`.
 
 ```
 # GOOD — capability colocated

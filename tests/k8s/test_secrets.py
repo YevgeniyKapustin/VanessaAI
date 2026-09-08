@@ -74,6 +74,7 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
         "ALLOWED_CHAT_TELEGRAM_ID": "-1001111111111",
         "REDIS_AUTH": "compose-only",
         "LANGFUSE_REDIS_AUTH": "langfuse-only",
+        "PRESENCE_AVATAR_PATH": "config/presence/avatar.yaml",
         "LOG_LEVEL": "DEBUG",
         "LOG_FILE_ENABLED": "true",
         "POSTGRES_HOST": "postgres",
@@ -97,6 +98,7 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
     assert "TELEGRAM_BOT_TOKEN" not in selected
     assert "REDIS_AUTH" not in selected
     assert "LANGFUSE_REDIS_AUTH" not in selected
+    assert "PRESENCE_AVATAR_PATH" not in selected
     manifest = build_configmap(namespace="vanessa", values=selected)
     assert manifest["metadata"]["name"] == CONFIGMAP_NAME
     assert "TELEGRAM_BOT_TOKEN" not in manifest["data"]

@@ -1,0 +1,53 @@
+# Gate knobs and phrase lists. The reaction-gate LLM prompt lives in
+# reaction_gate.yaml (same folder).
+block_consecutive_replies: true
+noise_max_words: 1
+noise_max_chars: 12
+default_bot_names:
+  - vanessa
+  - ванесса
+trigger_keywords:
+  - помоги
+  - объясни
+  - найди
+  - расскажи
+question_words:
+  - кто
+  - что
+  - где
+  - когда
+  - почему
+  - как
+  - зачем
+  - какой
+  - какая
+  - какие
+  - сколько
+modal_verbs:
+  - можно
+  - нужно
+  - стоит
+
+# Short follow-up demands right after the bot's own reply ("а ещё" = "tell me
+# another one"). Combined with sender awareness (the message must come from the
+# same user the bot just answered), these make terse continuations explicit
+# requests even when the post-reply listen window has expired. Empty = built-in
+# fallback set in vanessa/pipeline/decision/gate/continuation.py.
+continuation_phrases:
+  - а ещё
+  - и ещё
+  - ещё
+  - ещё один
+  - ещё раз
+  - ещё вариант
+  - давай ещё
+  - давай дальше
+  - ну и ещё
+  - продолжай
+  - продолжи
+  - расскажи ещё
+  - расскажи ещё один
+  - дальше
+  - что дальше
+  - а дальше
+  - а ещё что

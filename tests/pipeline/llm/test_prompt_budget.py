@@ -107,7 +107,7 @@ def test_build_user_prompt_applies_budget_and_keeps_current() -> None:
     )
     assert current in prompt
     assert "личь" in prompt
-    # The real configured global cap (llm.yaml) is never exceeded.
+    # The real configured global cap (compose/generation.yaml) is never exceeded.
     budget = builder._content.llm.budget
     if budget.max_chars > 0:
         assert len(prompt) <= budget.max_chars

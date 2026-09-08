@@ -7,14 +7,13 @@ from pathlib import Path
 
 import yaml
 
+from vanessa.config.paths import resolve_settings_path
+from vanessa.config.settings import settings
 from vanessa.knowledge.people.people_identity import normalize_person_text
-
-_JOINS_RELATIVE = Path("config") / "people" / "joins.yaml"
 
 
 def resolve_joins_path() -> Path:
-    project_root = Path(__file__).resolve().parents[3]
-    return project_root / _JOINS_RELATIVE
+    return resolve_settings_path(settings.joins_config_path, "joins.yaml")
 
 
 def _positive_int(raw: object) -> int | None:

@@ -36,11 +36,16 @@ class SharedSettings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 2
 
-    # --- Config paths ----------------------------------------------------------
-    # Directory with one YAML file per section (bot, persona, llm, ...) or a
-    # single monolithic YAML file for backward compatibility.
-    content_config_path: str = "config/content"
+    # --- Config paths (one git tree: config/) --------------------------------
+    # Loaders try cwd, then the repo root. Empty slice path → `{config_root}/…`.
+    # behavior/ + channels/ — agent/bot/worker. nicknames + joins — agent.
+    # presence/avatar.yaml — host process only (not compose / k8s).
+    config_root: str = "config"
+    behavior_config_path: str = "config/behavior"
+    channels_config_path: str = "config/channels"
     nicknames_config_path: str = "config/nicknames.yaml"
+    joins_config_path: str = "config/joins.yaml"
+    presence_avatar_path: str = "config/presence/avatar.yaml"
 
     # --- Speech (ElevenLabs TTS in adapters; wav never on Redis) -----------
     elevenlabs_api_key: str = ""

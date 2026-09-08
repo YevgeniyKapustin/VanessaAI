@@ -4,6 +4,7 @@ from vanessa.config.channels import (
     load_channel_profile,
     resolve_channels_dir,
 )
+from vanessa.config.settings import settings
 
 
 def test_telegram_profile_keeps_current_agent_flags() -> None:
@@ -65,3 +66,18 @@ def test_resolve_channels_dir_points_at_config() -> None:
     assert folder.name == "channels"
     assert (folder / "telegram.yaml").is_file()
     assert (folder / "vrchat.yaml").is_file()
+
+
+def test_channels_config_path_override(tmp_path, monkeypatch) -> None:
+    (tmp_path / "telegram.yaml").write_text(
+        "speech: true\nscene: true\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings, "channels_config_path", str(tmp_path))
+    _load_channel_file.cache_clear()
+    try:
+        profile = load_channel_profile("telegram")
+        assert profile.speech is True
+        assert profile.scene is True
+    finally:
+        _load_channel_file.cache_clear()

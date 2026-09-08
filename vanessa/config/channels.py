@@ -5,6 +5,9 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, field_validator
 
+from vanessa.config.paths import resolve_settings_path
+from vanessa.config.settings import settings
+
 ChannelName = Literal["telegram", "vrchat"]
 AddressingMode = Literal["telegram", "addressed"]
 ListenWindowMode = Literal["current", "on"]
@@ -35,7 +38,7 @@ class ChannelProfile(BaseModel):
 
 
 def resolve_channels_dir() -> Path:
-    return Path(__file__).resolve().parents[2] / "config" / "channels"
+    return resolve_settings_path(settings.channels_config_path, "channels")
 
 
 def _canonical_channel(channel: str | None) -> ChannelName:

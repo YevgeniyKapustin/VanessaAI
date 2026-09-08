@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def _catalog_sticker_tags() -> frozenset[str]:
     """Tags that actually have a sticker in the pack (the single source of truth).
 
-    Derived from config/content/stickers.yaml so the allowed set can never drift
+    Derived from config/behavior/humor/stickers.yaml so the allowed set can never drift
     from the stickers that really exist. Anything else the model emits is stripped
     and dropped (or soft-mapped through ``TAG_ALIASES``).
     """
@@ -32,7 +32,7 @@ KNOWN_STICKER_TAGS = _catalog_sticker_tags()
 def _catalog_tag_aliases() -> dict[str, str]:
     """Normalized alias map: invented LLM tag -> closest real tag.
 
-    Loaded from config/content/stickers.yaml ``tag_aliases``. Alias targets that
+    Loaded from config/behavior/humor/stickers.yaml ``tag_aliases``. Alias targets that
     don't resolve to a real pack tag are ignored so the fallback can never point
     at a sticker that doesn't exist.
     """

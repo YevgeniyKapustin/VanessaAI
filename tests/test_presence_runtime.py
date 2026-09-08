@@ -189,6 +189,10 @@ def test_avatar_path_env_and_non_dict(tmp_path, monkeypatch) -> None:
     assert avatar.speaker_name == "You"
     monkeypatch.setenv("PRESENCE_AVATAR_PATH", str(yaml_path))
     assert resolve_avatar_path() == yaml_path
+    monkeypatch.delenv("PRESENCE_AVATAR_PATH", raising=False)
+    default = resolve_avatar_path()
+    assert default.name == "avatar.yaml"
+    assert default.is_file()
 
 
 async def test_play_wav_bytes_and_default_player(monkeypatch, tmp_path) -> None:

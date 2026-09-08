@@ -1,0 +1,2 @@
+# Retrieve-stage knobs. The turn-planner prompt lives in gate/planner.yaml.
+vector_min_score: 0.35

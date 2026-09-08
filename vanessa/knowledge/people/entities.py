@@ -54,7 +54,7 @@ __all__ = [
 
 
 def _question_pattern() -> re.Pattern:
-    """Regex over the configured question words (config/content/decision.yaml)."""
+    """Regex over the configured question words (config/behavior/gate/decision.yaml)."""
     words = sorted(
         {str(word).strip().lower() for word in get_question_words() if str(word).strip()},
         key=len,

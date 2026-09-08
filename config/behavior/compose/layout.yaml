@@ -1,0 +1,28 @@
+# Templates that wrap injected user-prompt blocks (prompt_context / format).
+# Always-on system copy: system.yaml. Conditional notes: notes.yaml.
+context_header: "<!-- Old conversations in the chat -->"
+context_block_header: "<!-- Block {index} ({started_at} — {ended_at}) -->"
+context_block_separator: "\n\n"
+session_header: "<!-- Recent correspondence in the chat -->"
+current_message_header: "<!-- Current message in the chat -->"
+reply_message_header: "<!-- The user's message is a reply to this message -->"
+aliases_header: |
+  Aliases — the same person is often called by different names in the chat
+  (a Telegram nickname, a nickname, a shortened form). Treat them as ONE person:
+
+knowledge_header: "From my archive on the topic:"
+knowledge_block_line: "- [{kind}] {title}:\n  {content}"
+humor_quotes_header: "Recognizable memes (if appropriate):"
+humor_quote_line: "- {quote}"
+meme_header: |
+  Curated memes I know (use ONLY if it fits perfectly, max one per reply,
+  paraphrase — never dump the definition, never force it):
+meme_line: "- {name}: {meaning} (appropriate: {usage})"
+meme_menu_header: |
+  Memes I can use if one fits (optional, max one per reply, never force,
+  never dump the definition):
+meme_menu_line: "- {name} — {usage}"
+web_header: "<!-- Live web results on the topic -->"
+web_block_line: "- {title} ({url}):\n  {snippet}"
+photo_album_header: "<!-- Photos I can send (from our chat, matched to the context) -->"
+photo_album_line: '<attachment index="{index}" type="photo" sender="{sender}" time="{time}">\n  <description>{caption}</description>\n</attachment>'

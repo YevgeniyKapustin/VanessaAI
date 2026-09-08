@@ -22,7 +22,8 @@ vanessa/
   infrastructure/   db, broker, ingest, observability
   config/ contracts/
   k8s/              Deploy helpers
-config/content/ Per-section YAML (persona, conversation, llm, …)
+config/          YAML defaults (behavior, channels, identity, presence)
+config/behavior/ Per-section YAML in compose/, gate/, retrieve/, …
 knowledge/      Runtime vault data
 scripts/        import, reindex, portraits, stickers, k8s secrets
 tests/          Automated tests

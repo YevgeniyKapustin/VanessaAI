@@ -22,7 +22,7 @@ The compose prompt follows a "Markdown system + XML input" architecture:
 
 - the reply is plain text (only the planner returns JSON).
 
-Conventions (documented to the model in ``llm.yaml`` → ``task:``):
+Conventions (documented to the model in ``compose/system.yaml`` → ``task:``):
 
 - ``<msg>`` — one chat message. Attributes: ``id`` (message number, target of
   ``reply_to`` links), ``sender`` (a participant's display name, or ``bot`` for

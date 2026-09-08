@@ -26,23 +26,28 @@ from vanessa.config.content_sections import (
     RagContent,
 )
 from vanessa.config.content_stickers import StickerDefContent, StickersContent
+from vanessa.config.paths import resolve_settings_path
 from vanessa.config.settings import settings
 
-# One file per responsibility (SRP). Each file holds the body of its top-level
-# section from the original monolithic config/content.yaml.
-CONTENT_SECTIONS: dict[str, str] = {
+# Paths are relative to config/behavior/. Clusters match pipeline jobs.
+CONTENT_SECTIONS: dict[str, str | tuple[str, ...]] = {
     "bot": "bot.yaml",
     "persona": "persona.yaml",
     "conversation": "conversation.yaml",
-    "llm": "llm.yaml",
-    "decision": "decision.yaml",
-    "memory": "memory.yaml",
-    "metrics": "metrics.yaml",
-    "portrait": "portrait.yaml",
-    "rag": "rag.yaml",
-    "profanity": "profanity.yaml",
-    "stickers": "stickers.yaml",
-    "memes": "memes.yaml",
+    "llm": (
+        "compose/system.yaml",
+        "compose/layout.yaml",
+        "compose/notes.yaml",
+        "compose/generation.yaml",
+    ),
+    "decision": ("gate/decision.yaml", "gate/reaction_gate.yaml"),
+    "memory": "knowledge/memory.yaml",
+    "metrics": ("knowledge/metrics.yaml", "knowledge/mood.yaml"),
+    "portrait": "knowledge/portrait.yaml",
+    "rag": ("retrieve/rag.yaml", "gate/planner.yaml"),
+    "profanity": "humor/profanity.yaml",
+    "stickers": "humor/stickers.yaml",
+    "memes": "humor/memes.yaml",
 }
 
 
@@ -62,30 +67,42 @@ class AppContent(BaseModel):
 
 
 def resolve_content_source() -> Path:
-    """Locate the content config: a directory of per-section files or a single YAML file."""
-    configured = Path(settings.content_config_path)
-    if configured.exists():
-        return configured
-    project_root = Path(__file__).resolve().parents[2]
-    fallback = project_root / "config" / "content"
-    if fallback.is_dir():
-        return fallback
-    raise FileNotFoundError(
-        f"Content config not found: {configured} or {fallback}"
-    )
+    """Locate the behavior YAML: a directory of per-section files or a single file."""
+    source = resolve_settings_path(settings.behavior_config_path, "behavior")
+    if source.exists():
+        return source
+    raise FileNotFoundError(f"Behavior config not found: {source}")
+
+
+def _read_yaml_mapping(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        return {}
+    return raw
+
+
+def _merge_section_files(source: Path, filenames: str | tuple[str, ...]) -> dict:
+    names = (filenames,) if isinstance(filenames, str) else filenames
+    merged: dict = {}
+    for name in names:
+        chunk = _read_yaml_mapping(source / name)
+        clash = set(merged) & set(chunk)
+        if clash:
+            raise ValueError(f"duplicate keys in {name}: {sorted(clash)}")
+        merged.update(chunk)
+    return merged
 
 
 def _load_content_dict(source: Path) -> dict:
     """Assemble the AppContent dict from either a directory of section files
     or a single monolithic YAML file (backward compatible)."""
     if source.is_dir():
-        data: dict = {}
-        for section, filename in CONTENT_SECTIONS.items():
-            section_file = source / filename
-            if section_file.is_file():
-                raw = yaml.safe_load(section_file.read_text(encoding="utf-8"))
-                data[section] = raw or {}
-        return data
+        return {
+            section: _merge_section_files(source, filenames)
+            for section, filenames in CONTENT_SECTIONS.items()
+        }
     raw = yaml.safe_load(source.read_text(encoding="utf-8"))
     return raw or {}
 

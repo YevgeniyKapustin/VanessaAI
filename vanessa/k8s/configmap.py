@@ -29,6 +29,7 @@ COMPOSE_ONLY_KEYS: frozenset[str] = frozenset(
         "API_WORKERS",
         "API_GRACEFUL_TIMEOUT",
         "NGINX_HTTP_PORT",
+        "PRESENCE_AVATAR_PATH",
     }
 )
 

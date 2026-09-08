@@ -26,7 +26,7 @@ __all__ = [
     "last_bot_reply_partner_sender_id",
 ]
 
-# Fallback phrase set, used when config/content/decision.yaml provides no
+# Fallback phrase set, used when config/behavior/gate/decision.yaml provides no
 # ``continuation_phrases``. Full lowercase phrases, matched as a whole against
 # the normalized (lowercased, whitespace-collapsed) message.
 DEFAULT_CONTINUATION_PHRASES = (

@@ -5,6 +5,7 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
+from vanessa.config.paths import resolve_settings_path
 from vanessa.config.settings import settings
 from vanessa.infrastructure.ingest.user_backfill import load_nicknames
 from vanessa.knowledge.format import PEOPLE
@@ -31,12 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_nicknames_path() -> Path:
-    configured = Path(settings.nicknames_config_path)
-    if configured.is_file():
-        return configured
-    project_root = Path(__file__).resolve().parents[3]
-    fallback = project_root / "config" / "nicknames.yaml"
-    return fallback if fallback.is_file() else configured
+    return resolve_settings_path(
+        settings.nicknames_config_path, "nicknames.yaml"
+    )
 
 
 @lru_cache

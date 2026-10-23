@@ -64,7 +64,12 @@ class HermesRunner:
         file_task = self._composer.file_task(
             attached=split.file is not None, refused=bool(split.problems)
         )
-        text = await self._composer.compose(ask, split.text or None, file_task=file_task)
+        text = await self._composer.compose(
+            ask,
+            split.text or None,
+            file_task=file_task,
+            elapsed_seconds=time.monotonic() - started,
+        )
         await self._broker.publish(self._stream, _outbound(ask, text, split.file))
         seconds = time.monotonic() - started
         record_hermes_job(outcome, seconds)

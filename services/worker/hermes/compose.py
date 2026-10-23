@@ -80,11 +80,19 @@ class FollowupComposer:
         self._generation = generation
 
     async def compose(
-        self, ask: HermesAsk, answer: str | None, *, file_task: str = ""
+        self,
+        ask: HermesAsk,
+        answer: str | None,
+        *,
+        file_task: str = "",
+        elapsed_seconds: float | None = None,
     ) -> str:
-        """Always return a non-empty text of at most 4096 characters."""
+        """Always return a non-empty text of at most 4096 characters.
+
+        ``elapsed_seconds``: the real time from the run start to the answer.
+        """
         try:
-            raw = await self._complete(ask, answer, file_task)
+            raw = await self._complete(ask, answer, file_task, elapsed_seconds)
         except Exception as exc:  # noqa: BLE001 - any LLM failure → plain fallback
             # The type only: provider errors may echo the prompt.
             logger.warning(
@@ -113,9 +121,19 @@ class FollowupComposer:
             return self._prompts.file_attached_task
         return self._prompts.file_refused_task if refused else ""
 
-    async def _complete(self, ask: HermesAsk, answer: str | None, file_task: str) -> str:
+    async def _complete(
+        self,
+        ask: HermesAsk,
+        answer: str | None,
+        file_task: str,
+        elapsed_seconds: float | None,
+    ) -> str:
         user = build_followup_user_prompt(
-            ask, answer, self._prompts, file_task=file_task
+            ask,
+            answer,
+            self._prompts,
+            file_task=file_task,
+            elapsed_seconds=elapsed_seconds,
         )
         messages, extra = chat_request(self._completer, self._system, user)
         return await request_tagged(

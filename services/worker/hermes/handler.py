@@ -5,6 +5,8 @@ The worker consumes tasks one at a time, and a Hermes run can take up to
 validates the payload, starts an asyncio job and returns (the task is
 acked). A semaphore bounds the jobs that talk to Hermes at once; the rest
 queue on it, up to ``max_queued``. Extra asks are dropped with a log.
+An ask that rephrases a job still open in the same chat is merged into it
+(skipped, ``hermes_ask_merged``): see ``dedupe``.
 
 Jobs live only in this process. A worker restart loses the jobs in
 progress (the task is already acked, so it is not redelivered); the Hermes
@@ -17,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from services.worker.hermes.dedupe import OpenAsks
 from services.worker.hermes.payload import HermesAsk, parse_hermes_ask
 from services.worker.hermes.runner import HermesRunner
 from vanessa.contracts.messages import TaskMessage
@@ -41,6 +44,7 @@ class HermesAskHandler:
         self._max_jobs = parallel + queued
         # Strong references: the event loop keeps only weak ones to tasks.
         self._jobs: set[asyncio.Task[None]] = set()
+        self._open = OpenAsks()
 
     @property
     def job_count(self) -> int:
@@ -50,6 +54,16 @@ class HermesAskHandler:
         ask = parse_hermes_ask(task)
         if ask is None:
             logger.warning("hermes_ask_invalid correlation_id=%s", task.correlation_id)
+            return
+        if self._open.repeats(ask.telegram_chat_id, ask.question):
+            # A rephrase of a job still open in this chat: its follow-up
+            # answers both messages. A second job would post a near-duplicate.
+            logger.info(
+                "hermes_ask_merged chat_id=%s message_id=%s",
+                ask.telegram_chat_id,
+                ask.telegram_message_id,
+            )
+            record_hermes_job("merged")
             return
         if len(self._jobs) >= self._max_jobs:
             logger.warning(
@@ -61,7 +75,12 @@ class HermesAskHandler:
             return
         job = asyncio.create_task(self._guarded(ask), name=f"hermes:{ask.idempotency_key}")
         self._jobs.add(job)
-        job.add_done_callback(self._jobs.discard)
+        self._open.add(job, ask.telegram_chat_id, ask.question)
+        job.add_done_callback(self._job_done)
+
+    def _job_done(self, job: asyncio.Task[None]) -> None:
+        self._jobs.discard(job)
+        self._open.discard(job)
 
     async def aclose(self) -> None:
         """Cancel every job (worker shutdown) and wait until they stop."""

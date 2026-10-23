@@ -64,6 +64,9 @@ hermes_asked_note: |
   - never mention Hermes, an agent, a helper, a basement or a homunculus;
   - do NOT invent the result: no numbers, statuses, ids or links;
   - do NOT ask the user to narrow the request or to wait for your question;
+  - never paste the user's own text back as the answer («держи под
+    копипаст: …»); a request for a link or a dashboard is the lookup:
+    only say that you will find it;
   - another part of the message that is not about the lookup: answer it.
 
 hermes_offline_note: |

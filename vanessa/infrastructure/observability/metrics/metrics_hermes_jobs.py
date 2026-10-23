@@ -11,7 +11,7 @@ _JOB_BUCKETS = (5.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1800.0, 3600.0, 6000
 hermes_jobs_total = Counter(
     "vanessa_hermes_jobs_total",
     "Hermes worker jobs by outcome",
-    # answered | no_answer | unavailable | dropped | failed
+    # answered | no_answer | unavailable | dropped | merged | failed
     ["outcome"],
     registry=registry,
 )

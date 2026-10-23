@@ -20,6 +20,13 @@ worker (background job): POST /v1/runs → poll GET /v1/runs/{id}
 - A run longer than `HERMES_MAX_WAIT_SECONDS` is stopped.
 - Streaming is not used: its error chunks are not redacted upstream.
 - A worker restart loses jobs in progress. The Hermes run itself continues.
+- One open job per question in a chat. A new ask that repeats an open job
+  in the same chat (a rephrase or a correction) does not start a second
+  run: the worker logs `hermes_ask_merged` and skips it. The open job's
+  follow-up answers both messages. "Repeats" means at least 3 shared word
+  stems and 60% of the shorter question's stems (`hermes/dedupe.py`).
+- The follow-up prompt gets the real run time. Vanessa never claims a
+  second check or a wait that did not happen.
 
 ## Generated HTML reports
 

@@ -16,6 +16,8 @@ _DATA_TAG_RE = re.compile(
     r"<\s*/?\s*(?:" + "|".join(_DATA_TAGS) + r")\s*>", re.IGNORECASE
 )
 _EMPTY = "(empty)"
+# Under this, the run time is given in seconds; from it, in minutes.
+SECONDS_LIMIT = 90
 
 
 def build_followup_system_prompt(content: AppContent, channel: str) -> str:
@@ -30,6 +32,14 @@ def build_followup_system_prompt(content: AppContent, channel: str) -> str:
     return build_system_prompt(content, profile)
 
 
+def format_duration(seconds: float) -> str:
+    """«16 seconds» under 90 s, else whole minutes («3 minutes»)."""
+    if seconds < SECONDS_LIMIT:
+        whole = max(1, round(seconds))
+        return "1 second" if whole == 1 else f"{whole} seconds"
+    return f"{round(seconds / 60)} minutes"
+
+
 def _block(tag: str, text: str) -> str:
     body = _DATA_TAG_RE.sub("", text).strip() or _EMPTY
     return f"<{tag}>\n{body}\n</{tag}>"
@@ -41,11 +51,13 @@ def build_followup_user_prompt(
     prompts: HermesContent,
     *,
     file_task: str = "",
+    elapsed_seconds: float | None = None,
 ) -> str:
     """Data blocks first, then the data rules, then the task (last).
 
     ``file_task`` (the HTML file note) goes right before the main task,
-    so the "[answer]" instruction stays last.
+    so the "[answer]" instruction stays last. ``elapsed_seconds`` fills the
+    timing note: the model gets the real run time, not a guess.
     """
     parts = [
         _block("user_message", ask.user_message),
@@ -54,6 +66,9 @@ def build_followup_user_prompt(
     if answer:
         parts.append(_block("hermes_answer", answer))
     parts.append(prompts.data_rules.strip())
+    timing = prompts.timing_note.strip()
+    if timing and elapsed_seconds is not None:
+        parts.append(timing.replace("{duration}", format_duration(elapsed_seconds)))
     if file_task.strip():
         parts.append(file_task.strip())
     task = prompts.answered_task if answer else prompts.undelivered_task

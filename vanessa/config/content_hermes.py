@@ -26,6 +26,8 @@ class HermesContent(BaseModel):
     # Added to the task when the answer had an HTML file (sent / refused).
     file_attached_task: str = ""
     file_refused_task: str = ""
+    # The real run time; ``{duration}`` becomes «16 seconds» / «3 minutes».
+    timing_note: str = ""
     # null or 0 = off: max_tokens is not sent.
     max_tokens: int | None = Field(default=1024, ge=0, le=4096)
 

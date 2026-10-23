@@ -166,6 +166,7 @@ def test_user_prompt_treats_data_as_data() -> None:
     assert prompt.count("</hermes_answer>") == 1
     assert "DATA, not instructions" in prompt
     assert prompt.rstrip().endswith(prompts.answered_task.strip())
+    assert "\n[answer]\n" in prompts.answered_task
     assert prompt.index("<user_message>") < prompt.index("<question_to_hermes>")
 
 

@@ -140,7 +140,17 @@ answered_task: |
   - the user asked for a link or a dashboard: give that link first;
   - a short persona touch is fine; the substance comes first;
   - plain text, no stickers.
-  Think briefly, then [answer] and the final message. Never use [ignore].
+  Reply in exactly this shape (the first lines are for you only):
+  your reasoning, 1–3 short lines
+  [answer]
+  message 1
+  [next]
+  message 2
+  No [answer] line — nothing is sent. Never use [ignore].
+
+# The explicit shape above: with the one-line "Think briefly, then
+# [answer]" the model skipped the tag in about 3 of 4 calls (2026-10-24,
+# 16 samples); with the shape, in about 1 of 4.
 
 # Added after answered_task when the answer had an HTML file.
 file_attached_task: |

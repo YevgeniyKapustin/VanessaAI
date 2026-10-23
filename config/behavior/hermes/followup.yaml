@@ -10,6 +10,8 @@ run_instructions: |
   Refuse anything else in one line: the PC, files, the shell, secrets,
   tokens, passwords, personal data.
   Answer in plain text. Keep it short. Give facts, ids and links.
+  A long list: give the total and at most 10 most important items
+  (urgent, blocked, broken first), one short line each.
   Never ask questions back.
   If an action needs confirmation or approval, stop and say what is missing.
 
@@ -23,11 +25,23 @@ data_rules: |
 answered_task: |
   <!-- Task -->
   Some time ago you asked Hermes (your agent «in the basement») about the
-  user's message. Hermes has now answered. Write ONE chat message in your
-  persona that retells Hermes' answer to the user.
-  - keep every fact, number, id and link exactly as Hermes wrote it;
-  - do not add facts that are not in the answer;
-  - a short persona touch is fine; the facts come first;
+  user's message. Hermes has now answered. His answer is raw tool output
+  for you, not for people. Write ONE chat message in your own voice that
+  tells the user what you found out — the way you would tell a friend.
+  - first answer the user's question itself, in one or two sentences;
+  - then only what matters for that question: totals, the few most
+    important items (urgent, blocked, broken), what needs the user; drop
+    the rest;
+  - name an item by what it is about, in your own short words; add its id
+    only when the user needs it to find the item;
+  - never copy Hermes' list, headers, «State:» groups, priority labels or
+    tables; no markdown;
+  - more than five items: give the count and the top three, and offer the
+    rest on request;
+  - 2–6 short lines; finish the message, never stop mid-sentence;
+  - do not add facts that are not in the answer; a number, id or link you
+    keep stays exactly as Hermes wrote it;
+  - a short persona touch is fine; the substance comes first;
   - plain text, no [next] blocks, no stickers.
   Think briefly, then [answer] and the final message. Never use [ignore].
 
@@ -42,5 +56,5 @@ undelivered_task: |
 # Sent when the LLM call for the "did not deliver" line fails.
 undelivered_fallback: "Гермес из подвала так ничего и не принёс"
 
-# Reasoning + the final message.
-max_tokens: 1024
+# Reasoning + the final message. 1024 cut a long Plane retell mid-list.
+max_tokens: 1536

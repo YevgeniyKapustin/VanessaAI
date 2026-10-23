@@ -57,6 +57,7 @@ class OrchestratorFactory:
             web_search=engines.web_search,
             hermes=engines.hermes,
             dispatcher=dispatcher,
+            reminders=engines.reminders,
         )
         compose = ComposeStage(
             engines.llm,

@@ -8,6 +8,7 @@ from vanessa.core.protocols.compose import (
     TurnMetricsProtocol,
 )
 from vanessa.core.protocols.hermes import HermesHealthProtocol
+from vanessa.core.protocols.reminders import ReminderStoreProtocol
 from vanessa.core.protocols.speech import SpeechAudio, SpeechSynthesizer
 from vanessa.core.protocols.storage import (
     ChatUserProtocol,
@@ -25,6 +26,7 @@ __all__ = [
     "LLMProviderProtocol",
     "MessageRepositoryProtocol",
     "PhotoCaptionerProtocol",
+    "ReminderStoreProtocol",
     "SceneDescriberProtocol",
     "SpeechAudio",
     "SpeechSynthesizer",

@@ -1,4 +1,5 @@
 from vanessa.config.settings_hermes import HermesMixin
+from vanessa.config.settings_schedule import ScheduleMixin
 from vanessa.config.settings_sections import (
     BotMixin,
     CoreMixin,
@@ -9,7 +10,13 @@ from vanessa.config.settings_sections import (
 
 
 class Settings(
-    BotMixin, CoreMixin, WorkerMixin, McpMixin, HermesMixin, SharedSettings
+    BotMixin,
+    CoreMixin,
+    WorkerMixin,
+    McpMixin,
+    HermesMixin,
+    ScheduleMixin,
+    SharedSettings,
 ):
     """Aggregate settings for the current monolith deployment.
 

@@ -44,6 +44,8 @@ class GenerateRequest:
     scene_description: str | None = None
     # Hermes ask outcome: "asked" | "offline" | None (see prompt_hermes).
     hermes_status: str | None = None
+    # Schedule request outcome as a ready directive (see prompt_schedule).
+    schedule_note: str | None = None
     channel_profile: ChannelProfile | None = None
 
 

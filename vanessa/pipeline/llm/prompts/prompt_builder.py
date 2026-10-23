@@ -15,6 +15,7 @@ from vanessa.pipeline.llm.prompts import (
     prompt_directives,
     prompt_format,
     prompt_hermes,
+    prompt_schedule,
 )
 from vanessa.pipeline.llm.prompts.budget import PRIORITY_DIRECTIVES, apply_budget
 from vanessa.pipeline.llm.prompts.prompt_system import build_system_prompt
@@ -150,6 +151,7 @@ class PromptBuilder:
         parts.extend(prompt_directives.scene_parts(request.scene_description))
         parts.extend(prompt_directives.web_parts(content, request.web_blocks))
         parts.extend(prompt_hermes.hermes_parts(content, request.hermes_status))
+        parts.extend(prompt_schedule.schedule_parts(request.schedule_note))
         parts.extend(prompt_context.humor_parts(content, request.humor_quotes))
         parts.extend(_meme_parts(content, request))
         parts.extend(prompt_context.metrics_parts(content, request.metrics_block))

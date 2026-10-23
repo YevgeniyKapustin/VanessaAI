@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from vanessa.config import settings
-from vanessa.infrastructure.db import models
+from vanessa.infrastructure.db import (
+    models,
+    reminder_models,  # noqa: F401 - registers the table
+)
 
 target_metadata = models.Base.metadata
 

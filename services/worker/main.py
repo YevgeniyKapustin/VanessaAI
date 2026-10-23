@@ -2,7 +2,8 @@
 
 Runs in its own container (isolated CPU/RAM): consumes ``TaskMessage``s from
 the broker's task stream and runs the heavy handlers, plus the sweep/portrait
-polling loops.
+polling loops and the scheduled-post loop (the only process that fires the
+posts Vanessa schedules for herself).
 
     python -m services.worker.main
 """
@@ -16,6 +17,7 @@ from uuid import uuid4
 
 from services.worker.app import WorkerApp
 from services.worker.handlers import build_worker_handlers
+from services.worker.reminders import build_reminder_scheduler
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.broker.metrics_collector import BrokerMetricsCollector
@@ -81,6 +83,9 @@ async def main() -> None:
         dedup=broker.dedup_guard(),
         sweep_worker=sweep_worker,
         portrait_worker=portrait_worker,
+        scheduler=build_reminder_scheduler(
+            broker, outbound_stream=streams.outbound, settings=settings
+        ),
     )
     logger.info("worker_started stream=%s group=%s", streams.tasks, settings.broker_group_worker)
     try:

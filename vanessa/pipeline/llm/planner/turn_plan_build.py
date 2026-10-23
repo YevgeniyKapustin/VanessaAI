@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from vanessa.config.settings import settings
+from vanessa.pipeline.decision.schedule_request import ScheduleRequest
 from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.llm.planner.schedule_parse import parse_schedule
 
 _TONE_VALUES = frozenset({"neutral", "serious", "ironic", "humorous"})
 _DETAIL_VALUES = frozenset({"brief", "normal", "detailed"})
@@ -123,6 +125,15 @@ def _hermes_fields(payload: dict) -> tuple[bool, str]:
     return ask_hermes, query if ask_hermes else ""
 
 
+def _schedule_fields(payload: dict) -> tuple[ScheduleRequest | None, bool | None]:
+    # A schedule request needs her confirmation; should_reply is still
+    # only a suggestion (the Decision Engine can veto).
+    schedule = parse_schedule(payload) if settings.schedule_enabled else None
+    if schedule is not None:
+        return schedule, True
+    return None, _parse_should_reply(payload.get("should_reply"))
+
+
 def _search_plan(
     original: str,
     payload: dict,
@@ -135,6 +146,7 @@ def _search_plan(
     humor_ok, humor_query = _humor_fields(payload)
     web_search, web_query = _web_search_fields(payload, text)
     ask_hermes, hermes_query = _hermes_fields(payload)
+    schedule, should_reply = _schedule_fields(payload)
     knowledge_indexes = tuple(
         str(item).strip().lower()
         for item in _as_list(payload.get("knowledge_indexes"))
@@ -147,7 +159,7 @@ def _search_plan(
         tone=_parse_tone(payload.get("tone")),
         humor_ok=humor_ok,
         humor_query=humor_query,
-        should_reply=_parse_should_reply(payload.get("should_reply")),
+        should_reply=should_reply,
         deep_search=payload.get("deep_search") is True,
         knowledge_indexes=knowledge_indexes,
         knowledge_query=str(payload.get("knowledge_query", "")).strip(),
@@ -160,5 +172,6 @@ def _search_plan(
         detail=_parse_detail(payload.get("detail")),
         ask_hermes=ask_hermes,
         hermes_query=hermes_query,
+        schedule=schedule,
         reason=reason,
     )

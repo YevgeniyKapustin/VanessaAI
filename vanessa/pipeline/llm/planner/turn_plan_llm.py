@@ -12,6 +12,7 @@ from vanessa.pipeline.llm.prompts.session_format import (
     session_context_messages,
 )
 from vanessa.pipeline.llm.providers.protocols import create_chat_completer
+from vanessa.pipeline.schedule.timing import planner_now_text
 
 logger = logging.getLogger("vanessa.pipeline.llm.planner.turn_planner")
 
@@ -48,6 +49,7 @@ class _TurnPlanLlmMixin:
             reply_to_bot=_yes_no(enabled=reply_to_bot),
             reply_to_other_user=_yes_no(enabled=reply_to_other_user),
             listen_window=_yes_no(enabled=in_listen_window),
+            now=planner_now_text(),
         )
         raw = (
             await client.complete(

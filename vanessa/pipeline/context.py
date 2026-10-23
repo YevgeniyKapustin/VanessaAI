@@ -35,6 +35,9 @@ class TurnPipelineContext:
     # Hermes ask outcome from the Retrieve stage: "asked" (task queued for the
     # worker), "offline" (health check failed), None (not requested).
     hermes_status: Literal["asked", "offline"] | None = None
+    # Compose directive for a schedule request (add / list / cancel a post
+    # Vanessa schedules for herself); None when the turn has none.
+    schedule_note: str | None = None
     meme_blocks: list[MemeDefContent] = field(default_factory=list)
     meme_menu: list[MemeDefContent] = field(default_factory=list)
     sender_profile: SenderProfile | None = None

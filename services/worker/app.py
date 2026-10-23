@@ -29,6 +29,7 @@ class WorkerApp:
         dedup=None,
         sweep_worker=None,
         portrait_worker=None,
+        scheduler=None,
     ) -> None:
         self._broker = broker
         self._handlers = dict(handlers)
@@ -36,15 +37,16 @@ class WorkerApp:
         self._group = group
         self._consumer = consumer
         self._dedup = dedup
-        self._sweep_worker = sweep_worker
-        self._portrait_worker = portrait_worker
+        # Polling loops next to the task consumer; None skips one.
+        self._loops = [
+            loop
+            for loop in (sweep_worker, portrait_worker, scheduler)
+            if loop is not None
+        ]
 
     async def run_forever(self) -> None:
         tasks = [asyncio.create_task(self._consume_tasks())]
-        if self._sweep_worker is not None:
-            tasks.append(asyncio.create_task(self._sweep_worker.run_forever()))
-        if self._portrait_worker is not None:
-            tasks.append(asyncio.create_task(self._portrait_worker.run_forever()))
+        tasks.extend(asyncio.create_task(loop.run_forever()) for loop in self._loops)
         await asyncio.gather(*tasks)
 
     async def _consume_tasks(self) -> None:

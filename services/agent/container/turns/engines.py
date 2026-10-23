@@ -10,8 +10,10 @@ from vanessa.config.settings import settings
 from vanessa.core.protocols import (
     HermesHealthProtocol,
     LLMProviderProtocol,
+    ReminderStoreProtocol,
     SceneDescriberProtocol,
 )
+from vanessa.infrastructure.db.reminder_repository import create_reminder_store
 from vanessa.infrastructure.hermes import create_hermes_client
 from vanessa.infrastructure.observability.eval import RagTriadEvaluator
 from vanessa.infrastructure.websearch.factory import create_web_search
@@ -41,6 +43,8 @@ class TurnEngines:
     config: OrchestratorConfig
     metrics_retriever: MetricsRetriever
     scene_describer: SceneDescriberProtocol
+    # Posts Vanessa schedules for herself; None when the skill is off.
+    reminders: ReminderStoreProtocol | None = None
 
     @classmethod
     def build(
@@ -70,4 +74,5 @@ class TurnEngines:
             config=OrchestratorConfig.from_settings(),
             metrics_retriever=knowledge.metrics_retriever(),
             scene_describer=SceneDescriber(),
+            reminders=create_reminder_store(settings),
         )

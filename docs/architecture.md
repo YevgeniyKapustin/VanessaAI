@@ -157,6 +157,16 @@ rules.
   per-person mood and facts, so aliases and topics match.
 - **History import** — `scripts/import_telegram_history.py` loads Telegram
   Desktop `result.json` into Postgres in batches.
+- **Scheduled posts** — the planner fills `schedule` (add / list / cancel)
+  when someone asks Vanessa to post something later or on a schedule. The
+  step stores it in the Postgres `reminders` table and compose confirms it.
+  The worker loop (`services/worker/reminders`) claims due rows with
+  `FOR UPDATE SKIP LOCKED`, retells the post in her voice (the link stays
+  verbatim, else the stored text goes out), and publishes it to the
+  outbound stream. A recurring post moves to its next run; a one-shot post
+  is deleted. Times use `SCHEDULE_TIMEZONE` (default `Asia/Tbilisi`); she
+  never names a time zone in the chat. Limits: `SCHEDULE_MAX_PER_CHAT`,
+  `SCHEDULE_MIN_INTERVAL_MINUTES`.
 
 ## Photos and character
 

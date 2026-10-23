@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Any
 
+from vanessa.pipeline.decision.schedule_request import ScheduleRequest
+
 
 @dataclass(frozen=True, slots=True)
 class TurnPlan:
@@ -51,6 +53,9 @@ class TurnPlan:
     # Retrieve stage only queues the task; Hermes answers later.
     ask_hermes: bool = False
     hermes_query: str = ""
+    # A post Vanessa schedules for herself (add / list / cancel). The
+    # Retrieve stage applies it; compose confirms it in her voice.
+    schedule: ScheduleRequest | None = None
 
     def to_trace_dict(self) -> dict[str, Any]:
         """Serialize the plan for the Langfuse trace (gate span output).
@@ -81,5 +86,6 @@ class TurnPlan:
             "detail": self.detail,
             "ask_hermes": self.ask_hermes,
             "hermes_query": self.hermes_query,
+            "schedule": self.schedule.to_trace_dict() if self.schedule else None,
             "reason": self.reason,
         }

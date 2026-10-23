@@ -19,3 +19,5 @@ class HermesMixin:
     # Hermes jobs the worker runs at the same time.
     hermes_max_parallel: int = 3
     hermes_query_max_chars: int = 500
+    # Largest generated HTML file the worker sends as a document (UTF-8 bytes).
+    hermes_file_max_bytes: int = 262_144

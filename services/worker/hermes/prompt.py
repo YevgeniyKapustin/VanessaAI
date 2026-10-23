@@ -36,15 +36,26 @@ def _block(tag: str, text: str) -> str:
 
 
 def build_followup_user_prompt(
-    ask: HermesAsk, answer: str | None, prompts: HermesContent
+    ask: HermesAsk,
+    answer: str | None,
+    prompts: HermesContent,
+    *,
+    file_task: str = "",
 ) -> str:
-    """Data blocks first, then the data rules, then the task (last)."""
+    """Data blocks first, then the data rules, then the task (last).
+
+    ``file_task`` (the HTML file note) goes right before the main task,
+    so the "[answer]" instruction stays last.
+    """
     parts = [
         _block("user_message", ask.user_message),
         _block("question_to_hermes", ask.question),
     ]
     if answer:
         parts.append(_block("hermes_answer", answer))
+    parts.append(prompts.data_rules.strip())
+    if file_task.strip():
+        parts.append(file_task.strip())
     task = prompts.answered_task if answer else prompts.undelivered_task
-    parts.extend([prompts.data_rules.strip(), task.strip()])
+    parts.append(task.strip())
     return "\n\n".join(parts)

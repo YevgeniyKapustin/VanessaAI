@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from aiogram import Bot
 
+from services.bot.outbound.document import post_document
 from services.bot.outbound.send import post_outbound
 from vanessa.config import settings
 from vanessa.contracts import OutboundMessage
@@ -85,8 +86,9 @@ async def handle_outbound(
     message = delivery.message
     if not _should_post(message, allowed_chat_id):
         return
+    post = post_outbound if message.document is None else post_document
     try:
-        delivered = await post_outbound(bot, message)
+        delivered = await post(bot, message)
     except Exception:  # a send failure must not redeliver
         logger.exception(
             "outbound_send_failed chat_id=%s source=%s",
@@ -95,12 +97,13 @@ async def handle_outbound(
         )
         return
     logger.info(
-        "outbound_sent chat_id=%s source=%s reply_to=%s delivered=%s len=%s",
+        "outbound_sent chat_id=%s source=%s reply_to=%s delivered=%s len=%s file=%s",
         message.telegram_chat_id,
         message.source,
         message.reply_to_message_id,
         delivered,
         len(message.text),
+        message.document.file_name if message.document else "-",
     )
 
 

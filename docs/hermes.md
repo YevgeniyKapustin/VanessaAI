@@ -21,6 +21,40 @@ worker (background job): POST /v1/runs → poll GET /v1/runs/{id}
 - Streaming is not used: its error chunks are not redacted upstream.
 - A worker restart loses jobs in progress. The Hermes run itself continues.
 
+## Generated HTML reports
+
+When the user asks for an HTML report (a file or a page), Hermes returns
+the page inline, once, in one block:
+
+```
+<vanessa_file name="short-slug.html">
+<!doctype html>…</html>
+</vanessa_file>
+```
+
+The worker (`services/worker/hermes/html_file.py`) takes the block out
+before the follow-up LLM sees the answer. A short note takes its place.
+The bot sends the page as a `.html` document. Vanessa's message is the
+caption (or a message before the file, when it is longer than 1024
+characters).
+
+The worker sends the file only when all of these are true:
+
+- It is one whole document: `<!doctype html>` or `<html>` up to `</html>`.
+- It is static: no `<script>`, frames, `<object>`, `<embed>`, `<form>`,
+  `<base>`, `on…=` handlers, `javascript:` or refresh redirects.
+- It is one file per answer.
+- Its size is at most `HERMES_FILE_MAX_BYTES` (default 262144).
+
+The file name is made safe: letters, digits, `_` and `-`, at most 60
+characters, then `.html`. A fenced ```` ```html ```` block or a bare page
+also counts as a file. An HTML start with no end is a cut file: the rest
+of the answer is dropped and no file is sent. HTML never goes to the
+chat as text. If Telegram refuses the file, the text still goes out.
+
+The report style lives in the Hermes profile memory on the PC, not in
+this repo.
+
 ## Server
 
 1. In `/etc/ssh/sshd_config.d/70-vanessa-hermes.conf`, set

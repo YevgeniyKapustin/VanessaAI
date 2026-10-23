@@ -79,10 +79,12 @@ class FollowupComposer:
         self._prompts = prompts
         self._generation = generation
 
-    async def compose(self, ask: HermesAsk, answer: str | None) -> str:
+    async def compose(
+        self, ask: HermesAsk, answer: str | None, *, file_task: str = ""
+    ) -> str:
         """Always return a non-empty text of at most 4096 characters."""
         try:
-            raw = await self._complete(ask, answer)
+            raw = await self._complete(ask, answer, file_task)
         except Exception as exc:  # noqa: BLE001 - any LLM failure → plain fallback
             # The type only: provider errors may echo the prompt.
             logger.warning(
@@ -105,8 +107,16 @@ class FollowupComposer:
             return fallback_text(answer, self._prompts)
         return truncate_message(text)
 
-    async def _complete(self, ask: HermesAsk, answer: str | None) -> str:
-        user = build_followup_user_prompt(ask, answer, self._prompts)
+    def file_task(self, *, attached: bool, refused: bool) -> str:
+        """The HTML file note for the task: sent wins over refused."""
+        if attached:
+            return self._prompts.file_attached_task
+        return self._prompts.file_refused_task if refused else ""
+
+    async def _complete(self, ask: HermesAsk, answer: str | None, file_task: str) -> str:
+        user = build_followup_user_prompt(
+            ask, answer, self._prompts, file_task=file_task
+        )
         messages, extra = chat_request(self._completer, self._system, user)
         return await request_tagged(
             lambda: self._completer.complete(

@@ -225,6 +225,9 @@ turn_planner_prompt: |
   is ask_hermes=true, not needs_clarification and not a generic answer.
   Exception: what the project is in general — Vanessa answers from the
   owner's facts, ask_hermes=false.
+  An HTML report / report file / page about that work («сделай отчёт в
+  html по багам») is ask_hermes=true: Hermes makes the file and Vanessa
+  sends it; keep «HTML-отчёт» in hermes_query.
   false (default) for chit-chat, general knowledge (that is web_search),
   our people/lore, and ANYTHING about the PC itself, its files or commands.
   hermes_query: ONE short self-contained question in the user's language

@@ -10,8 +10,13 @@ import logging
 import time
 
 from services.worker.hermes.compose import FollowupComposer
+from services.worker.hermes.html_file import HtmlFile, SplitAnswer, split_html_file
 from services.worker.hermes.payload import HermesAsk
-from vanessa.contracts.outbound import OutboundMessage
+from vanessa.contracts.outbound import (
+    DOCUMENT_MAX_CHARS,
+    OutboundDocument,
+    OutboundMessage,
+)
 from vanessa.infrastructure.hermes import (
     HermesClient,
     HermesUnavailableError,
@@ -40,6 +45,7 @@ class HermesRunner:
         instructions: str,
         poll_seconds: float,
         max_wait_seconds: float,
+        file_max_bytes: int = 262_144,
     ) -> None:
         self._client = client
         self._composer = composer
@@ -48,21 +54,21 @@ class HermesRunner:
         self._instructions = instructions.strip() or None
         self._poll_seconds = poll_seconds
         self._max_wait_seconds = max_wait_seconds
+        # Bytes >= chars, so this also keeps the file under the wire cap.
+        self._file_max_bytes = max(0, min(file_max_bytes, DOCUMENT_MAX_CHARS))
 
     async def run(self, ask: HermesAsk) -> None:
         started = time.monotonic()
         answer, outcome = await self._ask_hermes(ask)
-        text = await self._composer.compose(ask, answer)
-        await self._broker.publish(self._stream, _outbound(ask, text))
+        split = split_html_file(answer or "", max_bytes=self._file_max_bytes)
+        file_task = self._composer.file_task(
+            attached=split.file is not None, refused=bool(split.problems)
+        )
+        text = await self._composer.compose(ask, split.text or None, file_task=file_task)
+        await self._broker.publish(self._stream, _outbound(ask, text, split.file))
         seconds = time.monotonic() - started
         record_hermes_job(outcome, seconds)
-        logger.info(
-            "hermes_job_done chat_id=%s outcome=%s seconds=%.1f len=%s",
-            ask.telegram_chat_id,
-            outcome,
-            seconds,
-            len(text),
-        )
+        _log_done(ask, outcome, seconds, text, split)
 
     async def _ask_hermes(self, ask: HermesAsk) -> tuple[str | None, str]:
         try:
@@ -101,11 +107,32 @@ class HermesRunner:
         return answer
 
 
-def _outbound(ask: HermesAsk, text: str) -> OutboundMessage:
+def _log_done(
+    ask: HermesAsk, outcome: str, seconds: float, text: str, split: SplitAnswer
+) -> None:
+    logger.info(
+        "hermes_job_done chat_id=%s outcome=%s seconds=%.1f len=%s "
+        "file_bytes=%s file_refused=%s",
+        ask.telegram_chat_id,
+        outcome,
+        seconds,
+        len(text),
+        split.file.size_bytes if split.file else 0,
+        ",".join(split.problems) or "-",
+    )
+
+
+def _outbound(ask: HermesAsk, text: str, file: HtmlFile | None) -> OutboundMessage:
+    document = (
+        OutboundDocument(file_name=file.file_name, content=file.content)
+        if file is not None
+        else None
+    )
     return OutboundMessage(
         channel="telegram",
         telegram_chat_id=ask.telegram_chat_id,
         text=text,
         reply_to_message_id=ask.telegram_message_id,
         source=OUTBOUND_SOURCE,
+        document=document,
     )

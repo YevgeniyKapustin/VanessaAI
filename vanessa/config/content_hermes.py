@@ -23,6 +23,9 @@ class HermesContent(BaseModel):
     answered_task: str
     undelivered_task: str
     undelivered_fallback: str = Field(min_length=1)
+    # Added to the task when the answer had an HTML file (sent / refused).
+    file_attached_task: str = ""
+    file_refused_task: str = ""
     # null or 0 = off: max_tokens is not sent.
     max_tokens: int | None = Field(default=1024, ge=0, le=4096)
 

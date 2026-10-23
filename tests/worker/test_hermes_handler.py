@@ -132,6 +132,7 @@ def _settings(*, enabled: bool) -> SimpleNamespace:
         hermes_timeout_seconds=5.0,
         hermes_poll_seconds=5.0,
         hermes_max_wait_seconds=6000.0,
+        hermes_file_max_bytes=262_144,
         hermes_max_parallel=2,
         knowledge_model="",
         planner_model="planner-model",

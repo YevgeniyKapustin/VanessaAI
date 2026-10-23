@@ -47,6 +47,7 @@ def build_hermes_runner(
         instructions=prompts.run_instructions,
         poll_seconds=settings.hermes_poll_seconds,
         max_wait_seconds=settings.hermes_max_wait_seconds,
+        file_max_bytes=settings.hermes_file_max_bytes,
     )
 
 

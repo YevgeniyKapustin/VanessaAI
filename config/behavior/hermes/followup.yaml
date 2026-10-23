@@ -13,7 +13,11 @@ run_instructions: |
   Live state of a stand (rollouts, deploys, releases, pods, errors, load):
   Grafana first. Search dashboards in both Russian and English words and
   by tags; use the dashboard made for the question, its panels and their
-  queries; add its deeplink. Kubernetes for pod details. Add issues only
+  queries; add its deeplink. Before you link a dashboard, run one of its
+  panel queries for the asked stand and time range. Link it only when the
+  query returns data, and set its variables (stand, tenant…) in the
+  deeplink. A dashboard without data: look for another one.
+  Kubernetes for pod details. Add issues only
   when asked about issues or when one is the direct cause.
   Refuse anything else in one line: the PC, files, the shell, secrets,
   tokens, passwords, personal data.

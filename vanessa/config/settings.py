@@ -1,4 +1,5 @@
 from vanessa.config.settings_hermes import HermesMixin
+from vanessa.config.settings_pinned import PinnedNotesMixin
 from vanessa.config.settings_schedule import ScheduleMixin
 from vanessa.config.settings_sections import (
     BotMixin,
@@ -16,6 +17,7 @@ class Settings(
     McpMixin,
     HermesMixin,
     ScheduleMixin,
+    PinnedNotesMixin,
     SharedSettings,
 ):
     """Aggregate settings for the current monolith deployment.

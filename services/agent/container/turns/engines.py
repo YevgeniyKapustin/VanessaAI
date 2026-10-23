@@ -10,6 +10,7 @@ from vanessa.config.settings import settings
 from vanessa.core.protocols import (
     HermesHealthProtocol,
     LLMProviderProtocol,
+    PinnedNotesProtocol,
     ReminderStoreProtocol,
     SceneDescriberProtocol,
 )
@@ -45,6 +46,8 @@ class TurnEngines:
     scene_describer: SceneDescriberProtocol
     # Posts Vanessa schedules for herself; None when the skill is off.
     reminders: ReminderStoreProtocol | None = None
+    # Vault notes in every compose prompt; None when none are configured.
+    pinned_notes: PinnedNotesProtocol | None = None
 
     @classmethod
     def build(
@@ -75,4 +78,5 @@ class TurnEngines:
             metrics_retriever=knowledge.metrics_retriever(),
             scene_describer=SceneDescriber(),
             reminders=create_reminder_store(settings),
+            pinned_notes=knowledge.pinned_notes(),
         )

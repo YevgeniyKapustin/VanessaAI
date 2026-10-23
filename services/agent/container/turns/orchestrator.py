@@ -58,6 +58,7 @@ class OrchestratorFactory:
             hermes=engines.hermes,
             dispatcher=dispatcher,
             reminders=engines.reminders,
+            pinned_notes=engines.pinned_notes,
         )
         compose = ComposeStage(
             engines.llm,

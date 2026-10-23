@@ -15,6 +15,7 @@ from vanessa.knowledge.metrics.pipeline import MetricsPipeline
 from vanessa.knowledge.metrics.planner import MetricsPlanner
 from vanessa.knowledge.metrics.retriever import MetricsRetriever
 from vanessa.knowledge.metrics.store import MetricsStore
+from vanessa.knowledge.pinned import PinnedNotes
 from vanessa.knowledge.portraits import PortraitBuilder, PortraitWorker
 from vanessa.knowledge.store.vault import KnowledgeVault
 
@@ -33,6 +34,16 @@ class KnowledgeGraph:
 
     def metrics_retriever(self) -> MetricsRetriever:
         return MetricsRetriever(self.vault, self.index)
+
+    def pinned_notes(self) -> PinnedNotes | None:
+        paths = settings.pinned_note_paths
+        if not paths:
+            return None
+        return PinnedNotes(
+            self.vault,
+            paths,
+            max_chars=settings.knowledge_pinned_max_chars,
+        )
 
     def metrics_pipeline(
         self,

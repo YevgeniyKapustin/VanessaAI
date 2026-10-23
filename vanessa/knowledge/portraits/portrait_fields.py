@@ -18,10 +18,22 @@ def note_meta(note) -> dict:
     return dict(note.meta or {})
 
 
+def has_chat_identity(meta: dict) -> bool:
+    """Portraits are for chat participants: cards with a ``telegram_id``."""
+    return bool(str(meta.get("telegram_id") or "").strip())
+
+
 def portrait_is_current(meta: dict, signature: str, *, force: bool) -> bool:
     if force:
         return False
     return str(meta.get("portrait_signature") or "") == signature
+
+
+def needs_portrait(meta: dict, signature: str, *, force: bool) -> bool:
+    """A chat participant's card whose portrait is missing or stale."""
+    if not has_chat_identity(meta):
+        return False
+    return not portrait_is_current(meta, signature, force=force)
 
 
 def clip_dossier(body: object, max_chars: int) -> str:
@@ -30,7 +42,7 @@ def clip_dossier(body: object, max_chars: int) -> str:
         return ""
     if len(dossier) <= max_chars:
         return dossier
-    return dossier[: max_chars].rstrip() + "\n…"
+    return dossier[:max_chars].rstrip() + "\n…"
 
 
 def alias_names(raw: object) -> list[str]:

@@ -3,6 +3,7 @@ import logging
 
 from vanessa.core.protocols import (
     HermesHealthProtocol,
+    PinnedNotesProtocol,
     ReminderStoreProtocol,
     UnitOfWorkProtocol,
 )
@@ -13,13 +14,14 @@ from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.llm.memes import MemeCatalog, MemeDecider
 from vanessa.pipeline.stages.retrieve_extras import _RetrieveExtrasMixin
 from vanessa.pipeline.stages.retrieve_hermes import run_hermes_step
+from vanessa.pipeline.stages.retrieve_pinned import run_pinned_step
 from vanessa.pipeline.stages.retrieve_schedule import run_schedule_step
 
 logger = logging.getLogger("vanessa.pipeline.stages")
 
 
 class RetrieveStage(_RetrieveExtrasMixin):
-    """Collect extra compose inputs: web results, memes, Hermes, schedule."""
+    """Collect compose inputs: pinned notes, web, memes, Hermes, schedule."""
 
     def __init__(
         self,
@@ -31,6 +33,7 @@ class RetrieveStage(_RetrieveExtrasMixin):
         hermes: HermesHealthProtocol | None = None,
         dispatcher: TaskDispatcher | None = None,
         reminders: ReminderStoreProtocol | None = None,
+        pinned_notes: PinnedNotesProtocol | None = None,
     ) -> None:
         self._uow = uow
         self._meme_catalog = meme_catalog
@@ -42,6 +45,8 @@ class RetrieveStage(_RetrieveExtrasMixin):
         self._dispatcher = dispatcher
         # Posts Vanessa schedules for herself; None disables the skill.
         self._reminders = reminders
+        # Vault notes Vanessa sees on every reply; None disables them.
+        self._pinned_notes = pinned_notes
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         if self._uow is not None:
@@ -49,18 +54,19 @@ class RetrieveStage(_RetrieveExtrasMixin):
 
         assert ctx.turn_plan is not None
         # Live web search (the "googling" skill), the Hermes ask and the
-        # schedule request when the planner flagged the turn. All fail open
-        # and run side by side.
+        # schedule request when the planner flagged the turn, plus the pinned
+        # notes. All fail open and run side by side.
         await asyncio.gather(
             self._run_web_search(ctx),
             run_hermes_step(ctx, self._hermes, self._dispatcher),
             run_schedule_step(ctx, self._reminders),
+            run_pinned_step(ctx, self._pinned_notes),
         )
         self._maybe_attach_memes(ctx)
 
         logger.info(
             "turn_stage retrieve request_id=%s web=%s meme_blocks=%s "
-            "meme_menu=%s web_ms=%.1f hermes=%s schedule=%s",
+            "meme_menu=%s web_ms=%.1f hermes=%s schedule=%s knowledge=%s",
             get_request_id(),
             len(ctx.web_blocks),
             len(ctx.meme_blocks),
@@ -68,5 +74,6 @@ class RetrieveStage(_RetrieveExtrasMixin):
             ctx.web_ms,
             ctx.hermes_status,
             ctx.schedule_note is not None,
+            len(ctx.knowledge_blocks),
         )
         return True

@@ -14,7 +14,6 @@ dossier only when a concrete fact is asked (see ``KnowledgeRetriever``).
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from vanessa.config.content import get_content
@@ -23,14 +22,14 @@ from vanessa.knowledge.format import PEOPLE, today
 from vanessa.knowledge.portraits.portrait_fields import (
     clip_dossier,
     dossier_signature,
+    needs_portrait,
     note_meta,
-    portrait_is_current,
     portrait_prompt_fields,
 )
 from vanessa.knowledge.portraits.portrait_planner import PortraitPlanner
 from vanessa.knowledge.store.vault import KnowledgeVault
 
-__all__ = ["PortraitBuilder", "PortraitPlanner", "PortraitWorker"]
+__all__ = ["PortraitBuilder", "PortraitPlanner"]
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,9 @@ class PortraitBuilder:
 
     A portrait is stale when the card has no ``portrait`` yet, or when the
     dossier changed since the last generation (fingerprinted in
-    ``portrait_signature``). Regeneration is fail-open per person.
+    ``portrait_signature``). Regeneration is fail-open per person. A card
+    with no ``telegram_id`` is not a chat participant (for example a team
+    note), so it gets no portrait.
     """
 
     def __init__(
@@ -56,10 +57,14 @@ class PortraitBuilder:
         self._enabled = (
             enabled
             if enabled is not None
-            else (settings.knowledge_portrait_enabled and get_content().portrait.enabled)
+            else (
+                settings.knowledge_portrait_enabled and get_content().portrait.enabled
+            )
         )
         self._max_chars = (
-            max_chars if max_chars is not None else settings.knowledge_portrait_max_chars
+            max_chars
+            if max_chars is not None
+            else settings.knowledge_portrait_max_chars
         )
 
     async def _refresh_one(self, rel: str, *, force: bool) -> int:
@@ -89,13 +94,10 @@ class PortraitBuilder:
         )
         return updated
 
-    def _people_notes(self) -> list[str]:
-        return [note.relative_path for note in self._vault.list_notes_sync(PEOPLE)]
-
     async def _build_portrait(self, note, *, force: bool) -> bool:
         meta = note_meta(note)
         signature = dossier_signature(note)
-        if portrait_is_current(meta, signature, force=force):
+        if not needs_portrait(meta, signature, force=force):
             return False
 
         dossier = clip_dossier(note.body, self._max_chars)
@@ -130,26 +132,3 @@ class PortraitBuilder:
             len(portrait),
         )
         return True
-
-
-class PortraitWorker:
-    """Background loop that periodically refreshes stale person portraits."""
-
-    def __init__(
-        self,
-        builder: PortraitBuilder,
-        *,
-        poll_seconds: int = 300,
-    ) -> None:
-        self._builder = builder
-        self._poll = max(1, poll_seconds)
-
-    async def run_forever(self) -> None:
-        while True:
-            try:
-                updated = await self._builder.run()
-                if updated:
-                    logger.info("portrait_worker_cycle updated=%s", updated)
-            except Exception:
-                logger.exception("portrait_worker_cycle_failed")
-            await asyncio.sleep(self._poll)

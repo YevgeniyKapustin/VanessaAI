@@ -72,6 +72,14 @@ class SharedSettings(BaseSettings):
     broker_poll_seconds: float = 0.05
     broker_dlq_enabled: bool = True
     broker_stream_maxlen: int = 100_000
+    # Debug history (s) kept in turns/tasks/outbound; pending stays always.
+    broker_stream_retention_seconds: int = 86_400
+    # Reply streams expire this long (s) after the last write (> RPC timeout).
+    broker_reply_ttl_seconds: int = 300
+    # Consumers with 0 pending entries, idle this long (s), are removed.
+    broker_consumer_idle_seconds: int = 3_600
+    # How often (s) the worker runs the broker janitor.
+    broker_janitor_poll_seconds: float = 300.0
     # Consumer group names (one group per logical consumer service).
     broker_group_agent: str = "agent"
     broker_group_worker: str = "worker"

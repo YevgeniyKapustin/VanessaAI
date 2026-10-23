@@ -17,6 +17,9 @@ class _CloseBroker:
     def dedup_guard(self):
         return None
 
+    def janitor(self, *_args):
+        return _Collector()
+
     async def close(self) -> None:
         self.closed += 1
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from vanessa.config import settings
 from vanessa.contracts.messages import InboxNoteReply, TaskMessage
 from vanessa.knowledge.inbox import InboxNoteError, save_inbox_note
 
@@ -35,4 +36,6 @@ class InboxNoteHandler:
                 error=exc.code,
             )
         if task.reply_to and self._broker is not None:
-            await self._broker.publish(task.reply_to, reply)
+            await self._broker.publish(
+                task.reply_to, reply, ttl_seconds=settings.broker_reply_ttl_seconds
+            )

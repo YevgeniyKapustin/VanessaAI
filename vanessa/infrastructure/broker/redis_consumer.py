@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 
 import redis.asyncio as aioredis
 from redis.exceptions import ResponseError
@@ -29,10 +30,14 @@ class _RedisStreamConsumer:
         *,
         stream_maxlen: int,
         dlq_enabled: bool,
+        delete_on_ack: Iterable[str] = (),
     ) -> None:
         self._client = client
         self._stream_maxlen = stream_maxlen
         self._dlq_enabled = dlq_enabled
+        # Streams whose entries are useless once handled (e.g. outbound with
+        # file payloads): ack also deletes the entry from the stream.
+        self._delete_on_ack = frozenset(delete_on_ack)
 
     async def ensure_group(self, stream: str, group: str) -> None:
         try:
@@ -73,7 +78,13 @@ class _RedisStreamConsumer:
         await self.ack(stream, group, stream_id)
 
     async def ack(self, stream: str, group: str, stream_id: str) -> None:
-        await self._client.xack(stream, group, stream_id)
+        if stream not in self._delete_on_ack:
+            await self._client.xack(stream, group, stream_id)
+            return
+        async with self._client.pipeline(transaction=True) as pipe:
+            pipe.xack(stream, group, stream_id)
+            pipe.xdel(stream, stream_id)
+            await pipe.execute()
 
     async def reject(
         self, stream: str, group: str, delivery: Delivery, error: BaseException

@@ -11,7 +11,6 @@ posts Vanessa schedules for herself).
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 from uuid import uuid4
 
@@ -54,7 +53,10 @@ async def main() -> None:
         ],
         poll_seconds=15.0,
     )
-    metrics_task = asyncio.create_task(broker_metrics.run_forever())
+    background = [
+        asyncio.create_task(broker_metrics.run_forever()),
+        asyncio.create_task(broker.janitor(streams, settings).run_forever()),
+    ]
     assembly = await build_worker_handlers(broker, outbound_stream=streams.outbound)
     consumer_suffix = settings.broker_consumer_id or uuid4().hex[:6]
     sweep_worker = (
@@ -94,9 +96,9 @@ async def main() -> None:
         # Hermes jobs are in-process only: a restart loses them (see handler).
         if assembly.hermes is not None:
             await assembly.hermes.aclose()
-        metrics_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await metrics_task
+        for task in background:
+            task.cancel()
+        await asyncio.gather(*background, return_exceptions=True)
         await broker.close()
 
 

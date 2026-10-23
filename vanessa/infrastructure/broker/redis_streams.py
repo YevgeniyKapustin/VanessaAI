@@ -12,11 +12,17 @@ Delivery guarantees
 * At-least-once via consumer groups (a message stays pending until acked).
 * Idempotency via ``message_id`` dedup (SET NX EX) in ``RedisDedupGuard``.
 * Poison messages are moved to the DLQ stream and acked out of the main stream.
+
+Retention
+---------
+* ``delete_on_ack`` streams (outbound) drop an entry as soon as it is acked.
+* Reply streams carry a TTL (``publish(..., ttl_seconds=...)``).
+* ``BrokerJanitor`` trims by age and removes dead consumers (see ``janitor``).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -25,7 +31,9 @@ from vanessa.contracts.messages import BrokerMessage
 from vanessa.infrastructure.broker.backends import (
     consume_forever as run_consume_loop,
 )
+from vanessa.infrastructure.broker.janitor import BrokerJanitor
 from vanessa.infrastructure.broker.redis_consumer import _RedisStreamConsumer
+from vanessa.infrastructure.broker.redis_entries import _xadd_stream
 from vanessa.infrastructure.broker.redis_rpc import _rpc_request
 from vanessa.infrastructure.broker.serialization import encode
 from vanessa.infrastructure.observability.metrics import record_broker_publish
@@ -53,6 +61,7 @@ class RedisStreamBroker:
         *,
         stream_maxlen: int = 100_000,
         dlq_enabled: bool = True,
+        delete_on_ack: Iterable[str] = (),
         client: aioredis.Redis | None = None,
     ) -> None:
         self._client = client or aioredis.from_url(url)
@@ -62,13 +71,21 @@ class RedisStreamBroker:
             self._client,
             stream_maxlen=stream_maxlen,
             dlq_enabled=dlq_enabled,
+            delete_on_ack=delete_on_ack,
         )
 
     # -- Producer / RPC --------------------------------------------------------
 
-    async def publish(self, stream: str, message: BrokerMessage) -> str:
-        entry_id = await self._client.xadd(
-            stream, encode(message), maxlen=self._stream_maxlen, approximate=True
+    async def publish(
+        self, stream: str, message: BrokerMessage, *, ttl_seconds: int = 0
+    ) -> str:
+        """XADD ``message``; ``ttl_seconds`` > 0 also (re)arms the key TTL."""
+        entry_id = await _xadd_stream(
+            self._client,
+            stream,
+            encode(message),
+            maxlen=self._stream_maxlen,
+            ttl_seconds=ttl_seconds,
         )
         record_broker_publish(stream, message.message_kind())
         return str(entry_id)
@@ -95,6 +112,10 @@ class RedisStreamBroker:
     def dedup_guard(self, ttl_seconds: int = 3600) -> RedisDedupGuard:
         """Idempotency guard sharing this broker's Redis client."""
         return RedisDedupGuard(self._client, ttl_seconds=ttl_seconds)
+
+    def janitor(self, streams, settings) -> BrokerJanitor:
+        """Retention loop (age trim, dead consumers) on this broker's client."""
+        return BrokerJanitor.from_settings(self._client, streams, settings)
 
     async def ensure_group(self, stream: str, group: str) -> None:
         await self._consumer.ensure_group(stream, group)

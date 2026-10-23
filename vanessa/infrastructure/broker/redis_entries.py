@@ -34,12 +34,16 @@ def _dlq_field_value(value: bytes | str) -> str:
     return value
 
 
-def _raw_dlq_fields(fields: dict[str, bytes | str], stream: str) -> dict[str, str]:
+def _raw_dlq_fields(
+    fields: dict[str, bytes | str],
+    stream: str,
+    error: str = "undecodable message",
+) -> dict[str, str]:
     encoded = {_dlq_field_key(key): _dlq_field_value(value) for key, value in fields.items()}
     return {
         **encoded,
         "source_stream": stream,
-        "error": "undecodable message",
+        "error": error,
     }
 
 
@@ -56,6 +60,24 @@ async def _xadd_dlq(
         maxlen=maxlen,
         approximate=True,
     )
+
+
+async def _xadd_stream(
+    client: aioredis.Redis,
+    stream: str,
+    fields: dict[str, str],
+    *,
+    maxlen: int,
+    ttl_seconds: int = 0,
+) -> Any:
+    """XADD; ``ttl_seconds`` > 0 (re)arms the key TTL in the same transaction."""
+    if ttl_seconds <= 0:
+        return await client.xadd(stream, fields, maxlen=maxlen, approximate=True)
+    async with client.pipeline(transaction=True) as pipe:
+        pipe.xadd(stream, fields, maxlen=maxlen, approximate=True)
+        pipe.expire(stream, ttl_seconds)
+        entry_id, _ = await pipe.execute()
+    return entry_id
 
 
 async def _xreadgroup_or_create(

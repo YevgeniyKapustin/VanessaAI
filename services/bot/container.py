@@ -46,12 +46,14 @@ def create_bot_services() -> BotServices:
         min_messages_between=stickers_config.min_messages_between,
         tag_probability=stickers_config.tag_probability,
     )
+    streams = BrokerStreams.from_settings(settings)
+    # A delivered outbound entry (maybe a whole HTML file) has no further use.
     broker = RedisStreamBroker(
         settings.broker_redis_url,
         stream_maxlen=settings.broker_stream_maxlen,
         dlq_enabled=settings.broker_dlq_enabled,
+        delete_on_ack=(streams.outbound,),
     )
-    streams = BrokerStreams.from_settings(settings)
     chat_client = BrokerTurnClient(
         broker,
         streams=streams,

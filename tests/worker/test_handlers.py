@@ -63,8 +63,8 @@ async def test_inbox_note_handler_replies(monkeypatch) -> None:
     published: list = []
 
     class _Broker:
-        async def publish(self, stream, message) -> None:
-            published.append((stream, message))
+        async def publish(self, stream, message, *, ttl_seconds=0) -> None:
+            published.append((stream, message, ttl_seconds))
 
     handler = InboxNoteHandler(object(), _Broker())
     task = TaskMessage(
@@ -75,6 +75,7 @@ async def test_inbox_note_handler_replies(monkeypatch) -> None:
     )
     await handler.handle(task)
     assert published[0][0] == "replies:n1"
+    assert published[0][2] > 0
     reply = published[0][1]
     assert isinstance(reply, InboxNoteReply)
     assert reply.ok is True

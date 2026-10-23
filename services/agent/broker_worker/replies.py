@@ -1,3 +1,4 @@
+from vanessa.config import settings
 from vanessa.contracts.messages import TurnReply, TurnRequest, TurnStarted
 from vanessa.core.turn import ConversationTurnResult
 
@@ -5,6 +6,8 @@ from vanessa.core.turn import ConversationTurnResult
 class ReplyPublisher:
     def __init__(self, broker) -> None:
         self._broker = broker
+        # Private reply streams expire this long after the last write.
+        self._ttl = settings.broker_reply_ttl_seconds
 
     async def started(self, request: TurnRequest) -> None:
         if not request.reply_to:
@@ -15,6 +18,7 @@ class ReplyPublisher:
                 correlation_id=request.correlation_id,
                 trace_id=request.trace_id,
             ),
+            ttl_seconds=self._ttl,
         )
 
     async def reply(
@@ -39,4 +43,5 @@ class ReplyPublisher:
                 photo_file_id=result.photo_file_id,
                 photo_data_url=result.photo_data_url,
             ),
+            ttl_seconds=self._ttl,
         )

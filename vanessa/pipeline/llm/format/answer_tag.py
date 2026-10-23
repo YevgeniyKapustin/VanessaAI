@@ -140,6 +140,18 @@ def extract_answer(raw: str) -> tuple[str, str]:
     return strip_control_tags(text.strip()), ""
 
 
+def is_untagged_reply(raw: str) -> bool:
+    """True when the output has text but neither an answer tag nor ``[ignore]``.
+
+    Such output is usually bare reasoning («Он просто зовёт… Отвечаю сухо»):
+    sending it would leak the reasoning into the chat.
+    """
+    text = raw or ""
+    if not text.strip() or has_ignore_marker(text):
+        return False
+    return _last_tag_span(text) is None and _ANGLE_ANSWER_PAIR.search(text) is None
+
+
 def has_ignore_marker(text: str) -> bool:
     """True when the compose output contains a standalone ``[ignore]`` marker.
 

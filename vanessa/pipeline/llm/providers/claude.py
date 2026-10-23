@@ -115,6 +115,8 @@ class ClaudeLLMProvider(_ClaudeCompletionMixin):
             and self._content.llm.detailed_max_tokens > 0
         ):
             generation_kwargs["max_tokens"] = self._content.llm.detailed_max_tokens
+        # The Anthropic API requires max_tokens: an "off" config uses the setting.
+        generation_kwargs.setdefault("max_tokens", settings.anthropic_max_tokens)
         log_claude_prompt(
             request,
             model=self._model,

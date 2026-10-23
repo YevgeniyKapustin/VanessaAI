@@ -84,5 +84,7 @@ undelivered_task: |
 # Sent when the LLM call for the "did not deliver" line fails.
 undelivered_fallback: "Так и не смогла это достать, спроси позже"
 
-# Reasoning + the final message. 1024 cut a long Plane retell mid-list.
-max_tokens: 1536
+# Off (null): max_tokens is not sent, the API uses its model default.
+# Reasoning counts against max_tokens: 1024 cut a long retell mid-list, and
+# a cap can cut the [answer] tag. Claude falls back to ANTHROPIC_MAX_TOKENS.
+max_tokens: null

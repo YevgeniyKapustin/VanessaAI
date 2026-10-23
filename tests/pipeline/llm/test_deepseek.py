@@ -19,6 +19,9 @@ from vanessa.pipeline.llm.providers.deepseek import (
     DeepSeekLLMProvider,
     _usage_from_openai,
 )
+from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
+
+DETAILED_MAX_TOKENS = 4096
 
 
 class FakeSubstitutor:
@@ -48,9 +51,11 @@ class _RecordingTracer:
         yield self._span
 
 
-def _make_response(text: str) -> MagicMock:
+def _make_response(text: str, *, tagged: bool = True) -> MagicMock:
     choice = MagicMock()
-    choice.message.content = text
+    # The composer always writes [answer]; untagged output is bare reasoning.
+    has_tag = "[answer]" in text or "<answer>" in text
+    choice.message.content = text if has_tag or not tagged else f"[answer]\n{text}"
     response = MagicMock()
     response.choices = [choice]
     return response
@@ -261,6 +266,9 @@ async def test_deepseek_generate_includes_clarification_instruction(
 async def test_deepseek_generate_forwards_detail_and_bumps_max_tokens(
     provider: DeepSeekLLMProvider,
 ):
+    content = get_content()
+    llm = content.llm.model_copy(update={"detailed_max_tokens": DETAILED_MAX_TOKENS})
+    provider._content = content.model_copy(update={"llm": llm})
     await provider.generate(
         "давай подробнее",
         [],
@@ -268,8 +276,16 @@ async def test_deepseek_generate_forwards_detail_and_bumps_max_tokens(
     )
     call = provider._client.chat.completions.create.await_args
     user_prompt = call.kwargs["messages"][1]["content"]
-    assert get_content().llm.detail_note_detailed.strip() in user_prompt
-    assert call.kwargs["max_tokens"] == get_content().llm.detailed_max_tokens
+    assert content.llm.detail_note_detailed.strip() in user_prompt
+    assert call.kwargs["max_tokens"] == DETAILED_MAX_TOKENS
+
+
+@pytest.mark.asyncio
+async def test_deepseek_sends_no_max_tokens_when_off(provider: DeepSeekLLMProvider):
+    provider._generation = LLMGenerationParams(temperature=0.8, top_p=0.9, max_tokens=None)
+    await provider.generate("давай подробнее", [], detail="detailed")
+    call = provider._client.chat.completions.create.await_args
+    assert "max_tokens" not in call.kwargs
 
 
 @pytest.mark.asyncio
@@ -382,3 +398,33 @@ async def test_deepseek_web_blocks_injected_into_prompt(provider: DeepSeekLLMPro
     assert "Bitcoin is trading at 100k" in text
     assert "[2026-08-28]" in text
     assert "LIVE search results" in text
+
+
+@pytest.mark.asyncio
+async def test_deepseek_untagged_output_is_retried(provider: DeepSeekLLMProvider):
+    provider._client.chat.completions.create = AsyncMock(
+        side_effect=[
+            _make_response("Он просто зовёт по имени. Отвечаю сухо", tagged=False),
+            _make_response("думаю\n[answer]\nчего"),
+        ]
+    )
+    reply = await provider.generate("ванесса", [])
+    assert reply == "Чего"
+    assert provider._client.chat.completions.create.await_count == UNTAGGED_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_deepseek_untagged_twice_stays_silent(provider: DeepSeekLLMProvider):
+    leak = _make_response("Он просто зовёт по имени. Отвечаю сухо", tagged=False)
+    provider._client.chat.completions.create = AsyncMock(return_value=leak)
+    reply = await provider.generate("ванесса", [])
+    assert reply == ""
+    assert provider._client.chat.completions.create.await_count == UNTAGGED_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_deepseek_bare_ignore_marker_is_not_retried(provider: DeepSeekLLMProvider):
+    ignore = _make_response("[ignore] повтор", tagged=False)
+    provider._client.chat.completions.create = AsyncMock(return_value=ignore)
+    await provider.generate("ванесса", [])
+    provider._client.chat.completions.create.assert_awaited_once()

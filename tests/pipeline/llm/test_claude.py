@@ -5,10 +5,14 @@ import pytest
 from anthropic import APIStatusError
 
 from vanessa.config.content import get_content
+from vanessa.config.settings import settings
 from vanessa.core.messages import ContextBlock, ContextMessage
 from vanessa.infrastructure.observability.tracing import set_tracer
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
 from vanessa.pipeline.llm.providers.claude import ClaudeLLMProvider
+from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
+
+DETAILED_MAX_TOKENS = 4096
 
 
 class FakeSubstitutor:
@@ -42,7 +46,7 @@ class _RecordingTracer:
 def provider() -> ClaudeLLMProvider:
     client = AsyncMock()
     response = MagicMock()
-    response.content = [MagicMock(text="привет мир")]
+    response.content = [MagicMock(text="[answer]\nпривет мир")]
     client.messages.create = AsyncMock(return_value=response)
     return ClaudeLLMProvider(
         client=client,
@@ -78,7 +82,7 @@ async def test_claude_never_sends_reasoning_effort():
     # Claude must strip it — sending an unknown parameter would 400.
     client = AsyncMock()
     response = MagicMock()
-    response.content = [MagicMock(text="привет мир")]
+    response.content = [MagicMock(text="[answer]\nпривет мир")]
     client.messages.create = AsyncMock(return_value=response)
     provider = ClaudeLLMProvider(
         client=client,
@@ -102,7 +106,7 @@ async def test_claude_generate_strips_leading_sender_name(
     provider: ClaudeLLMProvider,
 ):
     provider._client.messages.create = AsyncMock(
-        return_value=MagicMock(content=[MagicMock(text="Евгений, привет мир")])
+        return_value=MagicMock(content=[MagicMock(text="[answer]\nЕвгений, привет мир")])
     )
     reply = await provider.generate("hello", [], sender_name="Евгений")
     # The leading name-address is removed before capitalization.
@@ -154,7 +158,7 @@ async def test_claude_generate_traces_reasoning(provider: ClaudeLLMProvider):
 @pytest.mark.asyncio
 async def test_claude_retries_on_rate_limit(provider: ClaudeLLMProvider):
     ok = MagicMock()
-    ok.content = [MagicMock(text="ok")]
+    ok.content = [MagicMock(text="[answer]\nok")]
     request = MagicMock()
     request.headers = {}
     rate_limit = APIStatusError(
@@ -214,6 +218,27 @@ async def test_claude_generate_forwards_brief_note(provider: ClaudeLLMProvider):
 async def test_claude_generate_bumps_max_tokens_for_detailed(
     provider: ClaudeLLMProvider,
 ):
+    content = get_content()
+    llm = content.llm.model_copy(update={"detailed_max_tokens": DETAILED_MAX_TOKENS})
+    provider._content = content.model_copy(update={"llm": llm})
     await provider.generate("давай подробнее", [], detail="detailed")
     call = provider._client.messages.create.await_args
-    assert call.kwargs["max_tokens"] == get_content().llm.detailed_max_tokens
+    assert call.kwargs["max_tokens"] == DETAILED_MAX_TOKENS
+
+
+@pytest.mark.asyncio
+async def test_claude_off_max_tokens_falls_back_to_setting(provider: ClaudeLLMProvider):
+    # The Anthropic API requires max_tokens even when the config turns it off.
+    provider._generation = LLMGenerationParams(temperature=0.8, top_p=0.9, max_tokens=None)
+    await provider.generate("привет", [])
+    call = provider._client.messages.create.await_args
+    assert call.kwargs["max_tokens"] == settings.anthropic_max_tokens
+
+
+@pytest.mark.asyncio
+async def test_claude_untagged_output_is_retried_then_silent(provider: ClaudeLLMProvider):
+    leak = MagicMock(content=[MagicMock(text="Он просто зовёт по имени. Отвечаю сухо")])
+    provider._client.messages.create = AsyncMock(return_value=leak)
+    reply = await provider.generate("ванесса", [])
+    assert reply == ""
+    assert provider._client.messages.create.await_count == UNTAGGED_ATTEMPTS

@@ -2,6 +2,7 @@ from vanessa.pipeline.llm.format.answer_tag import (
     extract_answer,
     extract_ignore_reason,
     has_ignore_marker,
+    is_untagged_reply,
     strip_control_tags,
 )
 
@@ -174,3 +175,11 @@ def test_strip_control_tags_case_insensitive():
 def test_strip_control_tags_keeps_code_fences():
     text = "текст\n```\n[answer]\n<answer>x</answer>\n```\nконец"
     assert strip_control_tags(text) == "текст\n```\n[answer]\n<answer>x</answer>\n```\nконец"
+
+
+def test_is_untagged_reply():
+    assert is_untagged_reply("Он просто зовёт. Отвечаю сухо") is True
+    assert is_untagged_reply("думаю\n[answer]\nчего") is False
+    assert is_untagged_reply("<answer>чего</answer>") is False
+    assert is_untagged_reply("[ignore] повтор") is False
+    assert is_untagged_reply("  ") is False

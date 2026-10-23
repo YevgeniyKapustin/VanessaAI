@@ -4,7 +4,8 @@ from pydantic import BaseModel, Field
 class LLMGenerationProfile(BaseModel):
     temperature: float = Field(default=0.8, ge=0.0, le=1.0)
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
-    max_tokens: int = Field(default=512, ge=64, le=4096)
+    # null or 0 = off: max_tokens is not sent (Claude uses anthropic_max_tokens).
+    max_tokens: int | None = Field(default=512, ge=0, le=4096)
     presence_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
     frequency_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
     # Reasoning mode for the composer on DeepSeek V4 (thinking) models: forces a

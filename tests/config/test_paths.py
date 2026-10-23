@@ -65,7 +65,7 @@ def test_behavior_split_files_exist() -> None:
 
 def test_merged_sections_keep_both_jobs() -> None:
     content = get_content()
-    assert content.llm.generation.composer.max_tokens > 0
+    assert content.llm.generation.planner.max_tokens > 0
     assert content.llm.task.strip()
     assert content.llm.context_header
     assert content.llm.owner_message_note.strip()

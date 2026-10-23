@@ -89,6 +89,8 @@ class ClaudeChatCompleter:
     ) -> str:
         async def call() -> tuple[str, dict[str, int] | None, str]:
             kwargs.pop("reasoning_effort", None)
+            # The Anthropic API requires max_tokens: an "off" config uses the setting.
+            kwargs.setdefault("max_tokens", settings.anthropic_max_tokens)
             response = await self._client.messages.create(
                 model=model,
                 messages=messages,

@@ -4,7 +4,6 @@ from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
 
 COMPOSER_TEMPERATURE = 0.8
 COMPOSER_TOP_P = 0.9
-COMPOSER_MAX_TOKENS = 2048
 COMPOSER_PRESENCE_PENALTY = 0.4
 COMPOSER_FREQUENCY_PENALTY = 0.35
 PLANNER_TEMPERATURE = 0.1
@@ -21,10 +20,10 @@ def test_composer_generation_loaded_from_content():
     assert isinstance(params, LLMGenerationParams)
     assert params.temperature == COMPOSER_TEMPERATURE
     assert params.top_p == COMPOSER_TOP_P
-    # The composer runs on a reasoning (V4) model whose chain-of-thought counts
-    # against max_tokens — the budget must cover reasoning + [answer] tag + the
-    # reply itself, not just the final message.
-    assert params.max_tokens == COMPOSER_MAX_TOKENS
+    # Off: reasoning counts against max_tokens, and a cap cut the [answer] tag.
+    assert params.max_tokens is None
+    assert "max_tokens" not in params.to_llm_kwargs()
+    assert get_content().llm.detailed_max_tokens == 0
     assert params.presence_penalty == COMPOSER_PRESENCE_PENALTY
     assert params.frequency_penalty == COMPOSER_FREQUENCY_PENALTY
     # The composer runs a medium chain of thought on every reply — the default
@@ -55,6 +54,12 @@ def test_llm_kwargs_include_sampling_params():
         "max_tokens": 512,
         "temperature": 0.7,
     }
+
+
+def test_llm_kwargs_omit_max_tokens_when_off():
+    for off in (None, 0):
+        params = LLMGenerationParams(temperature=0.7, top_p=0.9, max_tokens=off)
+        assert params.to_llm_kwargs() == {"temperature": 0.7}
 
 
 def test_planner_does_not_configure_reasoning():

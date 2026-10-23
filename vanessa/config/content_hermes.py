@@ -23,7 +23,8 @@ class HermesContent(BaseModel):
     answered_task: str
     undelivered_task: str
     undelivered_fallback: str = Field(min_length=1)
-    max_tokens: int = Field(default=1024, ge=64, le=4096)
+    # null or 0 = off: max_tokens is not sent.
+    max_tokens: int | None = Field(default=1024, ge=0, le=4096)
 
 
 def load_hermes_content(path: Path) -> HermesContent:

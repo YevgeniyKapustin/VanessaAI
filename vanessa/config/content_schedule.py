@@ -31,7 +31,8 @@ class ScheduleContent(BaseModel):
     error_note: str
     reasons: dict[str, str] = Field(default_factory=dict)
     fire_task: str
-    max_tokens: int = Field(default=512, ge=64, le=4096)
+    # null or 0 = off: max_tokens is not sent.
+    max_tokens: int | None = Field(default=512, ge=0, le=4096)
 
 
 def load_schedule_content(path: Path) -> ScheduleContent:

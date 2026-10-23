@@ -7,15 +7,19 @@ from vanessa.config.content import get_content
 from vanessa.infrastructure.observability.metrics import record_llm_call
 from vanessa.infrastructure.observability.tracing import get_tracer
 from vanessa.pipeline.llm.completion_retry import run_completion_with_retries
-from vanessa.pipeline.llm.format.answer_tag import extract_answer
 from vanessa.pipeline.llm.format.profanity_substitution import ProfanitySubstitutor
 from vanessa.pipeline.llm.format.reply_format import (
     capitalize_sentences,
     strip_leading_address,
     strip_trailing_periods,
 )
+from vanessa.pipeline.llm.tagged_reply import request_tagged, split_reply
 
 logger = logging.getLogger("vanessa.pipeline.llm.providers.claude")
+
+
+def _first_text(response: Any) -> str:
+    return response.content[0].text
 
 
 def _usage_from_anthropic(response: Any) -> dict[str, int] | None:
@@ -52,7 +56,7 @@ class _ClaudeCompletionMixin:
         sender_name: str | None,
         gen: Any,
     ) -> str:
-        text = response.content[0].text
+        text = _first_text(response)
         usage = _usage_from_anthropic(response)
         record_llm_call(
             provider="claude",
@@ -63,7 +67,7 @@ class _ClaudeCompletionMixin:
             usage=usage,
             output=text,
         )
-        reply_text, reasoning = extract_answer(text)
+        reply_text, reasoning = split_reply(text, self._model)
         if reasoning:
             logger.info(
                 "llm_reasoning model=%s reasoning=%r",
@@ -101,16 +105,15 @@ class _ClaudeCompletionMixin:
         generation_kwargs: dict[str, Any],
     ) -> str:
         async def complete(gen: Any, started: float) -> str:
-            response = await self._client.messages.create(
+            response = await request_tagged(
+                lambda: self._client.messages.create(
+                    model=self._model,
+                    system=system,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    **generation_kwargs,
+                ),
+                _first_text,
                 model=self._model,
-                system=system,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    }
-                ],
-                **generation_kwargs,
             )
             return self._reply_from_response(
                 response,

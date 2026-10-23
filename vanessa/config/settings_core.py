@@ -15,14 +15,14 @@ class CoreMixin:
 
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-v4-flash"
+    deepseek_model: str = "deepseek-flash"
     deepseek_planner_model: str = "deepseek-chat"
     deepseek_pro_model: str = "deepseek-v4-pro"
     deepseek_max_tokens: int = 4096
 
     # --- Vision (DeepSeek multimodal) ----------------------------------------
     vision_enabled: bool = True
-    deepseek_vision_model: str = "deepseek-v4-flash-vision-exp"
+    deepseek_vision_model: str = "deepseek-flash"
     vision_max_image_bytes: int = 1_500_000
     vision_session_images: int = 2
     vision_max_images_per_turn: int = 2

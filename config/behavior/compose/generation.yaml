@@ -3,12 +3,12 @@ generation:
   composer:
     temperature: 0.8
     top_p: 0.9
-    # The composer runs on a reasoning (V4) model: for DeepSeek its
-    # chain-of-thought counts AGAINST max_tokens, so the budget must cover
-    # reasoning + [answer] tag + the reply itself — not just the final message.
-    # 1024 was too tight (a long CoT left too little for a multi-block reply and
-    # the model truncated right after `[next]`); 2048 keeps real headroom.
-    max_tokens: 2048
+    # Off (null): max_tokens is not sent, the DeepSeek API uses its model
+    # default. The composer runs on a reasoning (V4) model: its chain of
+    # thought counts AGAINST max_tokens. A cap (1024, then 2048) cut the
+    # output before the [answer] tag or right after `[next]`. Claude requires
+    # the parameter: it falls back to ANTHROPIC_MAX_TOKENS.
+    max_tokens: null
     # DeepSeek V4 accepts reasoning_effort: low/medium/high. "medium" is the
     # default tradeoff: enough chain of thought for careful replies without
     # the latency/cost of high.
@@ -27,11 +27,11 @@ generation:
     presence_penalty: 0.0
     frequency_penalty: 0.0
 
-# Composer max_tokens override for "detailed" replies (TurnPlan.detail), so a
-# fuller answer — reasoning prefix + several blocks — is not truncated. 0 = use
-# the base composer max_tokens. 4096 is the practical ceiling for a multi-block
-# answer on top of the chain-of-thought.
-detailed_max_tokens: 4096
+# Composer max_tokens override for "detailed" replies (TurnPlan.detail).
+# 0 = no override: the base composer value applies (off above). A 4096 cap
+# here would bring the limit back for detailed replies: reasoning counts
+# against it and can cut the [answer] tag.
+detailed_max_tokens: 0
 
 budget:
   enabled: true

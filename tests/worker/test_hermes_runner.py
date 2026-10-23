@@ -20,7 +20,6 @@ from vanessa.config.content_hermes import get_hermes_content
 from vanessa.contracts.outbound import OutboundMessage
 
 _MAX_TOKENS = 900
-_MIN_TOKENS = 64
 ANSWER = "VAN-12 In Progress, MR !34 https://gitlab.example/x/-/merge_requests/34"
 
 
@@ -152,4 +151,5 @@ def test_hermes_content_loads() -> None:
     prompts = get_hermes_content()
     assert "Plane" in prompts.run_instructions
     assert "Never ask questions back" in prompts.run_instructions
-    assert prompts.max_tokens >= _MIN_TOKENS
+    # Off: reasoning counts against max_tokens, and a cap cut the [answer] tag.
+    assert prompts.max_tokens is None

@@ -2,6 +2,7 @@ from contextlib import suppress
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+from vanessa.config.settings import settings
 from vanessa.llm.completers import (
     ClaudeChatCompleter,
     DeepSeekChatCompleter,
@@ -98,6 +99,10 @@ async def test_deepseek_and_claude_completers(monkeypatch) -> None:
     claude = ClaudeChatCompleter(client=claude_client)
     assert claude.provider == "claude"
     assert await claude.complete("m", [], reasoning_effort="x") == "yo"
+    # The Anthropic API requires max_tokens: no value in kwargs uses the setting.
+    sent = claude_client.messages.create.await_args.kwargs
+    assert sent["max_tokens"] == settings.anthropic_max_tokens
+    assert "reasoning_effort" not in sent
 
 
 def test_create_chat_completer_branches(monkeypatch) -> None:

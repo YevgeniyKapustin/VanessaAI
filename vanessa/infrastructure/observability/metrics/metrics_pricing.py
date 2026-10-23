@@ -13,6 +13,8 @@ _LLM_PRICING_PER_1M: dict[tuple[str, str], tuple[float, float]] = {
     # published range is used as a single-point estimate for spend monitoring.
     # Flash (0731): input $0.14-0.22, output $0.28-0.66 -> (0.18, 0.47).
     ("deepseek", "deepseek-v4-flash"): (0.18, 0.47),
+    # deepseek-flash (V4.1-Flash): the same price sheet as V4 Flash.
+    ("deepseek", "deepseek-flash"): (0.18, 0.47),
     # Pro (0813): input $0.435-0.66, output $0.87-1.98 -> (0.5475, 1.425).
     ("deepseek", "deepseek-v4-pro"): (0.5475, 1.425),
     ("claude", "claude-sonnet-4-6"): (3.00, 15.00),
@@ -29,6 +31,7 @@ _LLM_CACHE_HIT_PROMPT_PRICE_PER_1M: dict[tuple[str, str], float] = {
     ("deepseek", "deepseek-chat"): 0.07,
     # Flash (0731): cache-hit $0.0028-0.007 -> midpoint 0.0049.
     ("deepseek", "deepseek-v4-flash"): 0.0049,
+    ("deepseek", "deepseek-flash"): 0.0049,
     # Pro (0813): cache-hit $0.0036-0.022 -> midpoint 0.0128.
     ("deepseek", "deepseek-v4-pro"): 0.0128,
 }

@@ -7,7 +7,6 @@ from vanessa.config.content import get_content
 from vanessa.infrastructure.observability.metrics import record_llm_call
 from vanessa.infrastructure.observability.tracing import get_tracer
 from vanessa.pipeline.llm.completion_retry import run_completion_with_retries
-from vanessa.pipeline.llm.format.answer_tag import extract_answer
 from vanessa.pipeline.llm.format.profanity_substitution import ProfanitySubstitutor
 from vanessa.pipeline.llm.format.reply_format import (
     capitalize_sentences,
@@ -18,8 +17,13 @@ from vanessa.pipeline.llm.providers.deepseek_usage import (
     _log_cache_usage,
     _usage_from_openai,
 )
+from vanessa.pipeline.llm.tagged_reply import request_tagged, split_reply
 
 logger = logging.getLogger("vanessa.pipeline.llm.providers.deepseek")
+
+
+def _content(response: Any) -> str:
+    return response.choices[0].message.content or ""
 
 
 class _DeepSeekCompletionMixin:
@@ -45,7 +49,7 @@ class _DeepSeekCompletionMixin:
         image_count: int,
         gen: Any,
     ) -> str:
-        text = response.choices[0].message.content or ""
+        text = _content(response)
         finish_reason = getattr(response.choices[0], "finish_reason", None)
         if finish_reason == "length":
             logger.warning(
@@ -69,7 +73,7 @@ class _DeepSeekCompletionMixin:
             usage=usage,
             output=text,
         )
-        reply_text, reasoning = extract_answer(text)
+        reply_text, reasoning = split_reply(text, model)
         if reasoning:
             logger.info(
                 "llm_reasoning model=%s reasoning=%r",
@@ -111,13 +115,17 @@ class _DeepSeekCompletionMixin:
         generation_kwargs: dict[str, Any],
     ) -> str:
         async def complete(gen: Any, started: float) -> str:
-            response = await self._openai_client.chat.completions.create(
+            response = await request_tagged(
+                lambda: self._openai_client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user_content},
+                    ],
+                    **generation_kwargs,
+                ),
+                _content,
                 model=model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_content},
-                ],
-                **generation_kwargs,
             )
             return self._reply_from_response(
                 response,

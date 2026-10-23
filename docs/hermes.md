@@ -98,6 +98,39 @@ that profile to Vanessa. Use a separate Hermes profile for Vanessa:
 - Approvals: deny by default. The worker also stops any run that waits
   for approval.
 
-Check the exact profile and toolset keys in the Hermes docs:
-<https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server>.
-With profile routing, `HERMES_URL` ends with `/p/<profile>`.
+Tested with Hermes 0.22.2 on Windows:
+
+```
+hermes profile create vanessa --clone --no-alias
+```
+
+Then, in `%LOCALAPPDATA%\hermes\profiles\vanessa\config.yaml`:
+
+```yaml
+gateway:
+  standalone: true          # own process, own API server on 127.0.0.1:8642
+agent:
+  disabled_toolsets: [terminal, file, code_execution, browser, computer_use,
+                      delegation, cronjob, skills, connections, kanban]
+platform_toolsets:
+  api_server: [plane, grafana, kubernetes]   # MCP server names only
+approvals:
+  mode: "manual"
+  unattended_mode: "deny"
+mcp_servers:
+  plane: {command: node.exe, args: [...], tools: {exclude: [plane_update_issue]}}
+  grafana: {command: powershell.exe, args: [..., mcp-grafana.ps1]}  # --disable-write
+  kubernetes: {command: kubernetes-mcp-server.cmd, args: ["--read-only"]}
+```
+
+Put the `API_SERVER_*` keys from the PC section into the profile's `.env`.
+Start the profile with `hermes -p vanessa gateway install --start-on-login`.
+Test it: the run must list only `mcp__*` tools and must refuse `whoami`.
+
+If the login item logs `no dependency environment is committed`, its
+`gateway-service\Hermes_Gateway_vanessa.{vbs,cmd}` must start
+`installs\<id>\environments\<id>\venv\Scripts\hermes.exe`, not the base
+`tools\python-*\python.exe`.
+
+With a multiplexed host gateway instead of `standalone`, `HERMES_URL`
+ends with `/p/vanessa`.

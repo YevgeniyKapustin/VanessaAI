@@ -163,7 +163,7 @@ async def test_metrics_store_create_and_update() -> None:
 
 
 async def test_metrics_pipeline_and_persist() -> None:
-    MetricsPipeline._last_run = 0.0
+    MetricsPipeline._last_run = None
     vault = _Vault()
     store = MetricsStore(vault, _Index({"telegram_id": {"7": {"id": "ada", "file": "People/ada.md"}}}))
     await store.store_snapshot(
@@ -199,7 +199,7 @@ async def test_metrics_pipeline_and_persist() -> None:
     pipe = MetricsPipeline(store, Planner(), cooldown_seconds=0)
     stored = await pipe.run(Repo(), semantic=True)
     assert stored >= 0
-    MetricsPipeline._last_run = 0.0
+    MetricsPipeline._last_run = None
     disabled = MetricsPipeline(store, Planner(), enabled=False)
     assert await disabled.run(Repo()) == 0
     MetricsPipeline._last_run = 10**12
@@ -211,7 +211,7 @@ async def test_metrics_pipeline_and_persist() -> None:
             del transcript
             raise RuntimeError("llm")
 
-    MetricsPipeline._last_run = 0.0
+    MetricsPipeline._last_run = None
     boom = MetricsPipeline(store, BoomPlanner(), cooldown_seconds=0)
     assert await boom.run(Repo(), semantic=True) >= 0
     stored_n, skipped = await persist_combined(

@@ -68,8 +68,9 @@ class MemoryStage:
     def _cooldown_blocks(self, chat_key: int) -> bool:
         if self._cooldown <= 0:
             return False
-        last_run = type(self)._last_run_by_chat.get(chat_key, 0.0)
-        if time.monotonic() - last_run < self._cooldown:
+        # No run yet: never blocked, even when the monotonic clock is young.
+        last_run = type(self)._last_run_by_chat.get(chat_key)
+        if last_run is not None and time.monotonic() - last_run < self._cooldown:
             logger.info("memory_stage_skip reason=cooldown chat_id=%s", chat_key)
             return True
         return False

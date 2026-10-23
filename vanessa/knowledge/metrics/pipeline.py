@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 _TRANSCRIPT_LIMIT = 120
 
 
-def _cooldown_blocks(last_run: float, cooldown: int, *, semantic: bool) -> bool:
-    if semantic or cooldown <= 0:
+def _cooldown_blocks(last_run: float | None, cooldown: int, *, semantic: bool) -> bool:
+    if semantic or cooldown <= 0 or last_run is None:
         return False
     return time.monotonic() - last_run < cooldown
 
@@ -55,7 +55,7 @@ def _filter_sender_metrics(
 class MetricsPipeline:
     # Shared across instances: per-turn runs are built per request in the DI
     # container, so the cooldown must live at class level to actually throttle.
-    _last_run: float = 0.0
+    _last_run: float | None = None
 
     def __init__(
         self,

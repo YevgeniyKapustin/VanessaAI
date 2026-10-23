@@ -15,6 +15,7 @@ from uuid import uuid4
 from aiogram import Bot
 
 from services.bot.outbound.document import post_document
+from services.bot.outbound.more import post_more_texts, should_post_more
 from services.bot.outbound.send import post_outbound
 from vanessa.config import settings
 from vanessa.contracts import OutboundMessage
@@ -39,6 +40,7 @@ def start_outbound_task(broker, streams: BrokerStreams, bot: Bot) -> asyncio.Tas
             consumer=f"{OUTBOUND_GROUP}-{suffix}",
             allowed_chat_id=settings.allowed_chat_telegram_id,
             dedup=broker.dedup_guard(),
+            delay_seconds=settings.bot_message_delay_seconds,
         )
     )
 
@@ -52,13 +54,20 @@ async def run_outbound_loop(
     allowed_chat_id: int = 0,
     dedup=None,
     retry_seconds: float = 5.0,
+    delay_seconds: float = 0.0,
 ) -> None:
     """Read ``stream`` forever and post every Telegram message to its chat.
 
     A broker failure (e.g. Redis restart) restarts the read after
-    ``retry_seconds``; only cancellation stops the loop.
+    ``retry_seconds``; only cancellation stops the loop. ``delay_seconds``
+    is the pause between the messages of one item.
     """
-    handler = partial(handle_outbound, bot, allowed_chat_id=allowed_chat_id)
+    handler = partial(
+        handle_outbound,
+        bot,
+        allowed_chat_id=allowed_chat_id,
+        delay_seconds=delay_seconds,
+    )
     logger.info("outbound_consumer_started stream=%s group=%s", stream, OUTBOUND_GROUP)
     while True:
         try:
@@ -81,14 +90,14 @@ async def handle_outbound(
     delivery: Delivery,
     *,
     allowed_chat_id: int = 0,
+    delay_seconds: float = 0.0,
 ) -> None:
     """Post one delivery. Never raises, so the consume loop always acks."""
     message = delivery.message
     if not _should_post(message, allowed_chat_id):
         return
-    post = post_outbound if message.document is None else post_document
     try:
-        delivered = await post(bot, message)
+        delivered, more = await _post_all(bot, message, delay_seconds)
     except Exception:  # a send failure must not redeliver
         logger.exception(
             "outbound_send_failed chat_id=%s source=%s",
@@ -97,14 +106,28 @@ async def handle_outbound(
         )
         return
     logger.info(
-        "outbound_sent chat_id=%s source=%s reply_to=%s delivered=%s len=%s file=%s",
+        "outbound_sent chat_id=%s source=%s reply_to=%s delivered=%s len=%s "
+        "more=%s/%s file=%s",
         message.telegram_chat_id,
         message.source,
         message.reply_to_message_id,
         delivered,
         len(message.text),
+        more,
+        len(message.more_texts),
         message.document.file_name if message.document else "-",
     )
+
+
+async def _post_all(
+    bot: Bot, message: OutboundMessage, delay_seconds: float
+) -> tuple[bool, int]:
+    """The main post (text or file), then the extra messages."""
+    post = post_outbound if message.document is None else post_document
+    delivered = await post(bot, message)
+    if not should_post_more(message, delivered=delivered):
+        return delivered, 0
+    return delivered, await post_more_texts(bot, message, delay_seconds=delay_seconds)
 
 
 def _should_post(message, allowed_chat_id: int) -> bool:

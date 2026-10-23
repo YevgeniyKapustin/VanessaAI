@@ -21,14 +21,12 @@ SECONDS_LIMIT = 90
 
 
 def build_followup_system_prompt(content: AppContent, channel: str) -> str:
-    """Vanessa's compose system prompt for one plain message.
+    """Vanessa's compose system prompt for the follow-up.
 
-    Stickers and ``[next]`` blocks are off: the outbound path posts the
-    text as one message.
+    Stickers are off. ``[next]`` blocks follow the channel profile, as in
+    her normal replies: the outbound path posts each block as a message.
     """
-    profile = load_channel_profile(channel).model_copy(
-        update={"stickers": False, "split_messages": False}
-    )
+    profile = load_channel_profile(channel).model_copy(update={"stickers": False})
     return build_system_prompt(content, profile)
 
 

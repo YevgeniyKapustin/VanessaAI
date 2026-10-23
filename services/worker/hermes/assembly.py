@@ -10,7 +10,11 @@ from services.worker.hermes.payload import SUPPORTED_CHANNEL
 from services.worker.hermes.prompt import build_followup_system_prompt
 from services.worker.hermes.runner import HermesRunner
 from vanessa.config.content import AppContent, get_content
-from vanessa.config.content_hermes import HermesContent, get_hermes_content
+from vanessa.config.content_hermes import (
+    HermesContent,
+    get_hermes_content,
+    get_report_css,
+)
 from vanessa.infrastructure.hermes import HermesClient, create_hermes_client
 from vanessa.llm.completers import create_chat_completer
 
@@ -48,6 +52,7 @@ def build_hermes_runner(
         poll_seconds=settings.hermes_poll_seconds,
         max_wait_seconds=settings.hermes_max_wait_seconds,
         file_max_bytes=settings.hermes_file_max_bytes,
+        report_css=get_report_css(),
     )
 
 

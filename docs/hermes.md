@@ -41,9 +41,15 @@ the page inline, once, in one block:
 
 The worker (`services/worker/hermes/html_file.py`) takes the block out
 before the follow-up LLM sees the answer. A short note takes its place.
-The bot sends the page as a `.html` document. Vanessa's message is the
-caption (or a message before the file, when it is longer than 1024
-characters).
+The bot sends the page as a `.html` document.
+
+Vanessa's follow-up is split into short messages, like her normal
+replies: `[next]` lines from the model, or a sentence split
+(`services/worker/hermes/blocks.py`). One `OutboundMessage` carries them
+all: `text` is the first message (the file caption), `more_texts` holds
+the rest. The bot posts them in order, with `BOT_MESSAGE_DELAY_SECONDS`
+between them, and stops on the first failure. A first message longer
+than 1024 characters goes before the file, and the file has no caption.
 
 The worker sends the file only when all of these are true:
 
@@ -59,8 +65,14 @@ also counts as a file. An HTML start with no end is a cut file: the rest
 of the answer is dropped and no file is sent. HTML never goes to the
 chat as text. If Telegram refuses the file, the text still goes out.
 
-The report style lives in the Hermes profile memory on the PC, not in
-this repo.
+Hermes writes the markup only: the sheet classes listed in
+`run_instructions` (`config/behavior/hermes/followup.yaml`). After the
+checks, the worker adds the report stylesheet
+`config/behavior/hermes/report_sheet.css` (the EngineerUI blueprint
+sheet) right after `<head>`, so every report has the same look
+(`services/worker/hermes/report_style.py`). The rules for the report
+content (panel order, tones, language) live in the Hermes profile
+memory on the PC, not in this repo.
 
 ## Server
 

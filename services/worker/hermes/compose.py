@@ -1,4 +1,4 @@
-"""Turn a Hermes outcome into one follow-up text in Vanessa's persona."""
+"""Turn a Hermes outcome into a follow-up text in Vanessa's persona."""
 
 from __future__ import annotations
 
@@ -39,13 +39,16 @@ def fallback_text(answer: str | None, prompts: HermesContent) -> str:
     return truncate_message(answer or prompts.undelivered_fallback)
 
 
-def final_text(raw: str) -> str:
-    """Final message after ``[answer]``; empty for no text or ``[ignore]``."""
+def final_text(raw: str, *, keep_blocks: bool = False) -> str:
+    """Final message after ``[answer]``; empty for no text or ``[ignore]``.
+
+    ``keep_blocks``: keep the ``[next]`` lines for the block split.
+    """
     reply, _reasoning = extract_answer(raw)
-    reply = strip_block_markers(reply)
-    if has_ignore_marker(reply):
+    plain = strip_stray_tags(strip_block_markers(reply)).strip()
+    if has_ignore_marker(plain) or not plain:
         return ""
-    return strip_stray_tags(reply).strip()
+    return strip_stray_tags(reply).strip() if keep_blocks else plain
 
 
 def chat_request(
@@ -87,8 +90,9 @@ class FollowupComposer:
         file_task: str = "",
         elapsed_seconds: float | None = None,
     ) -> str:
-        """Always return a non-empty text of at most 4096 characters.
+        """Always return a non-empty text; ``[next]`` lines split it.
 
+        ``followup_blocks`` cuts it into messages of at most 4096 chars.
         ``elapsed_seconds``: the real time from the run start to the answer.
         """
         try:
@@ -109,11 +113,13 @@ class FollowupComposer:
                 ask.telegram_chat_id,
                 len(raw),
             )
-            return truncate_message(self._prompts.undelivered_fallback)
-        text = final_text(raw)
-        if not text:
-            return fallback_text(answer, self._prompts)
-        return truncate_message(text)
+            return self.fallback_line()
+        text = final_text(raw, keep_blocks=True)
+        return text or fallback_text(answer, self._prompts)
+
+    def fallback_line(self) -> str:
+        """The fixed "did not deliver" line (never empty)."""
+        return truncate_message(self._prompts.undelivered_fallback)
 
     def file_task(self, *, attached: bool, refused: bool) -> str:
         """The HTML file note for the task: sent wins over refused."""

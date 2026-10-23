@@ -9,13 +9,23 @@ from tests.worker.hermes_fakes import (
     make_composer,
 )
 from vanessa.config.content_hermes import get_hermes_content
-from vanessa.contracts.outbound import OutboundMessage
+from vanessa.contracts.outbound import DOCUMENT_MAX_CHARS, OutboundMessage
 
 PAGE = "<!doctype html><html><body><h1>Баги недели</h1></body></html>"
 ANSWER = f'<vanessa_file name="bugs.html">\n{PAGE}\n</vanessa_file>\nГлавное: 3 бага.'
 
 
-def _runner(client, completer, broker, *, file_max_bytes: int = 262_144):
+DEFAULT_FILE_MAX_BYTES = 262_144
+
+
+def _runner(
+    client,
+    completer,
+    broker,
+    *,
+    file_max_bytes: int = DEFAULT_FILE_MAX_BYTES,
+    report_css: str = "",
+):
     return HermesRunner(
         client,
         make_composer(completer),
@@ -25,6 +35,7 @@ def _runner(client, completer, broker, *, file_max_bytes: int = 262_144):
         poll_seconds=0.0,
         max_wait_seconds=60.0,
         file_max_bytes=file_max_bytes,
+        report_css=report_css,
     )
 
 
@@ -42,7 +53,8 @@ async def test_file_goes_as_document_and_llm_never_sees_html() -> None:
     completer = FakeCompleter("[answer]\nДержи отчёт, три бага.")
     await _runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
     message = _message(broker)
-    assert message.text == "Держи отчёт, три бага."
+    assert message.text == "Держи отчёт, три бага"
+    assert message.more_texts == []
     assert message.document is not None
     assert message.document.file_name == "bugs.html"
     assert message.document.content == PAGE
@@ -59,7 +71,7 @@ async def test_refused_file_sends_text_only() -> None:
     await runner.run(make_ask())
     message = _message(broker)
     assert message.document is None
-    assert message.text == "Отчёт не собрался."
+    assert message.text == "Отчёт не собрался"
     prompt = _prompt(completer)
     assert "[HTML file not sent: too big]" in prompt
     assert get_hermes_content().file_refused_task.strip() in prompt
@@ -72,7 +84,33 @@ async def test_llm_failure_with_file_still_sends_no_html() -> None:
     message = _message(broker)
     assert message.document is not None
     assert "<html" not in message.text
-    assert "Главное: 3 бага." in message.text
+    assert "Главное: 3 бага" in message.text
+
+
+async def test_file_caption_is_first_block_and_style_is_added() -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter("[answer]\nСобрала отчёт.\n[next]\nТри бага горят.")
+    runner = _runner(
+        FakeClient(output=ANSWER), completer, broker, report_css=".sheet{color:red}"
+    )
+    await runner.run(make_ask())
+    message = _message(broker)
+    assert message.text == "Собрала отчёт"
+    assert message.more_texts == ["Три бага горят"]
+    assert message.document is not None
+    content = message.document.content
+    assert content.startswith("<!doctype html><html><style>\n.sheet{color:red}")
+    assert content.endswith("</body></html>")
+
+
+async def test_style_leaves_room_under_the_wire_cap() -> None:
+    css = "x" * 1000
+    runner = _runner(FakeClient(), FakeCompleter(), FakeBroker(), report_css=css)
+    assert runner._file_max_bytes == DEFAULT_FILE_MAX_BYTES
+    huge = _runner(
+        FakeClient(), FakeCompleter(), FakeBroker(), file_max_bytes=10**9, report_css=css
+    )
+    assert huge._file_max_bytes + len(css) < DOCUMENT_MAX_CHARS
 
 
 async def test_plain_answer_has_no_file_task() -> None:

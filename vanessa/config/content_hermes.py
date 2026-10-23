@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field
 from vanessa.config.content import resolve_content_source
 
 HERMES_FOLLOWUP_FILE = Path("hermes", "followup.yaml")
+#: The stylesheet the worker adds to every generated HTML report.
+REPORT_CSS_FILE = Path("hermes", "report_sheet.css")
 
 
 class HermesContent(BaseModel):
@@ -44,9 +46,18 @@ def get_hermes_content() -> HermesContent:
     return load_hermes_content(source / HERMES_FOLLOWUP_FILE)
 
 
+@lru_cache
+def get_report_css() -> str:
+    """The report stylesheet text; empty when the file is missing."""
+    path = resolve_content_source() / REPORT_CSS_FILE
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
 __all__ = [
     "HERMES_FOLLOWUP_FILE",
+    "REPORT_CSS_FILE",
     "HermesContent",
     "get_hermes_content",
+    "get_report_css",
     "load_hermes_content",
 ]

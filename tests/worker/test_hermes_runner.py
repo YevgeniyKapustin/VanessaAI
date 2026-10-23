@@ -131,11 +131,32 @@ async def test_untagged_twice_posts_fixed_line_not_reasoning() -> None:
     assert len(completer.calls) == UNTAGGED_ATTEMPTS
 
 
-async def test_long_llm_text_is_truncated() -> None:
+async def test_long_llm_text_is_split_into_messages() -> None:
     broker = FakeBroker()
     completer = FakeCompleter("[answer]\n" + "y" * 5000)
     await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
-    assert len(_only_message(broker).text) == OUTBOUND_MAX_CHARS
+    message = _only_message(broker)
+    assert len(message.text) == OUTBOUND_MAX_CHARS
+    assert [len(text) for text in message.more_texts] == [5000 - OUTBOUND_MAX_CHARS]
+
+
+async def test_next_blocks_become_separate_messages(caplog) -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter("[answer]\nГлянула.\n[next]\nДве задачи горят.\n[next]\n")
+    with caplog.at_level(logging.INFO):
+        await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
+    message = _only_message(broker)
+    assert message.text == "Глянула"
+    assert message.more_texts == ["Две задачи горят"]
+    assert message.reply_to_message_id == MESSAGE_ID
+    assert "messages=2" in caplog.text
+
+
+async def test_text_of_dots_only_posts_fixed_line() -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter("[answer]\n.")
+    await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
+    assert _only_message(broker).text == get_hermes_content().undelivered_fallback
 
 
 def test_user_prompt_treats_data_as_data() -> None:
@@ -157,12 +178,13 @@ def test_chat_request_puts_system_where_provider_wants_it() -> None:
     assert messages[0] == {"role": "system", "content": SYSTEM}
 
 
-def test_system_prompt_is_persona_without_stickers_or_blocks() -> None:
+def test_system_prompt_is_persona_with_blocks_without_stickers() -> None:
     content = get_content()
     prompt = build_followup_system_prompt(content, "telegram")
     assert content.persona.identity_text()[:40] in prompt
     assert "## Stickers" not in prompt
-    assert "do not emit [next]" in prompt
+    assert "do not emit [next]" not in prompt
+    assert "[next]" in prompt
 
 
 def test_hermes_content_loads() -> None:

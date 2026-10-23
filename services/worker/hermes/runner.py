@@ -9,9 +9,11 @@ from __future__ import annotations
 import logging
 import time
 
+from services.worker.hermes.blocks import followup_blocks
 from services.worker.hermes.compose import FollowupComposer
 from services.worker.hermes.html_file import HtmlFile, SplitAnswer, split_html_file
 from services.worker.hermes.payload import HermesAsk
+from services.worker.hermes.report_style import styled_file
 from vanessa.contracts.outbound import (
     DOCUMENT_MAX_CHARS,
     OutboundDocument,
@@ -30,6 +32,8 @@ from vanessa.infrastructure.observability.metrics.metrics_hermes_jobs import (
 logger = logging.getLogger(__name__)
 
 OUTBOUND_SOURCE = "hermes"
+# ``<style>\n`` + ``\n</style>`` around the report stylesheet.
+_STYLE_TAGS_CHARS = 32
 
 
 class HermesRunner:
@@ -46,6 +50,7 @@ class HermesRunner:
         poll_seconds: float,
         max_wait_seconds: float,
         file_max_bytes: int = 262_144,
+        report_css: str = "",
     ) -> None:
         self._client = client
         self._composer = composer
@@ -54,8 +59,11 @@ class HermesRunner:
         self._instructions = instructions.strip() or None
         self._poll_seconds = poll_seconds
         self._max_wait_seconds = max_wait_seconds
-        # Bytes >= chars, so this also keeps the file under the wire cap.
-        self._file_max_bytes = max(0, min(file_max_bytes, DOCUMENT_MAX_CHARS))
+        self._css = report_css
+        # Bytes >= chars, so the file plus our stylesheet stays under the
+        # wire cap.
+        room = DOCUMENT_MAX_CHARS - len(report_css) - _STYLE_TAGS_CHARS
+        self._file_max_bytes = max(0, min(file_max_bytes, room))
 
     async def run(self, ask: HermesAsk) -> None:
         started = time.monotonic()
@@ -70,10 +78,12 @@ class HermesRunner:
             file_task=file_task,
             elapsed_seconds=time.monotonic() - started,
         )
-        await self._broker.publish(self._stream, _outbound(ask, text, split.file))
+        blocks = followup_blocks(text) or [self._composer.fallback_line()]
+        file = styled_file(split.file, self._css)
+        await self._broker.publish(self._stream, _outbound(ask, blocks, file))
         seconds = time.monotonic() - started
         record_hermes_job(outcome, seconds)
-        _log_done(ask, outcome, seconds, text, split)
+        _log_done(ask, outcome, seconds, blocks, split)
 
     async def _ask_hermes(self, ask: HermesAsk) -> tuple[str | None, str]:
         try:
@@ -113,21 +123,30 @@ class HermesRunner:
 
 
 def _log_done(
-    ask: HermesAsk, outcome: str, seconds: float, text: str, split: SplitAnswer
+    ask: HermesAsk,
+    outcome: str,
+    seconds: float,
+    blocks: list[str],
+    split: SplitAnswer,
 ) -> None:
     logger.info(
-        "hermes_job_done chat_id=%s outcome=%s seconds=%.1f len=%s "
+        "hermes_job_done chat_id=%s outcome=%s seconds=%.1f len=%s messages=%s "
         "file_bytes=%s file_refused=%s",
         ask.telegram_chat_id,
         outcome,
         seconds,
-        len(text),
+        sum(len(block) for block in blocks),
+        len(blocks),
         split.file.size_bytes if split.file else 0,
         ",".join(split.problems) or "-",
     )
 
 
-def _outbound(ask: HermesAsk, text: str, file: HtmlFile | None) -> OutboundMessage:
+def _outbound(
+    ask: HermesAsk, blocks: list[str], file: HtmlFile | None
+) -> OutboundMessage:
+    """One outbound item: the first block (the caption with a file), then
+    the other blocks as separate messages."""
     document = (
         OutboundDocument(file_name=file.file_name, content=file.content)
         if file is not None
@@ -136,8 +155,9 @@ def _outbound(ask: HermesAsk, text: str, file: HtmlFile | None) -> OutboundMessa
     return OutboundMessage(
         channel="telegram",
         telegram_chat_id=ask.telegram_chat_id,
-        text=text,
+        text=blocks[0],
         reply_to_message_id=ask.telegram_message_id,
         source=OUTBOUND_SOURCE,
         document=document,
+        more_texts=blocks[1:],
     )

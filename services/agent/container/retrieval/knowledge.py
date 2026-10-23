@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from services.agent.container.retrieval.retrieval import RetrievalStack
 from vanessa.config import settings
 from vanessa.infrastructure.db.session import async_session_factory
 from vanessa.knowledge.index import KnowledgeIndex
@@ -17,34 +16,20 @@ from vanessa.knowledge.metrics.planner import MetricsPlanner
 from vanessa.knowledge.metrics.retriever import MetricsRetriever
 from vanessa.knowledge.metrics.store import MetricsStore
 from vanessa.knowledge.portraits import PortraitBuilder, PortraitWorker
-from vanessa.knowledge.retriever import KnowledgeRetriever
 from vanessa.knowledge.store.vault import KnowledgeVault
-from vanessa.knowledge.vectors import KnowledgeVectorIndexer
 
 
 class KnowledgeGraph:
     def __init__(
         self,
-        retrieval: RetrievalStack,
         vault: KnowledgeVault | None = None,
         index: KnowledgeIndex | None = None,
-        vector_indexer: KnowledgeVectorIndexer | None = None,
     ) -> None:
-        self._retrieval = retrieval
         self.vault = vault or KnowledgeVault()
         self.index = index or KnowledgeIndex(self.vault)
-        self.vector_indexer = vector_indexer or KnowledgeVectorIndexer(
-            self.vault,
-            retrieval.embeddings,
-            retrieval.indexes.knowledge,
-        )
 
     def vault_writer(self) -> KnowledgeVaultWriter:
-        return KnowledgeVaultWriter(
-            self.vault,
-            self.index,
-            vector_indexer=self.vector_indexer,
-        )
+        return KnowledgeVaultWriter(self.vault, self.index)
 
     def metrics_retriever(self) -> MetricsRetriever:
         return MetricsRetriever(self.vault, self.index)
@@ -65,16 +50,6 @@ class KnowledgeGraph:
             ),
             enabled=settings.knowledge_metrics_enabled,
             **extra,
-        )
-
-    def retriever(self) -> KnowledgeRetriever:
-        return KnowledgeRetriever(
-            self.vault,
-            self.index,
-            max_blocks=settings.knowledge_max_blocks,
-            people_max_blocks=settings.knowledge_people_max_blocks,
-            embeddings=self._retrieval.embeddings,
-            vector_store=self._retrieval.indexes.knowledge,
         )
 
     def memory_stage(self) -> MemoryStage:

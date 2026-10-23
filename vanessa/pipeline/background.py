@@ -1,7 +1,7 @@
 """Bounded background executor for non-critical post-reply work.
 
-The chat reply path must never wait on embedding-heavy or slow auxiliary work
-(memory extraction, metrics snapshots, message indexing). This executor runs
+The chat reply path must never wait on slow auxiliary work
+(memory extraction, metrics snapshots, photo captions). This executor runs
 such jobs on a small pool of worker tasks behind a bounded queue; when the
 queue is full, new jobs are dropped (fail-open) instead of blocking the caller.
 """

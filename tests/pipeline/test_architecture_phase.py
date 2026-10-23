@@ -1,19 +1,4 @@
-from vanessa.pipeline.llm.humor.humor_reflexion import reflexion_filter_humor_quotes
 from vanessa.pipeline.turn_metrics import TurnMetrics
-
-
-def test_reflexion_prefers_theme_matching_quotes():
-    quotes = [
-        "найди работу личь",
-        "просто привет всем",
-    ]
-    result = reflexion_filter_humor_quotes(
-        quotes,
-        humor_query="личь работа",
-        user_message="ну ладно поработаю",
-        max_quotes=1,
-    )
-    assert result == ["найди работу личь"]
 
 
 def test_turn_metrics_snapshot():

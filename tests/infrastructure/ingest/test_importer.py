@@ -20,7 +20,6 @@ class FakeMessages:
         self._next_id = 1
         self.created: list[StoredMessage] = []
         self.existing: set[int] = set()
-        self.point_updates: list[tuple[int, str]] = []
 
     async def get_existing_telegram_message_ids(
         self,
@@ -41,9 +40,6 @@ class FakeMessages:
         self.created.append(message)
         return message
 
-    async def update_qdrant_point_id(self, message_id: int, point_id: str) -> None:
-        self.point_updates.append((message_id, point_id))
-
 
 class FakeUsers:
     def __init__(self) -> None:
@@ -53,26 +49,6 @@ class FakeUsers:
         _ = kwargs
         self.calls.append(telegram_id)
         return object()
-
-
-class FakeEmbeddings:
-    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        return [[0.1, 0.2] for _ in texts]
-
-
-class FakeVectorStore:
-    def __init__(self) -> None:
-        self.batches: list[list[tuple[int, list[float], str | None]]] = []
-
-    async def ensure_collection(self) -> None:
-        return None
-
-    async def upsert_batch(
-        self,
-        items: list[tuple[int, list[float], str | None]],
-    ) -> list[str]:
-        self.batches.append(items)
-        return [f"pt-{message_id}" for message_id, _, _ in items]
 
 
 def _parsed(message_id: int, text: str = "hello") -> ParsedExportMessage:
@@ -86,24 +62,18 @@ def _parsed(message_id: int, text: str = "hello") -> ParsedExportMessage:
 
 
 @pytest.mark.asyncio
-async def test_importer_imports_and_embeds_batch():
+async def test_importer_imports_batches():
     uow = FakeUow()
     messages = FakeMessages()
     users = FakeUsers()
-    vectors = FakeVectorStore()
     importer = HistoryImporter(
         messages=messages,
         users=users,
-        embeddings=FakeEmbeddings(),
-        vector_store=vectors,
         unit_of_work=uow,
         batch_size=2,
     )
     parsed = [_parsed(1), _parsed(2), _parsed(3)]
-    imported, skipped = await importer.import_messages(
-        parsed,
-        embed=True,
-    )
+    imported, skipped = await importer.import_messages(parsed)
     assert imported == len(parsed)
     assert skipped == 0
     assert len(users.calls) == len(parsed)
@@ -111,7 +81,7 @@ async def test_importer_imports_and_embeds_batch():
         len(parsed) + importer._batch_size - 1
     ) // importer._batch_size
     assert uow.commits == expected_commits
-    assert messages.point_updates == [(1, "pt-1"), (2, "pt-2"), (3, "pt-3")]
+    assert [m.telegram_message_id for m in messages.created] == [1, 2, 3]
 
 
 @pytest.mark.asyncio
@@ -121,14 +91,9 @@ async def test_importer_skips_existing_telegram_ids():
     importer = HistoryImporter(
         messages=messages,
         users=FakeUsers(),
-        embeddings=FakeEmbeddings(),
-        vector_store=FakeVectorStore(),
         unit_of_work=FakeUow(),
         batch_size=10,
     )
-    imported, skipped = await importer.import_messages(
-        [_parsed(1), _parsed(2)],
-        embed=False,
-    )
+    imported, skipped = await importer.import_messages([_parsed(1), _parsed(2)])
     assert imported == 1
     assert skipped == 1

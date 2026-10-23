@@ -53,9 +53,9 @@ guard clauses, they do not grow a Strategy tree to chase a number.
 
 | Family | Why it is on |
 |--------|----------------|
-| **DTZ** | Logs, outbox, session trim, vault dates, Telegram `date`, Postgres + Qdrant. `datetime.now()` is naive vs aware. Agents love it. |
+| **DTZ** | Logs, outbox, session trim, vault dates, Telegram `date`, Postgres. `datetime.now()` is naive vs aware. Agents love it. |
 | **BLE** | LLM / network clients. `except Exception: pass` hides API and Redis failures. `except Exception` + `logger.exception` is allowed; bare swallow is not. |
-| **ASYNC** | aiogram, async SQLAlchemy, Redis Streams, AsyncOpenAI. Agents drop `requests.get` / `time.sleep` / `SentenceTransformer.encode` into `async def`. |
+| **ASYNC** | aiogram, async SQLAlchemy, Redis Streams, AsyncOpenAI. Agents drop `requests.get` / `time.sleep` into `async def`. |
 | **T10 / T20** | Forgotten `breakpoint()` in the gate; `print(response)` in a provider. CLI scripts may print (see per-file). |
 | **S** | SQL, subprocess, XML. Secrets live in `.env.local`, not in code. Noisy Bandit codes are ignored (below), not the whole family. |
 | **LOG / G** | Grafana / Loki. `logger.info(f"turn={turn}")` breaks lazy `%s` formatting and log-pattern extractors. |
@@ -104,8 +104,8 @@ ignore. Those are the mistakes this stack keeps making.
 | `services/bot/handlers/**` | `ARG001` | aiogram signatures (`message` / `bot` / `state`) are not always used. |
 
 `PLC0415` (import not at top of file) stays **on**. Lazy-import
-`sentence_transformers` or the DB engine with a `# noqa: PLC0415` and a
-one-line comment — pulling torch into the bot process is worse than a
+a heavy module (for example, the DB engine) with a `# noqa: PLC0415` and
+a one-line comment. A heavy import in the bot process is worse than a
 noqa.
 
 ## Not Ruff’s job
@@ -124,7 +124,7 @@ Use a code (`# noqa: BLE001`), not a bare `# noqa`. One line of why if
 it is not obvious.
 
 Allowed when the rule is a known false positive for that line (Telegram
-I/O swallow, health probe, lazy torch import, Langfuse `input=` vs
+I/O swallow, health probe, lazy heavy import, Langfuse `input=` vs
 `A002`).
 
 Not allowed to silence a rule you do not want to follow. Do not start

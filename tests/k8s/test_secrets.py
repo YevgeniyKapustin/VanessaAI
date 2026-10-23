@@ -82,13 +82,11 @@ def test_select_config_values_keeps_owner_id_and_drops_secrets():
     selected = select_config_values(
         env,
         postgres_host="host.docker.internal",
-        qdrant_host="host.docker.internal",
         langfuse_host="http://host.docker.internal:3000",
     )
     assert selected["REQUIRED_USER_TELEGRAM_ID"] == "123456789"
     assert selected["ALLOWED_CHAT_TELEGRAM_ID"] == "-1001111111111"
     assert selected["POSTGRES_HOST"] == "host.docker.internal"
-    assert selected["QDRANT_HOST"] == "host.docker.internal"
     assert selected["LANGFUSE_HOST"] == "http://host.docker.internal:3000"
     assert "TRANSPORT" not in selected
     assert selected["LOG_JSON"] == "true"
@@ -109,19 +107,19 @@ def test_select_secret_values_ignores_non_secret_keys():
         **_MINIMAL_ENV,
         "LOG_LEVEL": "DEBUG",
         "POSTGRES_HOST": "postgres",
-        "HF_TOKEN": "hf-token",
+        "WEB_SEARCH_API_KEY": "ws-key",
     }
     selected = select_secret_values(env)
     assert "LOG_LEVEL" not in selected
     assert "POSTGRES_HOST" not in selected
-    assert selected["HF_TOKEN"] == "hf-token"
+    assert selected["WEB_SEARCH_API_KEY"] == "ws-key"
     assert selected["TELEGRAM_BOT_TOKEN"] == "tg-token"
 
 
 def test_select_secret_values_skips_empty():
-    env = {**_MINIMAL_ENV, "HF_TOKEN": "  ", "API_INTERNAL_TOKEN": ""}
+    env = {**_MINIMAL_ENV, "WEB_SEARCH_API_KEY": "  ", "API_INTERNAL_TOKEN": ""}
     selected = select_secret_values(env)
-    assert "HF_TOKEN" not in selected
+    assert "WEB_SEARCH_API_KEY" not in selected
     assert "API_INTERNAL_TOKEN" not in selected
 
 
@@ -183,7 +181,7 @@ def test_plan_ok_minimal():
     validate_plan(plan)
     assert plan.missing == ()
     assert set(plan.present) == set(_MINIMAL_ENV)
-    assert "HF_TOKEN" in plan.optional_absent
+    assert "API_INTERNAL_TOKEN" in plan.optional_absent
 
 
 def test_build_opaque_secret_yaml_roundtrip():

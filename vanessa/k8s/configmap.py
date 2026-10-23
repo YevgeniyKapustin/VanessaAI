@@ -64,13 +64,10 @@ def _apply_host_overrides(
     selected: dict[str, str],
     *,
     postgres_host: str | None,
-    qdrant_host: str | None,
     langfuse_host: str | None,
 ) -> None:
     if postgres_host:
         selected["POSTGRES_HOST"] = postgres_host
-    if qdrant_host:
-        selected["QDRANT_HOST"] = qdrant_host
     if langfuse_host:
         selected["LANGFUSE_HOST"] = langfuse_host
 
@@ -79,7 +76,6 @@ def select_config_values(
     env: Mapping[str, str],
     *,
     postgres_host: str | None = None,
-    qdrant_host: str | None = None,
     langfuse_host: str | None = None,
 ) -> dict[str, str]:
     selected = _copy_public_env(env)
@@ -87,7 +83,6 @@ def select_config_values(
     _apply_host_overrides(
         selected,
         postgres_host=postgres_host,
-        qdrant_host=qdrant_host,
         langfuse_host=langfuse_host,
     )
     return dict(sorted(selected.items()))

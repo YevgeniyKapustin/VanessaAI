@@ -1,5 +1,4 @@
 from vanessa.core.protocols import (
-    MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
     TurnMetricsProtocol,
 )
@@ -8,10 +7,8 @@ from vanessa.core.turn import ConversationTurnResult
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionAction
 from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
-from vanessa.pipeline.gate_support import index_user_on_ignore
 from vanessa.pipeline.llm.format.answer_tag import strip_control_tags
 from vanessa.pipeline.llm.memes import MemeDecider
-from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.stages.finalize_delivery import (
     delivery_messages,
     marker_free_reply,
@@ -24,17 +21,13 @@ class FinalizeStage:
     def __init__(
         self,
         messages: MessageRepositoryProtocol,
-        indexing: MessageIndexingSchedulerProtocol,
         decision_engine: DecisionEngineProtocol,
-        config: OrchestratorConfig,
         metrics: TurnMetricsProtocol,
         *,
         meme_decider: MemeDecider | None = None,
     ) -> None:
         self._messages = messages
-        self._indexing = indexing
         self._decision = decision_engine
-        self._config = config
         self._metrics = metrics
         self._meme_decider = meme_decider
 
@@ -42,10 +35,9 @@ class FinalizeStage:
         """Finish the turn without a reply.
 
         Used when a later stage decides the user's message does not need a
-        reply. The user message is still indexed and the turn is recorded as
-        ignored (no assistant message is created, no reply is registered).
+        reply. The turn is recorded as ignored (no assistant message is
+        created, no reply is registered).
         """
-        await index_user_on_ignore(ctx, self._indexing, self._config)
         ctx.result = ConversationTurnResult(
             action=DecisionAction.IGNORE.value,
             reason=reason,
@@ -64,11 +56,6 @@ class FinalizeStage:
         assert ctx.decision is not None
         assert ctx.turn_plan is not None
         assert ctx.reply is not None
-
-        if self._config.defer_index_on_ignore:
-            self._indexing.schedule(ctx.user_msg)
-        else:
-            await self._indexing.index_now(ctx.user_msg)
 
         clean_reply, sticker_tag = sticker_from_reply(ctx, ctx.reply)
         # Final control-tag safety net: a reasoning model may emit [answer] /

@@ -17,7 +17,6 @@ from vanessa.knowledge.memory.writer_notes import WriterNoteUpdates
 from vanessa.knowledge.memory.writer_people import WriterPeopleUpdates
 from vanessa.knowledge.schema import MemoryPlan, VaultNote
 from vanessa.knowledge.store.vault import KnowledgeVault
-from vanessa.knowledge.vectors.vector_index import KnowledgeVectorIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +26,9 @@ class KnowledgeVaultWriter(WriterPeopleUpdates, WriterNoteUpdates, WriterTemplat
         self,
         vault: KnowledgeVault,
         index: KnowledgeIndex | None = None,
-        vector_indexer: KnowledgeVectorIndexer | None = None,
     ) -> None:
         self._vault = vault
         self._index = index or KnowledgeIndex(vault)
-        self._vector_indexer = vector_indexer
 
     async def apply(
         self,
@@ -54,7 +51,6 @@ class KnowledgeVaultWriter(WriterPeopleUpdates, WriterNoteUpdates, WriterTemplat
         for folder in changed_folders:
             await self._index.rebuild_folder(folder)
             written_paths.append(f"{folder}/_index.yaml")
-        await self._reindex_written(written_paths)
         tracer = get_tracer()
         async with tracer.span(
             name="finalize:extract_knowledge",
@@ -99,18 +95,6 @@ class KnowledgeVaultWriter(WriterPeopleUpdates, WriterNoteUpdates, WriterTemplat
         except Exception:
             logger.exception("knowledge_update_failed update=%r", update)
             return None, []
-
-    async def _reindex_written(self, written_paths: list[str]) -> None:
-        if self._vector_indexer is None:
-            return
-        for path in written_paths:
-            try:
-                await self._vector_indexer.index_note(path)
-            except Exception:
-                logger.exception(
-                    "knowledge_vector_reindex_failed path=%s",
-                    path,
-                )
 
     async def _apply_update(
         self,

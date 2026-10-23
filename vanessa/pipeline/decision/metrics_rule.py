@@ -103,8 +103,6 @@ class LowAttitudeRule:
     note turns the tone unkind).
     """
 
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not settings.decision_low_attitude_rule_enabled:
             return None
@@ -165,8 +163,6 @@ def _toxic_ignore_result(context: DecisionContext) -> DecisionResult | None:
 
 
 class SenderMetricsRule:
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not settings.decision_metrics_rule_enabled:
             return None

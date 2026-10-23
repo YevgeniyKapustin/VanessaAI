@@ -9,14 +9,12 @@ from services.agent.runtime.broker import BrokerRuntime
 from services.agent.runtime.jobs import JobsRuntime
 from services.agent.runtime.knowledge import KnowledgeRuntime
 from services.agent.runtime.storage import StorageRuntime
-from services.agent.runtime.warmup import WarmupRuntime
 
 
 @asynccontextmanager
 async def lifespan(container: AppContainer) -> AsyncIterator[None]:
     runtimes = (
         StorageRuntime(),
-        WarmupRuntime(container),
         JobsRuntime(container),
         AlertRuntime(),
         KnowledgeRuntime(container),

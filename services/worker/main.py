@@ -53,7 +53,7 @@ async def main() -> None:
         poll_seconds=15.0,
     )
     metrics_task = asyncio.create_task(broker_metrics.run_forever())
-    assembly = await build_worker_handlers(broker)
+    assembly = await build_worker_handlers(broker, outbound_stream=streams.outbound)
     consumer_suffix = settings.broker_consumer_id or uuid4().hex[:6]
     sweep_worker = (
         SweepWorker(
@@ -86,6 +86,9 @@ async def main() -> None:
     try:
         await app.run_forever()
     finally:
+        # Hermes jobs are in-process only: a restart loses them (see handler).
+        if assembly.hermes is not None:
+            await assembly.hermes.aclose()
         metrics_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await metrics_task

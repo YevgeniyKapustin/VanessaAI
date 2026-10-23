@@ -22,7 +22,7 @@ class MessageRepository:
         """Run a fallible DB read inside a SAVEPOINT.
 
         Pipeline stages treat some reads as optional/fail-open (the photo-album
-        search, the RAG helpers) and swallow their errors. Without a savepoint,
+        search, the knowledge reads) and swallow their errors. Without a savepoint,
         a swallowed read failure aborts the whole Postgres transaction, and the
         next statement on the same request-scoped session — typically the
         assistant-message INSERT — fails with ``InFailedSQLTransactionError``.
@@ -132,7 +132,7 @@ class MessageRepository:
         """Persist the generated caption of a photo message.
 
         The FTS ``search_vector`` is recomputed to include the caption, so a bare
-        photo becomes findable "by meaning" in the text/hybrid RAG.
+        photo becomes findable by full-text search.
         """
         await self._session.execute(
             text(
@@ -143,19 +143,6 @@ class MessageRepository:
             ),
             {"caption": caption, "message_id": message_id},
         )
-
-    async def update_qdrant_point_id(
-        self,
-        message_id: int,
-        point_id: str,
-    ) -> None:
-        # Also guarded by a savepoint: ``index_now`` swallows failures here, and
-        # a poisoned transaction would silently break the later assistant INSERT.
-        async with self._savepoint():
-            message = await self._session.get(Message, message_id)
-            if message is None:
-                return
-            message.qdrant_point_id = point_id
 
     get_recent = message_queries.get_recent
     get_newer_than = message_queries.get_newer_than

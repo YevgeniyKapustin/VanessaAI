@@ -70,12 +70,6 @@ class MessageRepositoryProtocol(Protocol):
         telegram_message_ids: list[int],
     ) -> set[int]: ...
 
-    async def update_qdrant_point_id(
-        self,
-        message_id: int,
-        point_id: str,
-    ) -> None: ...
-
     async def update_photo_caption(
         self,
         message_id: int,
@@ -89,22 +83,6 @@ class MessageRepositoryProtocol(Protocol):
         *,
         channel: str = "telegram",
     ) -> list[StoredMessage]: ...
-
-
-class MessageIndexerProtocol(Protocol):
-    async def index(
-        self,
-        message_id: int,
-        role: str,
-        content: str,
-        point_id: str | None = None,
-    ) -> str: ...
-
-
-class MessageIndexingSchedulerProtocol(Protocol):
-    async def index_now(self, record: StoredMessage) -> None: ...
-
-    def schedule(self, record: StoredMessage) -> None: ...
 
 
 class ChatUserProtocol(Protocol):

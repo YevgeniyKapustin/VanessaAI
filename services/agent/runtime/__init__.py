@@ -5,7 +5,6 @@ from services.agent.runtime.knowledge import KnowledgeRuntime
 from services.agent.runtime.lifecycle import AsyncRuntime
 from services.agent.runtime.storage import StorageRuntime
 from services.agent.runtime.tasks import TaskSet
-from services.agent.runtime.warmup import WarmupRuntime
 
 __all__ = [
     "AlertRuntime",
@@ -15,5 +14,4 @@ __all__ = [
     "KnowledgeRuntime",
     "StorageRuntime",
     "TaskSet",
-    "WarmupRuntime",
 ]

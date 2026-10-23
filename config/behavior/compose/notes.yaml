@@ -57,6 +57,17 @@ web_instruction: |
   Answer from them when they are relevant; if they do not answer the question,
   say so honestly instead of inventing facts.
 
+hermes_asked_note: |
+  You asked your Hermes about this. He works slowly and will answer later in a
+  separate message. Say so briefly, in one phrase, in your own voice.
+  Do NOT invent his answer, results, numbers, statuses or ids.
+  Answer yourself what you can from the chat and your own knowledge.
+
+hermes_offline_note: |
+  Your Hermes is offline right now (the owner's PC is off). Say so in one
+  phrase and answer yourself as well as you can. Nothing is queued: do NOT
+  promise that Hermes will answer later.
+
 photo_album_instruction: |
   The chat already received the photos listed above — the app can re-send any of
   them by number. If one of them fits the current message (the user asks to send,

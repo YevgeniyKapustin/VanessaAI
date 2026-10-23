@@ -50,11 +50,11 @@ def test_turn_reply_round_trip() -> None:
 
 
 def test_task_message_kind() -> None:
-    task = TaskMessage(task=TaskKind.INDEX_MESSAGE, payload={"message_id": 7})
+    task = TaskMessage(task=TaskKind.SWEEP, payload={"message_id": 7})
     assert task.message_kind() == "task"
     decoded = decode(encode(task))
     assert isinstance(decoded, TaskMessage)
-    assert decoded.task == TaskKind.INDEX_MESSAGE
+    assert decoded.task == TaskKind.SWEEP
     assert decoded.payload == {"message_id": 7}
 
 

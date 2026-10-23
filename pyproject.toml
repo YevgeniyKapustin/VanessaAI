@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "vanessa"
 version = "0.1.0"
-description = "Telegram bot Vanessa with RAG and DeepSeek"
+description = "Telegram bot Vanessa with DeepSeek"
 authors = ["Vanessa Team"]
 packages = [
   { include = "vanessa" },
@@ -17,11 +17,8 @@ aiogram = ">=3.15.0"
 sqlalchemy = { version = ">=2.0.36", extras = ["asyncio"] }
 asyncpg = ">=0.30.0"
 alembic = ">=1.14.0"
-qdrant-client = ">=1.12.0"
 # Async message broker for cross-service transport (Redis Streams).
 redis = ">=5.0"
-sentence-transformers = ">=3.3.0"
-torch = { version = ">=2.4,<3", source = "pytorch-cpu" }
 anthropic = ">=0.40.0"
 openai = ">=1.0.0"
 # Model Context Protocol — servers (FastMCP) + client (streamable HTTP / stdio).
@@ -38,11 +35,8 @@ prometheus-client = ">=0.21.0"
 langfuse = ">=2.50.0"
 elevenlabs = ">=1.0.0"
 python-osc = ">=1.8.0"
-
-[[tool.poetry.source]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-priority = "explicit"
+# VRChat presence screen capture (host process).
+numpy = ">=1.26"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.0"

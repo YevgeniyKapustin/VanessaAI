@@ -17,7 +17,6 @@ class _RuleConfig:
     error_rate_threshold: float
     llm_empty_threshold: float
     latency_p95_threshold: float
-    rag_empty_threshold: float
     cost_window_threshold_usd: float
 
 
@@ -27,7 +26,6 @@ def evaluate_alert_rules(
     error_rate_threshold: float,
     llm_empty_threshold: float,
     latency_p95_threshold: float,
-    rag_empty_threshold: float,
     cost_window_threshold_usd: float,
 ) -> list[Alert]:
     config = _RuleConfig(
@@ -35,7 +33,6 @@ def evaluate_alert_rules(
         error_rate_threshold=error_rate_threshold,
         llm_empty_threshold=llm_empty_threshold,
         latency_p95_threshold=latency_p95_threshold,
-        rag_empty_threshold=rag_empty_threshold,
         cost_window_threshold_usd=cost_window_threshold_usd,
     )
     return [
@@ -93,21 +90,8 @@ def _turn_p95_alert(config: _RuleConfig) -> Alert | None:
     )
 
 
-def _rag_empty_alert(config: _RuleConfig) -> Alert | None:
-    if metrics.rag_outcomes.count() < config.min_samples:
-        return None
-    empty_rate = metrics.rag_outcomes.error_rate(lambda value: value[1] == 0)
-    if empty_rate <= config.rag_empty_threshold:
-        return None
-    return Alert(
-        "rag_empty_rate",
-        f"🔍 Empty RAG retrieval {empty_rate:.0%} over window "
-        f"(threshold {config.rag_empty_threshold:.0%})",
-    )
-
-
 def _platform_alerts(config: _RuleConfig) -> list[Alert]:
-    return _present(_turn_p95_alert(config), _rag_empty_alert(config))
+    return _present(_turn_p95_alert(config))
 
 
 def _telegram_error_alert(config: _RuleConfig) -> Alert | None:

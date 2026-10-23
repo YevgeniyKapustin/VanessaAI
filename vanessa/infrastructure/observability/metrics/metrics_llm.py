@@ -4,7 +4,6 @@ from prometheus_client import Counter, Gauge, Histogram
 
 from vanessa.infrastructure.observability.metrics.metrics_pipeline import (
     _LLM_BUCKETS,
-    _SCORE_BUCKETS,
     registry,
 )
 
@@ -32,33 +31,6 @@ llm_duration_seconds = Histogram(
     "LLM request latency in seconds",
     ["provider", "model", "kind"],
     buckets=_LLM_BUCKETS,
-    registry=registry,
-)
-
-# --- RAG ---------------------------------------------------------------------
-rag_search_total = Counter(
-    "vanessa_rag_search_total",
-    "RAG retrieval attempts",
-    ["source"],
-    registry=registry,
-)
-rag_hits_total = Counter(
-    "vanessa_rag_hits_total",
-    "RAG blocks returned",
-    ["source"],
-    registry=registry,
-)
-rag_score = Histogram(
-    "vanessa_rag_score",
-    "Top retrieval score per search (proxy for context relevance)",
-    ["source"],
-    buckets=_SCORE_BUCKETS,
-    registry=registry,
-)
-rag_empty_total = Counter(
-    "vanessa_rag_empty_total",
-    "RAG searches that returned nothing",
-    ["source"],
     registry=registry,
 )
 

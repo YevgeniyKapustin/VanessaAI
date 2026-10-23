@@ -57,7 +57,6 @@ def test_behavior_split_files_exist() -> None:
         "compose/notes.yaml",
         "compose/generation.yaml",
         "gate/planner.yaml",
-        "retrieve/rag.yaml",
         "gate/reaction_gate.yaml",
         "knowledge/mood.yaml",
     ):
@@ -71,7 +70,6 @@ def test_merged_sections_keep_both_jobs() -> None:
     assert content.llm.context_header
     assert content.llm.owner_message_note.strip()
     assert "should_reply" in content.rag.planner_prompt
-    assert content.rag.vector_min_score > 0
     assert "YES or NO" in content.decision.reaction_gate_prompt
     assert content.metrics.annoyance_note.strip()
 

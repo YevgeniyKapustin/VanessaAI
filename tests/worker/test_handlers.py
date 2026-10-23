@@ -3,9 +3,7 @@ from typing import Self
 
 from services.worker.handlers import (
     InboxNoteHandler,
-    IndexMessageHandler,
     PortraitHandler,
-    ReindexKnowledgeHandler,
     SweepHandler,
 )
 from vanessa.contracts.messages import InboxNoteReply, TaskKind, TaskMessage
@@ -21,61 +19,6 @@ class _FakeSession:
 
     async def commit(self) -> None:
         pass
-
-
-class _FakeEmbeddings:
-    async def embed(self, content):
-        _ = content
-        return [0.1, 0.2]
-
-
-class _FakeVectorStore:
-    async def upsert_message(self, **kwargs):
-        _ = kwargs
-        return "point-1"
-
-
-class _FakeRepo:
-    def __init__(self, session) -> None:
-        _ = session
-        self.updated: list[tuple[int, str]] = []
-
-    async def update_qdrant_point_id(self, message_id, point_id) -> None:
-        self.updated.append((message_id, point_id))
-
-
-async def test_index_message_handler(monkeypatch) -> None:
-    fake_repo = _FakeRepo(None)
-    monkeypatch.setattr(repository, "MessageRepository", lambda _session: fake_repo)
-
-    session = _FakeSession()
-    handler = IndexMessageHandler(
-        _FakeEmbeddings(),
-        _FakeVectorStore(),
-        lambda: session,
-        max_retries=2,
-    )
-    task = TaskMessage(
-        task=TaskKind.INDEX_MESSAGE,
-        payload={
-            "message_id": 7,
-            "role": "user",
-            "content": "hello",
-            "point_id": None,
-        },
-    )
-    await handler.handle(task)
-    assert fake_repo.updated == [(7, "point-1")]
-
-
-async def test_index_message_handler_skips_non_user_role() -> None:
-    handler = IndexMessageHandler(_FakeEmbeddings(), _FakeVectorStore(), None)
-    task = TaskMessage(
-        task=TaskKind.INDEX_MESSAGE,
-        payload={"message_id": 7, "role": "assistant", "content": "hi", "point_id": "p"},
-    )
-    # No session factory configured — would raise if it tried to update.
-    await handler.handle(task)
 
 
 async def test_sweep_handler_runs_once(monkeypatch) -> None:
@@ -109,21 +52,6 @@ async def test_portrait_handler_runs_builder() -> None:
     builder = _FakeBuilder()
     await PortraitHandler(builder).handle(TaskMessage(task=TaskKind.PORTRAIT, payload={}))
     assert builder.runs == 1
-
-
-async def test_reindex_knowledge_handler() -> None:
-    class _FakeIndexer:
-        def __init__(self) -> None:
-            self.runs = 0
-
-        async def index_all(self):
-            self.runs += 1
-
-    indexer = _FakeIndexer()
-    await ReindexKnowledgeHandler(indexer).handle(
-        TaskMessage(task=TaskKind.REINDEX_KNOWLEDGE, payload={})
-    )
-    assert indexer.runs == 1
 
 
 async def test_inbox_note_handler_replies(monkeypatch) -> None:

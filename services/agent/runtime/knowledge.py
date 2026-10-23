@@ -41,16 +41,6 @@ class KnowledgeRuntime(AsyncRuntime):
                 knowledge.portrait_worker().run_forever(),
                 name="knowledge_portrait",
             )
-        self._tasks.spawn(
-            self._index_vault(knowledge.vector_indexer),
-            name="vault_index",
-        )
 
     async def stop(self) -> None:
         await self._tasks.cancel_all()
-
-    async def _index_vault(self, indexer) -> None:
-        try:
-            await indexer.index_all()
-        except Exception:
-            logger.exception("knowledge_vector_index_all_failed at startup")

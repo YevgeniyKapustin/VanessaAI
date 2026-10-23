@@ -293,7 +293,6 @@ def _context(
         text="просто болтовня без смысла",
         telegram_chat_id=1,
         recent_messages=[],
-        query_vector=None,
         intent=IntentResult(detected=False, mentions_bot=mentions_bot),
         trigger=TriggerResult(detected=False),
         session_active=False,
@@ -359,21 +358,14 @@ def test_low_attitude_rule_never_for_owner():
 @pytest.mark.asyncio
 async def test_engine_low_attitude_ignores_weak_message():
 
-    class FakeRelevance:
-        async def score(self, text, query_vector=None, search_text=None) -> float:
-            _ = text, query_vector, search_text
-            return 0.1
-
     engine = DecisionEngine(
         intent_detector=IntentDetector(),
         trigger_checker=TriggerKeywordChecker(()),
-        relevance_checker=FakeRelevance(),
         session_analyzer=SessionWindowAnalyzer(
             10, IntentDetector(), TriggerKeywordChecker(())
         ),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
         block_consecutive_replies=False,
     )
     result = await engine.decide(
@@ -393,21 +385,14 @@ async def test_engine_low_attitude_ignores_weak_message():
 @pytest.mark.asyncio
 async def test_engine_low_attitude_still_replies_to_direct_question():
 
-    class FakeRelevance:
-        async def score(self, text, query_vector=None, search_text=None) -> float:
-            _ = text, query_vector, search_text
-            return 0.9
-
     engine = DecisionEngine(
         intent_detector=IntentDetector(),
         trigger_checker=TriggerKeywordChecker(()),
-        relevance_checker=FakeRelevance(),
         session_analyzer=SessionWindowAnalyzer(
             10, IntentDetector(), TriggerKeywordChecker(())
         ),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
         block_consecutive_replies=False,
     )
     result = await engine.decide(

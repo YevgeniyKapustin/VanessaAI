@@ -37,7 +37,6 @@ def _context(
         text="просто болтовня без смысла",
         telegram_chat_id=1,
         recent_messages=[],
-        query_vector=None,
         intent=IntentResult(detected=False, mentions_bot=mentions_bot),
         trigger=TriggerResult(detected=trigger_detected),
         session_active=False,
@@ -129,22 +128,14 @@ def test_rule_guard_listen_window():
 # --- engine integration ---
 
 
-class FakeRelevance:
-    async def score(self, text, query_vector=None, search_text=None) -> float:
-        _ = text, query_vector, search_text
-        return 0.9
-
-
 def build_engine(intent_detector, trigger_checker):
 
     return DecisionEngine(
         intent_detector=intent_detector,
         trigger_checker=trigger_checker,
-        relevance_checker=FakeRelevance(),
         session_analyzer=SessionWindowAnalyzer(10, intent_detector, trigger_checker),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
         block_consecutive_replies=False,
     )
 

@@ -29,6 +29,9 @@ class BotServices:
     speech: SpeechSynthesizer | None = None
     speech_enabled: bool = False
     speech_send: str = "voice_and_text"
+    #: Broker and stream names for background consumers (outbound follow-ups).
+    broker: RedisStreamBroker | None = None
+    streams: BrokerStreams | None = None
 
 
 def create_bot_services() -> BotServices:
@@ -76,4 +79,6 @@ def create_bot_services() -> BotServices:
         speech=speech,
         speech_enabled=speech_enabled,
         speech_send=settings.speech_send,
+        broker=broker,
+        streams=streams,
     )

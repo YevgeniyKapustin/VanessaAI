@@ -102,7 +102,6 @@ class PortraitContent(BaseModel):
 class RagContent(BaseModel):
     turn_planner_prompt: str = ""
     query_rewrite_prompt: str = ""
-    vector_min_score: float = 0.35
 
     @property
     def planner_prompt(self) -> str:

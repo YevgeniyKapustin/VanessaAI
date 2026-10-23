@@ -3,10 +3,7 @@ from __future__ import annotations
 import logging
 
 from vanessa.config.settings import settings
-from vanessa.core.protocols import (
-    MessageIndexingSchedulerProtocol,
-    TurnMetricsProtocol,
-)
+from vanessa.core.protocols import TurnMetricsProtocol
 from vanessa.core.request_context import get_request_id
 from vanessa.core.turn import ConversationTurnResult
 from vanessa.pipeline.context import TurnPipelineContext
@@ -20,7 +17,6 @@ from vanessa.pipeline.decision.gate.eligibility.user_ignore import (
     apply_owner_ignore_command,
 )
 from vanessa.pipeline.decision.models import DecisionAction
-from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +44,6 @@ async def finish_ignore_turn(
     *,
     reason: str,
     metrics: TurnMetricsProtocol,
-    indexing: MessageIndexingSchedulerProtocol,
-    config: OrchestratorConfig,
     planner_skipped: bool,
     relevance_score: float = 0.0,
     log_event: str,
@@ -60,7 +54,6 @@ async def finish_ignore_turn(
         get_request_id(),
         reason,
     )
-    await index_user_on_ignore(ctx, indexing, config)
     ctx.result = ConversationTurnResult(
         action=DecisionAction.IGNORE.value,
         reason=reason,
@@ -77,32 +70,16 @@ def decision_reason_from_prefilter_tag(tag: str) -> str:
     return prefilter_tag_to_decision_reason(tag).value
 
 
-async def index_user_on_ignore(
-    ctx: TurnPipelineContext,
-    indexing: MessageIndexingSchedulerProtocol,
-    config: OrchestratorConfig,
-) -> None:
-    assert ctx.user_msg is not None
-    if config.defer_index_on_ignore:
-        indexing.schedule(ctx.user_msg)
-    else:
-        await indexing.index_now(ctx.user_msg)
-
-
 async def finish_decision_ignore(
     ctx: TurnPipelineContext,
     *,
     metrics: TurnMetricsProtocol,
-    indexing: MessageIndexingSchedulerProtocol,
-    config: OrchestratorConfig,
 ) -> None:
     assert ctx.decision is not None
     await finish_ignore_turn(
         ctx,
         reason=ctx.decision.reason.value,
         metrics=metrics,
-        indexing=indexing,
-        config=config,
         planner_skipped=ctx.planner_skipped,
         relevance_score=ctx.decision.relevance_score,
         log_event="turn_stage decision_ignore",

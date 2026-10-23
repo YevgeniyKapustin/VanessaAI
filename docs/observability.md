@@ -11,7 +11,6 @@ Bot and API share a `request_id` via `X-Request-ID`. Features stay
 - turns (reply vs ignore by reason)
 - per-stage latency (gate, retrieve, compose)
 - LLM tokens, requests, errors
-- RAG hits, empty retrieval, scores
 - Telegram errors and HTTP latency
 
 The agent serves `GET /metrics` on `API_PORT` (typically `:8000`), same
@@ -39,7 +38,7 @@ reload, check Prometheus **Status → Targets**. The `nginx` job is DOWN
 unless `docker-compose.prod.yml` (nginx-exporter) is in the stack.
 
 Labeled counters and histograms appear only after the first event, so
-turn / LLM / RAG Grafana panels stay empty until live traffic. Nginx
+turn / LLM Grafana panels stay empty until live traffic. Nginx
 latency needs nginx JSON logs plus Vector `log_to_metric`. Broker
 panels need Redis stream transport.
 
@@ -74,8 +73,7 @@ keys are set — see [`.env.example`](../.env.example).
 
 ## RAG Triad evaluation
 
-Deterministic signals are always collected on replied turns. A sampled
-LLM-as-judge in `vanessa/infrastructure/observability/eval.py` scores:
+A sampled LLM-as-judge in `vanessa/infrastructure/observability/eval.py` scores:
 
 - context relevance
 - groundedness
@@ -90,7 +88,6 @@ running a second expensive model on every turn.
 
 - LLM error rate
 - turn p95 latency
-- empty RAG retrieval
 - Telegram errors
 - provider HTTP 402 (balance)
 

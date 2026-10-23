@@ -1,5 +1,5 @@
 # Default-deny ingress + explicit allow rules. Backing stores
-# (redis / postgres / qdrant) must carry the component labels referenced here.
+# (redis / postgres) must carry the component labels referenced here.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -44,25 +44,6 @@ spec:
                   values: [agent, worker, mcp-knowledge],
                 }
       ports: [{ port: 5432 }]
----
-# Qdrant: only agent and worker.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-to-qdrant
-  namespace: vanessa
-spec:
-  podSelector:
-    matchLabels: { component: qdrant }
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - podSelector:
-            matchExpressions:
-              - { key: component, operator: In, values: [agent, worker] }
-      ports:
-        - { port: 6333 }
-        - { port: 6334 }
 ---
 # MCP servers: ONLY agent may call them (no cross-MCP, no bot).
 apiVersion: networking.k8s.io/v1

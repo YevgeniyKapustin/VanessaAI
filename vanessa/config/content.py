@@ -44,7 +44,7 @@ CONTENT_SECTIONS: dict[str, str | tuple[str, ...]] = {
     "memory": "knowledge/memory.yaml",
     "metrics": ("knowledge/metrics.yaml", "knowledge/mood.yaml"),
     "portrait": "knowledge/portrait.yaml",
-    "rag": ("retrieve/rag.yaml", "gate/planner.yaml"),
+    "rag": "gate/planner.yaml",
     "profanity": "humor/profanity.yaml",
     "stickers": "humor/stickers.yaml",
     "memes": "humor/memes.yaml",

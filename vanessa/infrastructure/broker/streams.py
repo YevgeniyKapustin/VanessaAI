@@ -16,11 +16,18 @@ class BrokerStreams:
     prefix: str
     turns: str
     tasks: str
+    #: Late worker → adapter messages (e.g. Hermes follow-ups).
+    outbound: str = ""
 
     @classmethod
     def from_settings(cls, settings) -> BrokerStreams:
         prefix = settings.broker_streams_prefix
-        return cls(prefix=prefix, turns=f"{prefix}:turns", tasks=f"{prefix}:tasks")
+        return cls(
+            prefix=prefix,
+            turns=f"{prefix}:turns",
+            tasks=f"{prefix}:tasks",
+            outbound=f"{prefix}:outbound",
+        )
 
     def reply(self, bot_id: str, correlation_id: str) -> str:
         """Private per-request reply channel for RPC (agent → this bot)."""

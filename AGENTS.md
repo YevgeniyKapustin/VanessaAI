@@ -21,13 +21,15 @@ services. Adapters stay adapters: no `vanessa.pipeline`,
 
 Wire stages through `vanessa/core` protocols and `vanessa/contracts`.
 `vanessa.core` must not import knowledge, pipeline, or infrastructure.
-`pipeline.decision` must not import llm, rag, or infrastructure.
+`pipeline.decision` must not import llm, vision, or infrastructure.
 `vanessa.knowledge` must not import pipeline.
 
 Planner `should_reply` is a suggestion. Decision Engine can veto.
 
-Knowledge: Postgres + Qdrant. `KNOWLEDGE_STORE=filesystem` is for tests
-and local markdown. Vault notes are primary RAG; raw history is fallback.
+Knowledge: Postgres only. `KNOWLEDGE_STORE=filesystem` is for tests
+and local markdown. No RAG, no vector store, no embedding model: they
+use too much RAM. Do not add them back. Cards feed the mood block,
+the participants digest, and the MCP knowledge server.
 
 ## Python modules
 
@@ -63,7 +65,7 @@ docker compose --env-file .env.defaults --env-file .env.local up -d --build
 ```
 
 Secrets go in `.env.local` (gitignored). Do not commit them.
-Persona/YAML: `config/` (one tree). `behavior/` (compose/gate/retrieve/…)
+Persona/YAML: `config/` (one tree). `behavior/` (compose/gate/knowledge/humor)
 and `channels/` are the server pipeline; nicknames/joins are identity;
 `presence/avatar.yaml` is host-only (`PRESENCE_AVATAR_PATH`). Env keys:
 `.env.example`, `.env.defaults`.

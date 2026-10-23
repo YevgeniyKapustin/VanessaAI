@@ -4,12 +4,7 @@ import logging
 from collections.abc import Iterable
 
 from vanessa.core.messages import StoredMessage
-from vanessa.core.protocols import (
-    EmbeddingProviderProtocol,
-    MessageRepositoryProtocol,
-    UnitOfWorkProtocol,
-    VectorStoreProtocol,
-)
+from vanessa.core.protocols import MessageRepositoryProtocol, UnitOfWorkProtocol
 from vanessa.infrastructure.db.repository import UserRepository
 from vanessa.infrastructure.ingest.telegram_export import ParsedExportMessage
 
@@ -22,26 +17,18 @@ class HistoryImporter:
         *,
         messages: MessageRepositoryProtocol,
         users: UserRepository,
-        embeddings: EmbeddingProviderProtocol,
-        vector_store: VectorStoreProtocol,
         unit_of_work: UnitOfWorkProtocol,
         batch_size: int = 64,
     ) -> None:
         self._messages = messages
         self._users = users
-        self._embeddings = embeddings
-        self._vector_store = vector_store
         self._uow = unit_of_work
         self._batch_size = batch_size
 
     async def import_messages(
         self,
         parsed_messages: Iterable[ParsedExportMessage],
-        *,
-        embed: bool = True,
     ) -> tuple[int, int]:
-        await self._vector_store.ensure_collection()
-
         imported = 0
         skipped = 0
         batch: list[ParsedExportMessage] = []
@@ -50,10 +37,10 @@ class HistoryImporter:
             batch.append(message)
             if len(batch) >= self._batch_size:
                 imported, skipped = await self._flush_batch(
-                    batch, imported, skipped, embed=embed
+                    batch, imported, skipped
                 )
 
-        return await self._flush_batch(batch, imported, skipped, embed=embed)
+        return await self._flush_batch(batch, imported, skipped)
 
     async def _take_pending(
         self, batch: list[ParsedExportMessage]
@@ -93,29 +80,11 @@ class HistoryImporter:
             stored.append(message)
         return stored
 
-    async def _embed_stored(self, stored: list[StoredMessage]) -> None:
-        vectors = await self._embeddings.embed_batch(
-            [message.content for message in stored]
-        )
-        point_ids = await self._vector_store.upsert_batch(
-            [
-                (message.id, vector, message.qdrant_point_id)
-                for message, vector in zip(stored, vectors, strict=True)
-            ],
-        )
-        for message, point_id in zip(stored, point_ids, strict=True):
-            await self._messages.update_qdrant_point_id(
-                message.id,
-                point_id,
-            )
-
     async def _flush_batch(
         self,
         batch: list[ParsedExportMessage],
         imported: int,
         skipped: int,
-        *,
-        embed: bool,
     ) -> tuple[int, int]:
         if not batch:
             return imported, skipped
@@ -126,8 +95,6 @@ class HistoryImporter:
             return imported, skipped
 
         stored = await self._store_pending(pending)
-        if embed:
-            await self._embed_stored(stored)
 
         await self._uow.commit()
         imported += len(stored)

@@ -169,7 +169,6 @@ def test_render_metrics_contains_metric_families() -> None:
         "vanessa_llm_cost_total",
         "vanessa_llm_empty_total",
         "vanessa_llm_errors_total",
-        "vanessa_rag_score",
         "vanessa_telegram_errors_total",
         "vanessa_telegram_rate_limits_total",
         "vanessa_active_users",
@@ -211,13 +210,6 @@ def test_record_llm_error_adds_window_sample() -> None:
     assert metrics.llm_outcomes.error_rate(lambda s: s == "error") == 1.0
 
 
-def test_record_rag_search_counts_empty() -> None:
-    metrics.rag_outcomes.clear()
-    metrics.record_rag_search("semantic", hits=0, top_score=None)
-    assert metrics.rag_outcomes.count() == 1
-    assert metrics.rag_outcomes.error_rate(lambda value: value[1] == 0) == 1.0
-
-
 def test_record_telegram_and_error() -> None:
     metrics.telegram_outcomes.clear()
     metrics.record_telegram("send_reply", "success")
@@ -244,17 +236,10 @@ def test_prompt_budget_metrics_exposed() -> None:
 
 def test_knowledge_vault_metrics_exposed() -> None:
     metrics.record_knowledge_mutation("person", "update")
-    metrics.record_knowledge_vector_sync(0.12)
-    metrics.record_knowledge_search("qdrant", hits=3)
-    metrics.record_knowledge_search("postgres_fts", hits=1)
     text = metrics.render_metrics().decode()
     assert "vanessa_knowledge_mutations_total" in text
-    assert "vanessa_knowledge_vector_sync_duration_seconds" in text
-    assert "vanessa_knowledge_search_hits_total" in text
     assert 'type="person"' in text
     assert 'action="update"' in text
-    assert 'source="qdrant"' in text
-    assert 'source="postgres_fts"' in text
 
 
 def test_record_llm_usage_records_cost() -> None:

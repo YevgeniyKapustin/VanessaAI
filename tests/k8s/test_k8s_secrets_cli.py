@@ -100,8 +100,6 @@ def test_cli_apply_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "--dry-run",
             "--postgres-host",
             "host.docker.internal",
-            "--qdrant-host",
-            "host.docker.internal",
         ]
     )
     assert code == 0

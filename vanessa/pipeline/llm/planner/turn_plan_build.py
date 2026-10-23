@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from vanessa.config.settings import settings
 from vanessa.pipeline.decision.turn_plan import TurnPlan
 
 _TONE_VALUES = frozenset({"neutral", "serious", "ironic", "humorous"})
@@ -113,6 +114,15 @@ def _web_search_fields(payload: dict, text: str) -> tuple[bool, str]:
     return web_search, web_query
 
 
+def _hermes_fields(payload: dict) -> tuple[bool, str]:
+    # Ask Hermes (the owner's PC agent): one short self-contained question.
+    # No query means nothing to ask, so the flag drops.
+    query = str(payload.get("hermes_query", "")).strip()
+    query = query[: settings.hermes_query_max_chars].strip()
+    ask_hermes = payload.get("ask_hermes") is True and bool(query)
+    return ask_hermes, query if ask_hermes else ""
+
+
 def _search_plan(
     original: str,
     payload: dict,
@@ -124,6 +134,7 @@ def _search_plan(
     text = str(payload.get("search_query", "")).strip()
     humor_ok, humor_query = _humor_fields(payload)
     web_search, web_query = _web_search_fields(payload, text)
+    ask_hermes, hermes_query = _hermes_fields(payload)
     knowledge_indexes = tuple(
         str(item).strip().lower()
         for item in _as_list(payload.get("knowledge_indexes"))
@@ -147,5 +158,7 @@ def _search_plan(
         repeated_topic=repeated_topic,
         loop_level=loop_level,
         detail=_parse_detail(payload.get("detail")),
+        ask_hermes=ask_hermes,
+        hermes_query=hermes_query,
         reason=reason,
     )

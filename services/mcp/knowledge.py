@@ -1,8 +1,8 @@
 """MCP server: the knowledge vault (read/search by name).
 
 Exposes ``vault_read`` (direct note read by relative path) and ``vault_find``
-(name resolution across the People/Lore/Culture/inbox folders). Semantic
-embedding search stays in the agent core; this server is the "memory" tool.
+(name resolution across the People/Lore/Culture/inbox folders). This server
+is the "memory" tool.
 """
 
 from __future__ import annotations

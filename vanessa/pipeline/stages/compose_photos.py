@@ -13,9 +13,16 @@ from vanessa.knowledge.metrics.feedback import (
 )
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.llm.format.photo_tag import extract_photo_index
-from vanessa.pipeline.stages.query import _semantic_query
 
 logger = logging.getLogger("vanessa.pipeline.stages")
+
+
+def _photo_query(turn_plan, message: str) -> str:
+    """Prefer the planner archive query, then the planner query, then raw."""
+    for candidate in (turn_plan.knowledge_query, turn_plan.text):
+        if candidate and candidate.strip():
+            return candidate.strip()
+    return message.strip()
 
 
 class _ComposePhotoMixin:
@@ -56,7 +63,7 @@ class _ComposePhotoMixin:
         self, ctx: TurnPipelineContext
     ) -> list[ContextMessage]:
         # Photo album: photos the bot could re-send, matched to the context by
-        # RAG "по смыслу" + the recent session. The dedicated meaning-search leg
+        # caption full-text search + the recent session. The dedicated meaning-search leg
         # (``search_photo_messages``) finds photo messages whose caption matches
         # the REWRITTEN query — so a bare photo is found by the MEANING of the
         # turn ("скинь то фото где кот" -> the caption "рыжий кот на диване"),
@@ -66,7 +73,7 @@ class _ComposePhotoMixin:
         if not self._photo_search_ready(ctx):
             return []
         assert ctx.turn_plan is not None
-        meaning_query = _semantic_query(ctx.turn_plan, ctx.turn.message)
+        meaning_query = _photo_query(ctx.turn_plan, ctx.turn.message)
         try:
             stored = await self._messages.search_photo_messages(
                 meaning_query,

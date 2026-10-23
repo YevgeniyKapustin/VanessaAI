@@ -7,20 +7,10 @@ from vanessa.core.protocols.compose import (
     SceneDescriberProtocol,
     TurnMetricsProtocol,
 )
-from vanessa.core.protocols.search import (
-    ContextRetrieverProtocol,
-    EmbeddingProviderProtocol,
-    KnowledgeVectorHit,
-    KnowledgeVectorStoreProtocol,
-    TurnQueryProtocol,
-    VectorSearchHit,
-    VectorStoreProtocol,
-)
+from vanessa.core.protocols.hermes import HermesHealthProtocol
 from vanessa.core.protocols.speech import SpeechAudio, SpeechSynthesizer
 from vanessa.core.protocols.storage import (
     ChatUserProtocol,
-    MessageIndexerProtocol,
-    MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
     UnitOfWorkProtocol,
     UserRepositoryProtocol,
@@ -28,26 +18,18 @@ from vanessa.core.protocols.storage import (
 
 __all__ = [
     "ChatUserProtocol",
-    "ContextRetrieverProtocol",
-    "EmbeddingProviderProtocol",
     "GenerateRequest",
+    "HermesHealthProtocol",
     "IncomingTurnHandlerProtocol",
-    "KnowledgeVectorHit",
-    "KnowledgeVectorStoreProtocol",
     "LLMChatCompleter",
     "LLMProviderProtocol",
-    "MessageIndexerProtocol",
-    "MessageIndexingSchedulerProtocol",
     "MessageRepositoryProtocol",
     "PhotoCaptionerProtocol",
     "SceneDescriberProtocol",
     "SpeechAudio",
     "SpeechSynthesizer",
     "TurnMetricsProtocol",
-    "TurnQueryProtocol",
     "UnitOfWorkProtocol",
     "UserRepositoryProtocol",
-    "VectorSearchHit",
-    "VectorStoreProtocol",
     "as_generate_request",
 ]

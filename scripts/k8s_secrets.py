@@ -97,7 +97,6 @@ def cmd_apply_config(args: argparse.Namespace) -> int:
     values = select_config_values(
         env,
         postgres_host=args.postgres_host,
-        qdrant_host=args.qdrant_host,
         langfuse_host=args.langfuse_host,
     )
     print(f"source: {args.from_env}")

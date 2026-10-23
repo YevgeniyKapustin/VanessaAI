@@ -1,5 +1,6 @@
 import time
 from dataclasses import dataclass, field
+from typing import Literal
 
 from vanessa.config.channels import ChannelProfile, load_channel_profile
 from vanessa.config.content import MemeDefContent
@@ -31,6 +32,9 @@ class TurnPipelineContext:
     # stage when the planner flagged the turn and injected into the compose
     # prompt as a "live web results" block.
     web_blocks: list[WebResult] = field(default_factory=list)
+    # Hermes ask outcome from the Retrieve stage: "asked" (task queued for the
+    # worker), "offline" (health check failed), None (not requested).
+    hermes_status: Literal["asked", "offline"] | None = None
     meme_blocks: list[MemeDefContent] = field(default_factory=list)
     meme_menu: list[MemeDefContent] = field(default_factory=list)
     sender_profile: SenderProfile | None = None
@@ -55,13 +59,9 @@ class TurnPipelineContext:
     decision_ms: float = 0.0
     # Latency of the lightweight pre-planner Decision Gate (reaction classifier).
     reaction_gate_ms: float = 0.0
-    rag_ms: float = 0.0
-    semantic_ms: float = 0.0
     # Live web-search latency (only set when the turn was flagged for search).
     web_ms: float = 0.0
-    humor_rag_ms: float = 0.0
     llm_ms: float = 0.0
-    embed_ms: float = 0.0
     scene_description: str | None = None
 
     @property

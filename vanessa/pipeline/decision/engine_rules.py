@@ -19,7 +19,6 @@ from vanessa.pipeline.decision.rules import (
     PlannerReplyRule,
     PlannerYesRule,
     RateLimitRule,
-    RelevanceRule,
     TriggerRule,
 )
 
@@ -31,7 +30,6 @@ def default_decision_rules(
     noise_filter: NoiseFilterProtocol,
     eligibility: ReplyEligibilityProtocol,
     *,
-    relevance_threshold: float,
     block_consecutive_replies: bool,
 ) -> list[DecisionRule]:
     return [
@@ -52,7 +50,6 @@ def default_decision_rules(
         IntentRule(),
         TriggerRule(),
         SenderMetricsRule(),
-        RelevanceRule(relevance_threshold),
     ]
 
 

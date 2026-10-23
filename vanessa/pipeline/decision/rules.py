@@ -13,7 +13,6 @@ from vanessa.pipeline.decision.reply_rules import (
     ListenWindowRule,
     PlannerReplyRule,
     PlannerYesRule,
-    RelevanceRule,
     TriggerRule,
 )
 from vanessa.pipeline.decision.rule_outcomes import (
@@ -32,7 +31,6 @@ __all__ = [
     "PlannerReplyRule",
     "PlannerYesRule",
     "RateLimitRule",
-    "RelevanceRule",
     "TriggerRule",
     "_base",
     "_ignore",
@@ -41,8 +39,6 @@ __all__ = [
 
 
 class RateLimitRule:
-    needs_relevance = False
-
     def __init__(self, rate_limiter: RateLimiterProtocol) -> None:
         self._rate_limiter = rate_limiter
 
@@ -57,8 +53,6 @@ class RateLimitRule:
 
 
 class NoiseRule:
-    needs_relevance = False
-
     def __init__(self, noise_filter: NoiseFilterProtocol) -> None:
         self._noise = noise_filter
 
@@ -75,8 +69,6 @@ class NoiseRule:
 
 
 class HardIgnoreRule:
-    needs_relevance = False
-
     def __init__(self, eligibility: ReplyEligibilityProtocol) -> None:
         self._eligibility = eligibility
 
@@ -88,8 +80,6 @@ class HardIgnoreRule:
 
 
 class DirectAddressRule:
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.telegram_addressed_with_expectation:
             return None
@@ -97,8 +87,6 @@ class DirectAddressRule:
 
 
 class ConsecutiveReplyRule:
-    needs_relevance = False
-
     def __init__(
         self,
         intent_detector: IntentDetectorProtocol,

@@ -17,7 +17,6 @@ from vanessa.pipeline.decision.protocols import (
     IntentDetectorProtocol,
     NoiseFilterProtocol,
     RateLimiterProtocol,
-    RelevanceCheckerProtocol,
     SessionWindowProtocol,
     TriggerCheckerProtocol,
 )
@@ -29,11 +28,9 @@ class DecisionEngine:
         self,
         intent_detector: IntentDetectorProtocol,
         trigger_checker: TriggerCheckerProtocol,
-        relevance_checker: RelevanceCheckerProtocol,
         session_analyzer: SessionWindowProtocol,
         rate_limiter: RateLimiterProtocol,
         noise_filter: NoiseFilterProtocol,
-        relevance_threshold: float,
         *,
         rules: list[DecisionRule] | None = None,
         block_consecutive_replies: bool = False,
@@ -43,7 +40,6 @@ class DecisionEngine:
     ) -> None:
         self._intent = intent_detector
         self._triggers = trigger_checker
-        self._relevance = relevance_checker
         self._session = session_analyzer
         self._rate_limiter = rate_limiter
         eligibility, self._compose_gate = resolve_eligibility_gate(
@@ -60,13 +56,8 @@ class DecisionEngine:
             rate_limiter,
             noise_filter,
             eligibility,
-            relevance_threshold=relevance_threshold,
             block_consecutive_replies=block_consecutive_replies,
         )
-        self._pre_relevance_rules = [
-            r for r in self._rules if not r.needs_relevance
-        ]
-        self._relevance_rules = [r for r in self._rules if r.needs_relevance]
 
     def record_reply(self, chat_id: int | str) -> None:
         self._rate_limiter.record_reply(chat_id)
@@ -75,7 +66,6 @@ class DecisionEngine:
         self,
         context: DecisionContext,
         *,
-        search_text: str | None = None,
         humor_ok: bool = False,
     ) -> DecisionResult:
         context = replace(
@@ -86,22 +76,7 @@ class DecisionEngine:
                 context.recent_messages,
             ),
         )
-        result = first_matching_result(self._pre_relevance_rules, context)
-        if result is not None:
-            return apply_compose_gate(
-                self._compose_gate,
-                result,
-                context,
-                humor_ok=humor_ok,
-            )
-
-        relevance_score = await self._relevance.score(
-            context.text,
-            query_vector=context.query_vector,
-            search_text=search_text,
-        )
-        context = replace(context, relevance_score=relevance_score)
-        result = first_matching_result(self._relevance_rules, context)
+        result = first_matching_result(self._rules, context)
         if result is None:
             result = _base(context)
         return apply_compose_gate(

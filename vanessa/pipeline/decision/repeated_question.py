@@ -40,8 +40,6 @@ __all__ = [
 class RepeatedQuestionRule:
     """Skip a near-pure repeat of a question the bot already answered."""
 
-    needs_relevance = False
-
     def __init__(self, window: int = 8, min_occurrences: int = 2) -> None:
         self._window = window
         self._min_occurrences = max(2, min_occurrences)

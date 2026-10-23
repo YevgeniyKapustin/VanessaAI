@@ -4,10 +4,8 @@ from vanessa.pipeline.decision.gate.addressing.continuation import (
 )
 from vanessa.pipeline.decision.gate.addressing.planner_gate import planner_affirms_reply
 from vanessa.pipeline.decision.gate.expectation.reply_expectation import (
-    expects_follow_up_after_bot,
     is_conversation_closure,
     is_third_party_about_bot,
-    last_prior_role,
     listen_window_warrants_reply,
 )
 from vanessa.pipeline.decision.models import DecisionReason, DecisionResult
@@ -54,8 +52,6 @@ def _listen_window_partner_reply(context: DecisionContext) -> bool:
 
 
 class ListenWindowRule:
-    needs_relevance = False
-
     def __init__(self, noise_filter: NoiseFilterProtocol) -> None:
         self._noise = noise_filter
 
@@ -78,8 +74,6 @@ class ListenWindowRule:
 
 
 class PlannerReplyRule:
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.in_listen_window:
             return None
@@ -91,8 +85,6 @@ class PlannerReplyRule:
 
 
 class PlannerYesRule:
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if context.should_reply is not True:
             return None
@@ -120,8 +112,6 @@ def _intent_reply(context: DecisionContext) -> DecisionResult | None:
 
 
 class IntentRule:
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.intent.detected:
             return None
@@ -157,43 +147,7 @@ def _trigger_reply(context: DecisionContext) -> DecisionResult | None:
 
 
 class TriggerRule:
-    needs_relevance = False
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None:
         if not context.trigger.detected:
             return None
         return _trigger_reply(context)
-
-
-def _relevance_skip(context: DecisionContext, threshold: float) -> bool:
-    return context.relevance_score < threshold or not context.session_active
-
-
-def _relevance_forced_reply(context: DecisionContext) -> bool:
-    return context.intent.detected or context.trigger.detected
-
-
-def _relevance_follow_up(context: DecisionContext) -> DecisionResult:
-    prior_role = last_prior_role(context.recent_messages)
-    if expects_follow_up_after_bot(
-        context.text,
-        last_prior_role=prior_role,
-    ):
-        return _reply(context, DecisionReason.RELEVANT)
-    return _ignore(context, DecisionReason.NO_REPLY_NEEDED)
-
-
-class RelevanceRule:
-    needs_relevance = True
-
-    def __init__(self, threshold: float) -> None:
-        self._threshold = threshold
-
-    def evaluate(self, context: DecisionContext) -> DecisionResult | None:
-        if _relevance_skip(context, self._threshold):
-            return None
-        if _relevance_forced_reply(context):
-            return _reply(context, DecisionReason.RELEVANT)
-        if is_conversation_closure(context.text):
-            return _ignore(context, DecisionReason.NO_REPLY_NEEDED)
-        return _relevance_follow_up(context)

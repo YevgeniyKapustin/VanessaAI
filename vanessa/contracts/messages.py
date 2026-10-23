@@ -76,6 +76,8 @@ class TurnRequest(BrokerMessage):
 
     channel: Literal["telegram", "vrchat"] = "telegram"
     telegram_chat_id: int | None = None
+    #: The user's own message id (target for late follow-ups, e.g. Hermes).
+    telegram_message_id: int | None = None
     message: str = Field(min_length=1, max_length=4096)
     sender_telegram_id: int | None = None
     chat_title: str | None = None
@@ -125,15 +127,13 @@ class TurnReply(BrokerMessage):
 class TaskKind(StrEnum):
     """Fire-and-forget background task types consumed by the worker service."""
 
-    INDEX_MESSAGE = "index_message"
     SWEEP = "sweep"
     PORTRAIT = "portrait"
     MEMORY_EXTRACT = "memory_extract"
     METRICS_SNAPSHOT = "metrics_snapshot"
     PHOTO_CAPTION = "photo_caption"
-    VECTOR_INDEX = "vector_index"
-    REINDEX_KNOWLEDGE = "reindex_knowledge"
     INBOX_NOTE = "inbox_note"
+    HERMES_ASK = "hermes_ask"
 
 
 class TaskMessage(BrokerMessage):
@@ -144,7 +144,7 @@ class TaskMessage(BrokerMessage):
     task: TaskKind
     #: JSON-safe payload; its schema depends on ``task``.
     payload: dict[str, Any] = Field(default_factory=dict)
-    #: Optional explicit dedup key (e.g. the message id for indexing).
+    #: Optional explicit dedup key (e.g. the message id for a photo caption).
     dedup_key: str | None = None
 
 

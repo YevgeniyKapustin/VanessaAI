@@ -63,6 +63,7 @@ def _compose_generate_request(
         # model, not the current <msg>.
         current_images=list(turn.images) or None,
         scene_description=ctx.scene_description,
+        hermes_status=ctx.hermes_status,
         channel_profile=ctx.profile,
         system_prompt=build_system_prompt(get_content(), profile=ctx.profile),
     )

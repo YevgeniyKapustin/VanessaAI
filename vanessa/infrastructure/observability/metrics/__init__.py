@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from prometheus_client import CONTENT_TYPE_LATEST
 
+from vanessa.infrastructure.observability.metrics.metrics_hermes import (
+    record_hermes_dispatch,
+)
 from vanessa.infrastructure.observability.metrics.metrics_http import (
     ProcessMetricsServer,
     metrics_token_allowed,
@@ -14,8 +17,6 @@ from vanessa.infrastructure.observability.metrics.metrics_io import (
     active_users,
     knowledge_database_pool_connections,
     knowledge_mutations_total,
-    knowledge_search_hits_total,
-    knowledge_vector_sync_duration_seconds,
     photo_request_missed_total,
     photo_send_total,
     reply_length_chars,
@@ -38,12 +39,8 @@ from vanessa.infrastructure.observability.metrics.metrics_llm import (
     llm_tokens_total,
     prompt_budget_chars,
     prompt_truncations_total,
-    rag_empty_total,
     rag_eval_score,
     rag_eval_total,
-    rag_hits_total,
-    rag_score,
-    rag_search_total,
 )
 from vanessa.infrastructure.observability.metrics.metrics_pipeline import (
     background_queue_length,
@@ -79,14 +76,11 @@ from vanessa.infrastructure.observability.metrics.metrics_record import (
     record_http,
     record_http_client,
     record_knowledge_mutation,
-    record_knowledge_search,
-    record_knowledge_vector_sync,
     record_photo_request_missed,
     record_photo_send,
     record_prompt_budget,
     record_prompt_truncation,
     record_rag_eval,
-    record_rag_search,
     record_reply_length,
     record_stage,
     record_telegram,
@@ -112,7 +106,6 @@ from vanessa.infrastructure.observability.metrics.metrics_window import (
     llm_cost_outcomes,
     llm_empty_outcomes,
     llm_outcomes,
-    rag_outcomes,
     telegram_limit_outcomes,
     telegram_outcomes,
     turn_durations,
@@ -126,11 +119,10 @@ __all__ = [
     "llm_cache_hit_prompt_price_per_1m",
     "llm_price_per_1m",
     "record_background_queue",
+    "record_hermes_dispatch",
     "record_http",
     "record_http_client",
     "record_knowledge_mutation",
-    "record_knowledge_search",
-    "record_knowledge_vector_sync",
     "record_llm_call",
     "record_llm_duration",
     "record_llm_error",
@@ -141,7 +133,6 @@ __all__ = [
     "record_prompt_budget",
     "record_prompt_truncation",
     "record_rag_eval",
-    "record_rag_search",
     "record_reply_length",
     "record_stage",
     "record_telegram",

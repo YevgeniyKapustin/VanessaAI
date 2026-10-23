@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""Preflight check for Telegram history import — validates the export, Postgres
-and Qdrant state without writing anything. Safe to run any time.
+"""Preflight check for Telegram history import — validates the export and
+Postgres state without writing anything. Safe to run any time.
 
-Run from the host with Postgres/Qdrant up:
+Run from the host with Postgres up:
 
-    POSTGRES_HOST=localhost QDRANT_HOST=localhost \\
-      poetry run python scripts/preflight_import.py --export result.json --check-model
+    POSTGRES_HOST=localhost \\
+      poetry run python scripts/preflight_import.py --export result.json
 """
 from __future__ import annotations
 
@@ -15,9 +15,6 @@ import logging
 import sys
 from pathlib import Path
 
-import httpx
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 from sqlalchemy import func, select
 
 from scripts.preflight_import_report import (
@@ -25,11 +22,9 @@ from scripts.preflight_import_report import (
     log_export_summary,
     sender_names,
 )
-from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.db.models import Message
 from vanessa.infrastructure.db.session import async_session_factory
-from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
@@ -52,31 +47,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Path to result.json from Telegram Desktop export",
     )
-    parser.add_argument(
-        "--check-model",
-        action="store_true",
-        help="Preload the embedding model (downloads it into the local HF cache if absent)",
-    )
     return parser
-
-
-async def check_model() -> None:
-    logger.info("Preloading embedding model %r ...", settings.embedding_model_name)
-    await asyncio.to_thread(preload_embedding_model)
-    logger.info("Embedding model is ready.")
 
 
 async def check_db(telegram_ids: set[int]) -> None:
     async with async_session_factory() as session:
         total = (
             await session.execute(select(func.count(Message.id)))
-        ).scalar_one()
-        with_qdrant = (
-            await session.execute(
-                select(func.count(Message.id)).where(
-                    Message.qdrant_point_id.is_not(None),
-                )
-            )
         ).scalar_one()
         max_tg = (
             await session.execute(select(func.max(Message.telegram_message_id)))
@@ -94,9 +71,8 @@ async def check_db(telegram_ids: set[int]) -> None:
             existing += len(result.all())
 
     logger.info(
-        "Postgres: total messages=%s, with qdrant_point_id=%s, max telegram id=%s",
+        "Postgres: total messages=%s, max telegram id=%s",
         total,
-        with_qdrant,
         max_tg,
     )
     logger.info(
@@ -104,28 +80,6 @@ async def check_db(telegram_ids: set[int]) -> None:
         existing,
         len(ids),
     )
-
-
-async def check_qdrant() -> None:
-    client = AsyncQdrantClient(url=settings.qdrant_url)
-    try:
-        info = await client.get_collection(settings.qdrant_collection)
-        logger.info(
-            "Qdrant collection %r: vectors=%s, status=%s",
-            settings.qdrant_collection,
-            info.points_count,
-            info.status,
-        )
-    except (
-        OSError,
-        TimeoutError,
-        UnexpectedResponse,
-        ResponseHandlingException,
-        httpx.HTTPError,
-    ) as exc:
-        logger.warning("Could not read Qdrant collection: %s", exc)
-    finally:
-        await client.close()
 
 
 async def run(args: argparse.Namespace) -> int:
@@ -137,10 +91,7 @@ async def run(args: argparse.Namespace) -> int:
     senders = sender_names(messages)
     dates = [message.created_at for message in messages]
     log_export_summary(metadata, messages, ids, senders, dates, logger)
-    await check_qdrant()
     await check_db(ids)
-    if args.check_model:
-        await check_model()
     return 0
 
 

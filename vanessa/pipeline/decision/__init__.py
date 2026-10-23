@@ -1,7 +1,6 @@
 from vanessa.pipeline.decision.detectors.intent import IntentDetector, IntentResult
 from vanessa.pipeline.decision.detectors.noise import NoiseFilter
 from vanessa.pipeline.decision.detectors.rate_limit import RateLimiter
-from vanessa.pipeline.decision.detectors.relevance import QdrantRelevanceChecker
 from vanessa.pipeline.decision.detectors.session_window import SessionWindowAnalyzer
 from vanessa.pipeline.decision.detectors.triggers import (
     TriggerKeywordChecker,
@@ -17,10 +16,7 @@ from vanessa.pipeline.decision.models import (
     DecisionReason,
     DecisionResult,
 )
-from vanessa.pipeline.decision.protocols import (
-    DecisionEngineProtocol,
-    RelevanceCheckerProtocol,
-)
+from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
 
 __all__ = [
     "DecisionAction",
@@ -33,9 +29,7 @@ __all__ = [
     "NoiseFilter",
     "PlannerPrefilter",
     "PlannerPrefilterResult",
-    "QdrantRelevanceChecker",
     "RateLimiter",
-    "RelevanceCheckerProtocol",
     "SessionWindowAnalyzer",
     "TriggerKeywordChecker",
     "TriggerResult",

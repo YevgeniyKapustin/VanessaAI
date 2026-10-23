@@ -4,7 +4,7 @@ The query-composition model needs to know the chat participants — not just
 their nicknames, but what Vanessa knows about each of them (mood, recent facts)
 from the People dossiers she updates regularly. This helper turns those cards
 into a short, token-friendly block injected into the ``{participants}``
-placeholder of the planner prompt, so the model composes embedding queries that
+placeholder of the planner prompt, so the model composes queries that
 reference the right aliases and topics.
 
 To keep the planner prompt lean, the digest is now *dynamic*: instead of dumping

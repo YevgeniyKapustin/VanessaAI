@@ -30,9 +30,6 @@ def _record_stage_timings(ctx: TurnPipelineContext) -> None:
         ("reaction_gate", ctx.reaction_gate_ms),
         ("plan", ctx.plan_ms),
         ("decision", ctx.decision_ms),
-        ("embed", ctx.embed_ms),
-        ("rag", ctx.rag_ms),
-        ("humor_rag", ctx.humor_rag_ms),
         ("llm", ctx.llm_ms),
     ):
         if ms > 0:
@@ -70,8 +67,8 @@ def _log_action_turn(
         "turn_processed request_id=%s chat_id=%s sender_id=%s action=%s "
         "reason=%s relevance=%.3f search=%r skip=%s humor_quotes=%s "
         "context=%s sticker_tag=%s "
-        "reaction_gate_ms=%.1f plan_ms=%.1f embed_ms=%.1f decision_ms=%.1f "
-        "rag_ms=%.1f humor_rag_ms=%.1f llm_ms=%.1f total_ms=%.1f",
+        "reaction_gate_ms=%.1f plan_ms=%.1f decision_ms=%.1f "
+        "web_ms=%.1f llm_ms=%.1f total_ms=%.1f",
         get_request_id(),
         turn.telegram_chat_id,
         turn.sender_telegram_id,
@@ -85,10 +82,8 @@ def _log_action_turn(
         ctx.result.sticker_tag,
         ctx.reaction_gate_ms,
         ctx.plan_ms,
-        ctx.embed_ms,
         ctx.decision_ms,
-        ctx.rag_ms,
-        ctx.humor_rag_ms,
+        ctx.web_ms,
         ctx.llm_ms,
         total_ms,
     )

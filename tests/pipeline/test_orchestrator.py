@@ -24,12 +24,11 @@ from vanessa.pipeline.decision.models import (
     DecisionResult,
 )
 from vanessa.pipeline.decision.turn_plan import TurnPlan
-from vanessa.pipeline.humor_pipeline import HumorPipeline
+from vanessa.pipeline.llm.planner.turn_planner import TurnPlanner
 from vanessa.pipeline.orchestrator.conversation_orchestrator import (
     ConversationOrchestrator,
 )
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.stages import (
     ComposeStage,
     FinalizeStage,
@@ -107,17 +106,6 @@ class FakeMessageRepo:
         _ = telegram_message_ids
         return set()
 
-    async def update_qdrant_point_id(self, message_id: int, point_id: str) -> None:
-        message = self._messages[message_id]
-        self._messages[message_id] = StoredMessage(
-            id=message.id,
-            role=message.role,
-            content=message.content,
-            sender_telegram_id=message.sender_telegram_id,
-            qdrant_point_id=point_id,
-            telegram_message_id=message.telegram_message_id,
-        )
-
     async def update_photo_caption(self, message_id: int, caption: str) -> None:
         if message_id not in self._messages:
             return
@@ -156,76 +144,6 @@ class FakeUserRepo:
     async def get_or_create(self, **kwargs) -> FakeUser:
         _ = kwargs
         return FakeUser()
-
-
-class FakeTurnQuery:
-    async def embed_query(self, query: str) -> list[float]:
-        _ = query
-        return [0.1, 0.2, 0.3]
-
-
-class FakeContextRetriever:
-    def __init__(self) -> None:
-        self.calls: list[dict] = []
-
-    async def search(
-        self,
-        query: str,
-        top_k: int | None = None,
-        query_vector: list[float] | None = None,
-        *,
-        skip_fts: bool = False,
-        anchor_max: int | None = None,
-        fts_query: str | None = None,
-        semantic_queries: list[str] | None = None,
-        window_before: int | None = None,
-        window_after: int | None = None,
-    ) -> list[ContextBlock]:
-        _ = query_vector, skip_fts
-        self.calls.append(
-            {
-                "query": query,
-                "top_k": top_k,
-                "anchor_max": anchor_max,
-                "fts_query": fts_query,
-                "semantic_queries": semantic_queries,
-                "window_before": window_before,
-                "window_after": window_after,
-            }
-        )
-        if anchor_max is not None:
-            return [
-                ContextBlock(
-                    anchor_id=100,
-                    messages=(
-                        ContextMessage(
-                            id=100,
-                            role="user",
-                            content="найди работу",
-                            is_anchor=True,
-                        ),
-                    ),
-                )
-            ]
-        return [
-            ContextBlock(
-                anchor_id=99,
-                messages=(
-                    ContextMessage(id=99, role="user", content="context"),
-                ),
-            )
-        ]
-
-
-class FakeIndexing:
-    def __init__(self) -> None:
-        self.scheduled: list[StoredMessage] = []
-
-    async def index_now(self, record: StoredMessage) -> None:
-        self.scheduled.append(record)
-
-    def schedule(self, record: StoredMessage) -> None:
-        self.scheduled.append(record)
 
 
 class _BlockingMemory:
@@ -318,10 +236,9 @@ class FakeDecisionEngine:
         self,
         context: object,
         *,
-        search_text: str | None = None,
         humor_ok: bool = False,
     ) -> DecisionResult:
-        _ = context, search_text, humor_ok
+        _ = context, humor_ok
         self.decide_calls += 1
         return DecisionResult(
             action=self._action,
@@ -339,88 +256,70 @@ class FakeDecisionEngine:
 def _build_orchestrator(
     *,
     messages: FakeMessageRepo,
-    indexing: FakeIndexing,
     decision: FakeDecisionEngine,
-    retriever: FakeContextRetriever | None = None,
     llm: FakeLLM | None = None,
-    query_rewriter: QueryRewriter | None = None,
-    defer_index_on_ignore: bool = True,
     photo_captioner=None,
     compose_refuse_enabled: bool = True,
 ) -> ConversationOrchestrator:
-    retriever = retriever or FakeContextRetriever()
     llm = llm or FakeLLM()
     metrics = TurnMetrics()
-    config = OrchestratorConfig(
+    config = _config()
+    return ConversationOrchestrator(
+        messages=messages,
+        users=FakeUserRepo(),
+        config=config,
+        gate=_gate(decision, config, metrics, messages),
+        retrieve=RetrieveStage(None),
+        compose=ComposeStage(llm, refuse_enabled=compose_refuse_enabled),
+        finalize=FinalizeStage(messages, decision, metrics),
+        photo_captioner=photo_captioner,
+    )
+
+
+def _config() -> OrchestratorConfig:
+    return OrchestratorConfig(
         session_window_size=10,
         session_idle_seconds=300.0,
         post_reply_listen_count=5,
         planner_prefilter_enabled=False,
-        defer_index_on_ignore=defer_index_on_ignore,
     )
-    humor = HumorPipeline(retriever, FakeTurnQuery(), config)
-    registry = ChatIgnoreRegistry()
-    gate = GateStage(
-        query_rewriter or QueryRewriter(use_llm=False),
+
+
+def _gate(
+    decision: FakeDecisionEngine,
+    config: OrchestratorConfig,
+    metrics: TurnMetrics,
+    messages: FakeMessageRepo,
+) -> GateStage:
+    return GateStage(
+        TurnPlanner(use_llm=False),
         decision,
         None,
         config,
         metrics,
         messages,
-        indexing,
-        registry,
-    )
-    return ConversationOrchestrator(
-        messages=messages,
-        users=FakeUserRepo(),
-        config=config,
-        gate=gate,
-        retrieve=RetrieveStage(retriever, humor, None),
-        compose=ComposeStage(llm, refuse_enabled=compose_refuse_enabled),
-        finalize=FinalizeStage(messages, indexing, decision, config, metrics),
-        photo_captioner=photo_captioner,
+        ChatIgnoreRegistry(),
     )
 
 
 def _memory_metrics_orchestrator(
     *,
     messages: FakeMessageRepo,
-    indexing: FakeIndexing,
     decision: FakeDecisionEngine,
     memory: _BlockingMemory,
     metrics: _RecordingTurnMetrics,
     background: BackgroundExecutor,
 ) -> ConversationOrchestrator:
-    retriever = FakeContextRetriever()
-    llm = FakeLLM()
     turn_metrics = TurnMetrics()
-    config = OrchestratorConfig(
-        session_window_size=10,
-        session_idle_seconds=300.0,
-        post_reply_listen_count=5,
-        planner_prefilter_enabled=False,
-        defer_index_on_ignore=False,
-    )
-    humor = HumorPipeline(retriever, FakeTurnQuery(), config)
-    registry = ChatIgnoreRegistry()
-    gate = GateStage(
-        QueryRewriter(use_llm=False),
-        decision,
-        None,
-        config,
-        turn_metrics,
-        messages,
-        indexing,
-        registry,
-    )
+    config = _config()
     return ConversationOrchestrator(
         messages=messages,
         users=FakeUserRepo(),
         config=config,
-        gate=gate,
-        retrieve=RetrieveStage(retriever, humor, None),
-        compose=ComposeStage(llm),
-        finalize=FinalizeStage(messages, indexing, decision, config, turn_metrics),
+        gate=_gate(decision, config, turn_metrics, messages),
+        retrieve=RetrieveStage(None),
+        compose=ComposeStage(FakeLLM()),
+        finalize=FinalizeStage(messages, decision, turn_metrics),
         memory=memory,
         metrics=metrics,
         background=background,
@@ -428,15 +327,12 @@ def _memory_metrics_orchestrator(
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_replies_and_indexes_both_messages():
+async def test_orchestrator_replies_and_stores_both_messages():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -449,20 +345,17 @@ async def test_orchestrator_replies_and_indexes_both_messages():
 
     assert result.action == DecisionAction.REPLY
     assert result.reply == "echo: Vanessa, привет"
-    assert result.context_count == 1
+    assert result.context_count == 0
     stored_user_and_reply = 2
     assert len(messages._messages) == stored_user_and_reply
-    assert len(indexing.scheduled) == 1
     assert decision.recorded_chats == ["telegram:-1001"]
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_ignores_without_reply():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=FakeDecisionEngine(DecisionAction.IGNORE),
     )
 
@@ -477,54 +370,11 @@ async def test_orchestrator_ignores_without_reply():
     assert result.action == DecisionAction.IGNORE
     assert result.reply is None
     assert len(messages._messages) == 1
-    assert len(indexing.scheduled) == 1
-
-
-@pytest.mark.asyncio
-async def test_orchestrator_runs_humor_rag_when_planner_requests_it():
-    messages = FakeMessageRepo()
-    indexing = FakeIndexing()
-    retriever = FakeContextRetriever()
-    llm = FakeLLM()
-    planner = QueryRewriter(use_llm=False)
-    planner.prepare = AsyncMock(
-        return_value=TurnPlan(
-            original="ну ладно поработаю",
-            text="работа",
-            skip_search=False,
-            humor_ok=True,
-            humor_query="личь работа",
-        ),
-    )
-    orchestrator = _build_orchestrator(
-        messages=messages,
-        indexing=indexing,
-        decision=FakeDecisionEngine(DecisionAction.REPLY),
-        retriever=retriever,
-        llm=llm,
-        query_rewriter=planner,
-        defer_index_on_ignore=False,
-    )
-
-    result = await orchestrator.handle_incoming(
-        ChatTurnInput(
-            telegram_chat_id=-1001,
-            message="ну ладно поработаю",
-            sender_telegram_id=42,
-        )
-    )
-
-    assert result.reply == "echo: ну ладно поработаю"
-    expected_retriever_calls = 2
-    assert len(retriever.calls) == expected_retriever_calls
-    assert retriever.calls[1]["query"] == "личь работа"
-    assert llm.last_humor_quotes == ["найди работу"]
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_splits_reply_into_blocks():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
 
     class BlockLLM(FakeLLM):
@@ -534,10 +384,8 @@ async def test_orchestrator_splits_reply_into_blocks():
 
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=BlockLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -559,7 +407,6 @@ async def test_orchestrator_splits_reply_into_blocks():
 @pytest.mark.asyncio
 async def test_orchestrator_strips_trailing_periods_from_each_block():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
 
     class PeriodLLM(FakeLLM):
@@ -569,10 +416,8 @@ async def test_orchestrator_strips_trailing_periods_from_each_block():
 
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=PeriodLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -594,7 +439,6 @@ async def test_orchestrator_strips_trailing_periods_from_each_block():
 @pytest.mark.asyncio
 async def test_orchestrator_extracts_sticker_tag_from_reply():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
 
     class StickerLLM(FakeLLM):
@@ -604,10 +448,8 @@ async def test_orchestrator_extracts_sticker_tag_from_reply():
 
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=StickerLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -629,14 +471,11 @@ async def test_orchestrator_extracts_sticker_tag_from_reply():
 @pytest.mark.asyncio
 async def test_orchestrator_passes_reply_context_to_llm():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=FakeDecisionEngine(DecisionAction.REPLY),
         llm=llm,
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -671,7 +510,6 @@ async def test_orchestrator_passes_reply_context_to_llm():
 @pytest.mark.asyncio
 async def test_orchestrator_returns_reply_before_background_memory_metrics():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     release = asyncio.Event()
     memory = _BlockingMemory(release)
@@ -681,7 +519,6 @@ async def test_orchestrator_returns_reply_before_background_memory_metrics():
     try:
         orchestrator = _memory_metrics_orchestrator(
             messages=messages,
-            indexing=indexing,
             decision=decision,
             memory=memory,
             metrics=metrics,
@@ -808,12 +645,10 @@ async def test_orchestrator_ignores_bare_photo_not_listening_not_addressed():
     bot reply) nor addressed to Vanessa is skipped: no reply, no vision analysis,
     and the decision engine is never consulted."""
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
     )
@@ -838,7 +673,7 @@ async def test_orchestrator_ignores_bare_photo_not_listening_not_addressed():
     # compose (vision) model was invoked.
     assert decision.decide_calls == 0
     assert llm.last_images is None
-    # The user message is still indexed and its image persisted for follow-ups.
+    # The user message and its image are persisted for follow-ups.
     stored = messages._messages[1]
     assert stored.attachments == [
         {
@@ -848,7 +683,6 @@ async def test_orchestrator_ignores_bare_photo_not_listening_not_addressed():
             "description": None,
         }
     ]
-    assert stored in indexing.scheduled
 
 
 @pytest.mark.asyncio
@@ -856,14 +690,12 @@ async def test_orchestrator_replies_to_bare_photo_in_listen_window():
     """Vanessa answers (and analyzes) a bare photo when she is actively listening
     — i.e. she recently talked with the user (post-reply listen window)."""
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     # A recent bot reply puts Vanessa into the post-reply listen window.
     await messages.create(role="assistant", content="ну привет")
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
     )
@@ -901,12 +733,10 @@ async def test_orchestrator_replies_to_bare_photo_in_listen_window():
 async def test_orchestrator_replies_to_bare_photo_reply_to_bot():
     """A bare photo replying to Vanessa's own message is addressed to her → reply."""
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
     )
@@ -937,12 +767,10 @@ async def test_orchestrator_captioned_photo_addressed_uses_vision():
     """A captioned photo addressed to Vanessa flows through the normal pipeline;
     when it decides REPLY the image is attached for the vision model."""
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
     )
@@ -975,12 +803,10 @@ async def test_orchestrator_captioned_photo_group_talk_ignored_no_vision():
     """A captioned photo that is plain group talk (not addressed) is decided by
     the normal pipeline; an IGNORE verdict means the image is never analyzed."""
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
     )
@@ -1012,12 +838,10 @@ async def test_orchestrator_reply_to_any_photo_rollback_toggle(monkeypatch):
     listening/addressed (the pre-change behavior)."""
     monkeypatch.setattr(settings, "vision_reply_to_any_photo", True)
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
     )
@@ -1456,13 +1280,11 @@ def test_photo_candidates_do_not_treat_user_caption_as_description():
 @pytest.mark.asyncio
 async def test_orchestrator_stores_photo_caption_in_background():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     captioner = AsyncMock()
     captioner.generate = AsyncMock(return_value="кот на диване")
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         photo_captioner=captioner,
     )
@@ -1513,14 +1335,11 @@ class CountingLLM(FakeLLM):
 @pytest.mark.asyncio
 async def test_orchestrator_compose_refuses_empty_reply():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=SilentLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -1541,7 +1360,6 @@ async def test_orchestrator_compose_refuses_empty_reply():
     # Only the user message exists — no empty assistant message.
     assert len(messages._messages) == 1
     # The user message is still indexed.
-    assert len(indexing.scheduled) == 1
     # No reply was recorded → no rate-limit / reply side effects.
     assert decision.recorded_chats == []
 
@@ -1549,7 +1367,6 @@ async def test_orchestrator_compose_refuses_empty_reply():
 @pytest.mark.asyncio
 async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     llm = CountingLLM()
     # A prior identical user message from the same sender is already in history.
@@ -1560,10 +1377,8 @@ async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm
     )
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=llm,
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -1581,7 +1396,6 @@ async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm
     assert result.reply is None
     assert llm.calls == 0
     # User message still indexed; only user messages exist (no assistant reply).
-    assert len(indexing.scheduled) == 1
     stored_user_and_reply = 2
     assert len(messages._messages) == stored_user_and_reply
 
@@ -1589,14 +1403,11 @@ async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm
 @pytest.mark.asyncio
 async def test_orchestrator_compose_refuse_can_be_disabled():
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=SilentLLM(),
-        defer_index_on_ignore=False,
         compose_refuse_enabled=False,
     )
 
@@ -1623,14 +1434,11 @@ async def test_orchestrator_compose_refuses_ignore_marker():
             return "[ignore]"
 
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=IgnoreMarkerLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -1648,7 +1456,6 @@ async def test_orchestrator_compose_refuses_ignore_marker():
     assert result.reason == DecisionReason.REPEATED
     assert result.reply is None
     assert len(messages._messages) == 1
-    assert len(indexing.scheduled) == 1
     assert decision.recorded_chats == []
 
 
@@ -1663,14 +1470,11 @@ async def test_orchestrator_compose_refuses_ignore_marker_with_reason():
             return "[ignore] повтор того же вопроса"
 
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=IgnoreMarkerWithReasonLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(
@@ -1685,7 +1489,6 @@ async def test_orchestrator_compose_refuses_ignore_marker_with_reason():
     assert result.reason == DecisionReason.REPEATED
     assert result.reply is None
     assert len(messages._messages) == 1
-    assert len(indexing.scheduled) == 1
     assert decision.recorded_chats == []
     assert all("ignore" not in m.content for m in messages._messages.values())
 
@@ -1698,14 +1501,11 @@ async def test_orchestrator_does_not_refuse_when_marker_inside_reply():
             return "он написал [ignore] в чате, я молчу"
 
     messages = FakeMessageRepo()
-    indexing = FakeIndexing()
     decision = FakeDecisionEngine(DecisionAction.REPLY)
     orchestrator = _build_orchestrator(
         messages=messages,
-        indexing=indexing,
         decision=decision,
         llm=MarkerInSentenceLLM(),
-        defer_index_on_ignore=False,
     )
 
     result = await orchestrator.handle_incoming(

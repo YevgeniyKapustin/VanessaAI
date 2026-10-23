@@ -20,7 +20,6 @@ class DecisionContext:
     telegram_chat_id: int = 0
     channel: str | None = None
     recent_messages: list[ContextMessage] = field(default_factory=list)
-    query_vector: list[float] | None = None
     intent: IntentResult = _EMPTY_INTENT
     trigger: TriggerResult = _EMPTY_TRIGGER
     session_active: bool = False
@@ -81,7 +80,4 @@ class DecisionContext:
 
 
 class DecisionRule(Protocol):
-    @property
-    def needs_relevance(self) -> bool: ...
-
     def evaluate(self, context: DecisionContext) -> DecisionResult | None: ...

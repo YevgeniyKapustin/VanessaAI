@@ -25,6 +25,8 @@ class TurnMapper:
             sender_telegram_id=source.sender_telegram_id,
             chat_title=source.chat_title,
             channel=source.channel,
+            telegram_message_id=source.telegram_message_id,
+            correlation_id=source.correlation_id,
             chat_type=source.chat_type,
             sender_username=source.sender_username,
             sender_first_name=source.sender_first_name,

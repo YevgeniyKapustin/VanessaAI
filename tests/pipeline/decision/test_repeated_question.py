@@ -18,20 +18,6 @@ from vanessa.pipeline.decision.repeated_question import (
 )
 
 
-class FakeRelevance:
-    def __init__(self, score: float) -> None:
-        self._score = score
-
-    async def score(
-        self,
-        text: str,
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
-    ) -> float:
-        _ = text, query_vector, search_text
-        return self._score
-
-
 @pytest.fixture
 def engine():
 
@@ -40,11 +26,9 @@ def engine():
     return DecisionEngine(
         intent_detector=intent,
         trigger_checker=trigger,
-        relevance_checker=FakeRelevance(0.1),
         session_analyzer=SessionWindowAnalyzer(10, intent, trigger),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
     )
 
 
@@ -92,7 +76,6 @@ def test_rule_ignores_unanswered_repeat():
         text="ванесса как починить импорт в unity",
         telegram_chat_id=1,
         recent_messages=recent,
-        query_vector=None,
         intent=intent,
         trigger=trigger,
         session_active=True,
@@ -157,7 +140,6 @@ def test_rule_ignores_short_repeat_burst():
         text="ванесса",
         telegram_chat_id=1,
         recent_messages=recent,
-        query_vector=None,
         intent=intent,
         trigger=trigger,
         session_active=True,
@@ -183,7 +165,6 @@ def test_rule_defers_burst_when_planner_wants_reply():
         text="чек",
         telegram_chat_id=1,
         recent_messages=recent,
-        query_vector=None,
         intent=intent,
         trigger=trigger,
         session_active=True,

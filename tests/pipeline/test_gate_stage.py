@@ -11,8 +11,8 @@ from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
 )
 from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
+from vanessa.pipeline.llm.planner.turn_planner import TurnPlanner
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.stages import GateStage
 from vanessa.pipeline.turn_metrics import TurnMetrics
 
@@ -20,14 +20,6 @@ from vanessa.pipeline.turn_metrics import TurnMetrics
 class FakeMessageRepo:
     async def create(self, **kwargs: object):
         _ = kwargs
-
-
-class FakeIndexing:
-    def __init__(self) -> None:
-        self.scheduled: list[StoredMessage] = []
-
-    def schedule(self, record: StoredMessage) -> None:
-        self.scheduled.append(record)
 
 
 class NoDecision:
@@ -40,17 +32,15 @@ def _gate_stage(
     prefilter: PlannerPrefilter | None,
     *,
     config: OrchestratorConfig,
-    indexing: FakeIndexing,
 ) -> GateStage:
     registry = ChatIgnoreRegistry()
     return GateStage(
-        QueryRewriter(use_llm=False),
+        TurnPlanner(use_llm=False),
         NoDecision(),
         prefilter,
         config,
         TurnMetrics(),
         FakeMessageRepo(),  # type: ignore[arg-type]
-        indexing,  # type: ignore[arg-type]
         registry,
     )
 
@@ -62,7 +52,6 @@ async def test_gate_stage_prefilter_skips_planner():
         session_idle_seconds=300.0,
         post_reply_listen_count=3,
         planner_prefilter_enabled=True,
-        defer_index_on_ignore=True,
     )
     registry = ChatIgnoreRegistry()
     prefilter = PlannerPrefilter(
@@ -75,8 +64,7 @@ async def test_gate_stage_prefilter_skips_planner():
             post_reply_listen_idle_seconds=300.0,
         )
     )
-    indexing = FakeIndexing()
-    gate = _gate_stage(prefilter, config=config, indexing=indexing)
+    gate = _gate_stage(prefilter, config=config)
     user_msg = StoredMessage(id=1, role="user", content="ок")
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
@@ -101,4 +89,3 @@ async def test_gate_stage_prefilter_skips_planner():
     assert ctx.result is not None
     assert ctx.result.action == DecisionAction.IGNORE.value
     assert ctx.result.reason == DecisionReason.PREFILTER.value
-    assert indexing.scheduled == [user_msg]

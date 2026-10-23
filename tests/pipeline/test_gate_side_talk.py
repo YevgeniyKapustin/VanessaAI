@@ -15,24 +15,10 @@ from vanessa.pipeline.decision.gate.eligibility.reply_eligibility import (
 from vanessa.pipeline.decision.gate.eligibility.user_ignore import ChatIgnoreRegistry
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.llm.planner.turn_planner import TurnPlanner
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
-from vanessa.pipeline.rag.query_rewriter import QueryRewriter
 from vanessa.pipeline.stages import GateStage
 from vanessa.pipeline.turn_metrics import TurnMetrics
-
-
-class FakeRelevance:
-    def __init__(self, score: float) -> None:
-        self._score = score
-
-    async def score(
-        self,
-        text: str,
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
-    ) -> float:
-        _ = text, query_vector, search_text
-        return self._score
 
 
 class FakeMessageRepo:
@@ -40,12 +26,7 @@ class FakeMessageRepo:
         _ = kwargs
 
 
-class FakeIndexing:
-    def schedule(self, record: StoredMessage) -> None:
-        pass
-
-
-def _build_engine(relevance_score: float) -> DecisionEngine:
+def _build_engine() -> DecisionEngine:
     intent = IntentDetector()
     triggers = TriggerKeywordChecker(())
     registry = ChatIgnoreRegistry()
@@ -58,11 +39,9 @@ def _build_engine(relevance_score: float) -> DecisionEngine:
     return DecisionEngine(
         intent_detector=intent,
         trigger_checker=triggers,
-        relevance_checker=FakeRelevance(relevance_score),
         session_analyzer=SessionWindowAnalyzer(10, intent, triggers),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
         reply_eligibility=eligibility,
     )
 
@@ -74,16 +53,14 @@ def _gate_with_engine(engine: DecisionEngine) -> GateStage:
         session_idle_seconds=300.0,
         post_reply_listen_count=3,
         planner_prefilter_enabled=False,
-        defer_index_on_ignore=True,
     )
     return GateStage(
-        QueryRewriter(use_llm=False),
+        TurnPlanner(use_llm=False),
         engine,
         None,
         config,
         TurnMetrics(),
         FakeMessageRepo(),  # type: ignore[arg-type]
-        FakeIndexing(),  # type: ignore[arg-type]
         registry,
     )
 
@@ -99,7 +76,7 @@ class ScriptedPlanner:
 
 @pytest.mark.asyncio
 async def test_gate_stage_blocks_reply_to_other_via_decision_engine():
-    engine = _build_engine(0.99)
+    engine = _build_engine()
     gate = GateStage(
         ScriptedPlanner(
             TurnPlan(
@@ -117,11 +94,9 @@ async def test_gate_stage_blocks_reply_to_other_via_decision_engine():
             session_idle_seconds=300.0,
             post_reply_listen_count=3,
             planner_prefilter_enabled=False,
-            defer_index_on_ignore=True,
         ),
         TurnMetrics(),
         FakeMessageRepo(),  # type: ignore[arg-type]
-        FakeIndexing(),  # type: ignore[arg-type]
         ChatIgnoreRegistry(),
     )
     ctx = TurnPipelineContext(
@@ -156,7 +131,7 @@ async def test_gate_stage_allows_listen_window_follow_up():
         ContextMessage(id=2, role="assistant", content="Здесь, слушаю"),
         ContextMessage(id=3, role="user", content="втф чё с тобой"),
     ]
-    engine = _build_engine(0.87)
+    engine = _build_engine()
     gate = GateStage(
         ScriptedPlanner(
             TurnPlan(
@@ -174,11 +149,9 @@ async def test_gate_stage_allows_listen_window_follow_up():
             session_idle_seconds=300.0,
             post_reply_listen_count=3,
             planner_prefilter_enabled=False,
-            defer_index_on_ignore=True,
         ),
         TurnMetrics(),
         FakeMessageRepo(),  # type: ignore[arg-type]
-        FakeIndexing(),  # type: ignore[arg-type]
         ChatIgnoreRegistry(),
     )
     ctx = TurnPipelineContext(
@@ -210,7 +183,7 @@ async def test_gate_stage_allows_contextual_nickname_address():
     recent = [
         ContextMessage(id=1, role="user", content="продолжай список гомункул"),
     ]
-    gate = _gate_with_engine(_build_engine(0.1))
+    gate = _gate_with_engine(_build_engine())
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
             telegram_chat_id=-100,

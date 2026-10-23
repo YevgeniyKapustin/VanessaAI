@@ -60,7 +60,7 @@ class Message(Base):
     # {data_url, mime_type, telegram_file_id} dicts (base64 data URLs).
     attachments: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     # Short generated label of a photo message (vision captioner); included in
-    # the FTS search_vector so a bare photo is findable "by meaning" in RAG.
+    # the FTS search_vector so a bare photo is findable by full-text search.
     photo_caption: Mapped[str | None] = mapped_column(Text)
     channel: Mapped[str] = mapped_column(
         String,

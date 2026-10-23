@@ -39,7 +39,7 @@ class LLMProviderProtocol(Protocol):
 
 
 class PhotoCaptionerProtocol(Protocol):
-    """Generates a short one-line description of a photo (RAG enrichment)."""
+    """Generates a short one-line description of a photo (FTS enrichment)."""
 
     async def generate(self, attachment: ImageAttachment) -> str | None: ...
 

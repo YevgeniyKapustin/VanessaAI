@@ -12,11 +12,12 @@ dumb. She does not pretend she has a body or a weekend.
 
 Most messages in a group are people talking to each other. She stays
 out of those. If nobody addressed her and the topic isn't hers, she
-indexes the message and shuts up. That's the whole point of the
+stores the message and shuts up. That's the whole point of the
 project: knowing when not to speak.
 
-She also remembers people. There are cards (who is who, lore, memes, old fights).
-Search hits those first. Raw chat history only if the cards are empty.
+She also remembers people. There are cards in Postgres (who is who, lore,
+memes, old fights). The cards feed her mood notes about each person.
+There is no RAG and no vector search: it used too much memory.
 
 <br clear="right"/>
 
@@ -32,8 +33,8 @@ The person and the text go into Postgres. Then a gate: cheap filters
 kill noise without calling a model. A planner may say “reply”.
 Rules can still veto that (rate limit, nobody asked her, off-topic).
 
-If she does reply, she pulls cards / history / maybe the web / maybe
-a meme, writes one answer, and sends it. Empty answers and repeats
+If she does reply, she takes the recent chat, the mood of the sender,
+maybe the web and maybe a meme, writes one answer, and sends it. Empty answers and repeats
 are treated as silence. A sticker or an old photo can ride along
 without a second model call. Memory updates, mood scores, image
 captions run after the message is already in the chat.
@@ -42,9 +43,9 @@ Longer version: [architecture](docs/architecture.md).
 
 ## Stack, if you care
 
-Python 3.12, aiogram, Postgres, Qdrant, Redis. DeepSeek by
-default, Claude if you switch it. Embeddings on local CPU on purpose —
-I didn't want another paid LLM API. Bot, agent, and a worker are
+Python 3.12, aiogram, Postgres, Redis. DeepSeek by default, Claude
+if you switch it. No embedding model, no vector database. Bot, agent,
+and a worker are
 separate processes. Turns never go through an HTTP API. Tests in
 `tests/`, CI fails under 90% coverage. Why Ruff looks like this:
 [linting](docs/linting.md). Metrics and Grafana exist and stay off
@@ -68,7 +69,7 @@ Telegram export: [deployment](docs/deployment.md). Persona and rules:
 
 ## What's weak
 
-CPU embeddings choke on a huge archive. The chat dialect is weird enough that fine-tuning would help. I didn't do it: even a small local 7B would cost more than the API. Not worth it for one group.
+She does not search old chat history by meaning. The chat dialect is weird enough that fine-tuning would help. I didn't do it: even a small local 7B would cost more than the API. Not worth it for one group.
 
 Example of the process (fictitious names)
 <details>
@@ -77,8 +78,8 @@ Example of the process (fictitious names)
 ```
 User: Vanessa, what was that about Maxim and that duck?
 
-Gate: reply, humor, look up Maxim + duck lore
-Retrieve: Maxim's card, glossary quote
+Gate: reply, humor
+Retrieve: meme menu
 Bot: it's a concept, not a duck. Maxim already suffered this argument.
 ```
 

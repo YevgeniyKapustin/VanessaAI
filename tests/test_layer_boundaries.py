@@ -85,7 +85,6 @@ def test_decision_does_not_import_llm_or_infra() -> None:
         ROOT / "vanessa" / "pipeline" / "decision",
         (
             "vanessa.pipeline.llm",
-            "vanessa.pipeline.rag",
             "vanessa.pipeline.vision",
             "vanessa.infrastructure",
         ),

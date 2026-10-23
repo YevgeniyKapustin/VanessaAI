@@ -3,7 +3,6 @@ from __future__ import annotations
 from prometheus_client import Counter, Gauge, Histogram
 
 from vanessa.infrastructure.observability.metrics.metrics_pipeline import (
-    _STAGE_BUCKETS,
     registry,
 )
 from vanessa.infrastructure.observability.metrics.metrics_window import (
@@ -102,18 +101,6 @@ knowledge_mutations_total = Counter(
     "vanessa_knowledge_mutations_total",
     "Knowledge-node writes by type and action",
     ["type", "action"],
-    registry=registry,
-)
-knowledge_vector_sync_duration_seconds = Histogram(
-    "vanessa_knowledge_vector_sync_duration_seconds",
-    "Time to embed a knowledge node and upsert it into Qdrant",
-    buckets=_STAGE_BUCKETS,
-    registry=registry,
-)
-knowledge_search_hits_total = Counter(
-    "vanessa_knowledge_search_hits_total",
-    "Knowledge search hits by backend",
-    ["source"],
     registry=registry,
 )
 knowledge_database_pool_connections = Gauge(

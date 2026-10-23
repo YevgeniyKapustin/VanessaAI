@@ -68,7 +68,6 @@ llm_outcomes = EventWindow()
 llm_empty_outcomes = EventWindow()
 llm_cost_outcomes = EventWindow()
 turn_durations = EventWindow()
-rag_outcomes = EventWindow()
 telegram_outcomes = EventWindow()
 telegram_limit_outcomes = EventWindow()
 

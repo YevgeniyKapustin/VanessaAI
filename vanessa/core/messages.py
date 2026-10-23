@@ -44,7 +44,7 @@ class ContextMessage:
     # Images attached to this message (vision turns / follow-up context).
     attachments: tuple[ImageAttachment, ...] = ()
     # Short generated label of the photo (photo_caption column) — lets a bare
-    # photo be found "by meaning" in RAG and rendered in the photo album.
+    # photo be found by full-text search and rendered in the photo album.
     photo_caption: str | None = None
 
 
@@ -109,7 +109,7 @@ class StoredMessage:
     # Raw attachment dicts from the DB ``attachments`` JSONB column; None when
     # the row has none. Converted to ``ImageAttachment`` by ``stored_to_context``.
     attachments: list[dict[str, Any]] | None = None
-    # Short generated label of the photo (photo_caption column), searchable by RAG.
+    # Short generated label of the photo (photo_caption column), full-text searchable.
     photo_caption: str | None = None
     channel: str = "telegram"
 

@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,6 +28,7 @@ async def test_main_starts_polling(monkeypatch):
 
     mock_services = MagicMock()
     mock_services.stickers = None
+    mock_services.streams = None
 
     def _bot(token):
         _ = token
@@ -60,6 +62,7 @@ async def test_main_resolves_sticker_file_ids(monkeypatch):
     mock_services = MagicMock()
     mock_services.knowledge.ensure_structure = AsyncMock()
     mock_services.stickers = mock_stickers
+    mock_services.streams = None
 
     def _bot(token):
         _ = token
@@ -73,3 +76,47 @@ async def test_main_resolves_sticker_file_ids(monkeypatch):
     await bot_main.main()
 
     mock_stickers.resolve_file_ids.assert_awaited_once_with(mock_bot)
+
+
+
+class _FakeOutboundLoop:
+    def __init__(self) -> None:
+        self.args: tuple | None = None
+        self.cancelled = False
+
+    def start(self, broker, streams, bot) -> asyncio.Task:
+        self.args = (broker, streams, bot)
+        return asyncio.create_task(self._run())
+
+    async def _run(self) -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+
+
+async def _yield_polling(_bot) -> None:
+    await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_main_starts_and_cancels_outbound_task(monkeypatch):
+    mock_bot = AsyncMock()
+    mock_bot.get_me = AsyncMock(return_value=MagicMock(username="vanessa", id=1))
+    mock_dp = MagicMock()
+    mock_dp.start_polling = _yield_polling
+    mock_services = MagicMock()
+    mock_services.stickers = None
+    outbound = _FakeOutboundLoop()
+
+    monkeypatch.setattr(bot_main, "Bot", lambda **_kwargs: mock_bot)
+    monkeypatch.setattr(bot_main, "Dispatcher", lambda: mock_dp)
+    monkeypatch.setattr(bot_main, "create_bot_services", lambda: mock_services)
+    monkeypatch.setattr(bot_main, "create_router", lambda _: MagicMock())
+    monkeypatch.setattr(bot_main, "start_outbound_task", outbound.start)
+
+    await bot_main.main()
+
+    assert outbound.args == (mock_services.broker, mock_services.streams, mock_bot)
+    assert outbound.cancelled is True

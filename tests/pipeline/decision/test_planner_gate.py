@@ -12,7 +12,6 @@ def _ctx(**kwargs) -> DecisionContext:
         "text": "test",
         "telegram_chat_id": 1,
         "recent_messages": [],
-        "query_vector": None,
         "intent": IntentResult(detected=False),
         "trigger": TriggerResult(detected=False),
         "session_active": False,

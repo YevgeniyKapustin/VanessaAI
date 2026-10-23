@@ -185,19 +185,3 @@ async def test_writer_skips_blank_person_and_swallows_update_error() -> None:
         MemoryPlan(updates=({"type": "quote", "person": "A", "quote": "q"},))
     )
     assert "People/a.md" not in vault.notes
-
-
-async def test_writer_vector_reindex(monkeypatch) -> None:
-    vault = _Vault()
-    indexed: list[str] = []
-
-    class Vectors:
-        async def index_note(self, path: str) -> None:
-            indexed.append(path)
-            if path.endswith("_index.yaml"):
-                raise RuntimeError("skip")
-
-    writer = KnowledgeVaultWriter(vault, _Index(), vector_indexer=Vectors())
-    plan = MemoryPlan(updates=({"type": "quote", "person": "Ada", "quote": "hi"},))
-    await writer.apply(plan)
-    assert indexed

@@ -7,7 +7,6 @@ ENV POETRY_VERSION=2.1.1 \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=false \
     PATH="/opt/poetry/bin:$PATH" \
-    HF_HOME=/app/.cache/huggingface \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=0
 
@@ -26,12 +25,6 @@ COPY pyproject.toml poetry.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     poetry install --no-root --only main
-
-ARG PRELOAD_EMBEDDINGS=1
-RUN if [ "$PRELOAD_EMBEDDINGS" = "1" ]; then \
-    python -c "from sentence_transformers import SentenceTransformer; \
-SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"; \
-    fi
 
 COPY vanessa/ ./vanessa/
 COPY services/ ./services/

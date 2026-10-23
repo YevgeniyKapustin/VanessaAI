@@ -3,7 +3,6 @@ import time
 
 from vanessa.config.settings import settings
 from vanessa.core.protocols import (
-    MessageIndexingSchedulerProtocol,
     MessageRepositoryProtocol,
     TurnMetricsProtocol,
 )
@@ -48,7 +47,6 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
         config: OrchestratorConfig,
         metrics: TurnMetricsProtocol,
         messages: MessageRepositoryProtocol,
-        indexing: MessageIndexingSchedulerProtocol,
         ignore_registry: ChatIgnoreRegistryProtocol,
         metrics_retriever: MetricsRetriever | None = None,
         reaction_gate: ReactionGateProtocol | None = None,
@@ -65,7 +63,6 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
         self._config = config
         self._metrics = metrics
         self._messages = messages
-        self._indexing = indexing
         self._ignore_registry = ignore_registry
         self._metrics_retriever = metrics_retriever
 
@@ -99,7 +96,6 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
         decision_started = time.perf_counter()
         ctx.decision = await self._decision.decide(
             decision_context_from_pipeline(ctx),
-            search_text=ctx.turn_plan.text if not ctx.turn_plan.skip_search else "",
             humor_ok=ctx.turn_plan.humor_ok,
         )
         ctx.decision_ms = (time.perf_counter() - decision_started) * 1000
@@ -109,8 +105,6 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
             await finish_decision_ignore(
                 ctx,
                 metrics=self._metrics,
-                indexing=self._indexing,
-                config=self._config,
             )
             return False
         return True

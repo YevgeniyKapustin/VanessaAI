@@ -31,9 +31,10 @@ class _Collector:
 
 class _Assembly:
     def __init__(self) -> None:
-        self.handlers = {TaskKind.INDEX_MESSAGE: SimpleNamespace(handle=AsyncMock())}
+        self.handlers = {TaskKind.SWEEP: SimpleNamespace(handle=AsyncMock())}
         self.sweep = None
         self.portrait = None
+        self.hermes = None
 
 
 async def _cancel_forever(self) -> None:
@@ -79,7 +80,7 @@ async def test_worker_handle_unexpected_kind() -> None:
     )
 
 
-def _patch_worker_main(monkeypatch) -> _CloseBroker:
+def _patch_worker_main(monkeypatch, assembly=None) -> _CloseBroker:
     broker = _CloseBroker()
     monkeypatch.setattr("services.worker.main.configure_logging", lambda _n: None)
     monkeypatch.setattr(
@@ -87,7 +88,7 @@ def _patch_worker_main(monkeypatch) -> _CloseBroker:
     )
     monkeypatch.setattr(
         "services.worker.main.BrokerStreams.from_settings",
-        lambda _s: SimpleNamespace(turns="t", tasks="k"),
+        lambda _s: SimpleNamespace(turns="t", tasks="k", outbound="o"),
     )
     monkeypatch.setattr(
         "services.worker.main.RedisStreamBroker",
@@ -96,7 +97,7 @@ def _patch_worker_main(monkeypatch) -> _CloseBroker:
     monkeypatch.setattr("services.worker.main.BrokerMetricsCollector", _Collector)
     monkeypatch.setattr(
         "services.worker.main.build_worker_handlers",
-        AsyncMock(return_value=_Assembly()),
+        AsyncMock(return_value=assembly or _Assembly()),
     )
     monkeypatch.setattr("services.worker.main.WorkerApp.run_forever", _cancel_forever)
     return broker
@@ -106,4 +107,14 @@ async def test_worker_main_runs_until_cancelled(monkeypatch) -> None:
     broker = _patch_worker_main(monkeypatch)
     with suppress(asyncio.CancelledError):
         await main()
+    assert broker.closed == 1
+
+
+async def test_worker_main_closes_hermes_jobs(monkeypatch) -> None:
+    assembly = _Assembly()
+    assembly.hermes = SimpleNamespace(aclose=AsyncMock())
+    broker = _patch_worker_main(monkeypatch, assembly)
+    with suppress(asyncio.CancelledError):
+        await main()
+    assembly.hermes.aclose.assert_awaited_once()
     assert broker.closed == 1

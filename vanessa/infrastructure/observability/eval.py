@@ -1,7 +1,5 @@
 """RAG Triad evaluation (context relevance / groundedness / answer relevance).
 
-Deterministic signals (retrieval score histograms, empty-retrieval counter,
-context length) are collected continuously by :mod:`vanessa.infrastructure.observability.metrics`.
 This module adds the sampled LLM-as-judge evaluation that runs in the
 background after a reply and reports scores via ``vanessa_rag_eval_score``.
 

@@ -127,7 +127,7 @@ async def search_photo_messages(
 ) -> list[StoredMessage]:
     """FTS over messages that carry a photo (attachments non-empty).
 
-    Used by the "RAG по смыслу" photo-album gathering: finds photo messages
+    Used by the photo-album gathering: finds photo messages
     whose content/caption matches the meaning of the current turn. Runs
     inside a SAVEPOINT: the compose stage treats this as an optional,
     fail-open read, and a swallowed failure must not poison the shared

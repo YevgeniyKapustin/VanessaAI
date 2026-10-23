@@ -27,7 +27,7 @@ to override. Kubernetes secret names: [deploy/k8s/README.md](../deploy/k8s/READM
 and `deploy/k8s/secrets.env.example`.
 
 `config/behavior/` is grouped like the pipeline: `compose/`, `gate/`,
-`retrieve/`, `knowledge/`, `humor/`. Persona, conversation, and bot copy stay
+`knowledge/`, `humor/`. Persona, conversation, and bot copy stay
 at the root of `behavior/` (one file each). Compose copy is four files:
 system + layout + notes + generation (merged into `llm`).
 
@@ -45,7 +45,7 @@ system + layout + notes + generation (merged into `llm`).
 | `metrics.feedback_header` / `feedback_line` | Tone block in the compose prompt |
 | `bot.photo_placeholder` | Copy when vision caption is missing |
 | `decision.*` | Gate / rule-engine thresholds |
-| `rag.*` | Retrieval sizes and score cutoffs |
+| `rag.*` | Turn Planner prompts (`gate/planner.yaml`) |
 | `memory.*` | Vault write / sweep cadence |
 | `profanity.*` | Post-filter substitutions |
 | `memes.*` / `stickers.*` | Humor and sticker catalogs |
@@ -57,13 +57,13 @@ DeepSeek API does not apply them today.
 Files under `behavior/`: `persona.yaml`, `conversation.yaml`, `bot.yaml`,
 `compose/system.yaml`, `compose/layout.yaml`, `compose/notes.yaml`,
 `compose/generation.yaml`, `gate/decision.yaml`,
-`gate/reaction_gate.yaml`, `gate/planner.yaml`, `retrieve/rag.yaml`,
+`gate/reaction_gate.yaml`, `gate/planner.yaml`,
 `knowledge/memory.yaml`, `knowledge/metrics.yaml`, `knowledge/mood.yaml`,
 `knowledge/portrait.yaml`, `humor/profanity.yaml`, `humor/memes.yaml`,
 `humor/stickers.yaml`.
 
 A section may merge several files (system + layout + notes + generation
-→ `llm`; planner + retrieve knobs → `rag`; gate knobs + reaction prompt;
+→ `llm`; gate knobs + reaction prompt;
 metrics extract + mood).
 
 ## `config/channels/`

@@ -42,6 +42,8 @@ class GenerateRequest:
     photo_candidates: list[PhotoCandidate] | None = None
     current_images: list[ImageAttachment] | None = None
     scene_description: str | None = None
+    # Hermes ask outcome: "asked" | "offline" | None (see prompt_hermes).
+    hermes_status: str | None = None
     channel_profile: ChannelProfile | None = None
 
 

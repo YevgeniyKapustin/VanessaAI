@@ -46,6 +46,19 @@ def test_turn_mapper_copies_request_fields() -> None:
     assert turn.images == ()
 
 
+def test_turn_mapper_copies_message_and_correlation_ids() -> None:
+    message_id = 55
+    request = TurnRequest(
+        correlation_id="corr-7",
+        telegram_chat_id=9,
+        telegram_message_id=message_id,
+        message="hi",
+    )
+    turn = TurnMapper().to_turn(request)
+    assert turn.telegram_message_id == message_id
+    assert turn.correlation_id == "corr-7"
+
+
 def test_turn_mapper_keeps_scene_out_of_images() -> None:
     request = TurnRequest(
         channel="vrchat",

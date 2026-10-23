@@ -121,31 +121,13 @@ def test_decision_engine_record_reply_uses_session_key(
     engine = DecisionEngine(
         intent_detector=intent_detector,
         trigger_checker=trigger_checker,
-        relevance_checker=FakeRelevance(0.1),
         session_analyzer=SessionWindowAnalyzer(10, intent_detector, trigger_checker),
         rate_limiter=limiter,
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
     )
     engine.record_reply("vrchat")
     assert limiter.is_limited("vrchat") is True
     assert limiter.is_limited("telegram:-1001") is False
-
-
-class FakeRelevance:
-    def __init__(self, score: float) -> None:
-        self._score = score
-        self.calls = 0
-
-    async def score(
-        self,
-        text: str,
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
-    ) -> float:
-        _ = text, query_vector, search_text
-        self.calls += 1
-        return self._score
 
 
 def test_noise_filter_ignores_short_ack():
@@ -164,18 +146,15 @@ def test_noise_filter_ignores_short_ack():
 def build_engine(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
-    relevance_score: float,
     *,
     block_consecutive: bool = False,
 ) -> DecisionEngine:
     return DecisionEngine(
         intent_detector=intent_detector,
         trigger_checker=trigger_checker,
-        relevance_checker=FakeRelevance(relevance_score),
         session_analyzer=SessionWindowAnalyzer(10, intent_detector, trigger_checker),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
         block_consecutive_replies=block_consecutive,
     )
 
@@ -185,7 +164,7 @@ async def test_decision_engine_replies_in_listen_window_when_planner_affirms(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(
             id=1,
@@ -215,7 +194,7 @@ async def test_decision_engine_replies_listen_window_follow_up_without_planner(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.87)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="ванесса..."),
         ContextMessage(id=2, role="assistant", content="Здесь, слушаю"),
@@ -240,7 +219,7 @@ async def test_decision_engine_replies_bot_pronoun_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.87)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="Ладно я не злюсь на ванессу"),
         ContextMessage(id=2, role="assistant", content="Это великодушно"),
@@ -267,7 +246,7 @@ async def test_decision_engine_replies_partner_continuation_in_listen_window(
     # The user the bot just answered follows up inside the window ("ну чет
     # ваще мало" right after the dossier) — an explicit continuation even when
     # the LLM planner vetoed a reply.
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(
             id=1,
@@ -306,7 +285,7 @@ async def test_decision_engine_replies_question_in_listen_window_neutral_planner
 ):
     # A question inside the post-reply window warrants a reply even with a
     # neutral planner — has_question is now honored by the listen window.
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="ванесса расскажи про меш"),
         ContextMessage(id=2, role="assistant", content="Кратко про меш"),
@@ -335,7 +314,7 @@ async def test_decision_engine_replies_out_of_window_question_in_active_session(
     # A question to the bot outside the window but inside an active session
     # ("хочешь закурить?" after the bot answered the same user's riddle) is
     # approved by the intent rule and survives the compose gate.
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(
             id=1,
@@ -365,7 +344,7 @@ async def test_decision_engine_ignores_side_talk_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(
             id=1,
@@ -398,7 +377,7 @@ async def test_decision_engine_ignores_listen_window_without_planner_affirm(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="ванесса подскажи меш"),
         ContextMessage(id=2, role="assistant", content="Кратко про меш"),
@@ -428,7 +407,7 @@ async def test_decision_engine_ignores_status_remark_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="ванесса как дела"),
         ContextMessage(id=2, role="assistant", content="Норм"),
@@ -454,7 +433,7 @@ async def test_decision_engine_ignores_third_party_gossip_in_listen_window(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="ванесса про векторы"),
         ContextMessage(id=2, role="assistant", content="1500+ норма"),
@@ -480,7 +459,7 @@ async def test_decision_engine_ignores_dismissal_even_when_addressed(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    engine = build_engine(intent_detector, trigger_checker)
     result = await engine.decide(
         DecisionContext(
             text="ванесса хватит",
@@ -501,11 +480,9 @@ async def test_decision_engine_ignores_side_talk_when_planner_says_no():
     engine = DecisionEngine(
         intent_detector=IntentDetector(),
         trigger_checker=TriggerKeywordChecker(("помоги", "объясни", "найди", "расскажи")),
-        relevance_checker=FakeRelevance(0.99),
         session_analyzer=SessionWindowAnalyzer(10, IntentDetector(), TriggerKeywordChecker(("помоги",))),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
     )
 
     result = await engine.decide(
@@ -526,7 +503,7 @@ async def test_decision_engine_replies_when_planner_says_yes_without_mention(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     result = await engine.decide(
         DecisionContext(
             text="модест",
@@ -547,7 +524,7 @@ async def test_decision_engine_replies_direct_address_despite_planner_veto(
     # "ванесса + императив" is a direct address: even when the LLM planner
     # misclassifies it as "общение между собой" (should_reply=False), the
     # deterministic intent layer sees the bot was addressed and replies.
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -567,7 +544,7 @@ async def test_decision_engine_replies_on_reply_to_bot(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -588,7 +565,7 @@ async def test_decision_engine_reply_on_intent(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -607,7 +584,7 @@ async def test_decision_engine_reply_on_trigger(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -622,20 +599,16 @@ async def test_decision_engine_reply_on_trigger(
 
 
 @pytest.mark.asyncio
-async def test_decision_engine_skips_relevance_for_trigger(
+async def test_decision_engine_force_replies_on_trigger(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    relevance = FakeRelevance(0.99)
-
     engine = DecisionEngine(
         intent_detector=intent_detector,
         trigger_checker=trigger_checker,
-        relevance_checker=relevance,
         session_analyzer=SessionWindowAnalyzer(10, intent_detector, trigger_checker),
         rate_limiter=RateLimiter(max_replies=0),
         noise_filter=NoiseFilter(NoiseHeuristics(max_words=1, max_chars=12)),
-        relevance_threshold=0.75,
     )
 
     result = await engine.decide(
@@ -644,36 +617,10 @@ async def test_decision_engine_skips_relevance_for_trigger(
             telegram_chat_id=1,
             recent_messages=[],
         ),
-        search_text="крабер",
     )
 
     assert result.action == DecisionAction.REPLY
     assert result.reason == DecisionReason.FORCE_REPLY
-    assert relevance.calls == 0
-
-
-@pytest.mark.asyncio
-async def test_decision_engine_reply_on_relevance_with_session(
-    intent_detector: IntentDetector,
-    trigger_checker: TriggerKeywordChecker,
-):
-    engine = build_engine(intent_detector, trigger_checker, 0.9)
-    recent = [
-        ContextMessage(id=1, role="user", content="Vanessa, расскажи про API"),
-        ContextMessage(id=2, role="assistant", content="Кратко про API"),
-        ContextMessage(id=3, role="user", content="про токены тоже интересно"),
-    ]
-
-    result = await engine.decide(
-        DecisionContext(
-            text="про токены тоже интересно",
-            telegram_chat_id=1,
-            recent_messages=recent,
-        )
-    )
-
-    assert result.action == DecisionAction.REPLY
-    assert result.reason == DecisionReason.RELEVANT
 
 
 @pytest.mark.asyncio
@@ -681,7 +628,7 @@ async def test_decision_engine_ignores_irrelevant_small_talk(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.2)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -699,7 +646,7 @@ async def test_decision_engine_ignores_noise(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.9)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -718,7 +665,7 @@ async def test_decision_engine_does_not_hard_drop_short_maybe(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.9)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -740,7 +687,7 @@ async def test_decision_engine_listen_window_short_maybe_replies_when_planner_af
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(
             id=1,
@@ -772,7 +719,7 @@ async def test_decision_engine_skips_noise_when_trigger_present(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -791,7 +738,7 @@ async def test_decision_engine_blocks_consecutive_replies(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.9, block_consecutive=True)
+    engine = build_engine(intent_detector, trigger_checker, block_consecutive=True)
     recent = [
         ContextMessage(id=1, role="assistant", content="Уже ответила"),
     ]
@@ -813,7 +760,7 @@ async def test_decision_engine_ignores_closure_after_bot_chat(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="user", content="расскажи про кейт"),
         ContextMessage(id=2, role="assistant", content="Михась просил добавить"),
@@ -830,11 +777,10 @@ async def test_decision_engine_ignores_closure_after_bot_chat(
             telegram_chat_id=1,
             recent_messages=recent,
         ),
-        search_text="работа",
     )
 
     assert result.action == DecisionAction.IGNORE
-    assert result.reason == DecisionReason.NO_REPLY_NEEDED
+    assert result.reason == DecisionReason.IGNORE
 
 
 @pytest.mark.asyncio
@@ -845,7 +791,7 @@ async def test_decision_engine_ignores_quote_echo_reply_to_bot(
     bot_line = (
         "Котгаст, ты уже третий круг, скоро Данте тебя запишет в отдельный котёл"
     )
-    engine = build_engine(intent_detector, trigger_checker, 1.0)
+    engine = build_engine(intent_detector, trigger_checker)
     recent = [
         ContextMessage(id=1, role="assistant", content=bot_line),
     ]
@@ -869,7 +815,7 @@ async def test_decision_engine_replies_on_bare_mention(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.9)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -890,7 +836,7 @@ async def test_decision_engine_ignores_status_remark_mention(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.9)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(
@@ -910,7 +856,7 @@ async def test_decision_engine_replies_on_mention_with_question(
     intent_detector: IntentDetector,
     trigger_checker: TriggerKeywordChecker,
 ):
-    engine = build_engine(intent_detector, trigger_checker, 0.1)
+    engine = build_engine(intent_detector, trigger_checker)
 
     result = await engine.decide(
         DecisionContext(

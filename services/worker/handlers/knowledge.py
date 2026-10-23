@@ -1,4 +1,4 @@
-"""Knowledge-pipeline task handlers: sweep, portraits, reindex, memory, metrics."""
+"""Knowledge-pipeline task handlers: sweep, portraits, memory, metrics."""
 
 from __future__ import annotations
 
@@ -33,17 +33,6 @@ class PortraitHandler:
     async def handle(self, _task: TaskMessage) -> None:
         updated = await self._builder.run()
         logger.info("worker_portrait updated=%s", updated)
-
-
-class ReindexKnowledgeHandler:
-    """Rebuild the knowledge-vault vector collection."""
-
-    def __init__(self, indexer) -> None:
-        self._indexer = indexer
-
-    async def handle(self, _task: TaskMessage) -> None:
-        await self._indexer.index_all()
-        logger.info("worker_reindex_knowledge done")
 
 
 class MemoryExtractHandler:

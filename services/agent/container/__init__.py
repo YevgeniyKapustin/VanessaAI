@@ -12,12 +12,9 @@ from services.agent.container.metrics import Metrics
 from services.agent.container.retrieval import (
     KnowledgeGraph,
     MemeStack,
-    RetrievalStack,
-    VectorIndexes,
 )
 from services.agent.container.role import ProcessRole
 from services.agent.container.turns import (
-    Indexing,
     OrchestratorFactory,
     Persistence,
     Search,
@@ -32,7 +29,6 @@ __all__ = [
     "DecisionFactory",
     "DecisionStack",
     "EligibilityGates",
-    "Indexing",
     "KnowledgeGraph",
     "MemeStack",
     "MentionSignals",
@@ -41,9 +37,7 @@ __all__ = [
     "Persistence",
     "ProcessGraph",
     "ProcessRole",
-    "RetrievalStack",
     "Search",
     "TurnEngines",
     "TurnWiring",
-    "VectorIndexes",
 ]

@@ -7,8 +7,7 @@ Usage:
 
 Reads the filesystem vault (KNOWLEDGE_PATH) and UPSERTs every note plus
 folder indexes and sweep state. Then rebuilds _index.yaml documents in
-Postgres. Qdrant is not touched; run scripts/reindex_knowledge_vectors.py
-after this.
+Postgres.
 """
 
 from __future__ import annotations

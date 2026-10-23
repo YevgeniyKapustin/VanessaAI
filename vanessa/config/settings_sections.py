@@ -34,9 +34,8 @@ class BotMixin:
 
 
 class WorkerMixin:
-    """Background worker settings: sweep, portraits, memory, metrics, indexing."""
+    """Background worker settings: sweep, portraits, memory, metrics."""
 
-    indexing_max_retries: int = 2
     llm_max_retries: int = 2
 
     background_queue_size: int = 200

@@ -21,18 +21,6 @@ class SharedSettings(BaseSettings):
     postgres_password: str = "vanessa"
     postgres_db: str = "vanessa"
 
-    # --- Qdrant --------------------------------------------------------------
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-    qdrant_collection: str = "messages"
-    # Dedicated collection for the semantic knowledge vault notes.
-    qdrant_knowledge_collection: str = "knowledge"
-    qdrant_on_disk: bool = True
-    qdrant_quantization_enabled: bool = True
-    qdrant_indexing_threshold: int = 20000
-    qdrant_hnsw_m: int = 16
-    qdrant_hnsw_ef_construct: int = 64
-
     db_pool_size: int = 5
     db_max_overflow: int = 2
 
@@ -102,7 +90,3 @@ class SharedSettings(BaseSettings):
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
-
-    @property
-    def qdrant_url(self) -> str:
-        return f"http://{self.qdrant_host}:{self.qdrant_port}"

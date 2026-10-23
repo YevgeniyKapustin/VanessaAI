@@ -2,7 +2,7 @@
 
 How VanessaAI turns a message into a reply — or silence. The
 landing summary is in the [README](../README.md); this page is the
-pipeline, vault, mood metrics, and retrieval tracks.
+pipeline, vault, mood metrics, and the retrieve stage.
 
 Telegram is the default adapter. VRChat is a second adapter
 (`services/presence`) of the same agent — a host process on the game
@@ -42,8 +42,8 @@ flowchart LR
 
 - **Ingress** — persist the message, load session, apply nicknames.
 - **Gate** — prefilter → Turn Planner → Decision Engine.
-- **Retrieve** — semantic vault RAG first, raw-message RAG fallback,
-  optional ReAct, humor RAG + reflexion.
+- **Retrieve** — optional live web search and the meme menu. There is
+  no vector search and no RAG. No embedding model loads into RAM.
 - **Scene** — VRChat only: describe the current screenshot in parallel
   with retrieve, join (2s timeout) before compose. Telegram is
   zero-cost.
@@ -55,8 +55,9 @@ Channel flags (`stickers`, `photos`, `split_messages`, `scene`,
 and attach per turn on `TurnPipelineContext.profile`. They are not
 process-level `OrchestratorConfig`.
 
-Orchestrator stages live in `vanessa/pipeline/`; gate / retrieve / compose
-code is under `vanessa/pipeline/decision`, `rag`, and `llm`. Scene vision
+Orchestrator stages live in `vanessa/pipeline/stages/`. Gate code is
+under `vanessa/pipeline/decision`; compose and planner code is under
+`vanessa/pipeline/llm`. Scene vision
 is `vanessa/pipeline/vision/`. Dependencies are wired through protocols
 (`vanessa/core/protocols`) so stages stay testable. Process entrypoints
 live under `services/` (`bot`, `agent`, `worker`, `mcp`, plus host
@@ -70,19 +71,19 @@ This is the main difference from wrapping ChatGPT.
 | Layer | Role |
 |-------|------|
 | Prefilter | No LLM: noise, dismissal, off-topic remarks |
-| Turn Planner | LLM: should reply, search query, humor, deep_search |
-| Decision Engine | Rule chain: rate limit, addressing, listen window, relevance |
+| Turn Planner | LLM: should reply, web search, humor |
+| Decision Engine | Rule chain: rate limit, addressing, listen window, sender metrics |
 
 The planner suggests `should_reply`. It is **not** the single source of
-truth. The rule engine uses addressing, session state, and a relevance
-threshold. `ChatSessionState` trims context by idle timeout and listen
+truth. The rule engine uses addressing, session state, and the listen
+window. If no rule accepts the turn, the engine ignores it. `ChatSessionState` trims context by idle timeout and listen
 window, not only by message count.
 
 ## Knowledge vault
 
 Beyond raw history, Vanessa keeps structured memory in Postgres
-(`knowledge_nodes` + `knowledge_documents`) with Qdrant collection
-`knowledge` as the embedding index. `KNOWLEDGE_STORE=filesystem` keeps
+(`knowledge_nodes` + `knowledge_documents`). There is no vector index.
+`KNOWLEDGE_STORE=filesystem` keeps
 the legacy markdown tree for tests and local work.
 
 | Folder | Contents |
@@ -98,11 +99,10 @@ the legacy markdown tree for tests and local work.
 Each row keeps typed columns plus JSONB metadata and a markdown body
 with the same headings as the old files. Folder `_index.yaml` manifests
 live in `knowledge_documents`. Migrate with
-`scripts/migrate_knowledge_to_postgres.py`, then
-`scripts/reindex_knowledge_vectors.py`. Observability is request-scoped:
-Prometheus (`vanessa_knowledge_*`), Langfuse spans
-(`retrieve:knowledge_vault`, `compose:inject_knowledge`,
-`finalize:extract_knowledge`), and JSON logs with `node_id` for Loki.
+`scripts/migrate_knowledge_to_postgres.py`. Observability is
+request-scoped: Prometheus (`vanessa_knowledge_*`), Langfuse spans
+(`compose:inject_knowledge`, `finalize:extract_knowledge`), and JSON logs
+with `node_id` for Loki.
 
 **Write:**
 
@@ -112,13 +112,16 @@ Prometheus (`vanessa_knowledge_*`), Langfuse spans
   chunks the backlog into context-sized windows and extracts what was
   missed, including weekly digests.
 
-**Read** is semantic-first. Vault notes are already summaries (raw chat
-embeds poorly). They go into Qdrant collection `knowledge` and are
-matched by embedding similarity plus exact alias hits. The planner
-picks archives (`people` / `lore` / `culture` / `logs`); humor always
-consults lore. Matched notes are the **primary RAG context**. Raw
-message history is fallback. Notes re-embed on every write.
-`scripts/reindex_knowledge_vectors.py` rebuilds the collection.
+**Read:**
+
+- The compose prompt gets the sender mood block (from the People card
+  metrics) and the recent session messages.
+- The planner prompt gets the participants digest (mood and facts per
+  person).
+- The MCP knowledge server (`services/mcp/knowledge.py`) reads notes by
+  path and by name.
+- The compose prompt gets no vault notes by search. `knowledge_blocks`
+  and `context_blocks` stay empty.
 
 ## Mood and relationship metrics
 
@@ -144,25 +147,23 @@ hard guards: never the owner, never direct / triggered / expected replies.
 The composer gets a compact mood block to tune tone inside the persona
 rules.
 
-## Retrieve tracks
+## Retrieve stage
 
-- **Semantic-first RAG** — vault notes first; hybrid vector + Postgres
-  full-text on raw messages only if the vault is empty for that query.
-- **Participant-aware queries** — planner prompt includes compact
-  per-person mood and facts so aliases and topics match.
-- **ReAct** — if `deep_search=true`, iterative search up to N steps.
-- **Two-track humor** — separate meme search plus rule-based reflexion so
-  irrelevant quotes do not land in the prompt.
-- **Async indexing** — Postgres write is immediate; Qdrant embedding
-  runs in the background with retries.
+- **Web search** — runs when the planner sets `web_search=true` and
+  `WEB_SEARCH_ENABLED=true`. It is fail-open.
+- **Memes** — when the planner sets `humor_ok=true`, the meme menu goes
+  to the compose prompt.
+- **Participants digest** — the planner prompt includes compact
+  per-person mood and facts, so aliases and topics match.
 - **History import** — `scripts/import_telegram_history.py` loads Telegram
-  Desktop `result.json` into Postgres + Qdrant in batches.
+  Desktop `result.json` into Postgres in batches.
 
 ## Photos and character
 
 Vision (optional) captions images and OCR via a cheap DeepSeek vision
 model; captions stay in session for follow-ups. The composer can pick a
-meaning-relevant stored photo to re-send. Persona, nicknames, and
+stored photo to re-send. Postgres full-text search finds it by its
+caption. Persona, nicknames, and
 Telegram HTML formatting are config-driven (`config/behavior/`).
 
 See [Configuration](configuration.md) for YAML. Env keys:

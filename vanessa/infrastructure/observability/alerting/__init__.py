@@ -62,7 +62,6 @@ class AlertManager:
         cooldown: float,
         error_rate_threshold: float,
         latency_p95_threshold: float,
-        rag_empty_threshold: float,
         llm_empty_threshold: float = 0.1,
         cost_window_threshold_usd: float = 5.0,
         min_samples: int = _MIN_SAMPLES,
@@ -74,7 +73,6 @@ class AlertManager:
         self._cooldown = cooldown
         self._error_rate_threshold = error_rate_threshold
         self._latency_p95_threshold = latency_p95_threshold
-        self._rag_empty_threshold = rag_empty_threshold
         self._llm_empty_threshold = llm_empty_threshold
         self._cost_window_threshold_usd = cost_window_threshold_usd
         self._min_samples = min_samples
@@ -88,7 +86,6 @@ class AlertManager:
             error_rate_threshold=self._error_rate_threshold,
             llm_empty_threshold=self._llm_empty_threshold,
             latency_p95_threshold=self._latency_p95_threshold,
-            rag_empty_threshold=self._rag_empty_threshold,
             cost_window_threshold_usd=self._cost_window_threshold_usd,
         )
 
@@ -166,7 +163,6 @@ def create_alert_manager() -> AlertManager | None:
         cooldown=settings.alerting_cooldown_seconds,
         error_rate_threshold=settings.alerting_error_rate_threshold,
         latency_p95_threshold=settings.alerting_latency_p95_threshold,
-        rag_empty_threshold=settings.alerting_rag_empty_threshold,
         llm_empty_threshold=settings.alerting_llm_empty_threshold,
         cost_window_threshold_usd=settings.alerting_cost_window_threshold_usd,
         balance_check_hours=settings.alerting_balance_check_hours,

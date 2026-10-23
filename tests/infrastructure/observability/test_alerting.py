@@ -13,7 +13,6 @@ def _manager(**overrides) -> AlertManager:
         "cooldown": 0,
         "error_rate_threshold": 0.05,
         "latency_p95_threshold": 7.0,
-        "rag_empty_threshold": 0.5,
         "min_samples": 5,
     }
     defaults.update(overrides)
@@ -40,17 +39,6 @@ def test_evaluate_latency_p95(monkeypatch) -> None:
     assert any(alert.rule == "turn_p95" for alert in alerts)
 
 
-def test_evaluate_rag_empty_rate(monkeypatch) -> None:
-    window = metrics.EventWindow(window_seconds=300)
-    for _ in range(6):
-        window.add(("semantic", 0))
-    for _ in range(4):
-        window.add(("semantic", 3))
-    monkeypatch.setattr(metrics, "rag_outcomes", window)
-    alerts = _manager(rag_empty_threshold=0.5).evaluate()
-    assert any(alert.rule == "rag_empty_rate" for alert in alerts)
-
-
 def test_evaluate_telegram_error_rate(monkeypatch) -> None:
     window = metrics.EventWindow(window_seconds=300)
     for _ in range(4):
@@ -69,7 +57,6 @@ def _patch_all_windows(monkeypatch) -> None:
         "llm_empty_outcomes",
         "llm_cost_outcomes",
         "turn_durations",
-        "rag_outcomes",
         "telegram_outcomes",
         "telegram_limit_outcomes",
     ):

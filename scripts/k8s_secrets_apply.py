@@ -91,7 +91,6 @@ def apply_configmap_unless_skipped(
     config_values = select_config_values(
         env,
         postgres_host=args.postgres_host,
-        qdrant_host=args.qdrant_host,
         langfuse_host=args.langfuse_host,
     )
     print(f"configmap: {CONFIGMAP_NAME} ({len(config_values)} keys)")

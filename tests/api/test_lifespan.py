@@ -6,21 +6,17 @@ from services.agent.lifespan import lifespan
 from services.agent.runtime.broker import BrokerRuntime
 
 STORAGE = "services.agent.runtime.storage"
-WARMUP = "services.agent.runtime.warmup"
 KNOWLEDGE = "services.agent.runtime.knowledge"
 
 
-def _mock_container(vector_store, embeddings) -> MagicMock:
+def _mock_container() -> MagicMock:
     container = MagicMock()
     container.role.owns_knowledge_loops = False
     graph = container.graph
-    graph.retrieval.indexes.messages = vector_store
-    graph.retrieval.embeddings = embeddings
     graph.jobs.start = MagicMock()
     graph.jobs.shutdown = AsyncMock()
     graph.broker.close = AsyncMock()
     graph.knowledge.vault.ensure_structure = AsyncMock()
-    graph.knowledge.vector_indexer.index_all = AsyncMock()
     return container
 
 
@@ -52,15 +48,9 @@ async def test_lifespan_runs_startup_and_shutdown(monkeypatch):
     _patch_knowledge_flags(monkeypatch)
     _patch_broker_runtime(monkeypatch)
 
-    vector_store = AsyncMock()
-    vector_store.ensure_collection = AsyncMock()
-    embeddings = AsyncMock()
-    embeddings.embed = AsyncMock(return_value=[0.1])
-    container = _mock_container(vector_store, embeddings)
-    monkeypatch.setattr(f"{WARMUP}.preload_embedding_model", lambda: None)
+    container = _mock_container()
     async with lifespan(container):
-        vector_store.ensure_collection.assert_awaited_once()
-        embeddings.embed.assert_awaited_once_with("warmup")
+        container.graph.jobs.start.assert_called_once()
 
     mock_engine.dispose.assert_awaited_once()
     mock_conn.run_sync.assert_awaited_once()

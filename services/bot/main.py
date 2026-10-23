@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher
 from services.bot.container import create_bot_services
 from services.bot.handlers import create_router
 from services.bot.middleware import BotLoggingMiddleware
+from services.bot.outbound import start_outbound_task
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.observability import metrics as observability_metrics
@@ -14,6 +15,14 @@ from vanessa.infrastructure.observability.alerting import create_alert_manager
 
 configure_logging("bot")
 logger = logging.getLogger(__name__)
+
+
+async def _cancel_task(task: asyncio.Task | None) -> None:
+    if task is None:
+        return
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
 
 
 async def main() -> None:
@@ -35,6 +44,9 @@ async def main() -> None:
         await services.stickers.resolve_file_ids(bot)
     me = await bot.get_me()
     logger.info("Bot started as @%s id=%s", me.username, me.id)
+    outbound_task = None
+    if services.streams is not None:
+        outbound_task = start_outbound_task(services.broker, services.streams, bot)
     dp = Dispatcher()
     router = create_router(services)
     router.message.middleware(BotLoggingMiddleware())
@@ -50,10 +62,8 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         logger.info("Bot polling stopped, cleaning up")
-        if alert_task is not None:
-            alert_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await alert_task
+        await _cancel_task(outbound_task)
+        await _cancel_task(alert_task)
         with contextlib.suppress(Exception):
             await bot.session.close()
         logger.info("Bot shutdown complete")

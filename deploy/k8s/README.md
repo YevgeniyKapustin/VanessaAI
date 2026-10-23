@@ -59,29 +59,29 @@ kubectl -n vanessa rollout restart deploy
         ┌────────────┴─────────────┐
         ▼                          ▼
     ┌──────────────┐            ┌──────────────┐
-    │ agent   │  tasks ──▶ │ worker       │  sweep/portrait/indexing
+    │ agent   │  tasks ──▶ │ worker       │  sweep/portrait/memory
     │ (Deploy+HPA) │            │ (Deploy+HPA) │
     └──────┬───────┘            └──────────────┘
         │ MCP over HTTP (SSE)
         ├──────────▶ mcp-websearch
         ├──────────▶ mcp-knowledge
         └──────────▶ mcp-vision
-   agent ──▶ Postgres / Qdrant / Redis   (managed or StatefulSets)
-   worker    ──▶ Postgres / Qdrant
+   agent ──▶ Postgres / Redis   (managed or StatefulSets)
+   worker    ──▶ Postgres
 ```
 
 ## Namespace & network
 
 - Single namespace `vanessa`. Everything below uses it.
 - `NetworkPolicy` (`30-networkpolicy.yaml`) is **opt-in**. Do not apply it
-  for a Docker Desktop run that reaches Postgres/Qdrant/Redis on the host
+  for a Docker Desktop run that reaches Postgres/Redis on the host
   (`host.docker.internal`) — default-deny will black-hole that traffic.
   Apply it only when those backends run in-cluster with `component:
-  redis|postgres|qdrant` labels.
+  redis|postgres` labels.
 - When applied, isolation is:
-  - `bot` → broker (Redis 6379) only; never to Postgres/Qdrant/MCP.
-  - `agent` → broker, Postgres, Qdrant, MCP servers, (observability).
-  - `worker` → broker, Postgres, Qdrant.
+  - `bot` → broker (Redis 6379) only; never to Postgres/MCP.
+  - `agent` → broker, Postgres, MCP servers, (observability).
+  - `worker` → broker, Postgres.
   - `mcp-knowledge` → Postgres (vault reads).
   - MCP servers: only accept traffic from `agent`.
   - default-deny ingress per namespace (except monitoring + ingress-controller).
@@ -92,8 +92,8 @@ Everything is env-driven (`vanessa.config.settings`). Mapping is mechanical:
 
 | Kind | Examples (keys = env names) |
 |---|---|
-| `ConfigMap` | `BROKER_STREAMS_PREFIX`, `BROKER_GROUP_*`, `BROKER_RPC_TIMEOUT_SECONDS`, `WORKER_ENABLED`, `WORKER_METRICS_PORT`, `MCP_*_URL`, `POSTGRES_HOST/PORT/USER/DB`, `QDRANT_*`, `RAG_*`, `DECISION_*`, `KNOWLEDGE_*`, `VISION_*`, `LOG_*`, `METRICS_*` |
-| `Secret` (`scripts/k8s_secrets.py`) | `TELEGRAM_BOT_TOKEN`, `POSTGRES_PASSWORD`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `WEB_SEARCH_API_KEY`, `API_INTERNAL_TOKEN`, `HF_TOKEN`, `BROKER_REDIS_URL`, `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_ID_SALT` |
+| `ConfigMap` | `BROKER_STREAMS_PREFIX`, `BROKER_GROUP_*`, `BROKER_RPC_TIMEOUT_SECONDS`, `WORKER_ENABLED`, `WORKER_METRICS_PORT`, `MCP_*_URL`, `POSTGRES_HOST/PORT/USER/DB`, `DECISION_*`, `KNOWLEDGE_*`, `VISION_*`, `LOG_*`, `METRICS_*` |
+| `Secret` (`scripts/k8s_secrets.py`) | `TELEGRAM_BOT_TOKEN`, `POSTGRES_PASSWORD`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `WEB_SEARCH_API_KEY`, `API_INTERNAL_TOKEN`, `BROKER_REDIS_URL`, `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_ID_SALT` |
 
 `10-configmap.yaml` is an example only — kustomize does not apply it.
 `kubectl apply -k` would otherwise clobber the generated ConfigMap. The
@@ -121,16 +121,14 @@ docker tag vanessa-agent:latest vanessa-agent:local
 
 ## State
 
-- Postgres / Qdrant / Redis: run as managed services (preferred) or
+- Postgres / Redis: run as managed services (preferred) or
   StatefulSets with PVCs. Not in these manifests.
 - Local hybrid: keep them in docker-compose and set `POSTGRES_HOST` /
-  `QDRANT_HOST` / `BROKER_REDIS_URL` to `host.docker.internal` in the
+  `BROKER_REDIS_URL` to `host.docker.internal` in the
   ConfigMap / `.env` (then re-run `k8s_secrets.py apply` so the broker URL
   in the Secret matches).
 - Knowledge vault is Postgres (`KNOWLEDGE_STORE=postgres`). There is no
   shared knowledge PVC.
-- HuggingFace embedding model is baked into the image at
-  `HF_HOME=/app/.cache/huggingface` (no PVC; an empty volume would hide it).
 
 ## Rollout & smoke
 
@@ -178,7 +176,7 @@ kubectl apply -k deploy/k8s/
 `kubectl apply -k deploy/k8s/`  (apps only, no ConfigMap, no NetworkPolicy)
 `kubectl apply -k deploy/k8s/overlays/desktop`  (Docker Desktop hybrid)
 
-Docker Desktop (hybrid: Postgres/Qdrant/Redis stay in compose):
+Docker Desktop (hybrid: Postgres/Redis stay in compose):
 
 ```bash
 docker compose stop agent bot worker mcp-websearch mcp-knowledge mcp-vision
@@ -190,7 +188,6 @@ docker tag vanessa-agent:latest vanessa-agent:local
 python scripts/k8s_secrets.py apply --ensure-namespace \
   --broker-host host.docker.internal \
   --postgres-host host.docker.internal \
-  --qdrant-host host.docker.internal \
   --langfuse-host http://host.docker.internal:3000
 kubectl apply -k deploy/k8s/overlays/desktop
 kubectl -n vanessa port-forward svc/agent 8000:8000

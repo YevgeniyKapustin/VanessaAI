@@ -203,12 +203,7 @@ class FakeWebSearch:
 
 
 def _stage_ctx(web_search, *, web_search_flag: bool = True, web_query: str = "bitcoin"):
-    stage = RetrieveStage(
-        retriever=None,
-        humor_pipeline=None,
-        uow=None,
-        web_search=web_search,
-    )
+    stage = RetrieveStage(None, web_search=web_search)
     turn = ChatTurnInput(
         telegram_chat_id=1,
         message="какая цена биткоина",

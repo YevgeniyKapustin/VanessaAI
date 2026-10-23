@@ -31,21 +31,11 @@ class RateLimiterProtocol(Protocol):
     def record_reply(self, chat_id: int | str) -> None: ...
 
 
-class RelevanceCheckerProtocol(Protocol):
-    async def score(
-        self,
-        text: str,
-        query_vector: list[float] | None = None,
-        search_text: str | None = None,
-    ) -> float: ...
-
-
 class DecisionEngineProtocol(Protocol):
     async def decide(
         self,
         context: DecisionContext,
         *,
-        search_text: str | None = None,
         humor_ok: bool = False,
     ) -> DecisionResult: ...
 

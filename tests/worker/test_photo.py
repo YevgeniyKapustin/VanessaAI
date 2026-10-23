@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from typing import ClassVar, Self
 from unittest.mock import AsyncMock
 
-from services.worker.handlers.index import IndexMessageHandler
 from services.worker.handlers.knowledge import (
     MemoryExtractHandler,
     MetricsSnapshotHandler,
@@ -55,32 +54,6 @@ class _SkipRepo:
     async def get_by_id(self, message_id: int):
         del message_id
         return SimpleNamespace(attachments=[{"mime": "image/jpeg"}])
-
-
-class _IndexEmbed:
-    def __init__(self) -> None:
-        self.n = 0
-
-    async def embed(self, content):
-        del content
-        self.n += 1
-        if self.n == 1:
-            raise RuntimeError("once")
-        return [0.1]
-
-
-class _IndexVectors:
-    async def upsert_message(self, **kwargs) -> str:
-        del kwargs
-        return "p1"
-
-
-class _IndexRepo:
-    def __init__(self, session) -> None:
-        del session
-
-    async def update_qdrant_point_id(self, message_id, point_id) -> None:
-        del message_id, point_id
 
 
 async def test_photo_caption_handler(monkeypatch) -> None:
@@ -142,28 +115,3 @@ async def test_metrics_snapshot_handler(monkeypatch) -> None:
         )
     )
     assert metrics_calls[0]["only_senders"] == {9}
-
-
-async def test_index_handler_retry(monkeypatch) -> None:
-    monkeypatch.setattr(repository, "MessageRepository", _IndexRepo)
-    monkeypatch.setattr("services.worker.handlers.index.asyncio.sleep", AsyncMock())
-    handler = IndexMessageHandler(
-        _IndexEmbed(), _IndexVectors(), _Session, max_retries=1
-    )
-    await handler.handle(
-        TaskMessage(
-            task=TaskKind.INDEX_MESSAGE,
-            payload={"message_id": 3, "role": "user", "content": "hi"},
-        )
-    )
-
-
-async def test_index_handler_skips_non_user(monkeypatch) -> None:
-    monkeypatch.setattr(repository, "MessageRepository", _IndexRepo)
-    skip = IndexMessageHandler(_IndexEmbed(), _IndexVectors(), _Session)
-    await skip.handle(
-        TaskMessage(
-            task=TaskKind.INDEX_MESSAGE,
-            payload={"message_id": 3, "role": "assistant", "content": "hi"},
-        )
-    )

@@ -29,7 +29,7 @@ def test_compose_binds_ui_and_data_plane_to_localhost() -> None:
     )
     assert "127.0.0.1:5432:5432" in infra
     assert "127.0.0.1:6379:6379" in infra
-    assert "qdrant/qdrant:v1.13.4" in infra
+    assert "qdrant" not in infra
     assert "127.0.0.1:9090:9090" in monitoring
     assert "127.0.0.1:3001:3001" in monitoring
     langfuse = Path("docker-compose.langfuse.yml").read_text(encoding="utf-8")

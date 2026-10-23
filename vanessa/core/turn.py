@@ -25,6 +25,10 @@ class ChatTurnInput:
     images: tuple[ImageAttachment, ...] = ()
     scene_image: ImageAttachment | None = None
     channel: str = "telegram"
+    # The user's own Telegram message id (target for late follow-ups).
+    telegram_message_id: int | None = None
+    # Broker correlation id of the turn request (dedup key fallback).
+    correlation_id: str | None = None
 
     @property
     def has_image(self) -> bool:

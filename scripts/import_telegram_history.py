@@ -10,16 +10,12 @@ from pathlib import Path
 from alembic.config import Config
 
 from alembic import command
-from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
 from vanessa.infrastructure.db.session import async_session_factory
 from vanessa.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from vanessa.infrastructure.ingest.importer import HistoryImporter
 from vanessa.infrastructure.ingest.telegram_export import parse_telegram_export
-from vanessa.pipeline.rag.embeddings.embeddings import LocalEmbeddingProvider
-from vanessa.pipeline.rag.embeddings.local_embeddings import preload_embedding_model
-from vanessa.pipeline.rag.qdrant_client import QdrantVectorStore
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
@@ -31,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Import Telegram Desktop export (result.json) into Postgres and Qdrant.",
+        description="Import Telegram Desktop export (result.json) into Postgres.",
     )
     parser.add_argument(
         "--export",
@@ -43,12 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--batch-size",
         type=int,
         default=64,
-        help="Messages per DB/embed batch",
-    )
-    parser.add_argument(
-        "--no-embed",
-        action="store_true",
-        help="Store messages in Postgres only, skip Qdrant indexing",
+        help="Messages per DB batch",
     )
     return parser
 
@@ -82,26 +73,17 @@ async def run(args: argparse.Namespace) -> int:
         metadata.get("name"),
     )
 
-    embeddings = LocalEmbeddingProvider()
-    vector_store = QdrantVectorStore()
-    if not args.no_embed:
-        logger.info("Loading embedding model: %s", settings.embedding_model_name)
-        preload_embedding_model()
-
     async with async_session_factory() as session:
         uow = SqlAlchemyUnitOfWork(session)
         try:
             importer = HistoryImporter(
                 messages=MessageRepository(session),
                 users=UserRepository(session),
-                embeddings=embeddings,
-                vector_store=vector_store,
                 unit_of_work=uow,
                 batch_size=args.batch_size,
             )
             imported, skipped = await importer.import_messages(
                 parsed_messages=messages,
-                embed=not args.no_embed,
             )
         except Exception:
             await uow.rollback()

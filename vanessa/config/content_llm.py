@@ -137,11 +137,14 @@ class LLMContent(BaseModel):
     # Composer max_tokens override for "detailed" replies, so a fuller answer
     # is not truncated. 0 = use the base composer max_tokens.
     detailed_max_tokens: int = 0
+    # Hermes ask directives (TurnPlan.ask_hermes): task queued / PC offline.
+    hermes_asked_note: str = ""
+    hermes_offline_note: str = ""
     # Instruction injected when the turn carries an image (vision): tells the
     # model how to handle the attached picture (describe / OCR / be honest about
     # unclear text instead of hallucinating).
     vision_note: str = ""
-    # Photo album section: a list of photos the bot could re-send (RAG-selected),
+    # Photo album section: a list of photos the bot could re-send (FTS-selected),
     # with the instruction to emit [photo:<index>] when one fits the message.
     # Rendered as XML-like <attachment> entries (the input-block convention).
     photo_album_header: str = "<!-- Photos I can send (from our chat, matched to the context) -->"

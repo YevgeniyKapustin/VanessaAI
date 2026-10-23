@@ -12,7 +12,6 @@ SECRET_KEYS: frozenset[str] = frozenset(
         "ANTHROPIC_API_KEY",
         "WEB_SEARCH_API_KEY",
         "API_INTERNAL_TOKEN",
-        "HF_TOKEN",
         "BROKER_REDIS_URL",
         "LANGFUSE_PUBLIC_KEY",
         "LANGFUSE_SECRET_KEY",
@@ -34,7 +33,6 @@ OPTIONAL_SECRET_KEYS: frozenset[str] = frozenset(
         "ANTHROPIC_API_KEY",
         "WEB_SEARCH_API_KEY",
         "API_INTERNAL_TOKEN",
-        "HF_TOKEN",
         "LANGFUSE_PUBLIC_KEY",
         "LANGFUSE_SECRET_KEY",
         "LANGFUSE_ID_SALT",
@@ -52,7 +50,6 @@ WORKLOAD_SECRET_KEYS: dict[str, frozenset[str]] = {
             "DEEPSEEK_API_KEY",
             "ANTHROPIC_API_KEY",
             "API_INTERNAL_TOKEN",
-            "HF_TOKEN",
             "LANGFUSE_PUBLIC_KEY",
             "LANGFUSE_SECRET_KEY",
             "LANGFUSE_ID_SALT",
@@ -71,7 +68,6 @@ WORKLOAD_SECRET_KEYS: dict[str, frozenset[str]] = {
             "BROKER_REDIS_URL",
             "DEEPSEEK_API_KEY",
             "ANTHROPIC_API_KEY",
-            "HF_TOKEN",
             "LANGFUSE_PUBLIC_KEY",
             "LANGFUSE_SECRET_KEY",
             "LANGFUSE_ID_SALT",
@@ -106,7 +102,6 @@ def example_env_text() -> str:
         "\n"
         "# --- optional ---\n"
         "API_INTERNAL_TOKEN=\n"
-        "HF_TOKEN=\n"
         "LANGFUSE_PUBLIC_KEY=\n"
         "LANGFUSE_SECRET_KEY=\n"
         "LANGFUSE_ID_SALT=\n"

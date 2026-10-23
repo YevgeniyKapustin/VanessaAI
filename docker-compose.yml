@@ -1,4 +1,4 @@
-# Always pull infra (postgres, qdrant, redis) so a bare `docker compose up`
+# Always pull infra (postgres, redis) so a bare `docker compose up`
 # still works if COMPOSE_FILE is unset. Langfuse/monitoring stay optional.
 include:
   - docker-compose.infra.yml
@@ -7,15 +7,11 @@ x-app-image: &app-image
   image: vanessa-agent:latest
   build:
     context: .
-    args:
-      PRELOAD_EMBEDDINGS: "1"
 
 x-lite-image: &lite-image
   image: vanessa-lite:latest
   build:
     context: .
-    args:
-      PRELOAD_EMBEDDINGS: "0"
 
 x-env-files: &env-files
   - .env.defaults
@@ -51,8 +47,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      qdrant:
-        condition: service_healthy
       redis:
         condition: service_healthy
       migrate:
@@ -65,10 +59,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      # The lifespan cold start (knowledge vector reindex + first sweep)
-      # routinely takes 60-90s+, so a 30s grace would mark the container
-      # "unhealthy" and abort `docker compose up` (bot depends on agent).
+      # The lifespan cold start (vault sync + first sweep) can take a while,
+      # so a short grace would mark the container "unhealthy" and abort
+      # `docker compose up` (bot depends on agent).
       start_period: 300s
+    # Hermes on the owner's PC arrives as a reverse SSH tunnel on the host
+    # (docs/hermes.md); the agent only calls its /health.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - backend
       - frontend
@@ -87,10 +85,10 @@ services:
       - backend
 
   # --- Background worker -----------------------------------------------------
-  # Consumes TaskMessage jobs from the broker (message indexing, sweep,
-  # portraits, knowledge reindex) in an isolated process/container so heavy
-  # CPU/RAM work never stalls the reply path. Turns and inbox notes go bot →
-  # Redis → agent/worker. WORKER_ENABLED (default true) routes indexing here.
+  # Consumes TaskMessage jobs from the broker (sweep, portraits, memory
+  # extract, photo captions) in an isolated process/container so background
+  # work never stalls the reply path. Turns and inbox notes go bot →
+  # Redis → agent/worker.
   worker:
     <<: *app-image
     command: python -m services.worker.main
@@ -100,15 +98,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      qdrant:
-        condition: service_healthy
       redis:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    # Hermes runs (docs/hermes.md) go through the host's reverse SSH tunnel.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - backend
-    # Isolate the heavy CPU/RAM background work from the reply path.
+    # Isolate the background work from the reply path.
     deploy:
       resources:
         limits:

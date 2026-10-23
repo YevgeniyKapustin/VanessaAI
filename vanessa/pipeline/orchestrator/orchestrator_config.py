@@ -10,17 +10,10 @@ class OrchestratorConfig:
     session_idle_seconds: float
     post_reply_listen_count: int
     planner_prefilter_enabled: bool
-    defer_index_on_ignore: bool = True
     # Compose-stage refusal: refuse the answer (finalize as IGNORE) when the
     # answer-preparation stage detects a repeated same-sender message or the
     # compose model returns an empty "stay silent" reply.
     compose_refuse_enabled: bool = True
-    humor_top_k: int = 15
-    humor_anchor_max: int = 5
-    humor_window_before: int = 8
-    humor_window_after: int = 4
-    humor_max_quotes: int = 3
-    humor_min_quote_score: float = 2.5
 
     @classmethod
     def from_settings(cls) -> "OrchestratorConfig":
@@ -31,10 +24,4 @@ class OrchestratorConfig:
             post_reply_listen_count=conversation.post_reply_listen_count,
             planner_prefilter_enabled=settings.decision_planner_prefilter,
             compose_refuse_enabled=settings.decision_compose_refuse_enabled,
-            humor_top_k=settings.rag_humor_top_k,
-            humor_anchor_max=settings.rag_humor_anchor_max,
-            humor_window_before=settings.rag_humor_window_before,
-            humor_window_after=settings.rag_humor_window_after,
-            humor_max_quotes=settings.rag_humor_max_quotes,
-            humor_min_quote_score=settings.rag_humor_min_quote_score,
         )

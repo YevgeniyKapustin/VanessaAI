@@ -5,8 +5,8 @@ from vanessa.config.settings import settings
 from vanessa.core.turn import ChatTurnInput
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.stages.retrieve import RetrieveStage
 from vanessa.pipeline.stages.retrieve_extras import _RetrieveExtrasMixin
-from vanessa.pipeline.stages.retrieve_knowledge import _RetrieveKnowledgeMixin
 
 
 class _Extras(_RetrieveExtrasMixin):
@@ -14,11 +14,6 @@ class _Extras(_RetrieveExtrasMixin):
         self._meme_catalog = catalog
         self._meme_decider = decider
         self._web_search = web
-
-
-class _Knowledge(_RetrieveKnowledgeMixin):
-    def __init__(self, knowledge=None) -> None:
-        self._knowledge = knowledge
 
 
 def _ctx(*, humor: bool = True, web: bool = False) -> TurnPipelineContext:
@@ -87,37 +82,14 @@ async def test_web_search_found_empty_and_error(monkeypatch) -> None:
     await extras._run_web_search(ctx)
 
 
-async def test_knowledge_resolve_and_fetch() -> None:
-    class Knowledge:
-        async def resolve_people(self, *_a, **_k):
-            return ["People/ada.md"]
-
-        async def fetch_semantic(self, *_a, **_k):
-            return [SimpleNamespace(content="note")]
-
-    stage = _Knowledge(Knowledge())
-    ctx = _ctx()
-    files = await stage._resolve_people_files(ctx)
-    assert files
-    indexes = stage._knowledge_indexes(ctx, files)
-    assert "people" in indexes
-    assert await stage._fetch_knowledge(ctx, "q", indexes, files) is True
-    ctx.turn_plan = TurnPlan(original="x", text="x", skip_search=True)
-    stage._mark_embed_ms(ctx)
-
-
-async def test_knowledge_fail_open() -> None:
-    class Boom:
-        async def resolve_people(self, *_a, **_k):
-            raise RuntimeError("people")
-
-        async def fetch_semantic(self, *_a, **_k):
-            raise RuntimeError("qdrant")
-
-    stage = _Knowledge(Boom())
-    ctx = _ctx()
-    assert await stage._resolve_people_files(ctx) == []
-    assert await stage._fetch_knowledge(ctx, "q", ["people"], []) is False
-    empty = _Knowledge(None)
-    assert await empty._resolve_people_files(ctx) == []
-    assert await empty._fetch_knowledge(ctx, "q", [], []) is False
+async def test_retrieve_stage_commits_and_runs_extras(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "web_search_enabled", True)
+    uow = SimpleNamespace(commit=AsyncMock())
+    web = SimpleNamespace(search=AsyncMock(return_value=["hit"]))
+    stage = RetrieveStage(uow, web_search=web)
+    ctx = _ctx(web=True)
+    assert await stage.run(ctx) is True
+    uow.commit.assert_awaited_once()
+    assert ctx.web_blocks == ["hit"]
+    assert ctx.knowledge_blocks == []
+    assert await RetrieveStage(None).run(_ctx()) is True

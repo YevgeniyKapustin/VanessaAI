@@ -35,8 +35,6 @@ class _GateFilterMixin:
             ctx,
             reason=decision_reason_from_prefilter_tag(prefilter.reason),
             metrics=self._metrics,
-            indexing=self._indexing,
-            config=self._config,
             planner_skipped=True,
             log_event="turn_stage prefilter",
         )
@@ -77,8 +75,6 @@ class _GateFilterMixin:
             ctx,
             reason=DecisionReason.REACTION_GATE.value,
             metrics=self._metrics,
-            indexing=self._indexing,
-            config=self._config,
             planner_skipped=True,
             log_event="turn_stage reaction_gate",
         )

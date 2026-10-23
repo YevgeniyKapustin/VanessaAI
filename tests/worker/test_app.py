@@ -21,7 +21,7 @@ async def test_worker_app_dispatches_task() -> None:
     handler = _Handler()
     app = WorkerApp(
         broker,
-        {TaskKind.INDEX_MESSAGE: handler},
+        {TaskKind.SWEEP: handler},
         tasks_stream="vanessa:tasks",
         group="worker",
         consumer="w1",
@@ -30,14 +30,14 @@ async def test_worker_app_dispatches_task() -> None:
     await asyncio.sleep(0.05)
     await broker.publish(
         "vanessa:tasks",
-        TaskMessage(task=TaskKind.INDEX_MESSAGE, payload={"message_id": 1}),
+        TaskMessage(task=TaskKind.SWEEP, payload={"message_id": 1}),
     )
     await asyncio.sleep(0.1)
     consume_task.cancel()
     await asyncio.gather(consume_task, return_exceptions=True)
 
     assert len(handler.tasks) == 1
-    assert handler.tasks[0].task == TaskKind.INDEX_MESSAGE
+    assert handler.tasks[0].task == TaskKind.SWEEP
 
 
 async def test_worker_app_skips_unknown_kind() -> None:
@@ -55,7 +55,7 @@ async def test_worker_app_skips_unknown_kind() -> None:
     await asyncio.sleep(0.05)
     await broker.publish(
         "vanessa:tasks",
-        TaskMessage(task=TaskKind.INDEX_MESSAGE, payload={"message_id": 1}),
+        TaskMessage(task=TaskKind.SWEEP, payload={"message_id": 1}),
     )
     await asyncio.sleep(0.1)
     consume_task.cancel()

@@ -3,8 +3,6 @@ from __future__ import annotations
 from vanessa.infrastructure.observability.metrics.metrics_io import (
     _refresh_activity_gauges,
     knowledge_mutations_total,
-    knowledge_search_hits_total,
-    knowledge_vector_sync_duration_seconds,
     photo_request_missed_total,
     photo_send_total,
     reply_length_chars,
@@ -17,12 +15,8 @@ from vanessa.infrastructure.observability.metrics.metrics_io import (
 from vanessa.infrastructure.observability.metrics.metrics_llm import (
     prompt_budget_chars,
     prompt_truncations_total,
-    rag_empty_total,
     rag_eval_score,
     rag_eval_total,
-    rag_hits_total,
-    rag_score,
-    rag_search_total,
 )
 from vanessa.infrastructure.observability.metrics.metrics_pipeline import (
     background_queue_length,
@@ -42,7 +36,6 @@ from vanessa.infrastructure.observability.metrics.metrics_window import (
     active_sessions_5m,
     active_users_1h,
     active_users_24h,
-    rag_outcomes,
     telegram_limit_outcomes,
     telegram_outcomes,
     turn_durations,
@@ -111,20 +104,6 @@ def record_broker_rpc(kind: str, seconds: float) -> None:
     broker_rpc_duration_seconds.labels(kind=kind).observe(seconds)
 
 
-def record_rag_search(
-    source: str,
-    hits: int,
-    top_score: float | None,
-) -> None:
-    rag_search_total.labels(source=source).inc()
-    rag_hits_total.labels(source=source).inc(hits)
-    rag_outcomes.add((source, hits))
-    if top_score is not None:
-        rag_score.labels(source=source).observe(top_score)
-    if hits == 0:
-        rag_empty_total.labels(source=source).inc()
-
-
 def record_prompt_budget(section: str, chars: int) -> None:
     """Record the final length of one compose-prompt section (after budget)."""
     prompt_budget_chars.labels(section=section).observe(chars)
@@ -180,11 +159,3 @@ def record_rag_eval(dimension: str, score: float) -> None:
 
 def record_knowledge_mutation(node_type: str, action: str) -> None:
     knowledge_mutations_total.labels(type=node_type, action=action).inc()
-
-
-def record_knowledge_vector_sync(seconds: float) -> None:
-    knowledge_vector_sync_duration_seconds.observe(seconds)
-
-
-def record_knowledge_search(source: str, hits: int) -> None:
-    knowledge_search_hits_total.labels(source=source).inc(hits)

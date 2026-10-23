@@ -47,6 +47,10 @@ class TurnPlan:
     # Feeds a compose directive so Vanessa gives a fuller answer when the user
     # asks for detail and a one-liner when brevity is requested.
     detail: str = "normal"
+    # Ask Hermes (the owner's PC agent) about the owner's work. Async: the
+    # Retrieve stage only queues the task; Hermes answers later.
+    ask_hermes: bool = False
+    hermes_query: str = ""
 
     def to_trace_dict(self) -> dict[str, Any]:
         """Serialize the plan for the Langfuse trace (gate span output).
@@ -75,5 +79,7 @@ class TurnPlan:
             "repeated_topic": self.repeated_topic,
             "loop_level": self.loop_level,
             "detail": self.detail,
+            "ask_hermes": self.ask_hermes,
+            "hermes_query": self.hermes_query,
             "reason": self.reason,
         }

@@ -14,7 +14,6 @@ from vanessa.pipeline.decision import DecisionEngine
 from vanessa.pipeline.orchestrator.conversation_orchestrator import (
     ConversationOrchestrator,
 )
-from vanessa.pipeline.rag.search.hybrid_search import HybridSearchService
 from vanessa.pipeline.turn_metrics import TurnMetrics
 
 
@@ -27,20 +26,17 @@ def _request(container: AppContainer):
 def test_app_container_composes_factories() -> None:
     persistence = Persistence()
     search = MagicMock()
-    indexing = MagicMock()
     graph = MagicMock()
     turns = TurnWiring(
         graph,
         persistence=persistence,
         search=search,
-        indexing=indexing,
         decision_factory=MagicMock(),
         orchestrator=MagicMock(),
     )
     app = AppContainer(graph=graph, turns=turns)
     assert app.turns.persistence is persistence
     assert app.turns.search is search
-    assert app.turns.indexing is indexing
 
 
 def test_get_turn_metrics_returns_singleton():
@@ -58,30 +54,12 @@ def test_get_turn_metrics_returns_singleton():
 
 def test_decision_engine_builds_from_graph():
     container = AppContainer()
-    embeddings = container.graph.retrieval.embeddings
-    vector_store = container.graph.retrieval.indexes.messages
-    engine = container.turns.decision_factory.engine(embeddings, vector_store)
+    engine = container.turns.decision_factory.engine()
     assert isinstance(engine, DecisionEngine)
-
-
-def test_hybrid_search_wires_dependencies():
-    container = AppContainer()
-    messages = MessageRepository.__new__(MessageRepository)
-    embeddings = container.graph.retrieval.embeddings
-    vector_store = container.graph.retrieval.indexes.messages
-    service = container.turns.search.hybrid(messages, embeddings, vector_store)
-    assert isinstance(service, HybridSearchService)
 
 
 def test_query_rewriter():
     assert AppContainer().turns.search.query_rewriter() is not None
-
-
-def test_embedding_provider_is_singleton():
-    container = AppContainer()
-    first = container.graph.retrieval.embeddings
-    second = container.graph.retrieval.embeddings
-    assert first is second
 
 
 def test_repositories_from_persistence():

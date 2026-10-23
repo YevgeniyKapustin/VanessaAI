@@ -59,8 +59,6 @@ class _GateVisionMixin:
             ctx,
             reason=DecisionReason.NOT_EXPECTED.value,
             metrics=self._metrics,
-            indexing=self._indexing,
-            config=self._config,
             planner_skipped=True,
             log_event="turn_stage bare_photo_not_addressed",
         )

@@ -1,16 +1,10 @@
-"""Agent-core settings mixin: LLM, RAG, decision, vision, tools."""
+"""Agent-core settings mixin: LLM, planner, decision, vision, tools."""
 
 from __future__ import annotations
 
 
 class CoreMixin:
-    """Agent-core (orchestrator) settings: LLM, RAG, decision, vision, tools."""
-
-    # --- Embeddings ----------------------------------------------------------
-    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_dimensions: int = 384
-    embedding_threads: int = 1
-    hf_token: str = ""
+    """Agent-core (orchestrator) settings: LLM, planner, decision, vision, tools."""
 
     # --- LLM providers -------------------------------------------------------
     llm_provider: str = "deepseek"  # "deepseek" (default) or "claude"
@@ -40,30 +34,10 @@ class CoreMixin:
     vision_photo_caption_model: str = ""
     vision_photo_caption_max_chars: int = 160
 
-    # --- RAG ------------------------------------------------------------------
-    rag_context_min: int = 20
-    rag_context_max: int = 50
-    rag_anchor_max: int = 16
-    rag_context_window_before: int = 10
-    rag_context_window_after: int = 10
-    rag_context_window_max_total: int = 360
-    rag_hybrid_top_k: int = 40
-    rag_humor_top_k: int = 15
-    rag_humor_anchor_max: int = 5
-    rag_humor_max_quotes: int = 2
-    rag_humor_min_quote_score: float = 2.5
-    rag_humor_window_before: int = 8
-    rag_humor_window_after: int = 4
-    rag_embed_cache_size: int = 256
-    rag_embed_max_chars: int = 2000
+    # --- Turn planner ---------------------------------------------------------
     rag_query_rewrite_use_llm: bool = True
-    rag_query_rewrite_max_tokens: int = 256
-    rag_react_max_steps: int = 3
-    rag_react_min_blocks: int = 2
-    rag_vector_min_score: float = 0.35
 
     # --- Decision engine ------------------------------------------------------
-    decision_relevance_threshold: float = 0.76
     decision_session_window_size: int = 10
     decision_rate_limit_per_minute: int = 10
     decision_bot_names: str = ""
@@ -96,20 +70,11 @@ class CoreMixin:
 
     # --- Knowledge vault (read/retrieval side) --------------------------------
     knowledge_path: str = "knowledge"
-    knowledge_max_blocks: int = 3
-    knowledge_people_max_blocks: int = 3
     knowledge_model: str = ""
-    knowledge_vector_top_k: int = 10
-    knowledge_vector_min_score: float = 0.3
     knowledge_participant_max_people: int = 10
     knowledge_participant_max_facts: int = 3
     knowledge_participant_recent_window: int = 5
     knowledge_participant_min_people: int = 3
-    knowledge_people_raw_max_chars: int = 1400
-    knowledge_people_chunks_enabled: bool = True
-    knowledge_people_chunk_chars: int = 600
-    knowledge_people_chunk_overlap: int = 120
-    knowledge_people_detail_blocks: int = 5
     compose_budget_enabled: bool = True
     # filesystem (default, tests/local) or postgres (production vault).
     knowledge_store: str = "filesystem"
@@ -148,7 +113,6 @@ class CoreMixin:
     alerting_window_seconds: int = 300
     alerting_error_rate_threshold: float = 0.05
     alerting_latency_p95_threshold: float = 7.0
-    alerting_rag_empty_threshold: float = 0.5
     alerting_llm_empty_threshold: float = 0.1
     alerting_cost_window_threshold_usd: float = 5.0
     alerting_dev_chat_id: int = 0

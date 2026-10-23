@@ -70,11 +70,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override POSTGRES_HOST in the generated ConfigMap",
     )
     apply.add_argument(
-        "--qdrant-host",
-        default=None,
-        help="Override QDRANT_HOST in the generated ConfigMap",
-    )
-    apply.add_argument(
         "--langfuse-host",
         default=None,
         help="Override LANGFUSE_HOST in the generated ConfigMap",
@@ -93,11 +88,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--postgres-host",
         default=None,
         help="Override POSTGRES_HOST (e.g. host.docker.internal)",
-    )
-    cfg.add_argument(
-        "--qdrant-host",
-        default=None,
-        help="Override QDRANT_HOST (e.g. host.docker.internal)",
     )
     cfg.add_argument(
         "--langfuse-host",

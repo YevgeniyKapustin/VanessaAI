@@ -20,8 +20,6 @@ _NOISY_LOGGERS = (
     "httpcore",
     "aiogram.event",
     "aiogram.dispatcher",
-    "huggingface_hub",
-    "sentence_transformers",
 )
 
 _configured_service_name: ServiceName | None = None

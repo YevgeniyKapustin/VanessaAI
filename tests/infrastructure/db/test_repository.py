@@ -181,16 +181,6 @@ async def test_message_get_by_ids_preserves_order():
 
 
 @pytest.mark.asyncio
-async def test_message_update_qdrant_point_id_noop_when_missing():
-    session = AsyncMock()
-    _enable_nested(session)
-    session.get = AsyncMock(return_value=None)
-    repo = MessageRepository(session)
-    await repo.update_qdrant_point_id(1, "pt-1")
-    session.get.assert_awaited_once_with(Message, 1)
-
-
-@pytest.mark.asyncio
 async def test_user_get_by_telegram_id():
     session = AsyncMock()
     user = User(id=1, telegram_id=42)
@@ -348,18 +338,6 @@ async def test_message_window_blocks_without_context():
     assert blocks[0][0] == 1
     assert blocks[0][1][0].id == 1
     assert blocks[0][1][0].role == "user"
-
-
-@pytest.mark.asyncio
-async def test_message_update_qdrant_point_id_updates():
-    session = AsyncMock()
-    _enable_nested(session)
-    message = Message(id=1, role="user", content="x")
-    session.get = AsyncMock(return_value=message)
-    repo = MessageRepository(session)
-    await repo.update_qdrant_point_id(1, "pt-99")
-    assert message.qdrant_point_id == "pt-99"
-    session.begin_nested.assert_called_once()
 
 
 @pytest.mark.asyncio

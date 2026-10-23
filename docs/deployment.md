@@ -2,7 +2,7 @@
 
 Local Docker Compose is the default runtime. Kubernetes manifests map
 the same topology for a Docker Desktop hybrid lab (apps in-cluster;
-Postgres, Redis, and Qdrant stay on Compose). Hosted production on a
+Postgres and Redis stay on Compose). Hosted production on a
 single machine is the Compose prod overlay (unpublished API + Nginx).
 CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs tests
 on push/PR; image build and cluster apply are not in GitHub Actions yet.
@@ -13,7 +13,7 @@ on push/PR; image build and cluster apply are not in GitHub Actions yet.
 services/
   bot/          Telegram transport
   agent/        Turn pipeline + notes/health HTTP
-  worker/       Indexing, sweep, memory jobs
+  worker/       Sweep, memory, metrics, photo caption jobs
   mcp/          Tool servers
 vanessa/
   core/             DTOs, ports, session
@@ -23,9 +23,9 @@ vanessa/
   config/ contracts/
   k8s/              Deploy helpers
 config/          YAML defaults (behavior, channels, identity, presence)
-config/behavior/ Per-section YAML in compose/, gate/, retrieve/, …
+config/behavior/ Per-section YAML in compose/, gate/, knowledge/, humor/
 knowledge/      Runtime vault data
-scripts/        import, reindex, portraits, stickers, k8s secrets
+scripts/        import, portraits, stickers, k8s secrets
 tests/          Automated tests
 deploy/k8s/     Kubernetes manifests
 ```
@@ -48,7 +48,7 @@ docker compose --env-file .env.defaults --env-file .env.local up -d --build
 `docker compose logs migrate` and re-run migrate. `agent` waits on
 `service_completed_successfully`.
 
-Services: agent `http://localhost:8000`, Qdrant `6333`, Postgres `5432`.
+Services: agent `http://localhost:8000`, Postgres `5432`.
 Nginx under `deploy/nginx/` is only for the Compose prod path.
 
 ## Production Compose

@@ -83,12 +83,6 @@ spec:
                   name: vanessa-secrets
                   key: API_INTERNAL_TOKEN
                   optional: true
-            - name: HF_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: vanessa-secrets
-                  key: HF_TOKEN
-                  optional: true
             - name: LANGFUSE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:

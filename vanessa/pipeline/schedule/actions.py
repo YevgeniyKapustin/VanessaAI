@@ -9,6 +9,7 @@ from datetime import datetime
 from vanessa.core.protocols import ReminderStoreProtocol
 from vanessa.core.reminders import NewReminder, Reminder
 from vanessa.pipeline.decision.schedule_request import ScheduleRequest
+from vanessa.pipeline.schedule.duplicates import find_duplicate
 from vanessa.pipeline.schedule.matching import match_reminders
 from vanessa.pipeline.schedule.timing import SchedulePolicy, first_run
 from vanessa.pipeline.schedule.urls import keep_urls
@@ -28,8 +29,8 @@ class ScheduleCall:
 
 @dataclass(frozen=True, slots=True)
 class ScheduleOutcome:
-    """``status``: added, listed, empty, cancelled, not_found, ambiguous,
-    rejected or error. ``detail`` is the reject reason code."""
+    """``status``: added, exists, listed, empty, cancelled, not_found,
+    ambiguous, rejected or error. ``detail`` is the reject reason code."""
 
     status: str
     reminders: tuple[Reminder, ...] = ()
@@ -46,12 +47,16 @@ async def _add(call: ScheduleCall, store: ReminderStoreProtocol) -> ScheduleOutc
     if run_at is None:
         return ScheduleOutcome("rejected", detail=reason)
     existing = await store.list_for_chat(call.chat_id)
+    text = _post_text(call)
+    same = find_duplicate(existing, cron=call.request.cron, run_at=run_at, text=text)
+    if same is not None:
+        return ScheduleOutcome("exists", (same,))
     if len(existing) >= call.policy.max_per_chat:
         return ScheduleOutcome("rejected", tuple(existing), detail="limit")
     reminder = await store.add(
         NewReminder(
             chat_id=call.chat_id,
-            text=_post_text(call),
+            text=text,
             next_run_at=run_at,
             cron=call.request.cron,
             created_by=call.sender_id,

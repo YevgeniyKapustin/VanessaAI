@@ -41,13 +41,16 @@ def _reason(detail: str, content: ScheduleContent, policy: SchedulePolicy) -> st
     return template.format(min_minutes=minutes, max_per_chat=policy.max_per_chat)
 
 
-def _added(
-    outcome: ScheduleOutcome, content: ScheduleContent, policy: SchedulePolicy
-) -> str:
-    reminder = outcome.reminders[0]
-    return content.added_note.format(
-        when=describe_when(reminder, content, policy), text=reminder.text
-    )
+def _one(template: str):
+    def render(
+        outcome: ScheduleOutcome, content: ScheduleContent, policy: SchedulePolicy
+    ) -> str:
+        reminder = outcome.reminders[0]
+        return getattr(content, template).format(
+            when=describe_when(reminder, content, policy), text=reminder.text
+        )
+
+    return render
 
 
 def _rejected(
@@ -76,7 +79,8 @@ def _fixed(template: str):
 
 
 _RENDERERS = {
-    "added": _added,
+    "added": _one("added_note"),
+    "exists": _one("exists_note"),
     "rejected": _rejected,
     "listed": _listing("listed_note"),
     "cancelled": _listing("cancelled_note"),

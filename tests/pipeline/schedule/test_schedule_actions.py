@@ -1,6 +1,8 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
 
+import pytest
+
 from vanessa.core.reminders import NewReminder, Reminder
 from vanessa.pipeline.decision.schedule_request import ScheduleRequest
 from vanessa.pipeline.schedule.actions import ScheduleCall, apply_schedule
@@ -67,11 +69,49 @@ async def test_add_rejects_frequent_cron() -> None:
 
 async def test_add_respects_chat_cap() -> None:
     store = FakeStore()
-    for _ in range(POLICY.max_per_chat):
-        await apply_schedule(_call(ADD), store)
+    for number in range(POLICY.max_per_chat):
+        await apply_schedule(_call(replace(ADD, text=f"Пост {number}")), store)
     outcome = await apply_schedule(_call(ADD), store)
     assert (outcome.status, outcome.detail) == ("rejected", "limit")
     assert len(store.rows) == POLICY.max_per_chat
+
+
+async def test_same_cron_and_link_is_not_added_twice() -> None:
+    store = FakeStore()
+    first = await apply_schedule(_call(ADD, f"кидай обеды {URL}"), store)
+    reworded = replace(ADD, text="Пора заказывать обед!")
+    outcome = await apply_schedule(_call(reworded, f"меню тут {URL}"), store)
+    assert outcome.status == "exists"
+    assert outcome.reminders == first.reminders
+    assert len(store.rows) == 1
+
+
+async def test_same_text_without_link_is_not_added_twice() -> None:
+    store = FakeStore()
+    await apply_schedule(_call(ADD), store)
+    outcome = await apply_schedule(_call(replace(ADD, text="пятница  обеды")), store)
+    assert outcome.status == "exists"
+    assert len(store.rows) == 1
+
+
+@pytest.mark.parametrize(
+    ("request_", "source"),
+    [(replace(ADD, cron="0 13 * * 4"), URL), (ADD, f"{URL}/2")],
+)
+async def test_other_cron_or_link_is_a_new_post(request_, source: str) -> None:
+    store = FakeStore()
+    await apply_schedule(_call(ADD, f"обеды {URL}"), store)
+    assert (await apply_schedule(_call(request_, source), store)).status == "added"
+    assert len(store.rows) == POLICY.max_per_chat
+
+
+async def test_same_one_shot_is_not_added_twice() -> None:
+    store = FakeStore()
+    once = ScheduleRequest(action="add", at="2026-10-22T10:00", text="Созвон")
+    await apply_schedule(_call(once), store)
+    outcome = await apply_schedule(_call(once), store)
+    assert outcome.status == "exists"
+    assert len(store.rows) == 1
 
 
 async def test_list_empty_and_listed() -> None:

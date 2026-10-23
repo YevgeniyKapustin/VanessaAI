@@ -18,6 +18,13 @@ added_note: |
   Do NOT claim you posted it already.
   Never mention a time zone (no «UTC», «МСК», «по Тбилиси»).
 
+exists_note: |
+  You already have this post scheduled in this chat: {when}.
+  The post: «{text}».
+  You added NOTHING new. Say briefly in your own voice that it is already
+  set and when it runs, in plain words («по пятницам в 13:00»).
+  Never mention a time zone.
+
 listed_note: |
   Posts you scheduled for yourself in this chat:
   {items}

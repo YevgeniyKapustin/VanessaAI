@@ -22,6 +22,7 @@ class ScheduleContent(BaseModel):
     when_cron: str = Field(min_length=1)
     when_once: str = Field(min_length=1)
     added_note: str
+    exists_note: str
     listed_note: str
     empty_note: str
     cancelled_note: str

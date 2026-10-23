@@ -44,6 +44,14 @@ def test_added_note(content) -> None:
     assert "13:00" in note
 
 
+def test_exists_note_says_nothing_was_added(content) -> None:
+    note = render_note(ScheduleOutcome("exists", (WEEKLY,)), content, POLICY)
+    assert "https://e.x/m" in note
+    assert "13:00" in note
+    assert "already" in note
+    assert "NOTHING new" in note
+
+
 @pytest.mark.parametrize("status", ["listed", "cancelled", "not_found", "ambiguous"])
 def test_listing_notes_carry_items(content, status: str) -> None:
     note = render_note(ScheduleOutcome(status, (WEEKLY, ONCE)), content, POLICY)
@@ -69,14 +77,16 @@ def test_fixed_and_unknown_notes(content) -> None:
 
 
 def test_prompts_forbid_zone_names(content) -> None:
-    for text in (content.added_note, content.listed_note, content.fire_task):
+    notes = (content.added_note, content.exists_note, content.listed_note)
+    for text in (*notes, content.fire_task):
         assert "time zone" in text
 
 
 def test_load_schedule_content(tmp_path) -> None:
     path = tmp_path / "schedule.yaml"
     path.write_text(
-        "item: i\nwhen_cron: c\nwhen_once: o\nadded_note: a\nlisted_note: l\n"
+        "item: i\nwhen_cron: c\nwhen_once: o\nadded_note: a\nexists_note: x\n"
+        "listed_note: l\n"
         "empty_note: e\ncancelled_note: c\nnot_found_note: n\nambiguous_note: a\n"
         "rejected_note: r\nerror_note: e\nfire_task: f\n",
         encoding="utf-8",

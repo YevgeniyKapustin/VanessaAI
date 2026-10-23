@@ -15,7 +15,7 @@ from vanessa.config.content_schedule import ScheduleContent
 from vanessa.core.protocols import LLMChatCompleter
 from vanessa.core.reminders import Reminder
 from vanessa.llm.generation import LLMGenerationParams
-from vanessa.pipeline.llm.format.answer_tag import is_untagged_reply
+from vanessa.pipeline.llm.format.reasoning_leak import is_reasoning_leak
 from vanessa.pipeline.llm.tagged_reply import request_tagged
 from vanessa.pipeline.schedule.urls import extract_urls, urls_intact
 
@@ -64,8 +64,8 @@ class ReminderComposer:
                 type(exc).__name__,
             )
             return ""
-        if is_untagged_reply(raw):
-            # Still no [answer] after the retry: bare reasoning → stored text.
+        if is_reasoning_leak(raw):
+            # Untagged reasoning after the retry → the stored text.
             logger.warning(
                 "reminder_llm_untagged reminder_id=%s chars=%s",
                 reminder.id,

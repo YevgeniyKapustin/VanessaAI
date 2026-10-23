@@ -53,7 +53,7 @@ class _RecordingTracer:
 
 def _make_response(text: str, *, tagged: bool = True) -> MagicMock:
     choice = MagicMock()
-    # The composer always writes [answer]; untagged output is bare reasoning.
+    # tagged=True adds [answer] (the usual output); tagged=False keeps the raw text.
     has_tag = "[answer]" in text or "<answer>" in text
     choice.message.content = text if has_tag or not tagged else f"[answer]\n{text}"
     response = MagicMock()
@@ -431,4 +431,15 @@ async def test_deepseek_bare_ignore_marker_is_not_retried(provider: DeepSeekLLMP
     ignore = _make_response("[ignore] повтор", tagged=False)
     provider._client.chat.completions.create = AsyncMock(return_value=ignore)
     await provider.generate("ванесса", [])
+    provider._client.chat.completions.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_deepseek_clean_untagged_content_is_the_answer(provider: DeepSeekLLMProvider):
+    # Thinking mode: the reasoning comes apart, `content` is the clean message.
+    clean = _make_response("Ставлю. Каждую пятницу в 13:00 буду кидать меню", tagged=False)
+    clean.choices[0].message.reasoning_content = "He asks to set a reminder. Short."
+    provider._client.chat.completions.create = AsyncMock(return_value=clean)
+    reply = await provider.generate("ванесса", [])
+    assert reply == "Ставлю. Каждую пятницу в 13:00 буду кидать меню"
     provider._client.chat.completions.create.assert_awaited_once()

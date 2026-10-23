@@ -13,9 +13,9 @@ from vanessa.llm.generation import LLMGenerationParams
 from vanessa.pipeline.llm.format.answer_tag import (
     extract_answer,
     has_ignore_marker,
-    is_untagged_reply,
 )
 from vanessa.pipeline.llm.format.block_markers import strip_block_markers
+from vanessa.pipeline.llm.format.reasoning_leak import is_reasoning_leak
 from vanessa.pipeline.llm.format.stray_tags import strip_stray_tags
 from vanessa.pipeline.llm.tagged_reply import request_tagged
 
@@ -105,8 +105,8 @@ class FollowupComposer:
                 type(exc).__name__,
             )
             raw = ""
-        if is_untagged_reply(raw):
-            # Still no [answer] after the retry: the text is bare reasoning.
+        if is_reasoning_leak(raw):
+            # Untagged reasoning after the retry.
             # The user waits for a result, so post the fixed line, not silence.
             logger.warning(
                 "hermes_followup_untagged chat_id=%s chars=%s",

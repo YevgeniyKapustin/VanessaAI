@@ -58,15 +58,19 @@ web_instruction: |
   say so honestly instead of inventing facts.
 
 hermes_asked_note: |
-  You asked your Hermes about this. He works slowly and will answer later in a
-  separate message. Say so briefly, in one phrase, in your own voice.
-  Do NOT invent his answer, results, numbers, statuses or ids.
-  Answer yourself what you can from the chat and your own knowledge.
+  You started a work lookup for this message. The result comes later in a
+  separate message. Say so in one short phrase, first person, as your own
+  work («ща гляну», «погоди, найду — скину»); vary the words.
+  - never mention Hermes, an agent, a helper, a basement or a homunculus;
+  - do NOT invent the result: no numbers, statuses, ids or links;
+  - do NOT ask the user to narrow the request or to wait for your question;
+  - another part of the message that is not about the lookup: answer it.
 
 hermes_offline_note: |
-  Your Hermes is offline right now (the owner's PC is off). Say so in one
-  phrase and answer yourself as well as you can. Nothing is queued: do NOT
-  promise that Hermes will answer later.
+  You cannot check the work systems right now. Say so in one short phrase,
+  first person, and answer yourself as well as you can. Nothing is queued:
+  do NOT promise a later answer. Never mention Hermes, an agent, a helper,
+  a basement or a homunculus.
 
 photo_album_instruction: |
   The chat already received the photos listed above — the app can re-send any of

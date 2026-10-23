@@ -17,6 +17,7 @@ def render_feedback_block(
     name: str,
     metrics: PersonMetrics | None,
     mood: str = "",
+    facts: tuple[str, ...] = (),
 ) -> str | None:
     """Render the tone-block line for the compose prompt, or None when no data."""
     if metrics is None or not settings.feedback_tone_enabled:
@@ -25,13 +26,17 @@ def render_feedback_block(
     trust = metrics.trust_score if metrics.trust_score is not None else "-"
     distance = metrics.distance.value if metrics.distance else "unknown"
     content = get_content()
-    return content.metrics.feedback_line.format(
+    line = content.metrics.feedback_line.format(
         name=name,
         toxicity=toxicity,
         trust=trust,
         distance=distance,
         mood=mood or "?",
     )
+    template = content.metrics.feedback_facts_line
+    if not facts or not template.strip():
+        return line
+    return line + "\n" + template.format(name=name, facts="; ".join(facts))
 
 
 def render_annoyance_note(*, name: str, annoyance: float) -> str | None:

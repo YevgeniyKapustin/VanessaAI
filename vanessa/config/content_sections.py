@@ -86,6 +86,9 @@ class MetricsContent(BaseModel):
     feedback_line: str = (
         "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"
     )
+    # Card facts about the sender under the mood line. Placeholders: {name},
+    # {facts}. Empty = facts are not shown.
+    feedback_facts_line: str = "  facts about {name}: {facts}"
     # Cold-reply directive injected into the compose prompt when the sender is
     # stuck in a same-topic loop (annoyance >= feedback_annoyance_threshold).
     # Placeholders: {name}, {annoyance}. Empty = feature disabled.

@@ -6,6 +6,8 @@ _FENCED_CODE = re.compile(r"```(\w*)\n?(.*?)\n?```", re.DOTALL)
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
 _BOLD = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
 _ITALIC = re.compile(r"(?<!\*)\*([^*\n]+?)\*(?!\*)")
+# Markdown link with an http(s) URL: ``[name](https://...)``.
+_LINK = re.compile(r"\[([^\[\]\n]+)\]\((https?://[^\s()<>\"]+)\)")
 
 
 def markdown_to_telegram_html(text: str) -> str:
@@ -56,7 +58,8 @@ def _format_inline_markup(text: str) -> str:
     if not text:
         return ""
     placeholders: list[str] = []
-    marked = _BOLD.sub(partial(_stash_markup, placeholders, "b"), text)
+    marked = _LINK.sub(partial(_stash_link, placeholders), text)
+    marked = _BOLD.sub(partial(_stash_markup, placeholders, "b"), marked)
     marked = _ITALIC.sub(partial(_stash_markup, placeholders, "i"), marked)
     escaped = html.escape(marked, quote=False)
     return _restore_placeholders(escaped, placeholders)
@@ -67,6 +70,13 @@ def _stash_markup(
 ) -> str:
     inner = html.escape(match.group(1), quote=False)
     placeholders.append(f"<{tag}>{inner}</{tag}>")
+    return f"\x00{len(placeholders) - 1}\x00"
+
+
+def _stash_link(placeholders: list[str], match: re.Match[str]) -> str:
+    name = html.escape(match.group(1), quote=False)
+    url = html.escape(match.group(2), quote=True)
+    placeholders.append(f'<a href="{url}">{name}</a>')
     return f"\x00{len(placeholders) - 1}\x00"
 
 

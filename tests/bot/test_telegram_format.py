@@ -58,3 +58,16 @@ def test_capitalize_skips_fenced_code():
     assert result.startswith("Вот код:")
     assert "y = 2" in result
     assert "Y = 2" not in result
+
+
+def test_markdown_link_becomes_anchor():
+    html = markdown_to_telegram_html("горит [вход <iOS>](https://plane.example/ABC-1?a=1&b=2) и *всё*")
+
+    assert '<a href="https://plane.example/ABC-1?a=1&amp;b=2">вход &lt;iOS&gt;</a>' in html
+    assert "<i>всё</i>" in html
+
+
+def test_non_http_link_stays_text():
+    html = markdown_to_telegram_html("[жми](javascript:alert(1))")
+
+    assert "<a" not in html

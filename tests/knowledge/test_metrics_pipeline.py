@@ -247,12 +247,13 @@ async def test_metrics_retriever_profiles() -> None:
     vault.notes["People/ada.md"] = VaultNote(
         "People/ada.md",
         meta={"metrics": {"valence": 0.1}, "mood": "calm"},
-        body="",
+        body="## Контекст жизни\n- 2026-10-24: пишет бэкенд\n\n## Хроника\n- шум",
     )
     index = _Index({"telegram_id": {"7": {"id": "ada", "file": "People/ada.md"}}})
     retriever = MetricsRetriever(vault, index)
     profile = await retriever.get_by_telegram_id(7)
     assert profile is not None
+    assert profile.facts == ("пишет бэкенд",)
     assert profile.display_name == "ada"
     assert await retriever.get_by_telegram_id(0) is None
     by_id = await retriever.get_by_person_id("ada")

@@ -1,3 +1,4 @@
+from vanessa.config.content import get_content
 from vanessa.core.protocols import (
     MessageRepositoryProtocol,
     TurnMetricsProtocol,
@@ -8,6 +9,7 @@ from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionAction
 from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
 from vanessa.pipeline.llm.format.answer_tag import strip_control_tags
+from vanessa.pipeline.llm.format.stray_tags import strip_stray_tags
 from vanessa.pipeline.llm.memes import MemeDecider
 from vanessa.pipeline.stages.finalize_delivery import (
     delivery_messages,
@@ -63,6 +65,10 @@ class FinalizeStage:
         # let a control tag reach the chat. The [next] block marker is left for
         # the block splitter below, which needs it to separate the messages.
         clean_reply = strip_control_tags(clean_reply)
+        # Invented markers like «[forward]» at a line end never reach the chat.
+        clean_reply = strip_stray_tags(
+            clean_reply, keep=(get_content().llm.block_marker,)
+        )
         messages = delivery_messages(ctx, clean_reply)
         clean_reply = marker_free_reply(clean_reply)
         ctx.reply = clean_reply

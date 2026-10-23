@@ -11,9 +11,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from vanessa.config.settings import settings
 from vanessa.knowledge.format import PEOPLE
 from vanessa.knowledge.index.index import KnowledgeIndex
 from vanessa.knowledge.metrics.schema import PersonMetrics
+from vanessa.knowledge.people.participants_format import context_facts
 from vanessa.knowledge.people.vrchat_speaker import resolve_vrchat_speaker
 from vanessa.knowledge.store.vault import KnowledgeVault
 
@@ -27,6 +29,8 @@ class SenderProfile:
     person_id: str
     metrics: PersonMetrics | None
     mood: str = ""
+    # Newest ``## Контекст жизни`` bullets, dates stripped.
+    facts: tuple[str, ...] = ()
 
     @property
     def display_name(self) -> str:
@@ -81,8 +85,11 @@ class MetricsRetriever:
         data = note.meta.get("metrics")
         metrics = PersonMetrics.from_dict(data) if isinstance(data, dict) else None
         mood = str(note.meta.get("mood") or "")
+        max_facts = max(settings.knowledge_participant_max_facts, 0)
+        facts = tuple(context_facts(note.body or "")[-max_facts:]) if max_facts else ()
         return SenderProfile(
             person_id=person_id or rel,
             metrics=metrics,
             mood=mood,
+            facts=facts,
         )

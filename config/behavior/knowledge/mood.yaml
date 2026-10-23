@@ -2,6 +2,9 @@
 feedback_header: "My mood and relationship notes about the sender:"
 feedback_line: "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"
 
+# Facts from the sender's card («Контекст жизни»), newest last.
+feedback_facts_line: "  facts about {name}: {facts}"
+
 # Cold-reply directive for the compose prompt when the sender is stuck in a
 # same-topic loop and Vanessa is annoyed (annoyance >= feedback_annoyance_threshold).
 annoyance_note: |

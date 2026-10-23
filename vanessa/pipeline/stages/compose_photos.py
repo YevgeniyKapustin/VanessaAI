@@ -38,6 +38,7 @@ class _ComposePhotoMixin:
                 name=ctx.sender_name,
                 metrics=ctx.sender_metrics,
                 mood=ctx.sender_profile.mood,
+                facts=ctx.sender_profile.facts,
             )
         # Cold-reply note: a sender stuck in a same-topic loop gets a dry, sharp,
         # brief answer — no warmth, no fluff (the loop dropped Vanessa's attitude).

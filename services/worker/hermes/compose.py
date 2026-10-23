@@ -12,6 +12,7 @@ from vanessa.core.protocols import LLMChatCompleter
 from vanessa.llm.generation import LLMGenerationParams
 from vanessa.pipeline.llm.format.answer_tag import extract_answer, has_ignore_marker
 from vanessa.pipeline.llm.format.block_markers import strip_block_markers
+from vanessa.pipeline.llm.format.stray_tags import strip_stray_tags
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def final_text(raw: str) -> str:
     reply = strip_block_markers(reply)
     if has_ignore_marker(reply):
         return ""
-    return reply
+    return strip_stray_tags(reply).strip()
 
 
 def chat_request(

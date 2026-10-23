@@ -218,6 +218,12 @@ turn_planner_prompt: |
   ask_hermes=true ONLY for the owner's work: Plane issues, GitLab MRs and
   pipelines, agent sessions, Grafana / k8s state («что там с пайплайном»,
   «заведи задачу в Plane», «какие MR висят»).
+  The owner's work project: its name is in the owner's facts in the
+  participants block («наш проект» also means it). ANY question about that
+  project — its tasks, bugs, releases, stage/prod, process, testing flow —
+  is ask_hermes=true, not needs_clarification and not a generic answer.
+  Exception: what the project is in general — Vanessa answers from the
+  owner's facts, ask_hermes=false.
   false (default) for chit-chat, general knowledge (that is web_search),
   our people/lore, and ANYTHING about the PC itself, its files or commands.
   hermes_query: ONE short self-contained question in the user's language
@@ -272,6 +278,9 @@ turn_planner_prompt: |
 
   «ванесса, глянь, что с пайплайном в MR 42 в vanessa-ai» | owner's work → Hermes
   → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Какой статус пайплайна у MR 42 в проекте vanessa-ai в GitLab?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "reason": ""}}
+
+  «чекни для нашего проекта именно» (after «предложи доработки флоу тестирования») | work project → Hermes
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Как сейчас идёт тестирование в рабочем проекте (статусы и задачи в Plane) и что в этом флоу стоит доработать?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "reason": ""}}
 
   «ванесса я думаю ты виновата» | vague, ask one clarifying question
   → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": true, "clarification_hint": "почему", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "reason": ""}}

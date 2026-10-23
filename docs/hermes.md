@@ -23,8 +23,9 @@ worker (background job): POST /v1/runs → poll GET /v1/runs/{id}
 
 ## Server
 
-1. In `/etc/ssh/sshd_config`, set `GatewayPorts clientspecified`.
-   Then run `sudo systemctl reload sshd`.
+1. In `/etc/ssh/sshd_config.d/70-vanessa-hermes.conf`, set
+   `GatewayPorts clientspecified`. Run `sudo sshd -t`, then
+   `sudo systemctl reload ssh` (the unit is `sshd` on some distros).
 2. If `ufw` runs, allow port 8642 only from the Docker subnets.
    Do not open it to the internet.
 3. In `.env.local`, set:
@@ -59,11 +60,15 @@ ssh-keygen -t ed25519 -N "" -f %USERPROFILE%\.ssh\vanessa_hermes_ed25519
 ```
 
 3. On the server, add the public key to `~/.ssh/authorized_keys` of the
-   SSH user. The options let this key open only the one reverse forward:
+   SSH user. The options let this key open only the one reverse forward.
+   `restrict` does not block commands, so `command=` is required:
 
 ```
-restrict,port-forwarding,permitlisten="172.17.0.1:8642" ssh-ed25519 AAAA... vanessa-hermes
+restrict,port-forwarding,permitlisten="172.17.0.1:8642",command="/usr/sbin/nologin" ssh-ed25519 AAAA... vanessa-hermes
 ```
+
+   Test: `ssh -i <key> <user>@<server> id` must print
+   `This account is currently not available.`
 
 4. Connect once by hand to save the server host key (`StrictHostKeyChecking`
    is on in the script):

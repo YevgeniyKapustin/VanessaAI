@@ -111,7 +111,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          # Docker refuses a limit above the host CPU count (1-vCPU droplet).
+          cpus: "${WORKER_CPUS:-2.0}"
           memory: 2G
 
   # --- MCP servers (external tools over SSE) ---------------------------------

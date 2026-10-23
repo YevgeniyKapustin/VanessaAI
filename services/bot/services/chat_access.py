@@ -5,6 +5,7 @@ from services.bot.messages import IncomingMessage
 from services.bot.messages.message import _enum_to_str
 from vanessa.config import settings
 from vanessa.config.content import get_content
+from vanessa.config.owners import is_owner, owner_telegram_ids
 
 GROUP_CHAT_TYPES = {ChatType.GROUP, ChatType.SUPERGROUP}
 ACTIVE_MEMBER_STATUSES = {
@@ -33,19 +34,17 @@ class ChatAccessGuard:
         group_types = {_enum_to_str(chat_type) for chat_type in GROUP_CHAT_TYPES}
         return message.chat_type in group_types
 
+    def _owner_ids(self) -> list[int]:
+        extra = owner_telegram_ids() - {self._required_user_id}
+        return [self._required_user_id, *sorted(extra)]
+
     async def required_user_in_chat(self, message: IncomingMessage) -> bool:
         if not self._required_user_id:
             return False
-        try:
-            member = await message.bot.get_chat_member(
-                chat_id=message.telegram_chat_id,
-                user_id=self._required_user_id,
-            )
-        except TelegramBadRequest:
-            return False
-        return _enum_to_str(member.status) in {
-            _enum_to_str(status) for status in ACTIVE_MEMBER_STATUSES
-        }
+        for user_id in self._owner_ids():
+            if await _is_active_member(message, user_id):
+                return True
+        return False
 
     async def ensure_access(self, message: IncomingMessage) -> str | None:
         denial = self._static_access_denial(message)
@@ -81,6 +80,20 @@ class ChatAccessGuard:
             return self._messages.required_user_not_configured.strip()
         if not self.is_private_chat(message):
             return notes.owner_dm_only.strip()
-        if message.sender_telegram_id != self._required_user_id:
+        sender = message.sender_telegram_id
+        if sender != self._required_user_id and not is_owner(sender):
             return notes.owner_only.strip()
         return None
+
+
+async def _is_active_member(message: IncomingMessage, user_id: int) -> bool:
+    try:
+        member = await message.bot.get_chat_member(
+            chat_id=message.telegram_chat_id,
+            user_id=user_id,
+        )
+    except TelegramBadRequest:
+        return False
+    return _enum_to_str(member.status) in {
+        _enum_to_str(status) for status in ACTIVE_MEMBER_STATUSES
+    }

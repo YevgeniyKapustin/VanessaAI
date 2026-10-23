@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from vanessa.config.settings import settings
+from vanessa.config.owners import owner_id_for
 from vanessa.core.protocols import TurnMetricsProtocol
 from vanessa.core.request_context import get_request_id
 from vanessa.core.turn import ConversationTurnResult
@@ -25,7 +25,7 @@ async def apply_owner_ignore_if_needed(
     registry: ChatIgnoreRegistryProtocol,
     ctx: TurnPipelineContext,
 ) -> None:
-    owner_id = settings.required_user_telegram_id
+    owner_id = owner_id_for(ctx.turn.sender_telegram_id)
     if not owner_id:
         return
     apply_owner_ignore_command(

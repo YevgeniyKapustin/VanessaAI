@@ -18,6 +18,8 @@ class BotMixin:
 
     telegram_bot_token: str = ""
     required_user_telegram_id: int = 0
+    # Other accounts of the owner, comma-separated ids (vanessa.config.owners).
+    owner_extra_telegram_ids: str = ""
     # If set (> 0), the bot only works in this single Telegram chat.
     allowed_chat_telegram_id: int = 0
 

@@ -129,6 +129,7 @@ def _services(
         chat_client.process = AsyncMock(side_effect=_process)
     access_guard = AsyncMock()
     access_guard.ensure_access = AsyncMock(return_value=access_error)
+    access_guard.is_private_chat = MagicMock(return_value=True)
     return BotServices(
         chat_client=chat_client,
         notes_client=AsyncMock(),

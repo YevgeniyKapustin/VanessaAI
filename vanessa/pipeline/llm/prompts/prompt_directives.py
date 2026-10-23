@@ -1,4 +1,5 @@
 from vanessa.config.content import AppContent
+from vanessa.config.owners import is_owner
 from vanessa.config.settings import settings
 from vanessa.core.messages import PhotoCandidate, WebResult
 from vanessa.knowledge.users.nicknames import format_aliases_for_prompt
@@ -98,9 +99,8 @@ def vision_and_owner_parts(
     vision_note = llm.vision_note.strip()
     if has_image and vision_note:
         parts.append((PRIORITY_DIRECTIVES, "directives", vision_note))
-    owner_id = settings.required_user_telegram_id
     owner_note = llm.owner_message_note.strip()
-    if owner_id and sender_telegram_id == owner_id and owner_note:
+    if is_owner(sender_telegram_id) and owner_note:
         parts.append((PRIORITY_DIRECTIVES, "directives", owner_note))
     return parts
 

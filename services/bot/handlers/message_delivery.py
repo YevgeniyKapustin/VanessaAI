@@ -28,9 +28,17 @@ async def _reject_if_no_access(
             incoming.sender_telegram_id,
             incoming.chat_type,
         )
-        await telegram_message.answer(error)
+        if _addressed_to_bot(services, incoming):
+            await telegram_message.answer(error)
         return True
     return False
+
+
+def _addressed_to_bot(services: BotServices, incoming: IncomingMessage) -> bool:
+    # A denial on every group message is spam: answer only a tag or a reply.
+    if services.access_guard.is_private_chat(incoming):
+        return True
+    return incoming.mentions_bot or incoming.reply_to_bot
 
 
 async def _deliver_sticker_only(

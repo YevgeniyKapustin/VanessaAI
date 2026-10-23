@@ -8,6 +8,7 @@ the persona's hard rules: the owner is never affected by relational metrics.
 
 from __future__ import annotations
 
+from vanessa.config.owners import is_owner, owner_id_for
 from vanessa.config.settings import settings
 from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.pipeline.decision.context import DecisionContext
@@ -66,8 +67,7 @@ def is_low_attitude(
 
 
 def _owner_exempt(context: DecisionContext) -> bool:
-    owner = settings.required_user_telegram_id
-    return bool(owner and context.sender_telegram_id == owner)
+    return is_owner(context.sender_telegram_id)
 
 
 def _low_attitude_essential(context: DecisionContext) -> bool:
@@ -149,7 +149,7 @@ def _toxic_ignore_result(context: DecisionContext) -> DecisionResult | None:
     if not should_ignore_for_toxicity(
         metrics,
         sender_telegram_id=context.sender_telegram_id,
-        owner_telegram_id=settings.required_user_telegram_id,
+        owner_telegram_id=owner_id_for(context.sender_telegram_id),
     ):
         return None
     return DecisionResult(

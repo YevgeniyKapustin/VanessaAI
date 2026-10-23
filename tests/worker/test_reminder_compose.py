@@ -11,6 +11,7 @@ from tests.worker.hermes_fakes import SYSTEM, FakeBroker, FakeCompleter
 from vanessa.config.content_schedule import get_schedule_content
 from vanessa.core.reminders import Reminder
 from vanessa.llm.generation import LLMGenerationParams
+from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
 
 URL = "https://example.com/menu_week?id=1"
 POST = Reminder(
@@ -68,6 +69,15 @@ async def test_llm_error_and_empty_fall_back() -> None:
     failing = FakeCompleter(error=RuntimeError("provider echo secret"))
     assert await _composer(failing).compose(POST) == POST.text
     assert await _composer(FakeCompleter("[ignore]")).compose(POST) == POST.text
+
+
+async def test_untagged_output_is_retried_then_stored_text() -> None:
+    leak = f"Это пост про обеды, перескажу коротко {URL}"
+    completer = FakeCompleter(leak)
+    assert await _composer(completer).compose(POST) == POST.text
+    assert len(completer.calls) == UNTAGGED_ATTEMPTS
+    retried = FakeCompleter(replies=[leak, f"[answer]\nОбеды! {URL}"])
+    assert await _composer(retried).compose(POST) == f"Обеды! {URL}"
 
 
 def _settings(**overrides) -> SimpleNamespace:

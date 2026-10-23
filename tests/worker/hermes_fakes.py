@@ -68,16 +68,27 @@ class FakeClient:
 
 
 class FakeCompleter:
-    def __init__(self, reply: str = "", *, error: Exception | None = None, provider="deepseek"):
+    def __init__(
+        self,
+        reply: str = "",
+        *,
+        error: Exception | None = None,
+        provider="deepseek",
+        replies: list[str] | None = None,
+    ):
         self.reply = reply
         self.error = error
         self.provider = provider
+        # One reply per call, in order; ``reply`` once the list is used up.
+        self.replies = list(replies or [])
         self.calls: list[dict] = []
 
     async def complete(self, model, messages, *, kind="completion", **kwargs) -> str:
         self.calls.append({"model": model, "messages": messages, "kind": kind, **kwargs})
         if self.error is not None:
             raise self.error
+        if self.replies:
+            return self.replies.pop(0)
         return self.reply
 
 

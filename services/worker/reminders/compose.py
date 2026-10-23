@@ -15,6 +15,8 @@ from vanessa.config.content_schedule import ScheduleContent
 from vanessa.core.protocols import LLMChatCompleter
 from vanessa.core.reminders import Reminder
 from vanessa.llm.generation import LLMGenerationParams
+from vanessa.pipeline.llm.format.answer_tag import is_untagged_reply
+from vanessa.pipeline.llm.tagged_reply import request_tagged
 from vanessa.pipeline.schedule.urls import extract_urls, urls_intact
 
 logger = logging.getLogger(__name__)
@@ -62,18 +64,31 @@ class ReminderComposer:
                 type(exc).__name__,
             )
             return ""
+        if is_untagged_reply(raw):
+            # Still no [answer] after the retry: bare reasoning → stored text.
+            logger.warning(
+                "reminder_llm_untagged reminder_id=%s chars=%s",
+                reminder.id,
+                len(raw),
+            )
+            return ""
         return final_text(raw)
 
     async def _complete(self, text: str) -> str:
-        assert self._completer is not None
+        completer = self._completer
+        assert completer is not None
         user = build_fire_user_prompt(text, self._prompts)
-        messages, extra = chat_request(self._completer, self._system, user)
-        return await self._completer.complete(
-            self._model,
-            messages,
-            kind=LLM_KIND,
-            **self._generation.to_llm_kwargs(),
-            **extra,
+        messages, extra = chat_request(completer, self._system, user)
+        return await request_tagged(
+            lambda: completer.complete(
+                self._model,
+                messages,
+                kind=LLM_KIND,
+                **self._generation.to_llm_kwargs(),
+                **extra,
+            ),
+            str,
+            model=self._model,
         )
 
 

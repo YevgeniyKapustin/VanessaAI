@@ -18,8 +18,10 @@ from tests.worker.hermes_fakes import (
 from vanessa.config.content import get_content
 from vanessa.config.content_hermes import get_hermes_content
 from vanessa.contracts.outbound import OutboundMessage
+from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
 
 _MAX_TOKENS = 900
+LEAK = "Он просто спрашивает про задачу. Отвечаю сухо"
 ANSWER = "VAN-12 In Progress, MR !34 https://gitlab.example/x/-/merge_requests/34"
 
 
@@ -111,6 +113,22 @@ async def test_ignore_or_empty_llm_output_falls_back() -> None:
     completer = FakeCompleter("[ignore] скучно")
     await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
     assert _only_message(broker).text == ANSWER
+
+
+async def test_untagged_output_is_retried() -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter(replies=[LEAK, "думаю\n[answer]\nГотово"])
+    await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
+    assert _only_message(broker).text == "Готово"
+    assert len(completer.calls) == UNTAGGED_ATTEMPTS
+
+
+async def test_untagged_twice_posts_fixed_line_not_reasoning() -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter(LEAK)
+    await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
+    assert _only_message(broker).text == get_hermes_content().undelivered_fallback
+    assert len(completer.calls) == UNTAGGED_ATTEMPTS
 
 
 async def test_long_llm_text_is_truncated() -> None:

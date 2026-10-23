@@ -10,9 +10,14 @@ from services.worker.hermes.prompt import build_followup_user_prompt
 from vanessa.config.content_hermes import HermesContent
 from vanessa.core.protocols import LLMChatCompleter
 from vanessa.llm.generation import LLMGenerationParams
-from vanessa.pipeline.llm.format.answer_tag import extract_answer, has_ignore_marker
+from vanessa.pipeline.llm.format.answer_tag import (
+    extract_answer,
+    has_ignore_marker,
+    is_untagged_reply,
+)
 from vanessa.pipeline.llm.format.block_markers import strip_block_markers
 from vanessa.pipeline.llm.format.stray_tags import strip_stray_tags
+from vanessa.pipeline.llm.tagged_reply import request_tagged
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +91,15 @@ class FollowupComposer:
                 type(exc).__name__,
             )
             raw = ""
+        if is_untagged_reply(raw):
+            # Still no [answer] after the retry: the text is bare reasoning.
+            # The user waits for a result, so post the fixed line, not silence.
+            logger.warning(
+                "hermes_followup_untagged chat_id=%s chars=%s",
+                ask.telegram_chat_id,
+                len(raw),
+            )
+            return truncate_message(self._prompts.undelivered_fallback)
         text = final_text(raw)
         if not text:
             return fallback_text(answer, self._prompts)
@@ -94,10 +108,14 @@ class FollowupComposer:
     async def _complete(self, ask: HermesAsk, answer: str | None) -> str:
         user = build_followup_user_prompt(ask, answer, self._prompts)
         messages, extra = chat_request(self._completer, self._system, user)
-        return await self._completer.complete(
-            self._model,
-            messages,
-            kind=LLM_KIND,
-            **self._generation.to_llm_kwargs(),
-            **extra,
+        return await request_tagged(
+            lambda: self._completer.complete(
+                self._model,
+                messages,
+                kind=LLM_KIND,
+                **self._generation.to_llm_kwargs(),
+                **extra,
+            ),
+            str,
+            model=self._model,
         )

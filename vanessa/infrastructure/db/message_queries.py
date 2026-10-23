@@ -141,8 +141,11 @@ async def search_photo_messages(
                     WHERE m.role = 'user'
                       AND m.channel = :channel
                       AND m.attachments IS NOT NULL
-                      AND jsonb_typeof(m.attachments) = 'array'
-                      AND jsonb_array_length(m.attachments) > 0
+                      AND CASE
+                          WHEN jsonb_typeof(m.attachments) = 'array'
+                          THEN jsonb_array_length(m.attachments)
+                          ELSE 0
+                      END > 0
                       AND m.search_vector @@ plainto_tsquery('russian', :query)
                     ORDER BY ts_rank(
                         m.search_vector,

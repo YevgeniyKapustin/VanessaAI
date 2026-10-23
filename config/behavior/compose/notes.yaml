@@ -99,3 +99,14 @@ photo_album_empty_note: |
   asks you to send/show/return a photo, reply honestly that you don't have that
   photo (e.g. «у меня нет такой картинки») — never claim you sent, showed or
   attached a photo, because you can't deliver one.
+
+# Sent as an extra message when the first output had no [answer] tag.
+untagged_retry_note: |
+  Your previous output had no [answer] tag, so nothing was sent.
+  Write it again in the required format: your reasoning, then the tag
+  [answer] on its own line, then the message for the chat. Or the tag
+  [ignore] plus a short reason, when the silence rules apply.
+
+# Sent to a direct request when the retry is still untagged. Short and safe:
+# it never repeats the model output (that can be the bare reasoning).
+untagged_fallback: "Мысль потеряла, спроси ещё раз"

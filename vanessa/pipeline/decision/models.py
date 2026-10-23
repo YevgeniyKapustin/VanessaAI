@@ -33,6 +33,11 @@ class DecisionReason(StrEnum):
     # annoyance and/or a persistently low relationship) → even a weak / slightly
     # disliked message is ignored (maximal ignore tendency).
     LOW_ATTITUDE = "low_attitude"
+    # Compose-stage silence: the model wrote [ignore], returned an empty reply,
+    # or wrote no [answer] tag after the strict retry.
+    MODEL_IGNORE = "model_ignore"
+    EMPTY_REPLY = "empty_reply"
+    UNTAGGED = "untagged"
 
 
 @dataclass(frozen=True, slots=True)

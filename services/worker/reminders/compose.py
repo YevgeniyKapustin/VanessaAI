@@ -80,7 +80,7 @@ class ReminderComposer:
         user = build_fire_user_prompt(text, self._prompts)
         messages, extra = chat_request(completer, self._system, user)
         return await request_tagged(
-            lambda: completer.complete(
+            lambda **_: completer.complete(
                 self._model,
                 messages,
                 kind=LLM_KIND,

@@ -41,6 +41,8 @@ services:
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     env_file: *env-files
+    volumes:
+      - app_logs:/app/logs
     restart: unless-stopped
     # Give in-flight requests time to finish after SIGTERM (see /health/ready).
     stop_grace_period: 45s
@@ -78,6 +80,8 @@ services:
     # aiogram stops polling on SIGTERM and lets in-flight updates drain.
     stop_grace_period: 45s
     env_file: *env-files
+    volumes:
+      - app_logs:/app/logs
     depends_on:
       agent:
         condition: service_healthy
@@ -95,6 +99,8 @@ services:
     restart: unless-stopped
     stop_grace_period: 45s
     env_file: *env-files
+    volumes:
+      - app_logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,6 +179,12 @@ services:
         limits:
           cpus: "0.5"
           memory: 1G
+
+# Log files (LOG_DIR=logs → /app/logs) of agent, bot and worker. A named
+# volume keeps them when a deploy recreates the containers. Each service
+# writes its own <service>.log with rotation (LOG_FILE_MAX_BYTES).
+volumes:
+  app_logs:
 
 networks:
   backend:

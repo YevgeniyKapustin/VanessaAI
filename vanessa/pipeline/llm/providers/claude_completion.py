@@ -13,7 +13,11 @@ from vanessa.pipeline.llm.format.reply_format import (
     strip_leading_address,
     strip_trailing_periods,
 )
-from vanessa.pipeline.llm.tagged_reply import request_tagged, split_reply
+from vanessa.pipeline.llm.tagged_reply import (
+    raise_if_untagged,
+    request_tagged,
+    split_reply,
+)
 
 logger = logging.getLogger("vanessa.pipeline.llm.providers.claude")
 
@@ -104,17 +108,21 @@ class _ClaudeCompletionMixin:
         sender_name: str | None,
         generation_kwargs: dict[str, Any],
     ) -> str:
-        async def complete(gen: Any, started: float) -> str:
-            response = await request_tagged(
-                lambda: self._client.messages.create(
-                    model=self._model,
-                    system=system,
-                    messages=[{"role": "user", "content": user_prompt}],
-                    **generation_kwargs,
-                ),
-                _first_text,
+        final: dict[str, str] = {}
+
+        def create(*, strict: bool) -> Any:
+            note = self._content.llm.untagged_retry_note.strip()
+            prompt = f"{user_prompt}\n\n{note}" if strict and note else user_prompt
+            return self._client.messages.create(
                 model=self._model,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+                **generation_kwargs,
             )
+
+        async def complete(gen: Any, started: float) -> str:
+            response = await request_tagged(create, _first_text, model=self._model)
+            final["text"] = _first_text(response)
             return self._reply_from_response(
                 response,
                 started=started,
@@ -122,7 +130,7 @@ class _ClaudeCompletionMixin:
                 gen=gen,
             )
 
-        return await run_completion_with_retries(
+        reply = await run_completion_with_retries(
             get_tracer().generation(
                 name="llm_generation",
                 model=self._model,
@@ -137,3 +145,5 @@ class _ClaudeCompletionMixin:
             sleep=self._retry_sleep,
             logger=logger,
         )
+        raise_if_untagged(final.get("text", ""), self._model)
+        return reply

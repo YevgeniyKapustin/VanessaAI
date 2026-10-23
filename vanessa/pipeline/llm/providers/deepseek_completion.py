@@ -17,7 +17,11 @@ from vanessa.pipeline.llm.providers.deepseek_usage import (
     _log_cache_usage,
     _usage_from_openai,
 )
-from vanessa.pipeline.llm.tagged_reply import request_tagged, split_reply
+from vanessa.pipeline.llm.tagged_reply import (
+    raise_if_untagged,
+    request_tagged,
+    split_reply,
+)
 
 logger = logging.getLogger("vanessa.pipeline.llm.providers.deepseek")
 
@@ -114,19 +118,25 @@ class _DeepSeekCompletionMixin:
         image_count: int,
         generation_kwargs: dict[str, Any],
     ) -> str:
-        async def complete(gen: Any, started: float) -> str:
-            response = await request_tagged(
-                lambda: self._openai_client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user_content},
-                    ],
-                    **generation_kwargs,
-                ),
-                _content,
+        final: dict[str, str] = {}
+
+        def create(*, strict: bool) -> Any:
+            messages: list[dict[str, Any]] = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_content},
+            ]
+            note = self._content.llm.untagged_retry_note.strip()
+            if strict and note:
+                messages.append({"role": "user", "content": note})
+            return self._openai_client.chat.completions.create(
                 model=model,
+                messages=messages,
+                **generation_kwargs,
             )
+
+        async def complete(gen: Any, started: float) -> str:
+            response = await request_tagged(create, _content, model=model)
+            final["text"] = _content(response)
             return self._reply_from_response(
                 response,
                 model=model,
@@ -137,7 +147,7 @@ class _DeepSeekCompletionMixin:
                 gen=gen,
             )
 
-        return await run_completion_with_retries(
+        reply = await run_completion_with_retries(
             get_tracer().generation(
                 name="llm_generation",
                 model=model,
@@ -157,3 +167,5 @@ class _DeepSeekCompletionMixin:
             sleep=self._retry_sleep,
             logger=logger,
         )
+        raise_if_untagged(final.get("text", ""), model)
+        return reply

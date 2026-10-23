@@ -119,7 +119,7 @@ class FollowupComposer:
         )
         messages, extra = chat_request(self._completer, self._system, user)
         return await request_tagged(
-            lambda: self._completer.complete(
+            lambda **_: self._completer.complete(
                 self._model,
                 messages,
                 kind=LLM_KIND,

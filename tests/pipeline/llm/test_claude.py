@@ -10,7 +10,7 @@ from vanessa.core.messages import ContextBlock, ContextMessage
 from vanessa.infrastructure.observability.tracing import set_tracer
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
 from vanessa.pipeline.llm.providers.claude import ClaudeLLMProvider
-from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
+from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS, UntaggedReplyError
 
 DETAILED_MAX_TOKENS = 4096
 
@@ -236,9 +236,13 @@ async def test_claude_off_max_tokens_falls_back_to_setting(provider: ClaudeLLMPr
 
 
 @pytest.mark.asyncio
-async def test_claude_untagged_output_is_retried_then_silent(provider: ClaudeLLMProvider):
+async def test_claude_untagged_output_is_retried_then_raises(provider: ClaudeLLMProvider):
     leak = MagicMock(content=[MagicMock(text="Он просто зовёт по имени. Отвечаю сухо")])
-    provider._client.messages.create = AsyncMock(return_value=leak)
-    reply = await provider.generate("ванесса", [])
-    assert reply == ""
-    assert provider._client.messages.create.await_count == UNTAGGED_ATTEMPTS
+    create = AsyncMock(return_value=leak)
+    provider._client.messages.create = create
+    with pytest.raises(UntaggedReplyError):
+        await provider.generate("ванесса", [])
+    assert create.await_count == UNTAGGED_ATTEMPTS
+    first, retry = (call.kwargs["messages"][0]["content"] for call in create.await_args_list)
+    note = get_content().llm.untagged_retry_note.strip()
+    assert retry == f"{first}\n\n{note}"

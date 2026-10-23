@@ -1,6 +1,6 @@
 import logging
 
-from vanessa.config.content import get_photo_placeholder
+from vanessa.config.content import get_content, get_photo_placeholder
 from vanessa.core.request_context import get_request_id
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionReason
@@ -9,6 +9,7 @@ from vanessa.pipeline.llm.format.answer_tag import (
     extract_ignore_reason,
     has_ignore_marker,
 )
+from vanessa.pipeline.stages.direct_request import is_direct_request
 
 logger = logging.getLogger("vanessa.pipeline.stages")
 
@@ -50,7 +51,7 @@ class _ComposeRefuseMixin:
         if self._refuse_enabled and has_ignore_marker(ctx.reply or ""):
             return self._refuse(
                 ctx,
-                reason=DecisionReason.REPEATED.value,
+                reason=DecisionReason.MODEL_IGNORE.value,
                 log_event="turn_stage compose_refuse_marker",
                 # The model writes a short reason after the tag (e.g.
                 # `[ignore] повтор того же вопроса`) purely for debugging — it
@@ -64,10 +65,32 @@ class _ComposeRefuseMixin:
         if self._refuse_enabled and not (ctx.reply or "").strip():
             return self._refuse(
                 ctx,
-                reason=DecisionReason.REPEATED.value,
+                reason=DecisionReason.EMPTY_REPLY.value,
                 log_event="turn_stage compose_refuse_empty",
             )
         return None
+
+    def _handle_untagged(self, ctx: TurnPipelineContext) -> bool | None:
+        """The model wrote no ``[answer]`` tag, even after the strict retry.
+
+        The raw output can be bare reasoning, so it is never sent. A direct
+        request gets a short safe line instead of silence; any other turn
+        stays silent with its own reason (not "repeated").
+        """
+        fallback = get_content().llm.untagged_fallback.strip()
+        if fallback and is_direct_request(ctx):
+            ctx.reply = fallback
+            logger.warning(
+                "turn_stage compose_untagged_fallback request_id=%s sender_id=%s",
+                get_request_id(),
+                ctx.turn.sender_telegram_id,
+            )
+            return None
+        return self._refuse(
+            ctx,
+            reason=DecisionReason.UNTAGGED.value,
+            log_event="turn_stage compose_refuse_untagged",
+        )
 
     def _refuse(
         self,

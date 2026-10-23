@@ -21,12 +21,14 @@ services:
     command: python -m services.agent.main
     volumes: !override
       - ./knowledge:/app/knowledge
+      - app_logs:/app/logs
     restart: always
     stop_grace_period: 45s
 
   bot:
     env_file: *prod-env-files
-    volumes: !reset []
+    volumes: !override
+      - app_logs:/app/logs
     restart: always
     stop_grace_period: 45s
 
@@ -34,6 +36,7 @@ services:
     env_file: *prod-env-files
     volumes: !override
       - ./knowledge:/app/knowledge
+      - app_logs:/app/logs
     restart: always
     stop_grace_period: 45s
 

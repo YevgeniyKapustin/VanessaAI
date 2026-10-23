@@ -13,6 +13,7 @@ from vanessa.pipeline.decision.models import DecisionReason
 from vanessa.pipeline.llm.photo_request import is_photo_request
 from vanessa.pipeline.llm.prompts.prompt_system import build_system_prompt
 from vanessa.pipeline.llm.prompts.session_format import session_context_messages
+from vanessa.pipeline.llm.tagged_reply import UntaggedReplyError
 from vanessa.pipeline.stages.compose_photos import _ComposePhotoMixin
 from vanessa.pipeline.stages.compose_refuse import _ComposeRefuseMixin
 from vanessa.pipeline.stages.photos import (
@@ -124,17 +125,19 @@ class ComposeStage(_ComposeRefuseMixin, _ComposePhotoMixin):
             if settings.vision_enabled
             else []
         )
-        ctx.reply = await self._llm.generate(
-            _compose_generate_request(
-                ctx,
-                session_messages=session_messages,
-                metrics_block=metrics_block,
-                attitude_note=attitude_note,
-                images=images or None,
-                photo_candidates=photo_candidates or None,
-            )
+        request = _compose_generate_request(
+            ctx,
+            session_messages=session_messages,
+            metrics_block=metrics_block,
+            attitude_note=attitude_note,
+            images=images or None,
+            photo_candidates=photo_candidates or None,
         )
-        refused = self._refuse_after_generate(ctx)
+        try:
+            ctx.reply = await self._llm.generate(request)
+            refused = self._refuse_after_generate(ctx)
+        except UntaggedReplyError:
+            refused = self._handle_untagged(ctx)
         if refused is not None:
             return refused
         photo_index = self._apply_photo_index(ctx, photo_candidates)

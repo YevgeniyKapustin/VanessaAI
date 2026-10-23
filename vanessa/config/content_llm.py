@@ -141,6 +141,9 @@ class LLMContent(BaseModel):
     # Hermes ask directives (TurnPlan.ask_hermes): task queued / PC offline.
     hermes_asked_note: str = ""
     hermes_offline_note: str = ""
+    # Untagged output: the strict note for the retry, the line for a direct ask.
+    untagged_retry_note: str = ""
+    untagged_fallback: str = ""
     # Instruction injected when the turn carries an image (vision): tells the
     # model how to handle the attached picture (describe / OCR / be honest about
     # unclear text instead of hallucinating).

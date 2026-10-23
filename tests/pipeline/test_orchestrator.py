@@ -1355,7 +1355,7 @@ async def test_orchestrator_compose_refuses_empty_reply():
     # created (previously an empty reply still became an empty assistant message
     # and a recorded REPLY turn).
     assert result.action == DecisionAction.IGNORE
-    assert result.reason == DecisionReason.REPEATED
+    assert result.reason == DecisionReason.EMPTY_REPLY
     assert result.reply is None
     # Only the user message exists — no empty assistant message.
     assert len(messages._messages) == 1
@@ -1453,7 +1453,7 @@ async def test_orchestrator_compose_refuses_ignore_marker():
     # IGNORE, nothing is sent, no assistant message is created, and the literal
     # tag never reaches the chat or the DB.
     assert result.action == DecisionAction.IGNORE
-    assert result.reason == DecisionReason.REPEATED
+    assert result.reason == DecisionReason.MODEL_IGNORE
     assert result.reply is None
     assert len(messages._messages) == 1
     assert decision.recorded_chats == []
@@ -1486,7 +1486,7 @@ async def test_orchestrator_compose_refuses_ignore_marker_with_reason():
     )
 
     assert result.action == DecisionAction.IGNORE
-    assert result.reason == DecisionReason.REPEATED
+    assert result.reason == DecisionReason.MODEL_IGNORE
     assert result.reply is None
     assert len(messages._messages) == 1
     assert decision.recorded_chats == []

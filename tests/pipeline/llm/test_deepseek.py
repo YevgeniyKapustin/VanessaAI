@@ -19,7 +19,7 @@ from vanessa.pipeline.llm.providers.deepseek import (
     DeepSeekLLMProvider,
     _usage_from_openai,
 )
-from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
+from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS, UntaggedReplyError
 
 DETAILED_MAX_TOKENS = 4096
 
@@ -410,15 +410,19 @@ async def test_deepseek_untagged_output_is_retried(provider: DeepSeekLLMProvider
     )
     reply = await provider.generate("ванесса", [])
     assert reply == "Чего"
-    assert provider._client.chat.completions.create.await_count == UNTAGGED_ATTEMPTS
+    create = provider._client.chat.completions.create
+    assert create.await_count == UNTAGGED_ATTEMPTS
+    first, retry = (call.kwargs["messages"] for call in create.await_args_list)
+    note = get_content().llm.untagged_retry_note.strip()
+    assert retry == [*first, {"role": "user", "content": note}]
 
 
 @pytest.mark.asyncio
-async def test_deepseek_untagged_twice_stays_silent(provider: DeepSeekLLMProvider):
+async def test_deepseek_untagged_twice_raises(provider: DeepSeekLLMProvider):
     leak = _make_response("Он просто зовёт по имени. Отвечаю сухо", tagged=False)
     provider._client.chat.completions.create = AsyncMock(return_value=leak)
-    reply = await provider.generate("ванесса", [])
-    assert reply == ""
+    with pytest.raises(UntaggedReplyError):
+        await provider.generate("ванесса", [])
     assert provider._client.chat.completions.create.await_count == UNTAGGED_ATTEMPTS
 
 

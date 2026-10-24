@@ -130,12 +130,41 @@ restrict,port-forwarding,permitlisten="172.17.0.1:8642",command="/usr/sbin/nolog
 ssh -i %USERPROFILE%\.ssh\vanessa_hermes_ed25519 <user>@<server> exit
 ```
 
-5. Test the tunnel, then install it as a logon task:
+5. Test the tunnel, then install it as a scheduled task:
 
 ```
 powershell -ExecutionPolicy Bypass -File deploy\hermes-pc\hermes-tunnel.ps1 -SshHost <server> -SshUser <user>
 powershell -ExecutionPolicy Bypass -File deploy\hermes-pc\hermes-tunnel.ps1 -SshHost <server> -SshUser <user> -Install
 ```
+
+`-Install` copies the script to `%LOCALAPPDATA%\hermes-tunnel`, so a
+branch switch in the repo does not change the running tunnel. Run
+`-Install` again after you change the script. It replaces the running
+tunnel at once.
+
+The tunnel heals itself on two levels:
+
+- The script runs `ssh` in a loop. The retry waits 5 s, then doubles up
+  to 60 s. A connection that lived 120 s or more resets the wait.
+  `ServerAliveInterval=15` with `ServerAliveCountMax=3` drops a dead
+  link in about 45 s. `ExitOnForwardFailure=yes` makes `ssh` exit when
+  the server does not open the forward, so the loop tries again.
+- The task `VanessaHermesTunnel` starts the script at logon, every
+  5 minutes, on resume from sleep, and on network connect. "Do not
+  start a new instance" keeps one copy. Battery power does not stop it.
+
+The task runs `conhost.exe --headless`, so the tunnel has no window. A
+visible console (Windows Terminal) can be closed by hand, and that
+kills the whole loop with `0xC000013A`.
+
+Logs: `%LOCALAPPDATA%\hermes-tunnel\tunnel.log` (one line per `ssh`
+exit) and `ssh.log` (the `ssh` client errors).
+
+If the PC loses the network, the server can keep the old session and
+its listen port until its own TCP timeout. With sshd defaults
+(`ClientAliveInterval 0`, kernel keepalive 7200 s) that is about 2 hours.
+Until then the new `ssh` fails the forward and the loop retries. A
+server `ClientAliveInterval` (for example 30) makes this short.
 
 ## Hermes profile for Vanessa
 

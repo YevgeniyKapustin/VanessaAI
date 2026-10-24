@@ -1,12 +1,21 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from vanessa.core.messages import ContextMessage, stored_to_context
 from vanessa.core.protocols import MessageRepositoryProtocol
 from vanessa.core.session.dismissal import is_dismissal_request
 from vanessa.core.session.session_trim import (
+    earlier_tail,
     seconds_since_last_role,
     trim_session_by_idle_gap,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class EarlierWindow:
+    """How much of the thread before the idle gap the prompt still sees."""
+
+    count: int = 0
+    max_age_seconds: float = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,10 +25,18 @@ class ChatSessionState:
     idle_since_last_bot_seconds: float | None
     idle_expired: bool
     has_recent_dismissal: bool
+    # Tail of the older thread cut off by the idle gap (prompt context only:
+    # gate rules and the listen window use ``messages``).
+    earlier_messages: list[ContextMessage] = field(default_factory=list)
 
     @property
     def recent_messages(self) -> list[ContextMessage]:
         return self.messages
+
+    @property
+    def prompt_messages(self) -> list[ContextMessage]:
+        """Earlier thread + recent session, for the planner prompt."""
+        return [*self.earlier_messages, *self.messages]
 
 
 def _listen_idle_blocks(
@@ -91,10 +108,18 @@ def build_chat_session_state(
     *,
     max_idle_seconds: float,
     listen_max_messages: int,
+    earlier: EarlierWindow | None = None,
 ) -> ChatSessionState:
     trimmed = trim_session_by_idle_gap(
         messages,
         max_idle_seconds=max_idle_seconds,
+    )
+    window = earlier or EarlierWindow()
+    earlier_messages = earlier_tail(
+        messages,
+        trimmed,
+        count=window.count,
+        max_age_seconds=window.max_age_seconds,
     )
     idle = seconds_since_last_role(trimmed, "assistant")
     idle_expired = (
@@ -117,6 +142,7 @@ def build_chat_session_state(
         idle_since_last_bot_seconds=idle,
         idle_expired=idle_expired,
         has_recent_dismissal=has_dismissal,
+        earlier_messages=earlier_messages,
     )
 
 
@@ -127,6 +153,7 @@ async def load_chat_session_state(
     max_idle_seconds: float,
     listen_max_messages: int,
     channel: str = "telegram",
+    earlier: EarlierWindow | None = None,
 ) -> ChatSessionState:
     raw = [
         stored_to_context(message)
@@ -139,4 +166,5 @@ async def load_chat_session_state(
         raw,
         max_idle_seconds=max_idle_seconds,
         listen_max_messages=listen_max_messages,
+        earlier=earlier,
     )

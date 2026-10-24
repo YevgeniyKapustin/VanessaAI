@@ -5,6 +5,9 @@ class ConversationContent(BaseModel):
     session_window_size: int = Field(default=12, ge=4, le=50)
     session_idle_seconds: int = Field(default=300, ge=60, le=3600)
     post_reply_listen_count: int = Field(default=4, ge=1, le=20)
+    # Tail of the thread before the idle gap that the prompts still see.
+    session_earlier_count: int = Field(default=6, ge=0, le=20)
+    session_earlier_max_seconds: int = Field(default=10800, ge=0, le=86400)
 
 
 class PersonaContent(BaseModel):

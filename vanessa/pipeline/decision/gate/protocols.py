@@ -63,6 +63,7 @@ class TurnPlannerProtocol(Protocol):
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_name: str = "",
+        sender_is_owner: bool = False,
     ) -> TurnPlan: ...
 
 

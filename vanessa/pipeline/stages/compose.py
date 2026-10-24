@@ -15,6 +15,7 @@ from vanessa.pipeline.llm.prompts.prompt_system import build_system_prompt
 from vanessa.pipeline.llm.prompts.session_format import session_context_messages
 from vanessa.pipeline.llm.tagged_reply import UntaggedReplyError
 from vanessa.pipeline.stages.compose_photos import _ComposePhotoMixin
+from vanessa.pipeline.stages.compose_promise import without_false_promise
 from vanessa.pipeline.stages.compose_refuse import _ComposeRefuseMixin
 from vanessa.pipeline.stages.photos import (
     _collect_photo_candidates,
@@ -65,6 +66,7 @@ def _compose_generate_request(
         current_images=list(turn.images) or None,
         scene_description=ctx.scene_description,
         hermes_status=ctx.hermes_status,
+        earlier_messages=ctx.session.earlier_messages if ctx.session else None,
         schedule_note=ctx.schedule_note,
         channel_profile=ctx.profile,
         system_prompt=build_system_prompt(get_content(), profile=ctx.profile),
@@ -134,7 +136,8 @@ class ComposeStage(_ComposeRefuseMixin, _ComposePhotoMixin):
             photo_candidates=photo_candidates or None,
         )
         try:
-            ctx.reply = await self._llm.generate(request)
+            reply = await self._llm.generate(request)
+            ctx.reply = await without_false_promise(self._llm, request, reply)
             refused = self._refuse_after_generate(ctx)
         except UntaggedReplyError:
             refused = self._handle_untagged(ctx)

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from vanessa.config.content_llm_notes import LLMLookupNotes
+
 
 class LLMGenerationProfile(BaseModel):
     temperature: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -74,7 +76,7 @@ class PromptBudgetContent(BaseModel):
     web_blocks: int = 2000
 
 
-class LLMContent(BaseModel):
+class LLMContent(LLMLookupNotes):
     task: str = ""
     answer: str = ""
     answer_examples: str = ""
@@ -138,12 +140,6 @@ class LLMContent(BaseModel):
     # Composer max_tokens override for "detailed" replies, so a fuller answer
     # is not truncated. 0 = use the base composer max_tokens.
     detailed_max_tokens: int = 0
-    # Hermes ask directives (TurnPlan.ask_hermes): task queued / PC offline.
-    hermes_asked_note: str = ""
-    hermes_offline_note: str = ""
-    # Untagged output: the strict note for the retry, the line for a direct ask.
-    untagged_retry_note: str = ""
-    untagged_fallback: str = ""
     # Instruction injected when the turn carries an image (vision): tells the
     # model how to handle the attached picture (describe / OCR / be honest about
     # unclear text instead of hallucinating).

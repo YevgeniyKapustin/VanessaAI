@@ -3,6 +3,7 @@
 context_header: "<!-- Old conversations in the chat -->"
 context_block_header: "<!-- Block {index} ({started_at} — {ended_at}) -->"
 context_block_separator: "\n\n"
+earlier_header: "<!-- Earlier in the chat, before a pause (an older thread: use it when the current message refers back to it, e.g. to what you said or promised) -->"
 session_header: "<!-- Recent correspondence in the chat -->"
 current_message_header: "<!-- Current message in the chat -->"
 reply_message_header: "<!-- The user's message is a reply to this message -->"

@@ -34,6 +34,7 @@ class _TurnPlanLlmMixin:
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_name: str = "",
+        sender_is_owner: bool = False,
     ) -> TurnPlan:
         client = self._client or create_chat_completer()
         participants = await self._participants_digest(
@@ -42,6 +43,7 @@ class _TurnPlanLlmMixin:
         prompt = self._content.rag.planner_prompt.format(
             message=message,
             sender=sender_name.strip() or "(unknown)",
+            sender_is_owner=_yes_no(enabled=sender_is_owner),
             recent_messages=self._format_recent(recent_messages) or "(none)",
             nicknames=format_nicknames_for_planner(),
             participants=participants,

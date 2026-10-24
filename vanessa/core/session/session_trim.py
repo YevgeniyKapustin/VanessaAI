@@ -40,6 +40,37 @@ def trim_session_by_idle_gap(
     return _trim_from_newest(messages, max_idle_seconds)
 
 
+def _within_age(
+    message: ContextMessage, anchor: datetime | None, max_age_seconds: float
+) -> bool:
+    if anchor is None or message.created_at is None:
+        return False
+    return (anchor - message.created_at).total_seconds() <= max_age_seconds
+
+
+def earlier_tail(
+    messages: list[ContextMessage],
+    trimmed: list[ContextMessage],
+    *,
+    count: int,
+    max_age_seconds: float,
+) -> list[ContextMessage]:
+    """The last ``count`` messages cut off by the idle gap, not too old.
+
+    ``trimmed`` is the suffix of ``messages`` that survived the gap; the age
+    is measured from its first message (where the new thread starts).
+    """
+    dropped = messages[: len(messages) - len(trimmed)]
+    if count <= 0 or max_age_seconds <= 0 or not dropped or not trimmed:
+        return []
+    anchor = trimmed[0].created_at
+    return [
+        message
+        for message in dropped[-count:]
+        if _within_age(message, anchor, max_age_seconds)
+    ]
+
+
 def seconds_since_last_role(
     messages: list[ContextMessage],
     role: str,

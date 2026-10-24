@@ -13,6 +13,7 @@ from vanessa.pipeline.llm.photo_request import is_photo_request
 from vanessa.pipeline.llm.prompts import (
     prompt_context,
     prompt_directives,
+    prompt_earlier,
     prompt_format,
     prompt_hermes,
     prompt_schedule,
@@ -150,11 +151,12 @@ class PromptBuilder:
         parts.extend(prompt_context.knowledge_parts(content, request.knowledge_blocks))
         parts.extend(prompt_directives.scene_parts(request.scene_description))
         parts.extend(prompt_directives.web_parts(content, request.web_blocks))
-        parts.extend(prompt_hermes.hermes_parts(content, request.hermes_status))
+        parts.extend(prompt_hermes.hermes_parts(content, request))
         parts.extend(prompt_schedule.schedule_parts(request.schedule_note))
         parts.extend(prompt_context.humor_parts(content, request.humor_quotes))
         parts.extend(_meme_parts(content, request))
         parts.extend(prompt_context.metrics_parts(content, request.metrics_block))
+        parts.extend(prompt_earlier.earlier_parts(content, request.earlier_messages))
         parts.extend(prompt_context.session_parts(content, request.session_messages))
         parts.extend(
             _photo_album_parts(

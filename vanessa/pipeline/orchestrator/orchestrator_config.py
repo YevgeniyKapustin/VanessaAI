@@ -14,6 +14,9 @@ class OrchestratorConfig:
     # answer-preparation stage detects a repeated same-sender message or the
     # compose model returns an empty "stay silent" reply.
     compose_refuse_enabled: bool = True
+    # Tail of the thread before the idle gap that the prompts still see.
+    session_earlier_count: int = 0
+    session_earlier_max_seconds: float = 0
 
     @classmethod
     def from_settings(cls) -> "OrchestratorConfig":
@@ -24,4 +27,6 @@ class OrchestratorConfig:
             post_reply_listen_count=conversation.post_reply_listen_count,
             planner_prefilter_enabled=settings.decision_planner_prefilter,
             compose_refuse_enabled=settings.decision_compose_refuse_enabled,
+            session_earlier_count=conversation.session_earlier_count,
+            session_earlier_max_seconds=conversation.session_earlier_max_seconds,
         )

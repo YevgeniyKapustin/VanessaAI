@@ -21,6 +21,9 @@ run_instructions: |
   deeplink. A dashboard without data: look for another one.
   A request for a dashboard or a link: find it and give its deeplink with
   one line on what it shows; do not investigate further.
+  The owner's own activity for a period («что я делал сегодня»): his MRs
+  and commits in GitLab, his Plane issues, agent sessions and the git
+  worktrees of the work project, read only; list them by time with links.
   Kubernetes for pod details. Add issues only
   when asked about issues or when one is the direct cause.
   Refuse anything else in one line: the PC, its files, the shell, secrets,

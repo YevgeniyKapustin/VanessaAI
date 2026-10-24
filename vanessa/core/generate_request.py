@@ -44,6 +44,10 @@ class GenerateRequest:
     scene_description: str | None = None
     # Hermes ask outcome: "asked" | "offline" | None (see prompt_hermes).
     hermes_status: str | None = None
+    # Retry after a reply promised a later result with no lookup running.
+    false_promise_retry: bool = False
+    # Messages before the session idle gap (an older thread of this chat).
+    earlier_messages: list[ContextMessage] | None = None
     # Schedule request outcome as a ready directive (see prompt_schedule).
     schedule_note: str | None = None
     channel_profile: ChannelProfile | None = None

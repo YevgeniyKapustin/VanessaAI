@@ -1,3 +1,8 @@
 session_window_size: 20
 session_idle_seconds: 300
 post_reply_listen_count: 4
+# After a pause longer than session_idle_seconds the session starts anew.
+# The prompts still see the last messages of the older thread (up to this
+# count and age), so a «ты обещала…» after a pause finds her own words.
+session_earlier_count: 6
+session_earlier_max_seconds: 10800

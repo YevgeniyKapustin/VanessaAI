@@ -1,6 +1,7 @@
 import logging
 import time
 
+from vanessa.config.owners import is_owner
 from vanessa.config.settings import settings
 from vanessa.core.protocols import (
     MessageRepositoryProtocol,
@@ -86,12 +87,14 @@ class GateStage(_GateVisionMixin, _GateFilterMixin, _GateBotPeerMixin):
         assert ctx.session is not None
         ctx.turn_plan = await self._planner.prepare(
             ctx.turn.message,
-            recent_messages=ctx.recent,
+            # The planner also sees the thread before the idle gap.
+            recent_messages=ctx.session.prompt_messages,
             mentions_bot=ctx.turn.mentions_bot,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=pipeline_in_listen_window(ctx),
             sender_name=ctx.sender_name,
+            sender_is_owner=is_owner(ctx.turn.sender_telegram_id),
         )
         ctx.plan_ms = (time.perf_counter() - rewrite_started) * 1000
         await self._load_sender_profile(ctx)

@@ -87,6 +87,7 @@ class TurnPlanner(_TurnPlanLlmMixin):
         reply_to_other_user: bool = False,
         in_listen_window: bool = False,
         sender_name: str = "",
+        sender_is_owner: bool = False,
     ) -> TurnPlan:
         if not self._use_llm:
             result = apply_detail(fallback_plan(message), message)
@@ -118,6 +119,7 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 reply_to_other_user=reply_to_other_user,
                 in_listen_window=in_listen_window,
                 sender_name=sender_name,
+                sender_is_owner=sender_is_owner,
             )
         except Exception:
             logger.exception(
@@ -131,7 +133,8 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r knowledge_detail=%s "
                 "web_search=%s web_query=%r needs_clarification=%s "
-                "uses_pro_model=%s detail=%s reason=%r",
+                "uses_pro_model=%s detail=%s ask_hermes=%s hermes_query=%r "
+                "reason=%r",
                 result.text,
                 result.skip_search,
                 result.should_reply,
@@ -147,6 +150,8 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 result.needs_clarification,
                 result.uses_pro_model,
                 result.detail,
+                result.ask_hermes,
+                result.hermes_query,
                 result.reason,
             )
         return apply_detail(result, message)

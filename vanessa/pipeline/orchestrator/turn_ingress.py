@@ -4,7 +4,10 @@ from vanessa.core.bot_senders import bot_sender_label
 from vanessa.core.messages import attachments_to_dicts
 from vanessa.core.request_context import get_planning_started_signal, get_request_id
 from vanessa.core.session.channel_keys import turn_channel
-from vanessa.core.session.chat_session_state import load_chat_session_state
+from vanessa.core.session.chat_session_state import (
+    EarlierWindow,
+    load_chat_session_state,
+)
 from vanessa.core.turn import ChatTurnInput
 from vanessa.infrastructure.observability.metrics import record_user_activity
 from vanessa.knowledge.people.vrchat_speaker import resolve_vrchat_speaker
@@ -95,6 +98,10 @@ class _TurnIngressMixin:
             max_idle_seconds=self._config.session_idle_seconds,
             listen_max_messages=self._config.post_reply_listen_count,
             channel=channel,
+            earlier=EarlierWindow(
+                count=self._config.session_earlier_count,
+                max_age_seconds=self._config.session_earlier_max_seconds,
+            ),
         )
         ctx.recent = ctx.session.recent_messages
         return ctx

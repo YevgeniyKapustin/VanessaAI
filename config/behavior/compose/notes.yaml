@@ -75,6 +75,21 @@ hermes_offline_note: |
   do NOT promise a later answer. Never mention Hermes, an agent, a helper,
   a basement or a homunculus.
 
+# No work lookup was started for this message (the planner did not ask).
+hermes_none_note: |
+  No work lookup runs for this message: nothing will come later. Do NOT
+  promise to look, check or find something and send it later («ща гляну»,
+  «скину списком», «отпишусь»). Answer now from what you have. If the
+  answer needs work data you do not have, say in one short phrase that you
+  cannot check it right now. Never mention Hermes, an agent or a helper.
+
+# Sent with the retry when the reply still promised a later result.
+false_promise_retry_note: |
+  Your previous reply promised to look something up and send it later, but
+  no lookup runs: nothing will be sent. Write the reply again without that
+  promise: answer now, or say in one short phrase that you cannot check it
+  right now.
+
 photo_album_instruction: |
   The chat already received the photos listed above — the app can re-send any of
   them by number. If one of them fits the current message (the user asks to send,

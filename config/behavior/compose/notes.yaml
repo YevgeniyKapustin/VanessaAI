@@ -75,6 +75,15 @@ hermes_offline_note: |
   do NOT promise a later answer. Never mention Hermes, an agent, a helper,
   a basement or a homunculus.
 
+# A result for this question was posted in the chat a few minutes ago.
+hermes_answered_note: |
+  You already posted the result of this work lookup: it is in your own
+  messages above, after the request. No new lookup runs and nothing will
+  come later. Do NOT promise to look again («ща гляну», «скину»). React to
+  the user's message with what that result says; repeat only what the user
+  asks about, never the whole report. Never mention Hermes, an agent, a
+  helper, a basement or a homunculus.
+
 # No work lookup was started for this message (the planner did not ask).
 hermes_none_note: |
   No work lookup runs for this message: nothing will come later. Do NOT

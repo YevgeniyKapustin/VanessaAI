@@ -16,6 +16,7 @@ from services.worker.hermes.payload import HermesAsk
 from services.worker.hermes.report_style import styled_file
 from vanessa.contracts.outbound import (
     DOCUMENT_MAX_CHARS,
+    QUESTION_MAX_CHARS,
     OutboundDocument,
     OutboundMessage,
 )
@@ -160,4 +161,5 @@ def _outbound(
         source=OUTBOUND_SOURCE,
         document=document,
         more_texts=blocks[1:],
+        question=ask.question[:QUESTION_MAX_CHARS],
     )

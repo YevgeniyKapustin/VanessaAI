@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from vanessa.config.content import AppContent
+from vanessa.core.message_time import format_current_time
 from vanessa.core.messages import ContextBlock, ContextMessage, ImageAttachment
 from vanessa.knowledge.users.display_names import resolve_sender_display_name
 from vanessa.pipeline.llm.prompts.context_format import (
@@ -73,7 +74,7 @@ def format_current_message(
     rendered (a message that carried several keeps them all together).
     """
     sender = resolve_sender_display_name(sender_telegram_id, sender_name)
-    time_label = format_message_time(created_at or datetime.now(UTC))
+    time_label = format_current_time(created_at or datetime.now(UTC))
     msg = render_msg(
         content=content,
         sender=sender,

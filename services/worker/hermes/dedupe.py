@@ -2,36 +2,15 @@
 
 The planner turns a correction («не, я имею в виду глянь») into almost the
 same Hermes question. Two jobs then post two near-duplicate follow-ups. A
-job is open from ``handle()`` until its follow-up is posted.
-
-Similarity: word stems (first ``STEM_CHARS`` letters of words with at least
-``MIN_WORD_CHARS`` letters). A new question repeats an open one when they
-share at least ``MIN_SHARED`` stems and ``OVERLAP_RATIO`` of the shorter
-question's stems. Short function words («что», «как», «дай») drop out.
+job is open from ``handle()`` until its follow-up is posted. The rephrase
+check lives in ``vanessa.core.question_stems``.
 """
 
 from __future__ import annotations
 
-import re
+from vanessa.core.question_stems import is_rephrase, question_stems
 
-STEM_CHARS = 5
-MIN_WORD_CHARS = 4
-MIN_SHARED = 3
-OVERLAP_RATIO = 0.6
-
-_WORD_RE = re.compile(r"\w+")
-
-
-def question_stems(text: str) -> frozenset[str]:
-    words = _WORD_RE.findall(text.lower())
-    return frozenset(word[:STEM_CHARS] for word in words if len(word) >= MIN_WORD_CHARS)
-
-
-def is_rephrase(new: frozenset[str], open_question: frozenset[str]) -> bool:
-    shared = len(new & open_question)
-    if shared < MIN_SHARED:
-        return False
-    return shared / min(len(new), len(open_question)) >= OVERLAP_RATIO
+__all__ = ["OpenAsks", "is_rephrase", "question_stems"]
 
 
 class OpenAsks:

@@ -20,6 +20,8 @@ DOCUMENT_MAX_CHARS = 2_000_000
 MESSAGE_MAX_CHARS = 4096
 #: The most extra messages one outbound item may carry.
 MORE_TEXTS_MAX = 11
+#: Longest work question carried with a follow-up.
+QUESTION_MAX_CHARS = 4096
 MessageText = Annotated[str, Field(min_length=1, max_length=MESSAGE_MAX_CHARS)]
 #: A safe name: letters, digits, ``_`` and ``-``, then ``.html``.
 DOCUMENT_NAME_PATTERN = r"^[\w-]{1,60}\.html$"
@@ -56,3 +58,6 @@ class OutboundMessage(BrokerMessage):
     more_texts: list[MessageText] = Field(
         default_factory=list, max_length=MORE_TEXTS_MAX
     )
+    #: The work question this message answers (Hermes), if any. The adapter
+    #: hands it back in ``PostedMessages``, so the agent knows what was answered.
+    question: str | None = Field(default=None, max_length=QUESTION_MAX_CHARS)

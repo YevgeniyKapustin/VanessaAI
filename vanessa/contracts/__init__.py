@@ -12,6 +12,7 @@ from vanessa.contracts.messages import (
     TurnStarted,
 )
 from vanessa.contracts.outbound import OutboundDocument, OutboundMessage
+from vanessa.contracts.posted import PostedMessages
 from vanessa.contracts.version import SCHEMA_VERSION as _SCHEMA_VERSION
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "InboxNoteReply",
     "OutboundDocument",
     "OutboundMessage",
+    "PostedMessages",
     "TaskKind",
     "TaskMessage",
     "TurnImage",

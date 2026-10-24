@@ -5,9 +5,11 @@ import logging
 from services.agent.broker_worker.handlers import TurnHandlerFactory
 from services.agent.broker_worker.mapping import TurnMapper
 from services.agent.broker_worker.pipeline import SessionPipeline
+from services.agent.broker_worker.posted import PostedRecorder
 from services.agent.broker_worker.replies import ReplyPublisher
 from services.agent.broker_worker.types import HandlerBuilder
 from vanessa.contracts.messages import TurnRequest
+from vanessa.contracts.posted import PostedMessages
 from vanessa.core.request_context import (
     request_id_var,
     set_planning_started_signal,
@@ -24,13 +26,19 @@ class TurnDeliveryHandler:
         mapper: TurnMapper,
         pipeline: SessionPipeline,
         replies: ReplyPublisher,
+        posted: PostedRecorder | None = None,
     ) -> None:
         self._mapper = mapper
         self._pipeline = pipeline
         self._replies = replies
+        # Saves follow-ups the adapter posted on its own; None drops them.
+        self._posted = posted
 
     async def handle(self, delivery: Delivery) -> None:
         request = delivery.message
+        if isinstance(request, PostedMessages) and self._posted is not None:
+            await self._posted.record(request)
+            return
         if not isinstance(request, TurnRequest):
             logger.warning(
                 "broker_unexpected_message kind=%s stream=%s",
@@ -64,6 +72,7 @@ class BrokerTurnWorker:
         deliveries: TurnDeliveryHandler | None = None,
         handlers: TurnHandlerFactory | None = None,
         dedup=None,
+        posted: PostedRecorder | None = None,
     ) -> None:
         self._broker = broker
         self._stream = stream
@@ -84,6 +93,7 @@ class BrokerTurnWorker:
             self._mapper,
             self._pipeline,
             self._replies,
+            posted,
         )
 
     async def run_forever(self) -> None:

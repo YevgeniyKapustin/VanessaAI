@@ -21,3 +21,6 @@ class HermesMixin:
     hermes_query_max_chars: int = 500
     # Largest generated HTML file the worker sends as a document (UTF-8 bytes).
     hermes_file_max_bytes: int = 262_144
+    # A lookup result posted less than this long ago answers a reaction to
+    # it: the planner's repeat of the same question is not sent (agent).
+    hermes_recent_answer_seconds: float = 600.0

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from vanessa.core.hermes_answers import RecentAnswers
 from vanessa.core.protocols import (
     HermesHealthProtocol,
     PinnedNotesProtocol,
@@ -34,6 +35,7 @@ class RetrieveStage(_RetrieveExtrasMixin):
         dispatcher: TaskDispatcher | None = None,
         reminders: ReminderStoreProtocol | None = None,
         pinned_notes: PinnedNotesProtocol | None = None,
+        hermes_answers: RecentAnswers | None = None,
     ) -> None:
         self._uow = uow
         self._meme_catalog = meme_catalog
@@ -43,6 +45,8 @@ class RetrieveStage(_RetrieveExtrasMixin):
         # Hermes health probe + the worker task queue; None disables Hermes.
         self._hermes = hermes
         self._dispatcher = dispatcher
+        # Lookup results posted lately: a reaction to one asks no new lookup.
+        self._hermes_answers = hermes_answers
         # Posts Vanessa schedules for herself; None disables the skill.
         self._reminders = reminders
         # Vault notes Vanessa sees on every reply; None disables them.
@@ -58,7 +62,9 @@ class RetrieveStage(_RetrieveExtrasMixin):
         # notes. All fail open and run side by side.
         await asyncio.gather(
             self._run_web_search(ctx),
-            run_hermes_step(ctx, self._hermes, self._dispatcher),
+            run_hermes_step(
+                ctx, self._hermes, self._dispatcher, self._hermes_answers
+            ),
             run_schedule_step(ctx, self._reminders),
             run_pinned_step(ctx, self._pinned_notes),
         )

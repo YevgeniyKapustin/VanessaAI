@@ -36,7 +36,7 @@ class _DownBroker:
 async def test_broker_runtime_start_stop(monkeypatch) -> None:
     tasks = _Tasks()
     broker = _HealthyBroker()
-    container = SimpleNamespace(graph=SimpleNamespace(broker=broker))
+    container = SimpleNamespace(graph=SimpleNamespace(broker=broker, hermes_answers=None))
     monkeypatch.setattr("services.agent.runtime.broker.TaskSet", lambda: tasks)
     monkeypatch.setattr("services.agent.runtime.broker.settings.outbox_enabled", True)
     runtime = BrokerRuntime(container)

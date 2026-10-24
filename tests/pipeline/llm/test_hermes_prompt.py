@@ -88,3 +88,12 @@ def test_earlier_thread_rendered_with_header() -> None:
     assert llm.earlier_header in prompt
     assert "скину списком" in prompt
     assert llm.earlier_header not in _prompt(None)
+
+
+def test_answered_note_rendered() -> None:
+    llm = get_content().llm
+    prompt = _prompt("answered")
+    assert llm.hermes_answered_note.strip()
+    assert llm.hermes_answered_note.strip() in prompt
+    assert llm.hermes_asked_note.strip() not in prompt
+    assert llm.hermes_none_note.strip() not in prompt

@@ -2,13 +2,16 @@
 
 The worker publishes an ``OutboundMessage`` when a slow job (e.g. a Hermes
 run) finishes long after the turn RPC returned. The bot reads the stream
-with its own consumer group and posts each message to Telegram.
+with its own consumer group and posts each message to Telegram. Then it
+tells the agent which texts went out (``PostedReporter``), so they join
+the chat history.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 from functools import partial
 from uuid import uuid4
 
@@ -17,6 +20,7 @@ from aiogram import Bot
 from services.bot.outbound.document import post_document
 from services.bot.outbound.gate import owner_allows, should_post
 from services.bot.outbound.more import post_more_texts, should_post_more
+from services.bot.outbound.posted import PostedReporter
 from services.bot.outbound.send import post_outbound
 from vanessa.config import settings
 from vanessa.contracts import OutboundMessage
@@ -49,8 +53,15 @@ def start_outbound_task(
             dedup=broker.dedup_guard(),
             delay_seconds=settings.bot_message_delay_seconds,
             access_guard=access_guard,
+            reporter=_reporter(broker, streams),
         )
     )
+
+
+def _reporter(broker, streams: BrokerStreams) -> PostedReporter | None:
+    if not streams.turns:
+        return None
+    return PostedReporter(broker, streams.turns)
 
 
 async def run_outbound_loop(
@@ -64,6 +75,7 @@ async def run_outbound_loop(
     retry_seconds: float = 5.0,
     delay_seconds: float = 0.0,
     access_guard=None,
+    reporter: PostedReporter | None = None,
 ) -> None:
     """Read ``stream`` forever and post every Telegram message to its chat.
 
@@ -77,6 +89,7 @@ async def run_outbound_loop(
         allowed_chat_id=allowed_chat_id,
         delay_seconds=delay_seconds,
         access_guard=access_guard,
+        reporter=reporter,
     )
     logger.info("outbound_consumer_started stream=%s group=%s", stream, OUTBOUND_GROUP)
     while True:
@@ -102,13 +115,39 @@ async def handle_outbound(
     allowed_chat_id: int = 0,
     delay_seconds: float = 0.0,
     access_guard=None,
+    reporter: PostedReporter | None = None,
 ) -> None:
-    """Post one delivery. Never raises, so the consume loop always acks."""
+    """Post one delivery. Never raises, so the consume loop always acks.
+
+    ``reporter`` tells the agent which texts went out (chat history).
+    """
     message = delivery.message
     if not should_post(message, allowed_chat_id):
         return
     if not await owner_allows(access_guard, bot, message.telegram_chat_id):
         return
+    posted_at = datetime.now(UTC)
+    sent = await _post_and_log(bot, message, delay_seconds)
+    if sent is not None:
+        await _report(reporter, message, sent, posted_at)
+
+
+async def _report(
+    reporter: PostedReporter | None,
+    message: OutboundMessage,
+    sent: tuple[bool, int],
+    posted_at: datetime,
+) -> None:
+    if reporter is None:
+        return
+    delivered, more = sent
+    await reporter.report(message, delivered=delivered, more=more, posted_at=posted_at)
+
+
+async def _post_and_log(
+    bot: Bot, message: OutboundMessage, delay_seconds: float
+) -> tuple[bool, int] | None:
+    """Post everything and log it; None when a send raised."""
     try:
         delivered, more = await _post_all(bot, message, delay_seconds)
     except Exception:  # a send failure must not redeliver
@@ -117,7 +156,7 @@ async def handle_outbound(
             message.telegram_chat_id,
             message.source,
         )
-        return
+        return None
     logger.info(
         "outbound_sent chat_id=%s source=%s reply_to=%s delivered=%s len=%s "
         "more=%s/%s file=%s",
@@ -130,6 +169,7 @@ async def handle_outbound(
         len(message.more_texts),
         message.document.file_name if message.document else "-",
     )
+    return delivered, more
 
 
 async def _post_all(

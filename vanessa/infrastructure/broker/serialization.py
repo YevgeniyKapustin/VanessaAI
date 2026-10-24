@@ -19,6 +19,7 @@ from vanessa.contracts.messages import (
     TurnStarted,
 )
 from vanessa.contracts.outbound import OutboundMessage
+from vanessa.contracts.posted import PostedMessages
 from vanessa.infrastructure.broker.errors import UnknownMessageKind
 
 _KIND_TO_MODEL: dict[str, type[BrokerMessage]] = {
@@ -30,6 +31,7 @@ _KIND_TO_MODEL: dict[str, type[BrokerMessage]] = {
         TaskMessage,
         InboxNoteReply,
         OutboundMessage,
+        PostedMessages,
     )
 }
 

@@ -8,9 +8,11 @@ from pydantic import BaseModel
 
 class LLMLookupNotes(BaseModel):
     # Hermes ask directives (TurnPlan.ask_hermes): task queued / PC offline /
-    # no lookup this turn (then she must not promise a later result).
+    # result already posted / no lookup this turn (then she must not promise
+    # a later result).
     hermes_asked_note: str = ""
     hermes_offline_note: str = ""
+    hermes_answered_note: str = ""
     hermes_none_note: str = ""
     # Retry note when a reply promised a later result with no lookup running.
     false_promise_retry_note: str = ""

@@ -10,7 +10,7 @@ from vanessa.infrastructure.observability.metrics.metrics_pipeline import (
 
 hermes_dispatch_total = Counter(
     "vanessa_hermes_dispatch_total",
-    "Hermes ask outcomes in the Retrieve stage: asked / offline / error",
+    "Hermes ask outcomes in the Retrieve stage: asked / offline / error / answered",
     ["status"],
     registry=registry,
 )
@@ -25,3 +25,8 @@ def record_hermes_dispatch(status: str, ms: float) -> None:
     """Record one Hermes ask outcome and the health check latency."""
     hermes_dispatch_total.labels(status=status).inc()
     hermes_health_duration_seconds.observe(ms / 1000.0)
+
+
+def record_hermes_answered() -> None:
+    """Record an ask skipped because a fresh result already answers it."""
+    hermes_dispatch_total.labels(status="answered").inc()

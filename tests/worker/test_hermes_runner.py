@@ -48,6 +48,7 @@ async def test_success_publishes_persona_text_as_reply(caplog) -> None:
     assert message.telegram_chat_id == CHAT_ID
     assert message.reply_to_message_id == MESSAGE_ID
     assert message.source == "hermes"
+    assert message.question == "что в Plane по VAN-12?"
     question, kwargs = client.started[0]
     assert question == "что в Plane по VAN-12?"
     assert kwargs["session_id"] == f"vanessa-telegram-{CHAT_ID}"

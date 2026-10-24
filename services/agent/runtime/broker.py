@@ -4,6 +4,7 @@ import logging
 from uuid import uuid4
 
 from services.agent.broker_worker.handlers import TurnHandlerFactory
+from services.agent.broker_worker.posted import PostedRecorder
 from services.agent.broker_worker.worker import BrokerTurnWorker
 from services.agent.container.app import AppContainer
 from services.agent.runtime.lifecycle import AsyncRuntime
@@ -31,6 +32,9 @@ def _start_turn_worker(
         consumer=f"{settings.broker_group_agent}-{consumer_suffix}",
         handlers=TurnHandlerFactory(container),
         dedup=broker.dedup_guard(),
+        posted=PostedRecorder(
+            async_session_factory, container.graph.hermes_answers
+        ),
     )
     tasks.spawn(
         turn_worker.run_forever(),

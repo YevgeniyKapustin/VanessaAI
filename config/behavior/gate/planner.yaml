@@ -263,6 +263,10 @@ turn_planner_prompt: |
   A correction or a rephrase of the last work request («не, я имею в виду
   глянь») is the same lookup: keep the same hermes_query, change only what
   the user corrected.
+  A result already posted: Vanessa's messages after the work request carry
+  the answer (numbers, statuses, links). A reaction to it («ясно», «жесть»,
+  «ну и дела») is NOT a new lookup: ask_hermes=false. Only a new question
+  or an explicit «проверь ещё раз» asks again.
 
   ## schedule
   Vanessa can post to this chat by herself later or on a schedule.

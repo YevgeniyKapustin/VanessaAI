@@ -6,11 +6,13 @@ from vanessa.core.protocols import (
 from vanessa.core.session.channel_keys import dialogue_session_key, turn_channel
 from vanessa.core.turn import ConversationTurnResult
 from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget
 from vanessa.pipeline.decision.models import DecisionAction
 from vanessa.pipeline.decision.protocols import DecisionEngineProtocol
 from vanessa.pipeline.llm.format.answer_tag import strip_control_tags
 from vanessa.pipeline.llm.format.stray_tags import strip_stray_tags
 from vanessa.pipeline.llm.memes import MemeDecider
+from vanessa.pipeline.stages.bot_peer import record_bot_peer_reply
 from vanessa.pipeline.stages.finalize_delivery import (
     delivery_messages,
     marker_free_reply,
@@ -27,8 +29,10 @@ class FinalizeStage:
         metrics: TurnMetricsProtocol,
         *,
         meme_decider: MemeDecider | None = None,
+        bot_budget: BotPeerBudget | None = None,
     ) -> None:
         self._messages = messages
+        self._bot_budget = bot_budget
         self._decision = decision_engine
         self._metrics = metrics
         self._meme_decider = meme_decider
@@ -84,6 +88,8 @@ class FinalizeStage:
             telegram_chat_id=ctx.turn.telegram_chat_id,
         )
         self._decision.record_reply(session_key)
+        if self._bot_budget is not None:
+            record_bot_peer_reply(self._bot_budget, ctx)
         if self._meme_decider is not None:
             self._meme_decider.register_reply(session_key)
 

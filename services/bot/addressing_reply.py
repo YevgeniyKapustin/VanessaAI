@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from vanessa.core.bot_senders import bot_sender_label
+
 
 @dataclass(frozen=True, slots=True)
 class ReplyAddressing:
@@ -30,14 +32,17 @@ def _username_from_cached_me(bot: object) -> str:
     return str(me.username).lower()
 
 
-def _reply_sender_name(from_user: object | None) -> str | None:
+def _reply_sender_name(from_user: object | None, *, own_bot: bool = False) -> str | None:
     if from_user is None:
         return None
-    return (
+    name = (
         getattr(from_user, "first_name", None)
         or getattr(from_user, "last_name", None)
         or getattr(from_user, "username", None)
     )
+    if not own_bot and getattr(from_user, "is_bot", False) is True:
+        return bot_sender_label(name)
+    return name
 
 
 def _reply_text(reply_to: object | None) -> str | None:
@@ -74,5 +79,8 @@ def extract_reply_addressing(
         reply_to_sender_telegram_id=reply_author_id,
         reply_to_message_id=getattr(reply_to, "message_id", None),
         reply_to_text=_reply_text(reply_to),
-        reply_to_sender_name=_reply_sender_name(reply_to.from_user),
+        reply_to_sender_name=_reply_sender_name(
+            reply_to.from_user,
+            own_bot=reply_author_id == bot_id,
+        ),
     )

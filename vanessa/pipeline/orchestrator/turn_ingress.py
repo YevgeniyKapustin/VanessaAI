@@ -1,5 +1,6 @@
 import logging
 
+from vanessa.core.bot_senders import bot_sender_label
 from vanessa.core.messages import attachments_to_dicts
 from vanessa.core.request_context import get_planning_started_signal, get_request_id
 from vanessa.core.session.channel_keys import turn_channel
@@ -46,6 +47,9 @@ async def _resolve_ingress_sender(users, turn: ChatTurnInput) -> str:
     sender_id = turn.sender_telegram_id
     if sender_id is None:
         return _resolve_vrchat_ingress_sender(turn)
+    if turn.sender_is_bot:
+        # Another AI bot: no user row, no person card, only a «[бот Имя]» label.
+        return bot_sender_label(turn.sender_first_name or turn.sender_username)
     user = await users.get_or_create(
         telegram_id=sender_id,
         username=turn.sender_username,

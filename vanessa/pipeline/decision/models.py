@@ -29,6 +29,10 @@ class DecisionReason(StrEnum):
     USER_IGNORED = "user_ignored"
     TOXIC = "toxic"
     REPEATED = "repeated"
+    # Another AI bot wrote a message that is not for Vanessa (bot side talk).
+    BOT_PEER_SIDE = "bot_peer_side"
+    # The bot-to-bot reply budget is used up (depth, cooldown or hourly cap).
+    BOT_PEER_LIMIT = "bot_peer_limit"
     # Vanessa's attitude to the sender is critically low (loop-repetition
     # annoyance and/or a persistently low relationship) → even a weak / slightly
     # disliked message is ignored (maximal ignore tendency).

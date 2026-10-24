@@ -14,6 +14,11 @@ logger = logging.getLogger("vanessa.pipeline.stages")
 
 
 class _GateFilterMixin:
+    async def _filters_should_stop(self, ctx: TurnPipelineContext) -> bool:
+        if await self._prefilter_should_stop(ctx):
+            return True
+        return await self._reaction_gate_should_stop(ctx)
+
     async def _prefilter_should_stop(self, ctx: TurnPipelineContext) -> bool:
         if not self._config.planner_prefilter_enabled or self._prefilter is None:
             return False

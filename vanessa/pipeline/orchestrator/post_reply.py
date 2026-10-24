@@ -18,8 +18,11 @@ class _PostReplyMixin(_PostReplyJobsMixin):
 
         With a background executor injected, all are submitted as jobs and the
         reply returns immediately (non-blocking). Without one (unit tests /
-        fallback) they run inline exactly as before.
+        fallback) they run inline exactly as before. A turn from another
+        AI bot skips all of them: a bot never gets a person card.
         """
+        if ctx.turn.sender_is_bot:
+            return
         caption_job = self._build_photo_caption_job(ctx)
         if self._dispatcher is not None:
             self._submit_worker_post_reply(ctx)

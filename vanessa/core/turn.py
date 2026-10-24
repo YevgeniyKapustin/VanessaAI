@@ -13,6 +13,8 @@ class ChatTurnInput:
     sender_username: str | None = None
     sender_first_name: str | None = None
     sender_last_name: str | None = None
+    # The sender is another Telegram bot (an AI peer), not a person.
+    sender_is_bot: bool = False
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False

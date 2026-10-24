@@ -31,6 +31,7 @@ class TurnMapper:
             sender_username=source.sender_username,
             sender_first_name=source.sender_first_name,
             sender_last_name=source.sender_last_name,
+            sender_is_bot=source.sender_is_bot,
             mentions_bot=source.mentions_bot,
             reply_to_bot=source.reply_to_bot,
             reply_to_other_user=source.reply_to_other_user,

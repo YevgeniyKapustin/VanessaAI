@@ -49,6 +49,7 @@ class OrchestratorFactory:
             decision.ignore_registry,
             metrics_retriever=engines.metrics_retriever,
             reaction_gate=decision.reaction_gate,
+            bot_budget=decision.bot_budget,
         )
         retrieve = RetrieveStage(
             uow,
@@ -70,6 +71,7 @@ class OrchestratorFactory:
             engines.decision,
             metrics,
             meme_decider=memes.decider,
+            bot_budget=decision.bot_budget,
         )
         return ConversationOrchestrator(
             messages=messages,

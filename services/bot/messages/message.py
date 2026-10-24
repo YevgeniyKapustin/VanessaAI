@@ -27,6 +27,7 @@ class IncomingMessage:
     sender_username: str | None = None
     sender_first_name: str | None = None
     sender_last_name: str | None = None
+    sender_is_bot: bool = False
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
@@ -61,6 +62,7 @@ class IncomingMessage:
             sender_username=message.from_user.username,
             sender_first_name=message.from_user.first_name,
             sender_last_name=message.from_user.last_name,
+            sender_is_bot=message.from_user.is_bot is True,
             mentions_bot=addressing.mentions_bot,
             reply_to_bot=addressing.reply_to_bot,
             reply_to_other_user=addressing.reply_to_other_user,
@@ -81,6 +83,7 @@ class IncomingMessage:
             "sender_username": self.sender_username,
             "sender_first_name": self.sender_first_name,
             "sender_last_name": self.sender_last_name,
+            "sender_is_bot": self.sender_is_bot,
             "mentions_bot": self.mentions_bot,
             "reply_to_bot": self.reply_to_bot,
             "reply_to_other_user": self.reply_to_other_user,

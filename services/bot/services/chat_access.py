@@ -39,10 +39,14 @@ class ChatAccessGuard:
         return [self._required_user_id, *sorted(extra)]
 
     async def required_user_in_chat(self, message: IncomingMessage) -> bool:
+        return await self.owner_in_chat(message.bot, message.telegram_chat_id)
+
+    async def owner_in_chat(self, bot, chat_id: int) -> bool:
+        """Whether the owner (or a co-owner) is an active member of ``chat_id``."""
         if not self._required_user_id:
             return False
         for user_id in self._owner_ids():
-            if await _is_active_member(message, user_id):
+            if await _is_active_member(bot, chat_id, user_id):
                 return True
         return False
 
@@ -86,12 +90,9 @@ class ChatAccessGuard:
         return None
 
 
-async def _is_active_member(message: IncomingMessage, user_id: int) -> bool:
+async def _is_active_member(bot, chat_id: int, user_id: int) -> bool:
     try:
-        member = await message.bot.get_chat_member(
-            chat_id=message.telegram_chat_id,
-            user_id=user_id,
-        )
+        member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
     except TelegramBadRequest:
         return False
     return _enum_to_str(member.status) in {

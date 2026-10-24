@@ -84,8 +84,9 @@ class _FakeOutboundLoop:
         self.args: tuple | None = None
         self.cancelled = False
 
-    def start(self, broker, streams, bot) -> asyncio.Task:
+    def start(self, broker, streams, bot, access_guard=None) -> asyncio.Task:
         self.args = (broker, streams, bot)
+        self.access_guard = access_guard
         return asyncio.create_task(self._run())
 
     async def _run(self) -> None:

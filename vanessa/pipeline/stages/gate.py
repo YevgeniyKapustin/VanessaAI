@@ -9,6 +9,7 @@ from vanessa.core.protocols import (
 from vanessa.core.request_context import get_request_id
 from vanessa.knowledge.metrics.retriever import MetricsRetriever
 from vanessa.pipeline.context import TurnPipelineContext
+from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget
 from vanessa.pipeline.decision.gate.eligibility.ignore_registry_protocol import (
     ChatIgnoreRegistryProtocol,
 )
@@ -28,6 +29,7 @@ from vanessa.pipeline.gate_support import (
     finish_decision_ignore,
 )
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.pipeline.stages.bot_peer import _GateBotPeerMixin
 from vanessa.pipeline.stages.gate_decision import (
     decision_context_from_pipeline,
     pipeline_in_listen_window,
@@ -38,7 +40,7 @@ from vanessa.pipeline.stages.gate_vision import _GateVisionMixin
 logger = logging.getLogger("vanessa.pipeline.stages")
 
 
-class GateStage(_GateVisionMixin, _GateFilterMixin):
+class GateStage(_GateVisionMixin, _GateFilterMixin, _GateBotPeerMixin):
     def __init__(
         self,
         query_rewriter: TurnPlannerProtocol,
@@ -51,6 +53,7 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
         metrics_retriever: MetricsRetriever | None = None,
         reaction_gate: ReactionGateProtocol | None = None,
         loop_registry: LoopRegistry | None = None,
+        bot_budget: BotPeerBudget | None = None,
     ) -> None:
         self._planner = query_rewriter
         self._decision = decision_engine
@@ -65,15 +68,16 @@ class GateStage(_GateVisionMixin, _GateFilterMixin):
         self._messages = messages
         self._ignore_registry = ignore_registry
         self._metrics_retriever = metrics_retriever
+        self._bot_budget = bot_budget or BotPeerBudget()
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
         await apply_owner_ignore_if_needed(self._ignore_registry, ctx)
+        if await self._bot_peer_should_stop(ctx):
+            return False
         photo_done = await self._gate_bare_photo(ctx)
         if photo_done is not None:
             return photo_done
-        if await self._prefilter_should_stop(ctx):
-            return False
-        if await self._reaction_gate_should_stop(ctx):
+        if await self._filters_should_stop(ctx):
             return False
         return await self._plan_decide_and_finish(ctx)
 

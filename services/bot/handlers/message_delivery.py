@@ -28,7 +28,8 @@ async def _reject_if_no_access(
             incoming.sender_telegram_id,
             incoming.chat_type,
         )
-        if _addressed_to_bot(services, incoming):
+        # Never answer a bot with the denial: two bots would loop on it.
+        if not incoming.sender_is_bot and _addressed_to_bot(services, incoming):
             await telegram_message.answer(error)
         return True
     return False

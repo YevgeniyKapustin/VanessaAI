@@ -20,6 +20,10 @@ import time
 
 from vanessa.core.messages import StoredMessage, stored_to_context
 from vanessa.knowledge.memory.memory_stage import format_memory_transcript
+from vanessa.knowledge.metrics.batch_filters import (
+    drop_bot_messages,
+    filter_sender_metrics,
+)
 from vanessa.knowledge.metrics.deterministic import DeterministicMetricsCalculator
 from vanessa.knowledge.metrics.pipeline_persist import persist_combined
 from vanessa.knowledge.metrics.planner import MetricsPlanner
@@ -35,21 +39,6 @@ def _cooldown_blocks(last_run: float | None, cooldown: int, *, semantic: bool) -
     if semantic or cooldown <= 0 or last_run is None:
         return False
     return time.monotonic() - last_run < cooldown
-
-
-def _filter_sender_metrics(
-    det: dict[int, PersonMetrics],
-    only_senders: set[int] | None,
-) -> dict[int, PersonMetrics]:
-    if only_senders is None:
-        return det
-    # Per-turn pass: drop every other sender before any card is resolved
-    # or written, so we only ever touch the active participant.
-    return {
-        telegram_id: metrics
-        for telegram_id, metrics in det.items()
-        if telegram_id in only_senders
-    }
 
 
 class MetricsPipeline:
@@ -176,7 +165,8 @@ class MetricsPipeline:
             batch = await repo.get_messages_since(
                 days=self._calculator.history_days
             )
-        det = _filter_sender_metrics(
+        batch = drop_bot_messages(batch)
+        det = filter_sender_metrics(
             self._calculator.compute_per_sender(batch), only_senders
         )
 

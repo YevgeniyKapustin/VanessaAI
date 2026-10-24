@@ -46,7 +46,9 @@ async def main() -> None:
     logger.info("Bot started as @%s id=%s", me.username, me.id)
     outbound_task = None
     if services.streams is not None:
-        outbound_task = start_outbound_task(services.broker, services.streams, bot)
+        outbound_task = start_outbound_task(
+            services.broker, services.streams, bot, services.access_guard
+        )
     dp = Dispatcher()
     router = create_router(services)
     router.message.middleware(BotLoggingMiddleware())

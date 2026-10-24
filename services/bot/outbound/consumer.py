@@ -15,6 +15,7 @@ from uuid import uuid4
 from aiogram import Bot
 
 from services.bot.outbound.document import post_document
+from services.bot.outbound.gate import owner_allows, should_post
 from services.bot.outbound.more import post_more_texts, should_post_more
 from services.bot.outbound.send import post_outbound
 from vanessa.config import settings
@@ -27,8 +28,14 @@ logger = logging.getLogger(__name__)
 OUTBOUND_GROUP = "bot-outbound"
 
 
-def start_outbound_task(broker, streams: BrokerStreams, bot: Bot) -> asyncio.Task | None:
-    """Start the outbound consume loop as a background task (None if no broker)."""
+def start_outbound_task(
+    broker, streams: BrokerStreams, bot: Bot, access_guard=None
+) -> asyncio.Task | None:
+    """Start the outbound consume loop as a background task (None if no broker).
+
+    ``access_guard`` (``ChatAccessGuard``) drops follow-ups to chats without
+    the owner.
+    """
     if broker is None or not streams.outbound:
         return None
     suffix = settings.broker_consumer_id or uuid4().hex[:6]
@@ -41,6 +48,7 @@ def start_outbound_task(broker, streams: BrokerStreams, bot: Bot) -> asyncio.Tas
             allowed_chat_id=settings.allowed_chat_telegram_id,
             dedup=broker.dedup_guard(),
             delay_seconds=settings.bot_message_delay_seconds,
+            access_guard=access_guard,
         )
     )
 
@@ -55,6 +63,7 @@ async def run_outbound_loop(
     dedup=None,
     retry_seconds: float = 5.0,
     delay_seconds: float = 0.0,
+    access_guard=None,
 ) -> None:
     """Read ``stream`` forever and post every Telegram message to its chat.
 
@@ -67,6 +76,7 @@ async def run_outbound_loop(
         bot,
         allowed_chat_id=allowed_chat_id,
         delay_seconds=delay_seconds,
+        access_guard=access_guard,
     )
     logger.info("outbound_consumer_started stream=%s group=%s", stream, OUTBOUND_GROUP)
     while True:
@@ -91,10 +101,13 @@ async def handle_outbound(
     *,
     allowed_chat_id: int = 0,
     delay_seconds: float = 0.0,
+    access_guard=None,
 ) -> None:
     """Post one delivery. Never raises, so the consume loop always acks."""
     message = delivery.message
-    if not _should_post(message, allowed_chat_id):
+    if not should_post(message, allowed_chat_id):
+        return
+    if not await owner_allows(access_guard, bot, message.telegram_chat_id):
         return
     try:
         delivered, more = await _post_all(bot, message, delay_seconds)
@@ -128,20 +141,3 @@ async def _post_all(
     if not should_post_more(message, delivered=delivered):
         return delivered, 0
     return delivered, await post_more_texts(bot, message, delay_seconds=delay_seconds)
-
-
-def _should_post(message, allowed_chat_id: int) -> bool:
-    if not isinstance(message, OutboundMessage):
-        logger.warning("outbound_unexpected kind=%s", message.message_kind())
-        return False
-    if message.channel != "telegram":
-        logger.debug("outbound_skipped channel=%s", message.channel)
-        return False
-    if allowed_chat_id and message.telegram_chat_id != allowed_chat_id:
-        logger.warning(
-            "outbound_dropped_wrong_chat chat_id=%s allowed=%s",
-            message.telegram_chat_id,
-            allowed_chat_id,
-        )
-        return False
-    return True

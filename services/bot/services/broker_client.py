@@ -60,6 +60,7 @@ class BrokerTurnClient:
             sender_username=message.sender_username,
             sender_first_name=message.sender_first_name,
             sender_last_name=message.sender_last_name,
+            sender_is_bot=message.sender_is_bot,
             mentions_bot=message.mentions_bot,
             reply_to_bot=message.reply_to_bot,
             reply_to_other_user=message.reply_to_other_user,

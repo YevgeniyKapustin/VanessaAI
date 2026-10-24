@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from vanessa.core.bot_senders import is_bot_sender_label
 from vanessa.core.message_time import format_message_time
 from vanessa.core.messages import ContextMessage
 from vanessa.knowledge.people.people import canonical_name_for_telegram_id
@@ -33,14 +34,18 @@ def format_memory_transcript(messages: list[ContextMessage]) -> str:
     stable ``person`` references that the writer resolves to a single card —
     instead of inventing new spellings like «ну я», «капуст», «владимир».
     """
-    lines: list[str] = []
-    for message in messages:
-        text = message.content.replace("\n", " ").strip()
-        if not text:
-            continue
-        time_label = format_message_time(message.created_at)
-        if message.role == "assistant":
-            lines.append(f"{time_label} [assistant] {text}")
-            continue
-        lines.append(_memory_user_line(message, time_label, text))
-    return "\n".join(lines)
+    lines = [_memory_line(message) for message in messages]
+    return "\n".join(line for line in lines if line)
+
+
+def _memory_line(message: ContextMessage) -> str | None:
+    text = message.content.replace("\n", " ").strip()
+    if not text:
+        return None
+    time_label = format_message_time(message.created_at)
+    if message.role == "assistant":
+        return f"{time_label} [assistant] {text}"
+    if is_bot_sender_label(message.sender_name):
+        # Other AI bots get no person card: keep them out of memory.
+        return None
+    return _memory_user_line(message, time_label, text)

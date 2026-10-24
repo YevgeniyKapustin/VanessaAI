@@ -133,7 +133,7 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 "tone=%s humor_ok=%s humor_query=%r deep_search=%s "
                 "knowledge=%s knowledge_query=%r knowledge_detail=%s "
                 "web_search=%s web_query=%r needs_clarification=%s "
-                "uses_pro_model=%s detail=%s ask_hermes=%s hermes_query=%r "
+                "detail=%s ask_hermes=%s hermes_query=%r "
                 "reason=%r",
                 result.text,
                 result.skip_search,
@@ -148,7 +148,6 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 result.web_search,
                 result.web_query,
                 result.needs_clarification,
-                result.uses_pro_model,
                 result.detail,
                 result.ask_hermes,
                 result.hermes_query,

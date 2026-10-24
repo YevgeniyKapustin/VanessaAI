@@ -29,10 +29,6 @@ class TurnPlan:
     web_query: str = ""
     needs_clarification: bool = False
     clarification_hint: str = ""
-    # True when the turn needs the upscaled compose model (deepseek-v4-pro):
-    # super-complex synthesis, coding, long multi-step reasoning. The gate
-    # planner decides; the composer routes the generation call accordingly.
-    uses_pro_model: bool = False
     # Short reason for declining a reply — filled only when should_reply=false
     # (planner skip=true means stay silent; the parser forces should_reply=false).
     reason: str = ""
@@ -80,7 +76,6 @@ class TurnPlan:
             "web_query": self.web_query,
             "needs_clarification": self.needs_clarification,
             "clarification_hint": self.clarification_hint,
-            "uses_pro_model": self.uses_pro_model,
             "repeated_topic": self.repeated_topic,
             "loop_level": self.loop_level,
             "detail": self.detail,

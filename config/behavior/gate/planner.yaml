@@ -54,7 +54,6 @@ turn_planner_prompt: |
     "hermes_query": "",
     "needs_clarification": false,
     "clarification_hint": "",
-    "uses_pro_model": false,
     "detail": "normal",
     "repeated_topic": false,
     "loop_level": 0,
@@ -67,8 +66,8 @@ turn_planner_prompt: |
 
   Defaults-first: skip=false, tone="neutral", detail="normal", all flags
   false, knowledge_indexes=[], loop_level=0. Flip a flag ONLY when clearly
-  justified. A wrongly-false web_search / deep_search / uses_pro_model is
-  cheap; a wrongly-true one costs time and money.
+  justified. A wrongly-false web_search / deep_search is cheap; a
+  wrongly-true one costs time and money.
 
   ## Work lookup (Hermes) — the main rule for ask_hermes
   Hermes is Vanessa's work agent. He reads LIVE work data: tasks and
@@ -100,7 +99,7 @@ turn_planner_prompt: |
   ## Decision order (then check consistency)
   1. Who is it for? → should_reply / skip (## should_reply).
      If skip=true → should_reply=false, fill reason, turn OFF search,
-     knowledge, web, hermes, humor, deep_search, pro_model; stop.
+     knowledge, web, hermes, humor, deep_search; stop.
   2. Can we understand it? → needs_clarification. If true → should_reply=true,
      skip=false, search_query="", all search flags OFF, hint filled.
   3. Which source answers?
@@ -112,9 +111,8 @@ turn_planner_prompt: |
        (+ hermes_query); check this BEFORE search_query and knowledge.
      Do not stack web and knowledge unless both are required.
   4. Fill tone, humor_ok / humor_query, detail.
-  5. uses_pro_model ONLY for coding / super-complex synthesis.
-  6. repeated_topic / loop_level — anti-spam only, not anti deep-dive.
-  7. Re-check consistency.
+  5. repeated_topic / loop_level — anti-spam only, not anti deep-dive.
+  6. Re-check consistency.
 
   ## should_reply
   true — addressed to the bot, a question to her, a continuation of her
@@ -198,11 +196,6 @@ turn_planner_prompt: |
   true — comparison / several threads / technical analysis across points.
   false (default). Not true just because the message is long or has
   «почему».
-
-  ## uses_pro_model
-  true — coding (writing or fixing code), super-complex synthesis, deep
-  technical reasoning a fast model would fumble. false (default) for
-  regular dialogue and RAG. It costs more — escalate only when necessary.
 
   ## detail
   Always fill: "normal" (default); "detailed" if they ask «подробнее» /
@@ -311,67 +304,67 @@ turn_planner_prompt: |
   ## Examples (input → JSON; every field present)
 
   «чего и следовало ожидать» | empty/meaningless
-  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": "пустая фраза"}}
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": "пустая фраза"}}
 
   «это правда» | bare agreement
-  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": "пустая фраза"}}
+  → {{"should_reply": false, "search_query": "", "skip": true, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": "пустая фраза"}}
 
   «ну чет ваще мало» (listen_window, same user) | reply, no search
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "ironic", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "ironic", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «Ванесса, кто такой Тик так» | people, portrait only
-  → {{"should_reply": true, "search_query": "тик так", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": ["people"], "knowledge_query": "тик так", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "тик так", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": ["people"], "knowledge_query": "тик так", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «расскажи про меня» | sender=Личь — USER, not Vanessa
-  → {{"should_reply": true, "search_query": "личь", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": ["people"], "knowledge_query": "личь", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "личь", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": ["people"], "knowledge_query": "личь", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «расскажи про себя» | Vanessa about herself
-  → {{"should_reply": true, "search_query": "ванесса", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": ["people"], "knowledge_query": "ванесса", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "ванесса", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": ["people"], "knowledge_query": "ванесса", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «напиши скрипт на C#, чтобы объект плавно поворачивался к камере» | coding
-  → {{"should_reply": true, "search_query": "unity скрипт поворот к камере", "skip": false, "tone": "serious", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": true, "detail": "detailed", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "unity скрипт поворот к камере", "skip": false, "tone": "serious", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "detailed", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса не тормози я написал» | imperative address, NOT self-talk
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «давай более развёрнутый ответ» (listen_window) | detail="detailed", no search
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "detailed", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "detailed", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса отвечай» three times, no new substance | spam loop, still reply
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": true, "loop_level": 2, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": true, "loop_level": 2, "schedule": null, "reason": ""}}
 
   «ванесса, а какая сейчас цена на биткоин?» | live data
-  → {{"should_reply": true, "search_query": "bitcoin цена", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": true, "web_query": "bitcoin цена сегодня", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "bitcoin цена", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": true, "web_query": "bitcoin цена сегодня", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса, глянь, что с пайплайном в MR 42 в vanessa-ai» | owner's work → Hermes
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Какой статус пайплайна у MR 42 в проекте vanessa-ai в GitLab?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Какой статус пайплайна у MR 42 в проекте vanessa-ai в GitLab?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «чекни для нашего проекта именно» (after «предложи доработки флоу тестирования») | work project → Hermes
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Как сейчас идёт тестирование в рабочем проекте (статусы и задачи в Plane) и что в этом флоу стоит доработать?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Как сейчас идёт тестирование в рабочем проекте (статусы и задачи в Plane) и что в этом флоу стоит доработать?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса Открыть в Grafana счётчики ошибок оплаты. Ожидаемо: счётчик вырос на 1. это для QA, дай его мне» | link request → Hermes finds the link
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Найди в Grafana дашборд со счётчиками ошибок оплаты и дай ссылку на него", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Найди в Grafana дашборд со счётчиками ошибок оплаты и дай ссылку на него", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса что я делал сегодня» | Sender is the owner: yes → his work activity, Hermes
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса чем я вчера занимался» | sender=Личь, Sender is the owner: no → his work activity, Hermes
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что Личь делал вчера в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за вчера?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что Личь делал вчера в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за вчера?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса есть алерты?» | live state → Hermes, not a memory search
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Есть ли сейчас активные алерты по рабочему проекту в Grafana?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Есть ли сейчас активные алерты по рабочему проекту в Grafana?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса найди задачу про логин» | find a work item → Hermes
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Найди в Plane задачу рабочего проекта про логин и дай ссылку на неё", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Найди в Plane задачу рабочего проекта про логин и дай ссылку на неё", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ты обещала мне список» (earlier: «что я делал сегодня» → bot «ща гляну, скину списком») | reminder of a promised lookup → Hermes again
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса я думаю ты виновата» | vague, ask one clarifying question
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": true, "clarification_hint": "почему", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": true, "clarification_hint": "почему", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «Ванесса, ставь себе задачу каждую пятницу в час дня кидать ссылку на обеды https://example.com/menu, чтобы никто не забыл заказать» | recurring post
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "brief", "repeated_topic": false, "loop_level": 0, "schedule": {{"action": "add", "cron": "0 13 * * 5", "at": "", "text": "Пятница, обеды! Закажите, пока не поздно, я напоминаю: https://example.com/menu", "target": ""}}, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "brief", "repeated_topic": false, "loop_level": 0, "schedule": {{"action": "add", "cron": "0 13 * * 5", "at": "", "text": "Пятница, обеды! Закажите, пока не поздно, я напоминаю: https://example.com/menu", "target": ""}}, "reason": ""}}
 
   «ванесса, больше не кидай обеды» | cancel a post
-  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "brief", "repeated_topic": false, "loop_level": 0, "schedule": {{"action": "cancel", "target": "обеды"}}, "reason": ""}}
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": false, "clarification_hint": "", "detail": "brief", "repeated_topic": false, "loop_level": 0, "schedule": {{"action": "cancel", "target": "обеды"}}, "reason": ""}}

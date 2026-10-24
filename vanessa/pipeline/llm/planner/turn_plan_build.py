@@ -166,7 +166,6 @@ def _search_plan(
         knowledge_detail=payload.get("knowledge_detail") is True,
         web_search=web_search,
         web_query=web_query,
-        uses_pro_model=payload.get("uses_pro_model") is True,
         repeated_topic=repeated_topic,
         loop_level=loop_level,
         detail=_parse_detail(payload.get("detail")),

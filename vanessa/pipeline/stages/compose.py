@@ -53,7 +53,6 @@ def _compose_generate_request(
         needs_clarification=plan.needs_clarification,
         clarification_hint=plan.clarification_hint,
         detail=plan.detail,
-        uses_pro_model=plan.uses_pro_model,
         reply_to_text=turn.reply_to_text,
         reply_to_sender_telegram_id=turn.reply_to_sender_telegram_id,
         reply_to_sender_name=turn.reply_to_sender_name,

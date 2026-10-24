@@ -29,15 +29,11 @@ class DeepSeekLLMProvider(_DeepSeekCompletionMixin):
         max_retries: int | None = None,
         generation: LLMGenerationParams | None = None,
         content: AppContent | None = None,
-        pro_model: str | None = None,
         vision_model: str | None = None,
     ) -> None:
         self._content = content or get_content()
         self._client = client
         self._model = model or settings.deepseek_model
-        # Upscaled model for super-complex synthesis / coding turns. Selected
-        # per-call when generate(uses_pro_model=True) is set by the gate.
-        self._pro_model = pro_model or settings.deepseek_pro_model
         # Multimodal model for turns that carry images (vision). Selected
         # per-call when generate(images=[...]) is non-empty.
         self._vision_model = vision_model or settings.deepseek_vision_model
@@ -62,11 +58,9 @@ class DeepSeekLLMProvider(_DeepSeekCompletionMixin):
             )
         return self._client
 
-    def _resolve_model(self, *, uses_vision: bool, uses_pro_model: bool) -> str:
+    def _resolve_model(self, *, uses_vision: bool) -> str:
         if uses_vision:
             return self._vision_model
-        if uses_pro_model:
-            return self._pro_model
         return self._model
 
     def _user_message_content(
@@ -94,9 +88,7 @@ class DeepSeekLLMProvider(_DeepSeekCompletionMixin):
     ) -> str:
         request = as_generate_request(user_message, context_blocks, **kwargs)
         uses_vision = bool(request.images)
-        model = self._resolve_model(
-            uses_vision=uses_vision, uses_pro_model=request.uses_pro_model
-        )
+        model = self._resolve_model(uses_vision=uses_vision)
         system = request.system_prompt or self._prompts.system_prompt
         user_prompt = self._prompts.build_user_prompt(request)
         generation_kwargs = self._generation.to_llm_kwargs()

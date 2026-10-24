@@ -59,13 +59,12 @@ def log_deepseek_prompt(
     images: list[ImageAttachment] | None = request.images
     uses_vision = bool(images)
     logger.info(
-        "llm_prompt_prepared model=%s uses_pro_model=%s detail=%s "
+        "llm_prompt_prepared model=%s detail=%s "
         "context_blocks=%s context_messages=%s humor_quotes=%s meme_blocks=%s "
         "meme_menu=%s system_chars=%s user_chars=%s knowledge_blocks=%s "
         "web_blocks=%s knowledge_chars=%s session_chars=%s temperature=%s "
         "top_p=%s max_tokens=%s vision_images=%s",
         model,
-        request.uses_pro_model,
         request.detail,
         len(request.context_blocks),
         message_count,

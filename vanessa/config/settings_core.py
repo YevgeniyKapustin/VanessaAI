@@ -17,7 +17,6 @@ class CoreMixin:
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-flash"
     deepseek_planner_model: str = "deepseek-chat"
-    deepseek_pro_model: str = "deepseek-v4-pro"
     deepseek_max_tokens: int = 4096
 
     # --- Vision (DeepSeek multimodal) ----------------------------------------

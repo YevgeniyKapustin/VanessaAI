@@ -190,7 +190,6 @@ class FakeLLM:
         self.last_needs_clarification: bool = False
         self.last_clarification_hint: str = ""
         self.last_detail: str = "normal"
-        self.last_uses_pro_model: bool = False
         self.last_images: list | None = None
         self.last_photo_candidates: list | None = None
         self.last_current_images: list | None = None
@@ -214,7 +213,6 @@ class FakeLLM:
         self.last_needs_clarification = request.needs_clarification
         self.last_clarification_hint = request.clarification_hint
         self.last_detail = request.detail
-        self.last_uses_pro_model = request.uses_pro_model
         self.last_reply_to_text = request.reply_to_text
         self.last_reply_to_sender_telegram_id = request.reply_to_sender_telegram_id
         self.last_reply_to_sender_name = request.reply_to_sender_name

@@ -334,37 +334,24 @@ def test_turn_planner_prompt_documents_knowledge_detail():
 
 
 @pytest.mark.asyncio
-async def test_turn_planner_parse_uses_pro_model():
+async def test_turn_planner_ignores_stale_uses_pro_model():
+    """An old planner output with uses_pro_model parses; the field is dropped."""
     planner = TurnPlanner(use_llm=False)
     result = planner._parse_llm_response(
         "напиши скрипт на C#",
         '{"should_reply": true, "search_query": "скрипт", "skip": false, '
         '"humor_ok": false, "humor_query": "", "uses_pro_model": true}',
     )
-    assert result.uses_pro_model is True
+    assert result.should_reply is True
+    assert result.text == "скрипт"
+    assert not hasattr(result, "uses_pro_model")
+    assert "uses_pro_model" not in result.to_trace_dict()
 
 
-@pytest.mark.asyncio
-async def test_turn_planner_uses_pro_model_defaults_false():
-    planner = TurnPlanner(use_llm=False)
-    result = planner._parse_llm_response(
-        "привет",
-        '{"should_reply": true, "search_query": "", "skip": false, '
-        '"humor_ok": false, "humor_query": ""}',
-    )
-    assert result.uses_pro_model is False
-
-
-def test_turn_planner_prompt_documents_uses_pro_model():
-    """The gate prompt must teach when to escalate to the upscaled model."""
+def test_turn_planner_prompt_has_no_pro_model_option():
+    """The planner cannot pick the paid pro model: the prompt never offers it."""
     prompt = get_content().rag.turn_planner_prompt
-    section = prompt.split("## uses_pro_model", 1)[1].split("## Examples", 1)[0]
-    assert "coding" in section
-    assert "super-complex synthesis" in section
-    assert "false (default)" in section
-    assert "costs more" in section
-    # The output template must include the field, defaulting to false.
-    assert '"uses_pro_model": false' in prompt
+    assert "pro_model" not in prompt
 
 
 def test_turn_planner_prompt_documents_detail():
@@ -555,7 +542,6 @@ def test_turn_plan_to_trace_dict():
         knowledge_query="крабер",
         knowledge_detail=True,
         needs_clarification=False,
-        uses_pro_model=False,
         detail="detailed",
     )
     data = plan.to_trace_dict()
@@ -570,7 +556,6 @@ def test_turn_plan_to_trace_dict():
     assert data["knowledge_query"] == "крабер"
     assert data["knowledge_detail"] is True
     assert data["needs_clarification"] is False
-    assert data["uses_pro_model"] is False
     assert data["detail"] == "detailed"
     # The raw user message is already on the trace root — not duplicated here.
     assert "original" not in data

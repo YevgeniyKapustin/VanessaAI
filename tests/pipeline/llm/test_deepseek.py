@@ -130,10 +130,12 @@ async def test_deepseek_forwards_reasoning_effort_when_configured():
 
 
 @pytest.mark.asyncio
-async def test_deepseek_routes_pro_model_when_flagged(provider: DeepSeekLLMProvider):
+async def test_deepseek_coding_turn_uses_compose_model(provider: DeepSeekLLMProvider):
+    # No pro escalation: a coding turn (even with a stale flag) uses the
+    # compose model.
     await provider.generate("напиши код на C#", [], uses_pro_model=True)
     call = provider._client.chat.completions.create.await_args
-    assert call.kwargs["model"] == "deepseek-v4-pro"
+    assert call.kwargs["model"] == "test-model"
 
 
 def test_usage_from_openai_includes_cache_tokens():
@@ -309,7 +311,7 @@ async def test_deepseek_vision_routes_vision_model_and_sends_image_blocks(
     await provider.generate("что на фото", [], images=[image])
 
     call = provider._client.chat.completions.create.await_args
-    # Images route the call to the vision model (not the default/pro model).
+    # Images route the call to the vision model (not the default model).
     assert call.kwargs["model"] == settings.deepseek_vision_model
     # The user content becomes a list of OpenAI multimodal blocks: text + image_url.
     user_content = call.kwargs["messages"][1]["content"]

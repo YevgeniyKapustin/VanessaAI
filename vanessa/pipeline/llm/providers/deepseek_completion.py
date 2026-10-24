@@ -13,6 +13,11 @@ from vanessa.pipeline.llm.format.reply_format import (
     strip_leading_address,
     strip_trailing_periods,
 )
+from vanessa.pipeline.llm.providers.compose_trace import (
+    trace_compose_prompt,
+    trace_compose_reply,
+    trace_openai_output,
+)
 from vanessa.pipeline.llm.providers.deepseek_usage import (
     _log_cache_usage,
     _usage_from_openai,
@@ -93,6 +98,7 @@ class _DeepSeekCompletionMixin:
         if reasoning_content:
             raw_output = f"[reasoning_content]\n{reasoning_content}\n\n{text}"
         logger.debug("llm_raw_output model=%s output=%r", model, raw_output)
+        trace_compose_reply(model, reply, reasoning)
         gen.update(
             output=raw_output,
             metadata={
@@ -119,8 +125,9 @@ class _DeepSeekCompletionMixin:
         generation_kwargs: dict[str, Any],
     ) -> str:
         final: dict[str, str] = {}
+        trace_compose_prompt(model, system, user_prompt, image_count=image_count)
 
-        def create(*, strict: bool) -> Any:
+        async def create(*, strict: bool) -> Any:
             messages: list[dict[str, Any]] = [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_content},
@@ -128,11 +135,13 @@ class _DeepSeekCompletionMixin:
             note = self._content.llm.untagged_retry_note.strip()
             if strict and note:
                 messages.append({"role": "user", "content": note})
-            return self._openai_client.chat.completions.create(
+            response = await self._openai_client.chat.completions.create(
                 model=model,
                 messages=messages,
                 **generation_kwargs,
             )
+            trace_openai_output(model, response, strict=strict)
+            return response
 
         async def complete(gen: Any, started: float) -> str:
             response = await request_tagged(create, _content, model=model)

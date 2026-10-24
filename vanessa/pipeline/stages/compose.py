@@ -7,6 +7,7 @@ from vanessa.core.generate_request import GenerateRequest
 from vanessa.core.messages import ContextMessage, ImageAttachment, PhotoCandidate
 from vanessa.core.protocols import LLMProviderProtocol, MessageRepositoryProtocol
 from vanessa.core.request_context import get_request_id
+from vanessa.infrastructure.observability.trace_log import trace_event
 from vanessa.infrastructure.observability.tracing import get_tracer
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionReason
@@ -141,6 +142,7 @@ class ComposeStage(_ComposeRefuseMixin, _ComposePhotoMixin):
         except UntaggedReplyError:
             refused = self._handle_untagged(ctx)
         if refused is not None:
+            trace_event("compose_result", reply=None, refuse=ctx.refuse_reason)
             return refused
         photo_index = self._apply_photo_index(ctx, photo_candidates)
         self._record_photo_outcome(
@@ -156,4 +158,5 @@ class ComposeStage(_ComposeRefuseMixin, _ComposePhotoMixin):
             len(ctx.reply),
             ctx.llm_ms,
         )
+        trace_event("compose_result", reply=ctx.reply, photo_index=photo_index)
         return True

@@ -4,6 +4,7 @@ import logging
 
 from vanessa.config.conversation_config import load_conversation_config
 from vanessa.core.messages import ContextMessage
+from vanessa.infrastructure.observability.trace_log import trace_event
 from vanessa.knowledge.users.nicknames import format_nicknames_for_planner
 from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.pipeline.llm.planner.turn_plan_parse import parse_llm_response
@@ -61,7 +62,9 @@ class _TurnPlanLlmMixin:
                 **self._generation.to_llm_kwargs(),
             )
         ).strip()
-        return parse_llm_response(message, raw)
+        plan = parse_llm_response(message, raw)
+        trace_event("planner_plan", model=self._model, plan=plan)
+        return plan
 
     async def _participants_digest(
         self,

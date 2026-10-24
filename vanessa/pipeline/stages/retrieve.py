@@ -17,6 +17,7 @@ from vanessa.pipeline.stages.retrieve_extras import _RetrieveExtrasMixin
 from vanessa.pipeline.stages.retrieve_hermes import run_hermes_step
 from vanessa.pipeline.stages.retrieve_pinned import run_pinned_step
 from vanessa.pipeline.stages.retrieve_schedule import run_schedule_step
+from vanessa.pipeline.stages.retrieve_trace import trace_retrieve
 
 logger = logging.getLogger("vanessa.pipeline.stages")
 
@@ -69,6 +70,7 @@ class RetrieveStage(_RetrieveExtrasMixin):
             run_pinned_step(ctx, self._pinned_notes),
         )
         self._maybe_attach_memes(ctx)
+        trace_retrieve(ctx)
 
         logger.info(
             "turn_stage retrieve request_id=%s web=%s meme_blocks=%s "

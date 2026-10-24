@@ -12,6 +12,7 @@ from dataclasses import replace
 from vanessa.core.generate_request import GenerateRequest
 from vanessa.core.protocols import LLMProviderProtocol
 from vanessa.core.request_context import get_request_id
+from vanessa.infrastructure.observability.trace_log import trace_event
 from vanessa.pipeline.llm.format.later_promise import promises_later_result
 
 logger = logging.getLogger("vanessa.pipeline.stages")
@@ -32,6 +33,7 @@ async def without_false_promise(
         get_request_id(),
         request.hermes_status,
     )
+    trace_event("compose_false_promise", reply=reply, hermes=request.hermes_status)
     try:
         retried = await llm.generate(replace(request, false_promise_retry=True))
     except Exception:

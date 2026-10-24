@@ -14,6 +14,7 @@ from services.worker.hermes.compose import FollowupComposer
 from services.worker.hermes.html_file import HtmlFile, SplitAnswer, split_html_file
 from services.worker.hermes.payload import HermesAsk
 from services.worker.hermes.report_style import styled_file
+from services.worker.hermes.trace import bind_job, trace_answer, trace_query, trace_sent
 from vanessa.contracts.outbound import (
     DOCUMENT_MAX_CHARS,
     QUESTION_MAX_CHARS,
@@ -67,8 +68,10 @@ class HermesRunner:
         self._file_max_bytes = max(0, min(file_max_bytes, room))
 
     async def run(self, ask: HermesAsk) -> None:
+        bind_job(ask)
         started = time.monotonic()
         answer, outcome = await self._ask_hermes(ask)
+        trace_answer(answer, outcome)
         split = split_html_file(answer or "", max_bytes=self._file_max_bytes)
         file_task = self._composer.file_task(
             attached=split.file is not None, refused=bool(split.problems)
@@ -81,6 +84,7 @@ class HermesRunner:
         )
         blocks = followup_blocks(text) or [self._composer.fallback_line()]
         file = styled_file(split.file, self._css)
+        trace_sent(blocks, file)
         await self._broker.publish(self._stream, _outbound(ask, blocks, file))
         seconds = time.monotonic() - started
         record_hermes_job(outcome, seconds)
@@ -99,6 +103,7 @@ class HermesRunner:
 
     async def _run_and_wait(self, ask: HermesAsk) -> str | None:
         run_started = time.monotonic()
+        trace_query(ask, self._instructions)
         run_id = await self._client.start_run(
             ask.question,
             session_id=hermes_session_id(ask.channel, ask.telegram_chat_id),

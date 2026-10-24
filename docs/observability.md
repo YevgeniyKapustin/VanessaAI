@@ -71,6 +71,69 @@ the process. Sampling: `LANGFUSE_SAMPLE_RATE`. Self-hosted Langfuse is
 `docker-compose.langfuse.yml`. Off until `LANGFUSE_ENABLED=true` and
 keys are set — see [`.env.example`](../.env.example).
 
+## Trace log
+
+A per-turn debug log without Langfuse (no extra containers, no RAM). It
+answers "why did she say that": the planner output, what retrieve gave
+to compose, the prompt, the raw model output and the Hermes job.
+
+Enable: add `TRACE_LOG_ENABLED=true` to `.env.local`, then recreate
+`agent` and `worker`. Default is off. Code:
+`vanessa/infrastructure/observability/trace_log/`.
+
+File: `<LOG_DIR>/trace-<service>.jsonl` (`trace-agent.jsonl`,
+`trace-worker.jsonl`). In Compose this is `/app/logs` in the `app_logs`
+volume. Each process writes its own file, because two processes must not
+rotate one file. Rotation: `TRACE_LOG_MAX_BYTES` (20 MB) ×
+`TRACE_LOG_BACKUP_COUNT` (5) per file. A string field is clipped at
+`TRACE_LOG_MAX_FIELD_CHARS`, reasoning at `TRACE_LOG_MAX_REASONING_CHARS`,
+an image data URL at a short head.
+
+One JSON line per step. Every line has `ts` (UTC), `service`,
+`request_id` (`<chat_id>:<message_id>`, for example `-5441986530:174`),
+`chat_id` and `stage`:
+
+| stage | content |
+|---|---|
+| `planner` | planner LLM call: messages, raw output, reasoning, usage |
+| `planner_plan` | the parsed plan |
+| `gate_decision` | Decision Engine result |
+| `reaction_gate` | reaction gate LLM call |
+| `retrieve` | Hermes ask, web, pinned and knowledge notes (text), memes, session and earlier lines |
+| `compose_prompt` | compose model, system prompt, user prompt |
+| `compose_output` | every compose API call; `strict=true` is the untagged retry |
+| `compose_reply` | the reply after post-processing |
+| `compose_false_promise` | a "later" promise that compose retries |
+| `compose_result` | the final reply or the refuse reason |
+| `hermes_query` / `hermes_answer` / `hermes_sent` | the worker job: question, raw answer, parts sent |
+| `hermes_followup` | the retell LLM call |
+
+The Hermes job uses the request_id of the turn that asked, so one read
+shows the turn and its late follow-up. LLM calls outside a turn (memory,
+metrics, portraits, reminders) get one compact record each, with
+`request_id` `-`.
+
+Read one turn (the request_id is in the `turn_stage` lines of the agent
+log; chat ids are negative, the script accepts them as they are):
+
+```bash
+cd /opt/vanessa
+docker compose --env-file .env.defaults --env-file .env.local exec -T agent \
+  python - -5441986530:174 < scripts/trace_turn.py
+# recent turns:
+docker compose --env-file .env.defaults --env-file .env.local exec -T agent \
+  python - --last 20 < scripts/trace_turn.py
+```
+
+Locally: `python scripts/trace_turn.py <request_id> [--dir logs] [--file path]`.
+
+Tracing never breaks a turn: a failed write logs one warning
+(`trace_log_write_failed` / `trace_log_record_failed`) and the turn goes on.
+
+Privacy: the file holds the full chat text, prompts and Hermes answers.
+It stays on the server. Do not copy it into the repo, an issue or a chat.
+Turn it off when the debug is done.
+
 ## RAG Triad evaluation
 
 A sampled LLM-as-judge in `vanessa/infrastructure/observability/eval.py` scores:

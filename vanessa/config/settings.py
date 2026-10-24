@@ -9,6 +9,7 @@ from vanessa.config.settings_sections import (
     SharedSettings,
     WorkerMixin,
 )
+from vanessa.config.settings_trace import TraceLogMixin
 
 
 class Settings(
@@ -20,6 +21,7 @@ class Settings(
     ScheduleMixin,
     PinnedNotesMixin,
     BotPeerMixin,
+    TraceLogMixin,
     SharedSettings,
 ):
     """Aggregate settings for the current monolith deployment.

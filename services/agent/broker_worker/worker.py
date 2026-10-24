@@ -11,6 +11,7 @@ from services.agent.broker_worker.types import HandlerBuilder
 from vanessa.contracts.messages import TurnRequest
 from vanessa.contracts.posted import PostedMessages
 from vanessa.core.request_context import (
+    chat_id_var,
     request_id_var,
     set_planning_started_signal,
 )
@@ -47,6 +48,7 @@ class TurnDeliveryHandler:
             )
             return
         request_id_var.set(request.correlation_id)
+        chat_id_var.set(request.telegram_chat_id)
         turn = self._mapper.to_turn(request)
         set_planning_started_signal(lambda: self._replies.started(request))
         try:

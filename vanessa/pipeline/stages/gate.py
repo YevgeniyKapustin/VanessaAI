@@ -8,6 +8,7 @@ from vanessa.core.protocols import (
     TurnMetricsProtocol,
 )
 from vanessa.core.request_context import get_request_id
+from vanessa.infrastructure.observability.trace_log import trace_event
 from vanessa.knowledge.metrics.retriever import MetricsRetriever
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget
@@ -134,6 +135,7 @@ class GateStage(_GateVisionMixin, _GateFilterMixin, _GateBotPeerMixin):
         ctx.annoyance = signal.annoyance
 
     def _log_gate_plan(self, ctx: TurnPipelineContext) -> None:
+        trace_event("gate_decision", decision=ctx.decision, loop=ctx.loop_strength)
         logger.info(
             "turn_stage plan request_id=%s search=%r skip=%s should_reply=%s "
             "humor_ok=%s humor_query=%r deep_search=%s listen_window=%s "

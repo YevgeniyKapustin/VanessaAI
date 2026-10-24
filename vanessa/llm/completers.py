@@ -11,7 +11,9 @@ from vanessa.infrastructure.observability.metrics import (
     classify_llm_error,
     record_llm_call,
 )
+from vanessa.infrastructure.observability.trace_log.llm import trace_llm_call
 from vanessa.infrastructure.observability.tracing import get_tracer
+from vanessa.llm.usage import anthropic_usage, openai_usage
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,13 @@ async def run_instrumented_completion(
                 status="error",
                 error_type=classify_llm_error(exc),
             )
+            trace_llm_call(
+                provider=provider,
+                model=model,
+                kind=kind,
+                messages=messages,
+                error=type(exc).__name__,
+            )
             raise
         if reasoning:
             gen.update(
@@ -67,6 +76,15 @@ async def run_instrumented_completion(
         status="success",
         usage=usage,
         output=text,
+    )
+    trace_llm_call(
+        provider=provider,
+        model=model,
+        kind=kind,
+        messages=messages,
+        output=text,
+        reasoning=reasoning,
+        usage=usage,
     )
     return text
 
@@ -96,18 +114,7 @@ class ClaudeChatCompleter:
                 messages=messages,
                 **kwargs,
             )
-            usage = getattr(response, "usage", None)
-            prompt = int(getattr(usage, "input_tokens", 0) or 0) if usage else 0
-            completion = int(getattr(usage, "output_tokens", 0) or 0) if usage else 0
-            return response.content[0].text, (
-                {
-                    "prompt_tokens": prompt,
-                    "completion_tokens": completion,
-                    "total_tokens": prompt + completion,
-                }
-                if usage is not None
-                else None
-            ), ""
+            return response.content[0].text, anthropic_usage(response), ""
 
         return await run_instrumented_completion(
             self.provider, model, messages, kind, call
@@ -159,22 +166,7 @@ class DeepSeekChatCompleter:
                     reasoning[:80],
                     response.usage,
                 )
-            usage = getattr(response, "usage", None)
-            if usage is None:
-                return text, None, reasoning
-            return text, {
-                "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
-                "completion_tokens": int(
-                    getattr(usage, "completion_tokens", 0) or 0
-                ),
-                "total_tokens": int(getattr(usage, "total_tokens", 0) or 0),
-                "cache_hit_tokens": int(
-                    getattr(usage, "prompt_cache_hit_tokens", 0) or 0
-                ),
-                "cache_miss_tokens": int(
-                    getattr(usage, "prompt_cache_miss_tokens", 0) or 0
-                ),
-            }, reasoning
+            return text, openai_usage(response), reasoning
 
         return await run_instrumented_completion(
             self.provider, model, messages, kind, call

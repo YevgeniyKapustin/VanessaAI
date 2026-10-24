@@ -13,6 +13,11 @@ from vanessa.pipeline.llm.format.reply_format import (
     strip_leading_address,
     strip_trailing_periods,
 )
+from vanessa.pipeline.llm.providers.compose_trace import (
+    trace_claude_output,
+    trace_compose_prompt,
+    trace_compose_reply,
+)
 from vanessa.pipeline.llm.tagged_reply import (
     raise_if_untagged,
     request_tagged,
@@ -93,6 +98,7 @@ class _ClaudeCompletionMixin:
             self._model,
             text,
         )
+        trace_compose_reply(self._model, reply, reasoning)
         gen.update(
             output=text,
             metadata={"reasoning": reasoning, "reply": reply},
@@ -109,16 +115,19 @@ class _ClaudeCompletionMixin:
         generation_kwargs: dict[str, Any],
     ) -> str:
         final: dict[str, str] = {}
+        trace_compose_prompt(self._model, system, user_prompt)
 
-        def create(*, strict: bool) -> Any:
+        async def create(*, strict: bool) -> Any:
             note = self._content.llm.untagged_retry_note.strip()
             prompt = f"{user_prompt}\n\n{note}" if strict and note else user_prompt
-            return self._client.messages.create(
+            response = await self._client.messages.create(
                 model=self._model,
                 system=system,
                 messages=[{"role": "user", "content": prompt}],
                 **generation_kwargs,
             )
+            trace_claude_output(self._model, response, strict=strict)
+            return response
 
         async def complete(gen: Any, started: float) -> str:
             response = await request_tagged(create, _first_text, model=self._model)

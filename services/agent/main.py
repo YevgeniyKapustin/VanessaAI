@@ -16,6 +16,7 @@ from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
 from vanessa.infrastructure.db.locked_upgrade import _dsn
 from vanessa.infrastructure.observability.metrics import start_metrics_http_server
+from vanessa.infrastructure.observability.trace_log import configure_trace_log
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ def postgres_ready() -> bool:
 
 async def run(*, container: AppContainer | None = None) -> None:
     configure_logging("agent")
+    configure_trace_log("agent")
     owned = container or AppContainer()
     start_metrics_http_server(
         settings.api_port,

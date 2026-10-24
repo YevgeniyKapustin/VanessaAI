@@ -9,6 +9,7 @@ from vanessa.knowledge.format import (
     today,
 )
 from vanessa.knowledge.memory.writer_fields import first_str, stripped_text
+from vanessa.knowledge.memory.writer_guards import has_url
 
 
 def recommendation_target(update: dict) -> tuple[str, str, str, str] | None:
@@ -18,7 +19,9 @@ def recommendation_target(update: dict) -> tuple[str, str, str, str] | None:
     if folder is None:
         return None
     title = stripped_text(update.get("title"))
-    if not title:
+    # A movie/game/album has a name, not a link: a URL title is a menu,
+    # a shop or a reminder payload that the planner misfiled.
+    if not title or has_url(title):
         return None
     note_id = slugify(first_str(update.get("id"), title))
     return folder, kind, title, note_id

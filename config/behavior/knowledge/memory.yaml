@@ -39,6 +39,7 @@ extraction_prompt: |
         "kind": "movies|games|music (for recommendation)",
         "status": "proposed|liked|skipped",
         "recommended_by": "who recommended it",
+        "description": "1 sentence: what the work is and why it came up (for recommendation)",
         "summary": "briefly about the week's topic"
       }}
     ]
@@ -50,7 +51,10 @@ extraction_prompt: |
   - person_fact: person, section, text.
   - glossary: term, definition; optional aliases, first_quote.
   - event: title; optional date, participants, outcome, text.
-  - recommendation: kind, title; optional status, recommended_by.
+  - recommendation: kind, title, description; optional status, recommended_by.
+    Only a named movie, game or music work. "title" is the name of the work,
+    never a link. Links, menus, food, shops, tasks and reminders are not
+    recommendations: skip them.
   - weekly_summary: only at the end of the week; needs summary.
 
   Person identity rules:

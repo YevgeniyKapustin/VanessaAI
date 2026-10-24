@@ -14,12 +14,18 @@ from vanessa.knowledge.format import (
     slugify,
     today,
 )
+from vanessa.knowledge.memory.writer_bodies import (
+    event_body,
+    glossary_body,
+    recommendation_body,
+)
 from vanessa.knowledge.memory.writer_fields import (
     first_str,
     list_or_default,
     note_body,
     stripped_text,
 )
+from vanessa.knowledge.memory.writer_guards import card_label, has_body
 from vanessa.knowledge.memory.writer_merge import append_to_section, as_list
 from vanessa.knowledge.memory.writer_recommendation import (
     recommendation_meta,
@@ -34,7 +40,7 @@ class WriterNoteUpdates:
         update: dict,
         source_message_ids: list[int] | None,
     ) -> tuple[str, list[str]]:
-        term = stripped_text(update.get("term"))
+        term = card_label(stripped_text(update.get("term")))
         if not term:
             return LORE_GLOSSARY, []
         note_id = slugify(first_str(update.get("id"), term))
@@ -47,13 +53,9 @@ class WriterNoteUpdates:
             "created": today(),
             "updated": today(),
         }
-        body = note_body(existing)
-        definition = stripped_text(update.get("definition"))
-        if definition:
-            body = append_to_section(body, "## Значение", [definition])
-        quote = stripped_text(update.get("first_quote"))
-        if quote:
-            body = append_to_section(body, "## Пример", [f"> {quote}"])
+        body = glossary_body(update, existing)
+        if not has_body(body):
+            return LORE_GLOSSARY, []
         rel = await self._write(rel, meta, body, existing, source_message_ids)
         return LORE_GLOSSARY, [rel]
 
@@ -62,7 +64,7 @@ class WriterNoteUpdates:
         update: dict,
         source_message_ids: list[int] | None,
     ) -> tuple[str, list[str]]:
-        title = stripped_text(update.get("title"))
+        title = card_label(stripped_text(update.get("title")))
         if not title:
             return LORE_EVENTS, []
         date_str = first_str(update.get("date")) or today()
@@ -78,13 +80,9 @@ class WriterNoteUpdates:
             "created": today(),
             "updated": today(),
         }
-        body = note_body(existing)
-        summary = stripped_text(update.get("summary"), update.get("text"))
-        if summary:
-            body = append_to_section(body, "## Суть", [summary])
-        outcome = stripped_text(update.get("outcome"))
-        if outcome:
-            body = append_to_section(body, "## Чем закончилось", [outcome])
+        body = event_body(update, existing)
+        if not has_body(body):
+            return LORE_EVENTS, []
         rel = await self._write(rel, meta, body, existing, source_message_ids)
         return LORE_EVENTS, [rel]
 
@@ -106,10 +104,9 @@ class WriterNoteUpdates:
             title=title,
             status=recommendation_status(update, existing),
         )
-        body = note_body(existing)
-        description = stripped_text(update.get("description"), update.get("summary"))
-        if description:
-            body = append_to_section(body, "## Описание", [description])
+        body = recommendation_body(update, existing)
+        if not has_body(body):
+            return CULTURE, []
         rel = await self._write(rel, meta, body, existing, source_message_ids)
         return CULTURE, [rel]
 

@@ -70,6 +70,33 @@ turn_planner_prompt: |
   justified. A wrongly-false web_search / deep_search / uses_pro_model is
   cheap; a wrongly-true one costs time and money.
 
+  ## Work lookup (Hermes) — the main rule for ask_hermes
+  Hermes is Vanessa's work agent. He reads LIVE work data: tasks and
+  issues, MRs, commits, reviews, pipelines, releases, stands, dashboards,
+  metrics, alerts, errors, k8s, git worktrees, agent sessions. Vanessa
+  has none of it: not in the chat, not in her cards.
+  ask_hermes=true whenever the answer needs that data, for ANY sender:
+  - what someone did / is doing / has in progress or on review («что я
+    делал сегодня», «чем я вчера занимался», «что у меня в работе»,
+    «какие ревью на мне»);
+  - the state of work now («что по задачам», «что с релизом», «есть
+    алерты?», «как там qa», «что сейчас по…», «что с нагрузкой»);
+  - a work action: «глянь», «проверь», «найди», «чекни», «заведи задачу»,
+    «дай ссылку на дашборд» about work items.
+  A wrongly-false ask_hermes is EXPENSIVE: Vanessa cannot answer and makes
+  things up. In doubt between a memory search and Hermes for a work
+  question → Hermes. A memory or card fact never replaces Hermes for a
+  live question. Never needs_clarification for a work question: Hermes
+  works it out.
+  Slang counts: «мр», «мры», «мрах», «мерж» are MRs; «стейдж», «прод»,
+  «стенд» are stands; «поды» are k8s.
+  ask_hermes=false: chit-chat, greetings, opinions and feelings («что
+  думаешь про мою работу», «я устал на работе»), films/games, people and
+  lore (cards), general knowledge (web_search), what the work project is
+  in general (the owner's facts), the PC itself, its files or commands.
+  «ты» / «себя» is Vanessa: her own day or doings («что ты делала
+  сегодня», «как прошёл твой день») are chit-chat, not a lookup.
+
   ## Decision order (then check consistency)
   1. Who is it for? → should_reply / skip (## should_reply).
      If skip=true → should_reply=false, fill reason, turn OFF search,
@@ -81,9 +108,8 @@ turn_planner_prompt: |
      - our people/lore/events → knowledge_indexes (+ knowledge_query), not web;
      - fresh/external facts the archive cannot hold → web_search=true;
      - comparison / several threads / technical analysis → deep_search=true;
-     - the owner's work (Plane, GitLab, agent sessions, Grafana/k8s) and
-       the owner's own work activity («что я делал сегодня» from the owner)
-       → ask_hermes=true (+ hermes_query).
+     - live or work data (## Work lookup) → ask_hermes=true
+       (+ hermes_query); check this BEFORE search_query and knowledge.
      Do not stack web and knowledge unless both are required.
   4. Fill tone, humor_ok / humor_query, detail.
   5. uses_pro_model ONLY for coding / super-complex synthesis.
@@ -217,38 +243,24 @@ turn_planner_prompt: |
   web_query: 2–8 words. If web_search=true and web_query="", the app
   falls back to search_query.
 
-  ## ask_hermes / hermes_query
-  Hermes is Vanessa's agent on the owner's PC. He answers LATER in a
-  separate message. Hermes can read and create (e.g. create a Plane issue
-  when asked).
-  ask_hermes=true ONLY for the owner's work: Plane issues, GitLab MRs and
-  pipelines, agent sessions, Grafana / k8s state («что там с пайплайном»,
-  «заведи задачу в Plane», «какие MR висят»).
-  The owner's work project: its name is in the owner's facts in the
-  participants block («наш проект» also means it). ANY question about that
-  project — its tasks, bugs, releases, stage/prod, process, testing flow —
-  is ask_hermes=true, not needs_clarification and not a generic answer.
-  Exception: what the project is in general — Vanessa answers from the
-  owner's facts, ask_hermes=false.
-  The owner's own activity (Sender is the owner: yes): «что я делал
-  сегодня», «что я сделал за день / за неделю», «чем я вчера занимался»,
-  «какие у меня задачи» → ask_hermes=true, NOT a chat history search and
-  NOT needs_clarification. hermes_query: what the owner did in the work
-  project for that period — his GitLab MRs and commits, Plane issues, agent
-  sessions and git worktrees; keep the period from the message («сегодня»
-  if none). Sender is the owner: no → the same words are about the chat,
-  ask_hermes=false.
+  ## hermes_query (when ask_hermes=true; see ## Work lookup)
+  Hermes answers LATER in a separate message. He can read and create (e.g.
+  a Plane issue when asked). The work project: its name is in the owner's
+  facts in the participants block («наш проект» also means it).
+  hermes_query: ONE short self-contained question in the user's language
+  with all needed names / ids / projects / period from the message and
+  recent context (Hermes does not see the chat). ask_hermes=false →
+  hermes_query="".
+  First person («я», «мои», «на мне») is the Sender: the owner (Sender is
+  the owner: yes) → «владелец»; else the Sender's nickname. Someone's
+  activity for a period: their MRs and commits in GitLab, Plane issues,
+  agent sessions and git worktrees; keep the period («сегодня» if none).
   A reminder of a work lookup Vanessa promised earlier («ну и где», «ты
   обещала список») with that request in Recent context → the same lookup
   again: ask_hermes=true with that hermes_query.
   An HTML report / report file / page about that work («сделай отчёт в
   html по багам») is ask_hermes=true: Hermes makes the file and Vanessa
   sends it; keep «HTML-отчёт» in hermes_query.
-  false (default) for chit-chat, general knowledge (that is web_search),
-  our people/lore, and ANYTHING about the PC itself, its files or commands.
-  hermes_query: ONE short self-contained question in the user's language
-  with all needed names / ids / projects from the message and recent
-  context (Hermes does not see the chat). ask_hermes=false → hermes_query="".
   A request for a dashboard, a panel or a link («дай дашборд», «скинь
   ссылку», a pasted step «Открыть в Grafana …» + «дай его мне»): the
   hermes_query asks Hermes to FIND it and give its link, not to check
@@ -342,6 +354,15 @@ turn_planner_prompt: |
 
   «ванесса что я делал сегодня» | Sender is the owner: yes → his work activity, Hermes
   → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+
+  «ванесса чем я вчера занимался» | sender=Личь, Sender is the owner: no → his work activity, Hermes
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что Личь делал вчера в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за вчера?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+
+  «ванесса есть алерты?» | live state → Hermes, not a memory search
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Есть ли сейчас активные алерты по рабочему проекту в Grafana?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+
+  «ванесса найди задачу про логин» | find a work item → Hermes
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Найди в Plane задачу рабочего проекта про логин и дай ссылку на неё", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ты обещала мне список» (earlier: «что я делал сегодня» → bot «ща гляну, скину списком») | reminder of a promised lookup → Hermes again
   → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "uses_pro_model": false, "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}

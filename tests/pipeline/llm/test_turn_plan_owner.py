@@ -54,12 +54,24 @@ async def test_prompt_marks_other_sender() -> None:
     assert "Sender is the owner: no" in await _planner_prompt(owner=False)
 
 
-def test_prompt_routes_owner_activity_to_hermes() -> None:
+def test_prompt_has_one_work_lookup_rule_before_decisions() -> None:
+    prompt = get_content().rag.turn_planner_prompt
+    rule = prompt.index("## Work lookup (Hermes)")
+    assert rule < prompt.index("## Decision order")
+    block = prompt[rule : prompt.index("## Decision order")]
+    assert "for ANY sender" in block
+    assert "In doubt between a memory search and Hermes" in block
+    assert "never replaces Hermes for a" in block
+    assert "«чем я вчера занимался»" in block
+    assert "ask_hermes=false: chit-chat" in block
+
+
+def test_prompt_keeps_query_rules() -> None:
     prompt = get_content().rag.turn_planner_prompt
     assert "{sender_is_owner}" in prompt
-    assert "«что я делал сегодня» from the owner" in prompt
-    assert "The owner's own activity (Sender is the owner: yes)" in prompt
     assert "A reminder of a work lookup Vanessa promised earlier" in prompt
+    assert "FIND it and give its" in prompt
+    assert "Sender is the owner: no → the same words" not in prompt
 
 
 class CapturingPlanner:

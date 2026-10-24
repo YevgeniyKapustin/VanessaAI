@@ -71,7 +71,8 @@ def test_prompt_teaches_hermes() -> None:
     prompt = get_content().rag.turn_planner_prompt
     assert '"ask_hermes": false' in prompt
     assert '"hermes_query": ""' in prompt
-    assert "## ask_hermes / hermes_query" in prompt
+    assert "## Work lookup (Hermes)" in prompt
+    assert "## hermes_query" in prompt
     assert '"ask_hermes": true' in prompt
 
 

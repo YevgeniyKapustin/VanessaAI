@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
+from vanessa.core.chat_zone import chat_now
 from vanessa.knowledge.format import today
 from vanessa.knowledge.people.people import telegram_id_for_slug
 
@@ -140,5 +139,5 @@ class WriterTemplates:
 
     @staticmethod
     def _year_week() -> str:
-        iso = datetime.now().astimezone().date().isocalendar()
+        iso = chat_now().date().isocalendar()
         return f"{iso[0]}-W{iso[1]:02d}"

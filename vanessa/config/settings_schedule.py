@@ -7,7 +7,8 @@ class ScheduleMixin:
     """Agent (add/list/cancel) and worker (firing) settings for reminders."""
 
     schedule_enabled: bool = True
-    # IANA zone for cron fields and "tomorrow at 10" style times.
+    # IANA zone of the chat: cron fields, "tomorrow at 10" style times and
+    # every time label Vanessa sees (storage stays UTC).
     schedule_timezone: str = "Asia/Tbilisi"
     schedule_max_per_chat: int = 20
     # A recurring schedule may not fire more often than this.

@@ -15,9 +15,10 @@ records.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
+from vanessa.core.chat_zone import chat_now
 from vanessa.knowledge.format import PEOPLE
 from vanessa.knowledge.memory.compaction_apply import (
     compact_sections,
@@ -61,7 +62,7 @@ async def compact_person_card(
     quote_limit: int = QUOTE_LIMIT,
 ) -> tuple[int, int, bool]:
     """Compact one person card. Returns ``(kept, archived, changed)``."""
-    today_ = today_ or datetime.now().astimezone().date()
+    today_ = today_ or chat_now().date()
     rel = f"{PEOPLE}/{person_id}.md"
     note = await vault.read_note(rel)
     if note is None:

@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
-from functools import lru_cache
 from itertools import pairwise
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from vanessa.config.settings import settings
+from vanessa.core.chat_zone import schedule_zone
 from vanessa.pipeline.decision.schedule_request import ScheduleRequest
 from vanessa.pipeline.schedule.cron import CronSpec, next_run_utc, parse_cron
-
-logger = logging.getLogger(__name__)
 
 MAX_AHEAD = timedelta(days=366)
 # Frequency check: runs inside this window (a week covers weekday patterns).
@@ -36,18 +32,6 @@ class SchedulePolicy:
     max_per_chat: int = 20
     min_interval: timedelta = timedelta(minutes=30)
     text_max_chars: int = 1000
-
-
-@lru_cache
-def schedule_zone(name: str) -> tzinfo:
-    """IANA zone by name; UTC when the name is unknown on this host."""
-    if name.strip().upper() == "UTC":
-        return UTC
-    try:
-        return ZoneInfo(name.strip())
-    except (ZoneInfoNotFoundError, ValueError):
-        logger.warning("schedule_timezone_unknown name=%s fallback=UTC", name)
-        return UTC
 
 
 def schedule_policy() -> SchedulePolicy:

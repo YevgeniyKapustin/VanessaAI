@@ -11,8 +11,9 @@ from __future__ import annotations
 import logging
 import statistics
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime
 
+from vanessa.core.chat_zone import to_chat_time
 from vanessa.core.messages import RAG_SOURCE_ROLE, StoredMessage
 from vanessa.knowledge.metrics.schema import PersonMetrics
 
@@ -22,10 +23,7 @@ logger = logging.getLogger(__name__)
 def _local_datetime(value: datetime | None) -> datetime | None:
     if value is None:
         return None
-    dt = value
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone()
+    return to_chat_time(value)
 
 
 def _ensure_sender_stats(by_sender: dict[int, dict], sender: int) -> dict:

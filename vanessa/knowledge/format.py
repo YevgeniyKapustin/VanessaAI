@@ -9,10 +9,11 @@ machine manifests. There is intentionally no human MOC / wikilink layer.
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from pathlib import PurePosixPath
 
 import yaml
+
+from vanessa.core.chat_zone import chat_now
 
 # Folder taxonomy.
 PEOPLE = "People"
@@ -64,8 +65,8 @@ def slugify(value: str) -> str:
 
 
 def today() -> str:
-    """Today's date as ``YYYY-MM-DD`` (local)."""
-    return datetime.now().astimezone().date().isoformat()
+    """Today's date as ``YYYY-MM-DD`` in the chat zone."""
+    return chat_now().date().isoformat()
 
 
 def culture_kind_folder(kind: str) -> str | None:

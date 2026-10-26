@@ -53,11 +53,11 @@ htmlcov/
 
 .idea/
 .vscode/
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
-!.cursor/skills/
-!.cursor/skills/**
+.agents/*
+!.agents/rules/
+!.agents/rules/**
+!.agents/skills/
+!.agents/skills/**
 .DS_Store
 Thumbs.db
 Desktop.ini

@@ -1,8 +1,8 @@
 # Refactor notes
 
 Extract-vs-not, class↔function, and behavior traps. Python style
-lives in `.cursor/rules/python-clean-code.mdc`. Layout:
-`.cursor/rules/package-layout.mdc`.
+lives in `.agents/rules/python-clean-code.mdc`. Layout:
+`.agents/rules/package-layout.mdc`.
 
 ## Extract vs not
 
@@ -64,7 +64,7 @@ Rich behavior belongs on session, outbox, stores, brokers.
 ## Where extracts go
 
 Keep a new helper in the same capability as the caller
-(`.cursor/rules/package-layout.mdc`). Split a file that exceeds 150–200
+(`.agents/rules/package-layout.mdc`). Split a file that exceeds 150–200
 lines; do not merge siblings to cut file count. Do not add
 `domain/use_cases/adapters` or a new top-level package for a local extract.
 

@@ -21,16 +21,8 @@ def as_list(value: object) -> list:
     return [value]
 
 
-def canonical_for_card(meta: dict, roster: dict[int, str]) -> str:
-    """Canonical display name for a People card (roster by telegram_id first)."""
-    telegram_id = meta.get("telegram_id")
-    if telegram_id is not None:
-        try:
-            roster_name = roster.get(int(telegram_id))
-        except (TypeError, ValueError):
-            roster_name = None
-        if roster_name:
-            return str(roster_name)
+def canonical_for_card(meta: dict) -> str:
+    """Canonical display name stored in a People card."""
     return str(meta.get("nickname") or meta.get("id") or "").strip()
 
 
@@ -47,7 +39,7 @@ def _add_alias(
 def _aliases_from_fields(
     meta: dict, seen: set[str], aliases: list[str], canonical_key: str
 ) -> None:
-    for field in ("aliases", "names"):
+    for field in ("aliases", "names", "vrchat_names"):
         for raw in as_list(meta.get(field)):
             _add_alias(aliases, seen, str(raw).strip(), canonical_key)
 
@@ -70,26 +62,46 @@ def note_aliases(meta: dict, canonical: str) -> list[str]:
     return aliases
 
 
-def _note_alias_entry(note, roster: dict[int, str]) -> tuple[str, tuple[str, ...]] | None:
+def _note_alias_entry(note) -> tuple[str, tuple[str, ...]] | None:
     meta = note.meta
     if not isinstance(meta, dict):
         return None
-    canonical = canonical_for_card(meta, roster)
+    canonical = canonical_for_card(meta)
     if not canonical:
         return None
     aliases = note_aliases(meta, canonical)
-    if not aliases:
-        return None
     return canonical, tuple(aliases)
 
 
-def aliases_from_notes(notes, roster: dict[int, str]) -> dict[str, tuple[str, ...]]:
+def aliases_from_notes(notes) -> dict[str, tuple[str, ...]]:
     if not notes:
         return {}
     result: dict[str, tuple[str, ...]] = {}
     for note in notes:
-        entry = _note_alias_entry(note, roster)
+        entry = _note_alias_entry(note)
         if entry is None:
             continue
         result[entry[0]] = entry[1]
+    return result
+
+
+def _telegram_nickname_entry(note) -> tuple[int, str] | None:
+    if not isinstance(note.meta, dict):
+        return None
+    try:
+        telegram_id = int(note.meta.get("telegram_id"))
+    except (TypeError, ValueError):
+        return None
+    canonical = canonical_for_card(note.meta)
+    if telegram_id > 0 and canonical:
+        return telegram_id, canonical
+    return None
+
+
+def telegram_nicknames_from_notes(notes) -> dict[int, str]:
+    result: dict[int, str] = {}
+    for note in notes:
+        entry = _telegram_nickname_entry(note)
+        if entry is not None:
+            result.setdefault(*entry)
     return result

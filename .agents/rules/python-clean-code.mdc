@@ -24,7 +24,7 @@ Applies to new code and edits. Python 3.12 (Poetry
   Prefer a new file over growing past the budget. Do not pack one
   line, stuff huge strings, disable the CI check, or allowlist a path.
   Tests may exceed 200; keep them compact. Where the new file goes:
-  `.cursor/rules/package-layout.mdc`.
+  `.agents/rules/package-layout.mdc`.
 - **UP:** modern idioms for *this* project's Python only.
 - Preserve public signatures unless asked.
 - **YAGNI:** no new layers, Unit of Work, or DDD packages without a

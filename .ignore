@@ -63,7 +63,7 @@ secrets.env
 *.secrets.yaml
 deploy/k8s/secrets.env
 
-# IDE junk and a large root binary; .cursor/ stays visible for project rules
+# IDE junk and a large root binary; .agents/ stays visible for project rules
 .idea/
 .vscode/
 .DS_Store
@@ -71,5 +71,5 @@ Thumbs.db
 Vanessa.png
 poetry.toml
 
-# Cursor defaults also ignore *.lock and .env*; re-include what agents need
+# Keep the dependency lockfile available to search tools.
 !poetry.lock

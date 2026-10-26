@@ -13,7 +13,6 @@ from vanessa.config.paths import (
     resolve_settings_path,
 )
 from vanessa.config.settings import settings
-from vanessa.knowledge.users.nicknames import resolve_nicknames_path
 
 
 def test_repo_root_contains_config_tree() -> None:
@@ -44,9 +43,8 @@ def test_empty_override_uses_config_root(monkeypatch) -> None:
     assert (folder / "telegram.yaml").is_file()
 
 
-def test_content_and_nicknames_resolve() -> None:
+def test_content_resolves() -> None:
     assert resolve_content_source().is_dir()
-    assert resolve_nicknames_path().is_file()
 
 
 def test_behavior_split_files_exist() -> None:

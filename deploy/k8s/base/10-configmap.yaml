@@ -31,8 +31,6 @@ data:
   CONFIG_ROOT: "config"
   BEHAVIOR_CONFIG_PATH: "config/behavior"
   CHANNELS_CONFIG_PATH: "config/channels"
-  NICKNAMES_CONFIG_PATH: "config/nicknames.yaml"
-  JOINS_CONFIG_PATH: "config/joins.yaml"
   LOG_LEVEL: "INFO"
   LOG_JSON: "true"
   LOG_FILE_ENABLED: "false"

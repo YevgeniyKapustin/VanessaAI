@@ -8,7 +8,6 @@ to `{CONFIG_ROOT}/…`.
 |------|----------------|-----|
 | `behavior/` | agent, bot, worker | `BEHAVIOR_CONFIG_PATH` |
 | `channels/` | agent (per turn); bot `speech` flag | `CHANNELS_CONFIG_PATH` |
-| `nicknames.yaml`, `joins.yaml` | agent / worker | `NICKNAMES_CONFIG_PATH`, `JOINS_CONFIG_PATH` |
 | `presence/avatar.yaml` | host `services/presence` only | `PRESENCE_AVATAR_PATH` |
 
 Presence on the game PC does not need `behavior/` or `channels/`.
@@ -84,10 +83,16 @@ HTML, typing, `/note`, and access stay in the adapter, not this profile.
 
 ## Identity
 
-`config/nicknames.yaml` is the Telegram roster (`telegram_id →` canonical
-name). `config/joins.yaml` binds VRChat display names to an existing
-People card. Names not listed there stay name-keyed; do not reverse-lookup
-the roster for VRChat speakers.
+Telegram profiles supply incoming sender names. People cards store canonical
+names, aliases and Telegram IDs. There is no separate nickname roster in YAML.
+
+Each People card can declare `vrchat_names` alongside its existing `telegram_id`.
+The People index derives VRChat bindings from those fields. This avoids a second
+ID mapping in configuration. Names without an explicit binding stay name-keyed;
+do not infer a binding from a similar Telegram nickname.
+
+For the owner's card, set `vrchat_names: [Yevgeniy]`. Keep the existing
+`telegram_id`; `REQUIRED_USER_TELEGRAM_ID` in env controls owner access.
 
 ## Presence (host)
 

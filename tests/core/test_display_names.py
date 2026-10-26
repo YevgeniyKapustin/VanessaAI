@@ -1,8 +1,8 @@
 # Intentional Cyrillic display names and comments — not lookalike Latin.
 from datetime import UTC, datetime
 
+from vanessa.config.settings import settings
 from vanessa.core.messages import ContextMessage
-from vanessa.infrastructure.ingest.user_backfill import load_nicknames
 from vanessa.knowledge.users import nicknames
 from vanessa.knowledge.users.display_names import (
     resolve_sender_display_name,
@@ -63,18 +63,13 @@ def test_resolve_sender_uses_vault_telegram_username(monkeypatch, tmp_path):
     people = tmp_path / "People"
     people.mkdir(parents=True, exist_ok=True)
     (people / "гриша.md").write_text(
-        "---\ntype: person\nid: гриша\n"
+        "---\ntype: person\nid: гриша\nnickname: Гриша\n"
         "aliases:\n- Гриша\n- Ну я\n"
         "telegram_id: '1071793838'\ntelegram_username: 'nu_ya'\n"
         "---\n\n## Контекст жизни\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     assert resolve_sender_display_name(1071793838, "Ну я") == "Гриша"
@@ -97,18 +92,3 @@ def test_prompt_builder_uses_sender_name():
     )
     assert 'sender="Краб"' in line
     assert "6765300380" not in line
-
-
-def test_load_nicknames(tmp_path):
-    path = tmp_path / "nicknames.yaml"
-    path.write_text(
-        """
-        7714154251: Евгений
-        6765300380: Краб
-        """,
-        encoding="utf-8",
-    )
-    assert load_nicknames(path) == {
-        7714154251: "Евгений",
-        6765300380: "Краб",
-    }

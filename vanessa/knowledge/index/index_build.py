@@ -9,6 +9,7 @@ from vanessa.knowledge.format import CULTURE, CULTURE_KINDS, LOGS, slugify
 from vanessa.knowledge.schema import VaultNote
 from vanessa.knowledge.store.vault import KnowledgeVault
 from vanessa.knowledge.users.roster import canonical_name_for_telegram_id
+from vanessa.knowledge.users.vrchat_joins import parse_vrchat_joins
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ def _as_list(value: object) -> list:
 
 
 def _telegram_roster_slug(telegram_id: object) -> str:
-    """Canonical People-card slug for a telegram id, from config/nicknames.yaml."""
+    """Canonical People-card slug for a Telegram ID from cached card metadata."""
     try:
         value = int(telegram_id)  # type: ignore[arg-type]
     except (TypeError, ValueError):
@@ -71,6 +72,9 @@ def _index_alias_keys(people: dict, entry: dict, values: object) -> None:
 
 def build_people_index(notes: list[VaultNote]) -> dict:
     people: dict = {}
+    joins = parse_vrchat_joins([note.meta for note in notes])
+    if joins:
+        people["vrchat_names"] = joins
     for note in notes:
         rel = note.relative_path
         meta = note.meta

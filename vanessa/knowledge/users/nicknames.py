@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from functools import lru_cache
-from pathlib import Path
 
-from vanessa.config.paths import resolve_settings_path
-from vanessa.config.settings import settings
-from vanessa.infrastructure.ingest.user_backfill import load_nicknames
 from vanessa.knowledge.format import PEOPLE
 from vanessa.knowledge.users.alias_extract import (
     aliases_from_notes,
+    telegram_nicknames_from_notes,
 )
 from vanessa.knowledge.users.alias_extract import (
     normalize_alias as _normalize,
@@ -31,15 +27,8 @@ from vanessa.knowledge.users.people_notes import (
 logger = logging.getLogger(__name__)
 
 
-def resolve_nicknames_path() -> Path:
-    return resolve_settings_path(
-        settings.nicknames_config_path, "nicknames.yaml"
-    )
-
-
-@lru_cache
 def get_chat_nicknames() -> tuple[str, ...]:
-    return tuple(load_nicknames(resolve_nicknames_path()).values())
+    return tuple(get_chat_aliases())
 
 
 # ---------------------------------------------------------------------------
@@ -47,8 +36,7 @@ def get_chat_nicknames() -> tuple[str, ...]:
 # carries its own frontmatter ``aliases``/``names`` (e.g. «гриша.md» lists both
 # «Гриша» and «Ну я»), plus a dedicated ``telegram_username`` field for the TG
 # @username (e.g. ``nu_ya`` for ``@nu_ya``). The canonical display name is the
-# roster name from ``config/nicknames.yaml`` (by telegram_id) — the same name the
-# bot shows as the sender. Editing a People card is enough.
+# ``nickname`` or ``id`` in that same card. Editing a People card is enough.
 # ---------------------------------------------------------------------------
 
 
@@ -79,12 +67,11 @@ def _people_signature() -> tuple:
     return _people_signature_fs()
 
 
-def _aliases_from_notes(notes) -> dict[str, tuple[str, ...]]:
-    return aliases_from_notes(notes, load_nicknames(resolve_nicknames_path()))
+type _IdentityCache = tuple[tuple, dict[str, tuple[str, ...]], dict[int, str]]
 
 
-def _load_vault_aliases() -> dict[str, tuple[str, ...]]:
-    return _aliases_from_notes(_iter_people_notes())
+def _cache_from_notes(signature: tuple, notes) -> _IdentityCache:
+    return signature, aliases_from_notes(notes), telegram_nicknames_from_notes(notes)
 
 
 async def ensure_people_alias_cache() -> None:
@@ -100,27 +87,35 @@ async def ensure_people_alias_cache() -> None:
         else:
             signature = _people_signature_fs()
             notes = _iter_people_notes_fs()
-        _ALIAS_CACHE = (signature, _aliases_from_notes(notes))
+        _ALIAS_CACHE = _cache_from_notes(signature, notes)
     except Exception:
         logger.exception("people_alias_cache_failed")
         if _ALIAS_CACHE is None:
-            _ALIAS_CACHE = ((), {})
+            _ALIAS_CACHE = ((), {}, {})
 
 
-_ALIAS_CACHE: tuple[tuple, dict[str, tuple[str, ...]]] | None = None
+_ALIAS_CACHE: _IdentityCache | None = None
+
+
+def _people_identity_cache() -> _IdentityCache:
+    global _ALIAS_CACHE  # noqa: PLW0603 - tests reset this module cache
+    if _event_loop_running():
+        return ((), {}, {}) if _ALIAS_CACHE is None else _ALIAS_CACHE
+    signature = _people_signature()
+    if _ALIAS_CACHE is not None and _ALIAS_CACHE[0] == signature:
+        return _ALIAS_CACHE
+    _ALIAS_CACHE = _cache_from_notes(signature, _iter_people_notes())
+    return _ALIAS_CACHE
 
 
 def get_chat_aliases() -> dict[str, tuple[str, ...]]:
     """Alias map (canonical name -> aliases), cached by People-card mtimes."""
-    global _ALIAS_CACHE  # noqa: PLW0603 - tests reset this module cache
-    if _event_loop_running():
-        return {} if _ALIAS_CACHE is None else _ALIAS_CACHE[1]
-    signature = _people_signature()
-    if _ALIAS_CACHE is not None and _ALIAS_CACHE[0] == signature:
-        return _ALIAS_CACHE[1]
-    data = _load_vault_aliases()
-    _ALIAS_CACHE = (signature, data)
-    return data
+    return _people_identity_cache()[1]
+
+
+def get_telegram_nicknames() -> dict[int, str]:
+    """Telegram IDs and names from the same People-card snapshot as aliases."""
+    return _people_identity_cache()[2]
 
 
 def _build_variants(aliases: dict[str, tuple[str, ...]]) -> dict[str, str]:

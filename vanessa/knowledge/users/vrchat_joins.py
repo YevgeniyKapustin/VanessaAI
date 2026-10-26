@@ -1,19 +1,10 @@
-"""Overlay: VRChat display names bound to an existing People card."""
+"""Explicit VRChat identities from People-card metadata and its index."""
 
 from __future__ import annotations
 
-from functools import lru_cache
-from pathlib import Path
 
-import yaml
-
-from vanessa.config.paths import resolve_settings_path
-from vanessa.config.settings import settings
-from vanessa.knowledge.people.people_identity import normalize_person_text
-
-
-def resolve_joins_path() -> Path:
-    return resolve_settings_path(settings.joins_config_path, "joins.yaml")
+def normalize_vrchat_name(name: str) -> str:
+    return " ".join(name.replace("ё", "е").lower().split())
 
 
 def _positive_int(raw: object) -> int | None:
@@ -37,13 +28,13 @@ def _record_join(mapping: dict[str, int], item: dict) -> None:
     if telegram_id is None:
         return
     for name in _name_list(item.get("vrchat_names")):
-        key = normalize_person_text(name)
+        key = normalize_vrchat_name(name)
         if key:
             mapping[key] = telegram_id
 
 
 def parse_vrchat_joins(raw: object) -> dict[str, int]:
-    """Parse joins.yaml into ``normalized display name -> telegram_id``."""
+    """Read ``vrchat_names`` and ``telegram_id`` from People-card metadata."""
     if not isinstance(raw, list):
         return {}
     mapping: dict[str, int] = {}
@@ -53,16 +44,6 @@ def parse_vrchat_joins(raw: object) -> dict[str, int]:
     return mapping
 
 
-def _read_joins(path: Path) -> object:
-    if not path.is_file():
-        return []
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or []
-
-
-@lru_cache
-def load_vrchat_joins() -> dict[str, int]:
-    return parse_vrchat_joins(_read_joins(resolve_joins_path()))
-
-
-def clear_vrchat_joins_cache() -> None:
-    load_vrchat_joins.cache_clear()
+def vrchat_joins_from_index(people_index: dict | None) -> dict[str, int]:
+    mapping = (people_index or {}).get("vrchat_names")
+    return mapping if isinstance(mapping, dict) else {}

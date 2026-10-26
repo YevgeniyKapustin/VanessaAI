@@ -19,7 +19,7 @@ Python 3.12. Config lives in `ruff.toml` (`target-version = "py312"`,
 `line-length = 88`). Honor that line length, not 100.
 
 For leftover C90 / RET / PTH / FBT / UP style after auto-fix, follow
-`.cursor/rules/python-clean-code.mdc` on **those functions only**.
+`.agents/rules/python-clean-code.mdc` on **those functions only**.
 Do not copy that rule into this skill.
 
 ## Commands
@@ -47,7 +47,7 @@ run `ruff format` unless the user asked.
 5. **Structure leftovers** — if a leftover is complexity / structure
    (C90, nested RET that needs extract): smallest clean-refactor-style
    change on **those functions only**, following
-   `.cursor/rules/python-clean-code.mdc`. No SOLID tour.
+   `.agents/rules/python-clean-code.mdc`. No SOLID tour.
 6. **Verify** — `poetry run ruff check` clean on scope. If a hand-fix
    could change behavior, run existing tests for the touched files.
 7. **Chat** — short list of codes fixed, leftovers if any, commands

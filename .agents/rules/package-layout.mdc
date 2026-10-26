@@ -7,7 +7,7 @@ alwaysApply: true
 
 Telegram pipeline bot, not CRUD. Do **not** invent `users/orders/payments`
 or `domain/use_cases/adapters` inside features. Function style (class
-only for state or a DI boundary): `.cursor/rules/python-clean-code.mdc`.
+only for state or a DI boundary): `.agents/rules/python-clean-code.mdc`.
 
 ## Where code goes
 

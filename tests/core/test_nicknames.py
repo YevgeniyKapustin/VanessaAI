@@ -1,6 +1,7 @@
 # Intentional Cyrillic nicknames and comments — not lookalike Latin.
 from pathlib import Path
 
+from vanessa.config.settings import settings
 from vanessa.knowledge.schema import VaultNote
 from vanessa.knowledge.users import nicknames
 
@@ -97,7 +98,7 @@ def _write_people_card(tmp_path: Path, filename: str, telegram_id: str, aliases:
     card = people / filename
     aliases_block = "\n".join(f"- {alias}" for alias in aliases)
     card.write_text(
-        f"---\ntype: person\nid: {Path(filename).stem}\naliases:\n{aliases_block}\n"
+        f"---\ntype: person\nid: {Path(filename).stem}\nnickname: {aliases[0]}\naliases:\n{aliases_block}\n"
         f"telegram_id: '{telegram_id}'\n---\n\n## Контекст жизни\n",
         encoding="utf-8",
     )
@@ -106,12 +107,7 @@ def _write_people_card(tmp_path: Path, filename: str, telegram_id: str, aliases:
 def test_get_chat_aliases_reads_from_vault_people_cards(monkeypatch, tmp_path):
     _write_people_card(tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"])
     _write_people_card(tmp_path, "крабер.md", "7030546957", ["Крабер", "Владимир"])
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша", 7030546957: "Крабер"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша", "Крабер"))
 
     aliases = nicknames.get_chat_aliases()
@@ -121,12 +117,7 @@ def test_get_chat_aliases_reads_from_vault_people_cards(monkeypatch, tmp_path):
 
 def test_canonical_name_for_uses_vault_aliases(monkeypatch, tmp_path):
     _write_people_card(tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"])
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     # The vault card carries the alias, so the raw Telegram nickname resolves.
@@ -137,12 +128,7 @@ def test_canonical_name_for_uses_vault_aliases(monkeypatch, tmp_path):
 
 def test_format_aliases_for_prompt_uses_vault_aliases(monkeypatch, tmp_path):
     _write_people_card(tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"])
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     assert "Гриша = Ну я" in nicknames.format_aliases_for_prompt()
@@ -168,7 +154,7 @@ def _write_people_card_with_username(
     card = people / filename
     aliases_block = "\n".join(f"- {alias}" for alias in aliases)
     card.write_text(
-        f"---\ntype: person\nid: {Path(filename).stem}\naliases:\n{aliases_block}\n"
+        f"---\ntype: person\nid: {Path(filename).stem}\nnickname: {aliases[0]}\naliases:\n{aliases_block}\n"
         f"telegram_id: '{telegram_id}'\ntelegram_username: '{username}'\n"
         f"---\n\n## Контекст жизни\n",
         encoding="utf-8",
@@ -179,12 +165,7 @@ def test_get_chat_aliases_reads_telegram_username_field(monkeypatch, tmp_path):
     _write_people_card_with_username(
         tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"], "nu_ya"
     )
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     # aliases («Ну я») + the dedicated @username field, all resolving to «Гриша».
@@ -196,12 +177,7 @@ def test_canonical_name_for_resolves_telegram_username(monkeypatch, tmp_path):
     _write_people_card_with_username(
         tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"], "nu_ya"
     )
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     # The chat alias («Ну я») and both forms of the @username resolve.
@@ -217,12 +193,7 @@ def test_get_chat_aliases_merges_aliases_with_telegram_username(monkeypatch, tmp
     _write_people_card_with_username(
         tmp_path, "крабер.md", "7030546957", ["Крабер", "Владимир"], "kraber"
     )
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша", 7030546957: "Крабер"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша", "Крабер"))
 
     aliases = nicknames.get_chat_aliases()
@@ -234,19 +205,14 @@ def test_format_aliases_for_prompt_includes_telegram_username(monkeypatch, tmp_p
     _write_people_card_with_username(
         tmp_path, "гриша.md", "1071793838", ["Гриша", "Ну я"], "nu_ya"
     )
-    monkeypatch.setattr(nicknames.settings, "knowledge_path", str(tmp_path))
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
     monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Гриша",))
 
     assert "Гриша = Ну я, nu_ya" in nicknames.format_aliases_for_prompt()
 
 
 async def test_get_chat_aliases_skips_sync_postgres_on_running_loop(monkeypatch):
-    nicknames._ALIAS_CACHE = (("cached",), {"Гриша": ("Ну я",)})
+    nicknames._ALIAS_CACHE = (("cached",), {"Гриша": ("Ну я",)}, {1071793838: "Гриша"})
 
     def boom(*_args, **_kwargs):
         raise AssertionError("sync vault must not run on the event loop")
@@ -271,6 +237,7 @@ async def test_ensure_people_alias_cache_uses_async_vault(monkeypatch):
                 VaultNote(
                     relative_path="People/гриша.md",
                     meta={
+                        "nickname": "Гриша",
                         "telegram_id": "1071793838",
                         "aliases": ["Гриша", "Ну я"],
                     },
@@ -279,11 +246,6 @@ async def test_ensure_people_alias_cache_uses_async_vault(monkeypatch):
                 )
             ]
 
-    monkeypatch.setattr(
-        nicknames,
-        "load_nicknames",
-        lambda _: {1071793838: "Гриша"},
-    )
     monkeypatch.setattr(
         "vanessa.knowledge.store.vault.KnowledgeVault",
         lambda *_a, **_k: _Vault(),

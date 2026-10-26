@@ -6,9 +6,11 @@ from dataclasses import dataclass
 
 from vanessa.knowledge.format import slugify
 from vanessa.knowledge.people.people import canonicalize_person
-from vanessa.knowledge.people.people_identity import normalize_person_text
-from vanessa.knowledge.people.vrchat_joins import load_vrchat_joins
 from vanessa.knowledge.users.roster import canonical_name_for_telegram_id
+from vanessa.knowledge.users.vrchat_joins import (
+    normalize_vrchat_name,
+    vrchat_joins_from_index,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,10 +80,10 @@ def resolve_vrchat_speaker(
     2. Else a new name-keyed id (``slugify``), ``telegram_id`` empty.
     3. Never ``identity_similar`` / alias-fuzzy. Two Alexes stay two cards.
     """
-    reference = normalize_person_text(display_name)
+    reference = normalize_vrchat_name(display_name)
     if not reference:
         return PersonCard("")
-    table = joins if joins is not None else load_vrchat_joins()
+    table = joins if joins is not None else vrchat_joins_from_index(people_index)
     telegram_id = table.get(reference)
     if telegram_id is not None:
         return _joined_card(telegram_id, people_index)

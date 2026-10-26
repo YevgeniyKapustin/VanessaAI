@@ -30,7 +30,7 @@ def format_memory_transcript(messages: list[ContextMessage]) -> str:
     """Render recent messages for the memory planner.
 
     Senders are labelled with their canonical nickname (from
-    ``config/nicknames.yaml``) and their telegram id, so the planner outputs
+    People-card metadata) and their telegram id, so the planner outputs
     stable ``person`` references that the writer resolves to a single card —
     instead of inventing new spellings like «ну я», «капуст», «владимир».
     """

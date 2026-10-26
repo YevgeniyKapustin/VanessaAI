@@ -18,9 +18,9 @@ Surgical, behavior-preserving edits in VanessaAI. Chat is a short
 report. The deliverable is the file diffs — not a rewritten dump,
 not a design-pattern showcase.
 
-This repo is Python 3.12. Follow `.cursor/rules/python-clean-code.mdc`
+This repo is Python 3.12. Follow `.agents/rules/python-clean-code.mdc`
 for RET, PTH, FBT, C90, UP, YAGNI, functions vs classes, and public
-signatures. Follow `.cursor/rules/package-layout.mdc` for where
+signatures. Follow `.agents/rules/package-layout.mdc` for where
 extracts live: keep them in the same capability; do not invent CRUD
 feature folders or `domain/use_cases/adapters`, and do not merge files
 to shrink folder file-count. Use [reference.md](reference.md) for
@@ -78,8 +78,8 @@ DDD entities, or a Factory per DTO.
 
 Detect language from the files being refactored.
 
-**Python:** follow `.cursor/rules/python-clean-code.mdc` and
-`.cursor/rules/package-layout.mdc`. Use [reference.md](reference.md)
+**Python:** follow `.agents/rules/python-clean-code.mdc` and
+`.agents/rules/package-layout.mdc`. Use [reference.md](reference.md)
 for extract-vs-not, class↔function, and behavior traps.
 
 **YAML, shell, and other non-Python files in this repo:** same
@@ -102,7 +102,7 @@ object; do not unpack and rebuild.
 ## Design shape
 
 If the **named scope** already has these shapes, apply
-`.cursor/rules/python-clean-code.mdc`. Convert `@staticmethod`-only
+`.agents/rules/python-clean-code.mdc`. Convert `@staticmethod`-only
 classes to module functions when the name is not a public contract
 (or keep an alias). Pass hidden clients as arguments at composition
 roots. Split a god module along capability lines. Do **not** turn a

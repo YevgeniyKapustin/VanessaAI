@@ -11,7 +11,7 @@ actually hits: naive datetimes, swallowed API errors, `print()` in
 providers, blocking calls in `async def`, f-string logs that break Loki.
 
 Style for *how* to flatten a function after Ruff complains: 
-[`.cursor/rules/python-clean-code.mdc`](../.cursor/rules/python-clean-code.mdc).
+[`.agents/rules/python-clean-code.mdc`](../.agents/rules/python-clean-code.mdc).
 
 ```bash
 poetry run ruff check .
@@ -133,7 +133,7 @@ purpose.
 
 ## Related
 
-- Style after a leftover C90 / RET / PTH / FBT / UP: [`.cursor/rules/python-clean-code.mdc`](../.cursor/rules/python-clean-code.mdc)
-- Where a split file goes (capability grouping, not file-count merges): [`.cursor/rules/package-layout.mdc`](../.cursor/rules/package-layout.mdc)
-- Agent skill that only fixes violations, does not change this config: [`.cursor/skills/ruff-fix/SKILL.md`](../.cursor/skills/ruff-fix/SKILL.md)
+- Style after a leftover C90 / RET / PTH / FBT / UP: [`.agents/rules/python-clean-code.mdc`](../.agents/rules/python-clean-code.mdc)
+- Where a split file goes (capability grouping, not file-count merges): [`.agents/rules/package-layout.mdc`](../.agents/rules/package-layout.mdc)
+- Agent skill that only fixes violations, does not change this config: [`.agents/skills/ruff-fix/SKILL.md`](../.agents/skills/ruff-fix/SKILL.md)
 - File-length check: [`scripts/check_python_file_length.sh`](../scripts/check_python_file_length.sh)

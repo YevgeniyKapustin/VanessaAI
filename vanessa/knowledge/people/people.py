@@ -9,7 +9,7 @@ Sources of truth, in order:
 
 1. The ``People/_index.yaml`` manifest — existing cards with their
    ``id`` / ``aliases`` / ``telegram_id``.
-2. ``config/nicknames.yaml`` — the canonical roster ``telegram_id -> nickname``.
+2. Cached People-card metadata — canonical names and Telegram IDs.
 
 The writer resolves every update's ``person`` through :func:`canonicalize_person`
 before choosing the card file, so duplicate spellings never create new cards.
@@ -140,7 +140,7 @@ def canonicalize_person(
     2. name / alias / id -> existing People card (index ``aliases`` map),
        trying the exact reference, then fuzzy variants (no parentheticals,
        stem before ``(``) on both the reference and the alias keys.
-    3. canonical nickname from ``config/nicknames.yaml``.
+    3. canonical nickname from cached People-card metadata.
     4. fallback: slugify the reference (a brand-new card).
 
     Returns an empty string when the reference is blank.

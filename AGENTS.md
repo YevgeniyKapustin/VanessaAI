@@ -3,8 +3,8 @@
 Telegram group bot (VRChat is a second adapter). Default is silence.
 Domain lives in `vanessa/`; process entrypoints in `services/`. Longer
 docs: `README.md`, `docs/architecture.md`. Python style:
-`.cursor/rules/python-clean-code.mdc`.
-Layout: `.cursor/rules/package-layout.mdc`.
+`.agents/rules/python-clean-code.mdc`.
+Layout: `.agents/rules/package-layout.mdc`.
 
 ## Runtime
 
@@ -47,7 +47,7 @@ OOP. Do not invent DDD `domain/entities` or Unit of Work.
 Do not unpack an existing context/DTO into kwargs for a sibling that
 rebuilds it — pass the object. Do not add PLR0913 or invent a Parameter
 Object to dodge argument count.
-Details: `.cursor/rules/python-clean-code.mdc`.
+Details: `.agents/rules/python-clean-code.mdc`.
 
 ## Commands
 
@@ -66,6 +66,6 @@ docker compose --env-file .env.defaults --env-file .env.local up -d --build
 
 Secrets go in `.env.local` (gitignored). Do not commit them.
 Persona/YAML: `config/` (one tree). `behavior/` (compose/gate/knowledge/humor)
-and `channels/` are the server pipeline; nicknames/joins are identity;
+and `channels/` are the server pipeline; People cards hold identity bindings;
 `presence/avatar.yaml` is host-only (`PRESENCE_AVATAR_PATH`). Env keys:
 `.env.example`, `.env.defaults`.

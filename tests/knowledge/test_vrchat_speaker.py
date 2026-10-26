@@ -1,18 +1,15 @@
-from vanessa.config.settings import settings
+from vanessa.knowledge.index.index_build import build_people_index
 from vanessa.knowledge.people.people import canonicalize_person
 from vanessa.knowledge.people.people_identity import (
     identity_similar,
     normalize_person_text,
 )
-from vanessa.knowledge.people.vrchat_joins import (
-    clear_vrchat_joins_cache,
-    load_vrchat_joins,
-    parse_vrchat_joins,
-)
 from vanessa.knowledge.people.vrchat_speaker import (
     resolve_person_card,
     resolve_vrchat_speaker,
 )
+from vanessa.knowledge.schema import VaultNote
+from vanessa.knowledge.users.vrchat_joins import parse_vrchat_joins
 
 KAPUSTA_TG = 7714154251
 ALEX_TG = 42
@@ -57,10 +54,14 @@ def test_fuzzy_does_not_merge_vrchat_names() -> None:
     assert vrchat.telegram_id is None
 
 
-def test_joins_yaml_binds_kapusta_names() -> None:
-    table = load_vrchat_joins()
-    assert table[normalize_person_text("Капуста")] == KAPUSTA_TG
-    assert table[normalize_person_text("Kapusta")] == KAPUSTA_TG
+def test_people_card_binds_yevgeniy_to_telegram() -> None:
+    note = VaultNote(
+        "People/owner.md",
+        meta={"id": "owner", "telegram_id": ALEX_TG, "vrchat_names": ["Yevgeniy"]},
+    )
+    card = resolve_vrchat_speaker("Yevgeniy", build_people_index([note]))
+    assert card.person_id == "owner"
+    assert card.telegram_id == ALEX_TG
 
 
 def test_parse_joins_skips_invalid_rows() -> None:
@@ -118,32 +119,23 @@ def test_parse_joins_skips_non_list_and_non_positive() -> None:
     assert table == {}
 
 
-def test_load_joins_missing_file_is_empty(tmp_path, monkeypatch) -> None:
-    missing = tmp_path / "no-joins.yaml"
-    monkeypatch.setattr(
-        "vanessa.knowledge.people.vrchat_joins.resolve_joins_path",
-        lambda: missing,
-    )
-    clear_vrchat_joins_cache()
-    try:
-        assert load_vrchat_joins() == {}
-    finally:
-        clear_vrchat_joins_cache()
+def test_invalid_index_binding_keeps_vrchat_card_separate() -> None:
+    card = resolve_vrchat_speaker("Alex", {"vrchat_names": "bad"})
+    assert card.person_id == "alex"
+    assert card.telegram_id is None
 
 
-def test_joins_config_path_override(tmp_path, monkeypatch) -> None:
-    path = tmp_path / "joins.yaml"
-    path.write_text(
-        f"- telegram_id: {ALEX_TG}\n  vrchat_names: [Ada]\n",
-        encoding="utf-8",
+def test_people_card_edit_replaces_vrchat_binding() -> None:
+    note = VaultNote(
+        "People/owner.md",
+        meta={"id": "owner", "telegram_id": ALEX_TG, "vrchat_names": ["OldName"]},
     )
-    monkeypatch.setattr(settings, "joins_config_path", str(path))
-    clear_vrchat_joins_cache()
-    try:
-        table = load_vrchat_joins()
-        assert table[normalize_person_text("Ada")] == ALEX_TG
-    finally:
-        clear_vrchat_joins_cache()
+    before = build_people_index([note])
+    note.meta["vrchat_names"] = ["Yevgeniy"]
+    after = build_people_index([note])
+    assert resolve_vrchat_speaker("OldName", before).telegram_id == ALEX_TG
+    assert resolve_vrchat_speaker("OldName", after).telegram_id is None
+    assert resolve_vrchat_speaker("Yevgeniy", after).telegram_id == ALEX_TG
 
 
 def test_entry_id_skips_non_dict_index_values() -> None:

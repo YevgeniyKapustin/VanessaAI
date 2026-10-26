@@ -25,9 +25,6 @@ import contextlib
 import sys
 from pathlib import Path
 
-from vanessa.infrastructure.ingest.user_backfill import load_nicknames
-from vanessa.knowledge.users.nicknames import resolve_nicknames_path
-
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
@@ -79,7 +76,11 @@ def main(argv: list[str] | None = None) -> int:
     if root is None:
         return 1
     people = load_people(root)
-    roster = load_nicknames(resolve_nicknames_path())
+    roster = {
+        card.telegram_id: str(card.meta.get("nickname") or card.id)
+        for card in people.values()
+        if card.telegram_id is not None
+    }
     groups, reviews, suspicious = detect_groups(people, roster)
     return run_merge_cli(args, root, people, groups, reviews, suspicious, roster)
 

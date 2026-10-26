@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-
-import yaml
 
 from vanessa.core.protocols import UnitOfWorkProtocol
 from vanessa.infrastructure.db.repository import MessageRepository, UserRepository
@@ -17,17 +14,6 @@ class UserBackfillResult:
     updated: int
     unchanged: int
     telegram_fetched: int
-
-
-def load_nicknames(path: Path) -> dict[int, str]:
-    if not path.is_file():
-        return {}
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not raw:
-        return {}
-    if not isinstance(raw, dict):
-        raise TypeError(f"Nicknames file must be a mapping: {path}")
-    return {int(key): str(value).strip() for key, value in raw.items() if str(value).strip()}
 
 
 def _merge_sender_ids(

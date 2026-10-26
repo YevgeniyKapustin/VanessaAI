@@ -1,5 +1,0 @@
-# Explicit VRChat display name → existing People card (telegram_id).
-# Names not listed here become name-keyed cards with empty telegram_id.
-# Do not reverse-lookup config/nicknames.yaml for VRChat speakers.
-- telegram_id: 7714154251
-  vrchat_names: ["Капуста", "Kapusta"]

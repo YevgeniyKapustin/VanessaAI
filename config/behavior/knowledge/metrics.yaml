@@ -1,4 +1,23 @@
 enabled: true
+
+# Handicap for owner accounts (REQUIRED_USER_TELEGRAM_ID and
+# OWNER_EXTRA_TELEGRAM_IDS). The owner provokes Vanessa on purpose to tune
+# her, so a testing turn must not become a verdict on the relationship: the
+# extraction result is clamped after scoring. Friendly fields are raised to
+# at least the value below, hostile ones are lowered to at most it.
+# Deterministic counters (messages, presence, reaction time) are facts and
+# are never clamped.
+handicap:
+  enabled: true
+  trust_score: 70
+  valence: 0.3
+  sympathy: 0.4
+  distance: friendly
+  constructiveness: 0.3
+  support_index: 0.3
+  toxicity: 0.05
+  sarcasm_index: 0.15
+
 extraction_prompt: |
   You are Vanessa's metrics subsystem. Based on the transcript below, score the
   mood and relationship metrics for each chat participant with enough signals.

@@ -46,6 +46,9 @@ class BotNotesMessages(BaseModel):
 class BotMessagesContent(BaseModel):
     welcome: str
     photo_placeholder: str = "[фото]"
+    #: What a sticker / GIF turn looks like to the pipeline before vision.
+    sticker_placeholder: str = "[стикер]"
+    gif_placeholder: str = "[гифка]"
     access: BotAccessMessages
     notes: BotNotesMessages
 
@@ -82,9 +85,29 @@ class MemoryContent(BaseModel):
     extraction_prompt: str = ""
 
 
+class MetricsHandicapContent(BaseModel):
+    """Floors for the owner's card: a testing turn is not a verdict.
+
+    Enabled in ``knowledge/metrics.yaml``; applies only to owner accounts.
+    Friendly fields are raised to at least the value below, hostile ones
+    (toxicity, sarcasm) are lowered to at most it.
+    """
+
+    enabled: bool = False
+    trust_score: int = 70
+    valence: float = 0.3
+    sympathy: float = 0.4
+    distance: str = "friendly"
+    constructiveness: float = 0.3
+    support_index: float = 0.3
+    toxicity: float = 0.05
+    sarcasm_index: float = 0.15
+
+
 class MetricsContent(BaseModel):
     enabled: bool = True
     extraction_prompt: str = ""
+    handicap: MetricsHandicapContent = Field(default_factory=MetricsHandicapContent)
     feedback_header: str = "My mood and relationship notes about the sender:"
     feedback_line: str = (
         "- {name}: toxicity {toxicity}, trust {trust}/100, tone {distance}, mood {mood}"

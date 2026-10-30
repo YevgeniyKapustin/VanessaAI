@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import time
 
+from vanessa.config.content import get_content
 from vanessa.core.messages import StoredMessage, stored_to_context
 from vanessa.knowledge.memory.memory_stage import format_memory_transcript
 from vanessa.knowledge.metrics.batch_filters import (
@@ -25,6 +26,7 @@ from vanessa.knowledge.metrics.batch_filters import (
     filter_sender_metrics,
 )
 from vanessa.knowledge.metrics.deterministic import DeterministicMetricsCalculator
+from vanessa.knowledge.metrics.handicap import apply_owner_handicap
 from vanessa.knowledge.metrics.pipeline_persist import persist_combined
 from vanessa.knowledge.metrics.planner import MetricsPlanner
 from vanessa.knowledge.metrics.schema import MetricsSnapshot, PersonMetrics
@@ -92,6 +94,7 @@ class MetricsPipeline:
         combined: dict[str, tuple[int | None, str | None, PersonMetrics]] = {}
         await self._merge_semantic(combined, semantic_snapshots)
         await self._merge_deterministic(combined, det, names_by_telegram)
+        apply_owner_handicap(combined, get_content().metrics.handicap)
         return combined
 
     async def _merge_semantic(

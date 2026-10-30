@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 from vanessa.core.messages import StoredMessage, stored_to_context
 from vanessa.infrastructure.db.repository import MessageRepository
@@ -18,8 +19,12 @@ from vanessa.knowledge.memory.compaction import compact_all_person_cards
 from vanessa.knowledge.memory.memory_planner import MemoryPlanner
 from vanessa.knowledge.memory.memory_stage import format_memory_transcript
 from vanessa.knowledge.memory.writer import KnowledgeVaultWriter
-from vanessa.knowledge.metrics.pipeline import MetricsPipeline
 from vanessa.knowledge.store.vault import KnowledgeVault
+
+if TYPE_CHECKING:
+    # Annotation-only import: the pipeline itself imports this package at
+    # runtime, so a real import here is a cycle (import order dependent).
+    from vanessa.knowledge.metrics.pipeline import MetricsPipeline
 
 logger = logging.getLogger(__name__)
 

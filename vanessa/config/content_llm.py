@@ -88,6 +88,8 @@ class LLMContent(LLMLookupNotes):
     # what to do right now, in the freshest part of the model's memory.
     final_task: str = ""
     sticker_instruction: str = ""
+    #: How and when to answer with an emoji reaction ([reaction:<emoji>]).
+    reaction_instruction: str = ""
     # Marker line the composer uses to split a long reply into several short
     # messages (blocks) of 1-2 sentences each. The prompt (compose/system.yaml ``answer:``)
     # instructs the model to put this tag on its own line at the end of every

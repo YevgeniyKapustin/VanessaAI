@@ -73,7 +73,7 @@ channel; VRChat adds a short `prompt_addendum` here.
 
 | Flag | telegram | vrchat |
 |------|----------|--------|
-| `stickers` / `photos` / `split_messages` | on | off |
+| `stickers` / `photos` / `reactions` / `split_messages` | on | off |
 | `scene` | off | on |
 | `speech` | false | true |
 | `listen_window` | current session window | on |

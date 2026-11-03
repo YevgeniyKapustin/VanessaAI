@@ -7,15 +7,16 @@ from typing import Any
 
 from services.worker.hermes.payload import HermesAsk
 from services.worker.hermes.prompt import build_followup_user_prompt
+from vanessa.config.content import get_content
 from vanessa.config.content_hermes import HermesContent
 from vanessa.core.protocols import LLMChatCompleter
 from vanessa.llm.generation import LLMGenerationParams
 from vanessa.pipeline.llm.format.answer_tag import (
     extract_answer,
     has_ignore_marker,
+    is_untagged_reply,
 )
 from vanessa.pipeline.llm.format.block_markers import strip_block_markers
-from vanessa.pipeline.llm.format.reasoning_leak import is_reasoning_leak
 from vanessa.pipeline.llm.format.stray_tags import strip_stray_tags
 from vanessa.pipeline.llm.tagged_reply import request_tagged
 
@@ -44,6 +45,8 @@ def final_text(raw: str, *, keep_blocks: bool = False) -> str:
 
     ``keep_blocks``: keep the ``[next]`` lines for the block split.
     """
+    if is_untagged_reply(raw):
+        return ""
     reply, _reasoning = extract_answer(raw)
     plain = strip_stray_tags(strip_block_markers(reply)).strip()
     if has_ignore_marker(plain) or not plain:
@@ -52,9 +55,11 @@ def final_text(raw: str, *, keep_blocks: bool = False) -> str:
 
 
 def chat_request(
-    completer: LLMChatCompleter, system: str, user: str
+    completer: LLMChatCompleter, system: str, user: str, *, strict: bool = False
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Messages + extra kwargs: Anthropic takes ``system`` as a kwarg."""
+    if strict:
+        user = f"{user}\n\n{get_content().llm.untagged_retry_note.strip()}"
     if getattr(completer, "provider", "") == "claude":
         return [{"role": "user", "content": user}], {"system": system}
     messages = [
@@ -105,8 +110,8 @@ class FollowupComposer:
                 type(exc).__name__,
             )
             raw = ""
-        if is_reasoning_leak(raw):
-            # Untagged reasoning after the retry.
+        if is_untagged_reply(raw):
+            # No final-answer boundary after the retry.
             # The user waits for a result, so post the fixed line, not silence.
             logger.warning(
                 "hermes_followup_untagged chat_id=%s chars=%s",
@@ -141,15 +146,16 @@ class FollowupComposer:
             file_task=file_task,
             elapsed_seconds=elapsed_seconds,
         )
-        messages, extra = chat_request(self._completer, self._system, user)
-        return await request_tagged(
-            lambda **_: self._completer.complete(
+        async def create(*, strict: bool) -> str:
+            messages, extra = chat_request(
+                self._completer, self._system, user, strict=strict
+            )
+            return await self._completer.complete(
                 self._model,
                 messages,
                 kind=LLM_KIND,
                 **self._generation.to_llm_kwargs(),
                 **extra,
-            ),
-            str,
-            model=self._model,
-        )
+            )
+
+        return await request_tagged(create, str, model=self._model)

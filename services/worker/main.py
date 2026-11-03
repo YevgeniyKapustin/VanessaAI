@@ -14,6 +14,7 @@ import asyncio
 import logging
 from uuid import uuid4
 
+from services.worker.announce import build_announcers
 from services.worker.app import WorkerApp
 from services.worker.handlers import build_worker_handlers
 from services.worker.reminders import build_reminder_scheduler
@@ -89,6 +90,9 @@ async def main() -> None:
         portrait_worker=portrait_worker,
         scheduler=build_reminder_scheduler(
             broker, outbound_stream=streams.outbound, settings=settings
+        ),
+        announcers=build_announcers(
+            broker, settings, outbound_stream=streams.outbound
         ),
     )
     logger.info("worker_started stream=%s group=%s", streams.tasks, settings.broker_group_worker)

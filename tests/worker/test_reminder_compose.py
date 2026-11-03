@@ -8,6 +8,7 @@ from services.worker.reminders import assembly as reminder_assembly
 from services.worker.reminders.compose import LLM_KIND, ReminderComposer
 from services.worker.reminders.prompt import build_fire_user_prompt
 from tests.worker.hermes_fakes import SYSTEM, FakeBroker, FakeCompleter
+from vanessa.config.content import get_content
 from vanessa.config.content_schedule import get_schedule_content
 from vanessa.core.reminders import Reminder
 from vanessa.llm.generation import LLMGenerationParams
@@ -78,6 +79,14 @@ async def test_untagged_output_is_retried_then_stored_text() -> None:
     assert len(completer.calls) == UNTAGGED_ATTEMPTS
     retried = FakeCompleter(replies=[leak, f"[answer]\nОбеды! {URL}"])
     assert await _composer(retried).compose(POST) == f"Обеды! {URL}"
+    retry_prompt = retried.calls[-1]["messages"][-1]["content"]
+    assert get_content().llm.untagged_retry_note.strip() in retry_prompt
+
+
+async def test_unrecognized_untagged_plan_falls_back_to_stored_post() -> None:
+    completer = FakeCompleter(f"Пятница. Короткое приветствие, затем ссылка {URL}")
+    assert await _composer(completer).compose(POST) == POST.text
+    assert len(completer.calls) == UNTAGGED_ATTEMPTS
 
 
 def _settings(**overrides) -> SimpleNamespace:

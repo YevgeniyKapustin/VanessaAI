@@ -11,10 +11,13 @@ from vanessa.infrastructure.observability.trace_log import trace_event
 from vanessa.infrastructure.observability.tracing import get_tracer
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.models import DecisionReason
+from vanessa.pipeline.llm.format.cross_chat_send import extract_cross_chat_send
+from vanessa.pipeline.llm.format.owner_dm import extract_owner_dm
 from vanessa.pipeline.llm.photo_request import is_photo_request
 from vanessa.pipeline.llm.prompts.prompt_system import build_system_prompt
 from vanessa.pipeline.llm.prompts.session_format import session_context_messages
 from vanessa.pipeline.llm.tagged_reply import UntaggedReplyError
+from vanessa.pipeline.proxy.owner import owner_names
 from vanessa.pipeline.stages.compose_photos import _ComposePhotoMixin
 from vanessa.pipeline.stages.compose_promise import without_false_promise
 from vanessa.pipeline.stages.compose_refuse import _ComposeRefuseMixin
@@ -50,6 +53,11 @@ def _compose_generate_request(
         attitude_note=attitude_note,
         sender_telegram_id=turn.sender_telegram_id,
         sender_name=ctx.sender_name,
+        chat_title=turn.chat_title,
+        chat_type=turn.chat_type,
+        telegram_chat_id=turn.telegram_chat_id,
+        known_chats=turn.known_chats,
+        sender_is_owner=turn.sender_is_owner,
         tone=plan.tone,
         needs_clarification=plan.needs_clarification,
         clarification_hint=plan.clarification_hint,
@@ -70,6 +78,13 @@ def _compose_generate_request(
         schedule_note=ctx.schedule_note,
         channel_profile=ctx.profile,
         system_prompt=build_system_prompt(get_content(), profile=ctx.profile),
+        proxy_question=ctx.proxy.proxy_question,
+        proxy_chat_id=ctx.proxy.chat_id,
+        proxy_chat_title=ctx.proxy.chat_title,
+        owner_dm=ctx.proxy.owner_dm,
+        relay_chat_id=turn.relay_chat_id,
+        relay_chat_title=turn.relay_chat_title,
+        relay_question=turn.relay_question,
     )
 
 
@@ -144,6 +159,22 @@ class ComposeStage(_ComposeRefuseMixin, _ComposePhotoMixin):
         if refused is not None:
             trace_event("compose_result", reply=None, refuse=ctx.refuse_reason)
             return refused
+        ctx.reply, ctx.outbound_chat_id, ctx.outbound_text = (
+            extract_cross_chat_send(
+                ctx.reply,
+                known_chat_ids={
+                    chat.chat_id
+                    for chat in ctx.turn.known_chats
+                    if chat.chat_id != ctx.turn.telegram_chat_id
+                },
+                sender_is_owner=ctx.turn.sender_is_owner,
+                owner_names=owner_names(),
+            )
+        )
+        ctx.reply, ctx.owner_dm_text = extract_owner_dm(
+            ctx.reply,
+            allowed=ctx.proxy.proxy_question,
+        )
         photo_index = self._apply_photo_index(ctx, photo_candidates)
         self._record_photo_outcome(
             ctx,

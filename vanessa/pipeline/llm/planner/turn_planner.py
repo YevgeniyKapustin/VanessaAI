@@ -88,6 +88,8 @@ class TurnPlanner(_TurnPlanLlmMixin):
         in_listen_window: bool = False,
         sender_name: str = "",
         sender_is_owner: bool = False,
+        proxy_question: bool = False,
+        owner_dm: bool = False,
     ) -> TurnPlan:
         if not self._use_llm:
             result = apply_detail(fallback_plan(message), message)
@@ -120,6 +122,8 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 in_listen_window=in_listen_window,
                 sender_name=sender_name,
                 sender_is_owner=sender_is_owner,
+                proxy_question=proxy_question,
+                owner_dm=owner_dm,
             )
         except Exception:
             logger.exception(

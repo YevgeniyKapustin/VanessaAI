@@ -4,6 +4,7 @@ from vanessa.pipeline.llm.format.message_blocks import (
     split_reply_into_blocks,
     strip_block_markers,
 )
+from vanessa.pipeline.llm.format.reaction_tag import extract_reaction
 from vanessa.pipeline.llm.format.reply_format import strip_trailing_periods
 from vanessa.pipeline.llm.format.sticker_tag import extract_sticker_tag
 
@@ -13,6 +14,14 @@ def sticker_from_reply(ctx: TurnPipelineContext, reply: str) -> tuple[str, str |
     if not ctx.profile.stickers:
         return clean, None
     return clean, tag
+
+
+def reaction_from_reply(ctx: TurnPipelineContext, reply: str) -> tuple[str, str | None]:
+    """Strip the ``[reaction:<emoji>]`` marker the composer may have added."""
+    if not ctx.profile.reactions:
+        clean, _ = extract_reaction(reply)
+        return clean, None
+    return extract_reaction(reply)
 
 
 def photo_fields(ctx: TurnPipelineContext) -> tuple[str | None, str | None]:

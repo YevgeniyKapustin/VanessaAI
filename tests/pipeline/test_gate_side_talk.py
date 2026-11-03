@@ -75,7 +75,18 @@ class ScriptedPlanner:
 
 
 @pytest.mark.asyncio
-async def test_gate_stage_blocks_reply_to_other_via_decision_engine():
+@pytest.mark.parametrize(
+    ("message", "reply_to_other_user"),
+    [
+        ("Личь не делает карты по героям", True),
+        ("@ebashit_nado_bot тут?", False),
+    ],
+)
+async def test_gate_stage_blocks_other_addressee_via_decision_engine(
+    message: str,
+    *,
+    reply_to_other_user: bool,
+):
     engine = _build_engine()
     gate = GateStage(
         ScriptedPlanner(
@@ -102,9 +113,9 @@ async def test_gate_stage_blocks_reply_to_other_via_decision_engine():
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
             telegram_chat_id=-100,
-            message="Личь не делает карты по героям",
+            message=message,
             sender_telegram_id=1,
-            reply_to_other_user=True,
+            reply_to_other_user=reply_to_other_user,
         ),
         user_msg=StoredMessage(id=1, role="user", content="x"),
         session=ChatSessionState(

@@ -66,9 +66,14 @@ ban-relative-imports = "all"
 [lint.per-file-ignores]
 "tests/**/*" = [
     "ARG001",  # fixtures and callbacks
+    "PLR2004", # literal expectations are the point of a test
     "S108",    # /tmp in manifest tests
     "S310",    # urlopen to local /metrics
     "S314",    # ElementTree in sticker/prompt XML tests
+]
+"deploy/**/*" = [
+    "T201",  # CLI scripts print their result
+    "S603",  # bridge runs glab, a fixed trusted binary
 ]
 "scripts/**/*" = [
     "T201",     # CLI prints to stdout

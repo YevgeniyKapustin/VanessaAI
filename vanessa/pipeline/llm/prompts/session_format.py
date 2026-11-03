@@ -5,9 +5,11 @@ from vanessa.pipeline.llm.prompts.context_format import format_message_time
 from vanessa.pipeline.llm.prompts.message_xml import (
     BOT_SENDER,
     message_attachment_blocks,
+    message_sender_type,
     render_messages,
     render_msg,
 )
+from vanessa.pipeline.llm.prompts.reaction_xml import render_reaction
 
 
 def _session_text(message: ContextMessage) -> str:
@@ -31,13 +33,22 @@ def _session_reply_text(message: ContextMessage) -> str | None:
 
 
 def _render_session_message(message: ContextMessage) -> str:
+    if message.role == "reaction":
+        return render_reaction(
+            sender=_session_sender(message),
+            emoji=_session_text(message),
+            time=format_message_time(message.created_at),
+            to=message.reply_to_message_id,
+        )
     return render_msg(
         content=_session_text(message),
         sender=_session_sender(message),
+        sender_type=message_sender_type(message.role, message.sender_name),
         time=format_message_time(message.created_at),
         msg_id=message.id,
         reply_to=message.reply_to_message_id,
         reply_text=_session_reply_text(message),
+        reply_sender=message.reply_to_sender_name,
         attachments=message_attachment_blocks(
             message.attachments,
             message.photo_caption,

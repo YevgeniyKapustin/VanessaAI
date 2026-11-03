@@ -8,7 +8,7 @@ from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget, BotPeerLimi
 from vanessa.pipeline.decision.models import DecisionAction, DecisionReason
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
 from vanessa.pipeline.stages import GateStage
-from vanessa.pipeline.stages.bot_peer import record_bot_peer_reply
+from vanessa.pipeline.stages.bot_peer import bot_names_vanessa, record_bot_peer_reply
 from vanessa.pipeline.turn_metrics import TurnMetrics
 
 KIRILL = 777
@@ -46,17 +46,18 @@ def _ctx(
     mentions_bot: bool = False,
     listen: bool = False,
     recent: list[ContextMessage] | None = None,
+    message: str = "ну что скажешь",
 ) -> TurnPipelineContext:
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
             telegram_chat_id=-100,
-            message="ну что скажешь",
+            message=message,
             sender_telegram_id=sender,
             sender_first_name="Kirill",
             sender_is_bot=is_bot,
             mentions_bot=mentions_bot,
         ),
-        user_msg=StoredMessage(id=1, role="user", content="ну что скажешь"),
+        user_msg=StoredMessage(id=1, role="user", content=message),
         session=ChatSessionState(
             messages=[],
             in_listen_window=listen,
@@ -142,6 +143,32 @@ async def test_reply_loop_with_bot_stops_at_depth_then_human_resets():
         await gate.run(_ctx(sender=HUMAN, is_bot=False))
     with pytest.raises(PlannerCalledError):
         await gate.run(_ctx(mentions_bot=True))
+
+
+@pytest.mark.asyncio
+async def test_bot_naming_vanessa_reaches_the_planner():
+    planner = FakePlanner()
+    ctx = _ctx(message="Ванесса, скинь ссылку на макет")
+
+    with pytest.raises(PlannerCalledError):
+        await _gate(planner, _budget()).run(ctx)
+
+    assert planner.calls == 1
+    assert ctx.bot_mentions_name is True
+
+
+@pytest.mark.asyncio
+async def test_bot_status_remark_without_her_name_stays_side_talk():
+    planner = FakePlanner()
+    ctx = _ctx(message="макет обновил, всё готово")
+
+    assert await _gate(planner, _budget()).run(ctx) is False
+    assert planner.calls == 0
+
+
+def test_her_name_in_plain_text_needs_no_mention_entity():
+    assert bot_names_vanessa("ванесса, глянь пожалуйста") is True
+    assert bot_names_vanessa("макет обновил") is False
 
 
 def test_hermes_follow_up_counts_as_second_reply():

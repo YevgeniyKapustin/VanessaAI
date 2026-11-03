@@ -33,6 +33,11 @@ class DecisionReason(StrEnum):
     BOT_PEER_SIDE = "bot_peer_side"
     # The bot-to-bot reply budget is used up (depth, cooldown or hourly cap).
     BOT_PEER_LIMIT = "bot_peer_limit"
+    # An agent's clear question addressed to the owner in the proxy chat:
+    # Vanessa answers it for him (or passes it to his DM).
+    PROXY_QUESTION = "proxy_question"
+    # The owner wrote in the private chat with Vanessa.
+    OWNER_DM = "owner_dm"
     # Vanessa's attitude to the sender is critically low (loop-repetition
     # annoyance and/or a persistently low relationship) → even a weak / slightly
     # disliked message is ignored (maximal ignore tendency).

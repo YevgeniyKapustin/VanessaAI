@@ -47,6 +47,21 @@ def test_message_to_context():
     assert context.content == "ctx"
 
 
+def test_bot_label_survives_database_mapping_and_context_conversion():
+    message = Message(
+        id=7,
+        role="user",
+        content="я человек",
+        sender_telegram_id=777,
+        sender_display_name="[бот Кирилл]",
+    )
+
+    stored = message_to_stored(message)
+    assert stored.sender_name == "[бот Кирилл]"
+    assert stored_to_context(stored).sender_name == "[бот Кирилл]"
+    assert message_to_context(message).sender_name == "[бот Кирилл]"
+
+
 def test_messages_to_context_batch():
     messages = [
         Message(id=1, role="user", content="a"),

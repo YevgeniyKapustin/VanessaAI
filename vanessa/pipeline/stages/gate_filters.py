@@ -15,6 +15,10 @@ logger = logging.getLogger("vanessa.pipeline.stages")
 
 class _GateFilterMixin:
     async def _filters_should_stop(self, ctx: TurnPipelineContext) -> bool:
+        # Proxy questions and the owner's DM are explicit turns: the prefilter
+        # and the reaction classifier are built for "was Vanessa addressed?".
+        if ctx.proxy.active:
+            return False
         if await self._prefilter_should_stop(ctx):
             return True
         return await self._reaction_gate_should_stop(ctx)
@@ -27,7 +31,7 @@ class _GateFilterMixin:
             ctx.recent,
             telegram_chat_id=ctx.turn.telegram_chat_id or 0,
             sender_telegram_id=ctx.turn.sender_telegram_id or 0,
-            mentions_bot=ctx.turn.mentions_bot,
+            mentions_bot=ctx.turn.mentions_bot or ctx.bot_mentions_name,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
             addressing=ctx.profile.addressing,
@@ -58,7 +62,7 @@ class _GateFilterMixin:
         reaction = await self._reaction_gate.evaluate(
             ctx.turn.message,
             ctx.recent,
-            mentions_bot=ctx.turn.mentions_bot,
+            mentions_bot=ctx.turn.mentions_bot or ctx.bot_mentions_name,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=pipeline_in_listen_window(ctx),

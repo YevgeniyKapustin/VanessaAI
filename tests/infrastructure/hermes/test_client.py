@@ -26,6 +26,20 @@ async def test_is_online_false_when_unreachable():
     assert await _client(handler).is_online() is False
 
 
+async def test_is_online_retries_once_after_a_stale_socket():
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.RemoteProtocolError("server disconnected", request=request)
+        return httpx.Response(200, json={"status": "ok"})
+
+    assert await _client(handler).is_online() is True
+    assert calls == 2
+
+
 async def test_start_run_sends_session_and_idempotency_key():
     seen: dict = {}
 

@@ -14,6 +14,7 @@ from datetime import timedelta
 
 from vanessa.contracts.posted import PostedMessages
 from vanessa.core.hermes_answers import RecentAnswers
+from vanessa.core.session.channel_keys import dialogue_session_key
 from vanessa.infrastructure.db.repository import MessageRepository
 
 logger = logging.getLogger(__name__)
@@ -53,5 +54,8 @@ class PostedRecorder:
                 content=text,
                 created_at=posted.posted_at + index * PART_STEP,
                 reply_to_message_id=posted.reply_to_message_id if index == 0 else None,
-                channel=posted.channel,
+                channel=dialogue_session_key(
+                    channel=posted.channel,
+                    telegram_chat_id=posted.telegram_chat_id,
+                ),
             )

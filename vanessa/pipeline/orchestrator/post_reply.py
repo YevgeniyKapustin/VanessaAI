@@ -2,6 +2,7 @@ import logging
 
 from vanessa.contracts.messages import TaskKind
 from vanessa.core.messages import context_message_to_payload
+from vanessa.core.messages_attachments import KIND_PHOTO
 from vanessa.core.request_context import get_request_id
 from vanessa.core.session.channel_keys import memory_dedup_key, turn_channel
 from vanessa.pipeline.context import TurnPipelineContext
@@ -120,7 +121,11 @@ class _PostReplyMixin(_PostReplyJobsMixin):
             )
         if ctx.user_msg is not None and ctx.user_msg.attachments:
             first = ctx.user_msg.attachments[0]
-            if isinstance(first, dict) and first.get("data_url"):
+            if (
+                isinstance(first, dict)
+                and first.get("data_url")
+                and first.get("kind", KIND_PHOTO) == KIND_PHOTO
+            ):
                 self._dispatcher.submit(
                     TaskKind.PHOTO_CAPTION,
                     {"message_id": ctx.user_msg.id},

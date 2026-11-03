@@ -1,6 +1,7 @@
 from vanessa.core.session.channel_keys import turn_channel
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.context import DecisionContext
+from vanessa.pipeline.proxy.mode import is_private_chat
 
 
 def pipeline_in_listen_window(ctx: TurnPipelineContext) -> bool:
@@ -20,7 +21,7 @@ def decision_context_from_pipeline(ctx: TurnPipelineContext) -> DecisionContext:
         channel=turn_channel(ctx.turn),
         recent_messages=ctx.recent,
         should_reply=None if plan is None else plan.should_reply,
-        mentions_bot=ctx.turn.mentions_bot,
+        mentions_bot=ctx.turn.mentions_bot or ctx.bot_mentions_name,
         reply_to_bot=ctx.turn.reply_to_bot,
         reply_to_other_user=ctx.turn.reply_to_other_user,
         in_listen_window=pipeline_in_listen_window(ctx),
@@ -29,4 +30,8 @@ def decision_context_from_pipeline(ctx: TurnPipelineContext) -> DecisionContext:
         loop_strength=ctx.loop_strength,
         annoyance=ctx.annoyance,
         addressing=ctx.profile.addressing,
+        proxy_question=ctx.proxy.proxy_question,
+        owner_dm=ctx.proxy.owner_dm,
+        sender_is_owner=ctx.turn.sender_is_owner,
+        is_private_chat=is_private_chat(ctx.turn),
     )

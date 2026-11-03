@@ -71,3 +71,9 @@ def test_non_http_link_stays_text():
     html = markdown_to_telegram_html("[жми](javascript:alert(1))")
 
     assert "<a" not in html
+
+
+def test_telegram_user_mention_becomes_anchor():
+    html = markdown_to_telegram_html("выкатывал [@Canoist](tg://user?id=327160360)")
+
+    assert html == 'выкатывал <a href="tg://user?id=327160360">@Canoist</a>'

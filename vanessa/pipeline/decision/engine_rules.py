@@ -8,6 +8,7 @@ from vanessa.pipeline.decision.protocols import (
     RateLimiterProtocol,
     TriggerCheckerProtocol,
 )
+from vanessa.pipeline.decision.proxy_rules import OwnerDmRule, ProxyQuestionRule
 from vanessa.pipeline.decision.repeated_question import RepeatedQuestionRule
 from vanessa.pipeline.decision.rules import (
     ConsecutiveReplyRule,
@@ -34,6 +35,8 @@ def default_decision_rules(
 ) -> list[DecisionRule]:
     return [
         RateLimitRule(rate_limiter),
+        OwnerDmRule(),
+        ProxyQuestionRule(),
         NoiseRule(noise_filter),
         HardIgnoreRule(eligibility),
         RepeatedQuestionRule(),

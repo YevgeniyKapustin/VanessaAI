@@ -172,6 +172,7 @@ def current_message_parts(
     sender_telegram_id: int | None,
     sender_name: str | None,
     reply_to_text: str | None,
+    reply_to_sender_name: str | None = None,
     current_images: list[ImageAttachment] | None,
     format_current_message: Callable[..., str],
 ) -> list[BudgetPart]:
@@ -181,6 +182,7 @@ def current_message_parts(
         sender_telegram_id=sender_telegram_id,
         sender_name=sender_name,
         reply_to_text=reply_to_text,
+        reply_to_sender_name=reply_to_sender_name,
         images=current_images,
     )
     current_header = llm.current_message_header

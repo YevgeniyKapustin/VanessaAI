@@ -22,34 +22,25 @@ Retention
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
 from typing import Any
 
 import redis.asyncio as aioredis
 
-from vanessa.contracts.messages import BrokerMessage
+from vanessa.contracts.messages import BrokerMessage, KnownChat
+from vanessa.infrastructure.broker.announce_state import AnnouncementState
 from vanessa.infrastructure.broker.backends import (
     consume_forever as run_consume_loop,
 )
 from vanessa.infrastructure.broker.janitor import BrokerJanitor
+from vanessa.infrastructure.broker.owner_dm_store import OwnerDmStore
 from vanessa.infrastructure.broker.redis_consumer import _RedisStreamConsumer
+from vanessa.infrastructure.broker.redis_dedup import RedisDedupGuard
 from vanessa.infrastructure.broker.redis_entries import _xadd_stream
 from vanessa.infrastructure.broker.redis_rpc import _rpc_request
 from vanessa.infrastructure.broker.serialization import encode
 from vanessa.infrastructure.observability.metrics import record_broker_publish
-
-
-class RedisDedupGuard:
-    """SET NX EX dedup guard backed by the same Redis client as the broker."""
-
-    def __init__(self, client: aioredis.Redis, *, ttl_seconds: int = 3600) -> None:
-        self._client = client
-        self._ttl = ttl_seconds
-
-    async def acquire(self, message_id: str) -> bool:
-        return bool(
-            await self._client.set(f"dedup:{message_id}", "1", nx=True, ex=self._ttl)
-        )
 
 
 class RedisStreamBroker:
@@ -112,6 +103,38 @@ class RedisStreamBroker:
     def dedup_guard(self, ttl_seconds: int = 3600) -> RedisDedupGuard:
         """Idempotency guard sharing this broker's Redis client."""
         return RedisDedupGuard(self._client, ttl_seconds=ttl_seconds)
+
+    def owner_dm_store(self, ttl_seconds: int = 7 * 24 * 3600) -> OwnerDmStore:
+        """Pending owner-DM questions sharing this broker's Redis client."""
+        return OwnerDmStore(self._client, ttl_seconds=ttl_seconds)
+
+    def announce_state(self, key: str) -> AnnouncementState:
+        """Marker of the last announced event for one watch, same client."""
+        return AnnouncementState(self._client, key=key)
+
+    async def remember_chat(
+        self,
+        chat_id: int,
+        title: str | None,
+        chat_type: str | None,
+    ) -> None:
+        if not title or chat_type not in {"group", "supergroup"}:
+            return
+        value = json.dumps(
+            {"chat_id": chat_id, "title": title, "chat_type": chat_type},
+            ensure_ascii=False,
+        )
+        await self._client.hset("vanessa:chat_directory", str(chat_id), value)
+
+    async def known_chats(self) -> list[KnownChat]:
+        entries = await self._client.hgetall("vanessa:chat_directory")
+        chats: list[KnownChat] = []
+        for raw in entries.values():
+            try:
+                chats.append(KnownChat(**json.loads(raw)))
+            except (TypeError, ValueError):
+                continue
+        return sorted(chats, key=lambda chat: (chat.title.casefold(), chat.chat_id))
 
     def janitor(self, streams, settings) -> BrokerJanitor:
         """Retention loop (age trim, dead consumers) on this broker's client."""

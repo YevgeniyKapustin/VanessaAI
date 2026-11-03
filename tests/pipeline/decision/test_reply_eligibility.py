@@ -74,6 +74,42 @@ def test_prefilter_defers_question_to_reaction_gate(eligibility: ReplyEligibilit
     assert verdict.reason == "question"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "@ebashit_nado_bot тут?",
+        "  @ebashit_nado_bot тут",
+        "@another_user, помоги с задачей",
+    ],
+)
+def test_prefilter_blocks_other_username_in_listen_window(
+    eligibility: ReplyEligibility,
+    text: str,
+):
+    verdict = eligibility.evaluate_prefilter(text, [], force_listen_window=True)
+
+    assert verdict.run_planner is False
+    assert verdict.reason == "side_talk"
+
+
+@pytest.mark.parametrize(
+    "context",
+    [
+        _ctx("@vanessa_bot тут?", mentions_bot=True),
+        _ctx("@another_user тут?", reply_to_bot=True),
+        _ctx("@another_user Ванесса, что думаешь?"),
+        _ctx("Ванесса, что думаешь про @another_user?"),
+        _ctx("что думаешь про @another_user?"),
+        _ctx("contact@example.com — твоя почта?"),
+    ],
+)
+def test_hard_ignore_preserves_bot_address_and_username_references(
+    eligibility: ReplyEligibility,
+    context: DecisionContext,
+):
+    assert eligibility.hard_ignore(context) is None
+
+
 def test_allows_compose_humor_ok(eligibility: ReplyEligibility):
     assert eligibility.allows_compose(
         _ctx("любой текст"),

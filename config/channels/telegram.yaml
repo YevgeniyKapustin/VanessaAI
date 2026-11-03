@@ -1,6 +1,7 @@
 channel: telegram
 stickers: true
 photos: true
+reactions: true
 split_messages: true
 scene: false
 speech: false

@@ -2,6 +2,7 @@ from vanessa.core.session.channel_keys import (
     as_session_key,
     dialogue_session_key,
     memory_dedup_key,
+    message_storage_channel,
     turn_channel,
 )
 
@@ -14,6 +15,12 @@ class _Turn:
 def test_turn_channel_defaults_telegram():
     assert turn_channel(_Turn()) == "telegram"
     assert turn_channel(_Turn(channel="vrchat")) == "vrchat"
+
+
+def test_message_storage_channel_isolated_by_telegram_chat():
+    assert message_storage_channel(_Turn(telegram_chat_id=-1001)) == "telegram:-1001"
+    assert message_storage_channel(_Turn(telegram_chat_id=-1002)) == "telegram:-1002"
+    assert message_storage_channel(_Turn(channel="vrchat")) == "vrchat"
 
 
 def test_dialogue_session_key_telegram_vs_vrchat():

@@ -4,6 +4,7 @@ from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.stages.finalize_delivery import (
     delivery_messages,
     photo_fields,
+    reaction_from_reply,
     sticker_from_reply,
 )
 
@@ -46,3 +47,19 @@ def test_vrchat_finalize_drops_photo_fields() -> None:
     ctx.photo_file_id = "file-1"
     ctx.photo_data_url = "data:image/jpeg;base64,x"
     assert photo_fields(ctx) == (None, None)
+
+
+def test_telegram_finalize_keeps_the_reaction_marker() -> None:
+    ctx = _ctx("telegram")
+    assert load_channel_profile("telegram").reactions is True
+    clean, emoji = reaction_from_reply(ctx, "ага\n[reaction:🔥]")
+    assert clean == "ага"
+    assert emoji == "🔥"
+
+
+def test_vrchat_finalize_strips_reactions_without_emitting_one() -> None:
+    ctx = _ctx("vrchat")
+    assert ctx.profile.reactions is False
+    clean, emoji = reaction_from_reply(ctx, "ага\n[reaction:🔥]")
+    assert "reaction" not in clean.lower()
+    assert emoji is None

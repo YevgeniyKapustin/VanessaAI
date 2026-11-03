@@ -4,6 +4,7 @@ import fakeredis.aioredis
 import pytest
 
 from vanessa.contracts.messages import (
+    KnownChat,
     TaskKind,
     TaskMessage,
     TurnReply,
@@ -29,6 +30,18 @@ def broker():
 
 async def test_ping(broker: RedisStreamBroker) -> None:
     await broker.ping()
+
+
+async def test_chat_directory_remembers_groups_only(
+    broker: RedisStreamBroker,
+) -> None:
+    await broker.remember_chat(-1001, "First group", "supergroup")
+    await broker.remember_chat(5, "Private", "private")
+    await broker.remember_chat(-1002, None, "group")
+
+    assert await broker.known_chats() == [
+        KnownChat(chat_id=-1001, title="First group", chat_type="supergroup")
+    ]
 
 
 async def test_publish_consume_ack(broker: RedisStreamBroker) -> None:

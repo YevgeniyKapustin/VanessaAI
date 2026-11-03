@@ -19,6 +19,8 @@ class ChannelProfile(BaseModel):
     channel: ChannelName = "telegram"
     stickers: bool = True
     photos: bool = True
+    #: Vanessa may put an emoji reaction on the user's message (Telegram only).
+    reactions: bool = True
     split_messages: bool = True
     scene: bool = False
     speech: bool = False

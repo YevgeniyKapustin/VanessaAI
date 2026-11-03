@@ -3,7 +3,11 @@ from vanessa.core.protocols import (
     MessageRepositoryProtocol,
     TurnMetricsProtocol,
 )
-from vanessa.core.session.channel_keys import dialogue_session_key, turn_channel
+from vanessa.core.session.channel_keys import (
+    dialogue_session_key,
+    message_storage_channel,
+    turn_channel,
+)
 from vanessa.core.turn import ConversationTurnResult
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget
@@ -17,6 +21,7 @@ from vanessa.pipeline.stages.finalize_delivery import (
     delivery_messages,
     marker_free_reply,
     photo_fields,
+    reaction_from_reply,
     sticker_from_reply,
 )
 
@@ -64,6 +69,9 @@ class FinalizeStage:
         assert ctx.reply is not None
 
         clean_reply, sticker_tag = sticker_from_reply(ctx, ctx.reply)
+        # A reaction marker may stand alone (the reaction IS the answer) or sit
+        # next to a normal reply; either way it never reaches the chat as text.
+        clean_reply, reaction = reaction_from_reply(ctx, clean_reply)
         # Final control-tag safety net: a reasoning model may emit [answer] /
         # <answer> / [ignore] in a form the provider's splitter missed — never
         # let a control tag reach the chat. The [next] block marker is left for
@@ -80,8 +88,10 @@ class FinalizeStage:
 
         await self._messages.create(
             role="assistant",
-            content=clean_reply,
-            channel=turn_channel(ctx.turn),
+            # A reaction-only answer has no text: store the emoji so the turn
+            # still shows up in the session history.
+            content=clean_reply or reaction or "",
+            channel=message_storage_channel(ctx.turn),
         )
         session_key = dialogue_session_key(
             channel=turn_channel(ctx.turn),
@@ -101,8 +111,12 @@ class FinalizeStage:
             context_count=ctx.context_count,
             relevance_score=ctx.decision.relevance_score,
             sticker_tag=sticker_tag,
+            reaction=reaction,
             photo_file_id=photo_file_id,
             photo_data_url=photo_data_url,
+            outbound_chat_id=ctx.outbound_chat_id,
+            outbound_text=ctx.outbound_text,
+            owner_dm_text=ctx.owner_dm_text,
         )
         self._metrics.record_turn(
             action=ctx.result.action,

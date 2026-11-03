@@ -76,9 +76,12 @@ memory on the PC, not in this repo.
 
 ## Server
 
-1. In `/etc/ssh/sshd_config.d/70-vanessa-hermes.conf`, set
-   `GatewayPorts clientspecified`. Run `sudo sshd -t`, then
+1. Copy `deploy/hermes-pc/70-vanessa-hermes.conf` to
+   `/etc/ssh/sshd_config.d/70-vanessa-hermes.conf`. It sets
+   `GatewayPorts clientspecified`, `ClientAliveInterval 30` and
+   `ClientAliveCountMax 3`. Run `sudo sshd -t`, then
    `sudo systemctl reload ssh` (the unit is `sshd` on some distros).
+   Reconnect an existing tunnel after the reload to apply the keepalive.
 2. If `ufw` runs, allow port 8642 only from the Docker subnets.
    Do not open it to the internet.
 3. In `.env.local`, set:
@@ -94,6 +97,14 @@ HERMES_API_KEY=<same as API_SERVER_KEY on the PC>
 ```
 docker compose exec worker curl -s http://host.docker.internal:8642/health
 ```
+
+## Deploy announcements share the tunnel
+
+The same tunnel carries a second forward, `172.17.0.1:8643`, for the
+read-only GitLab bridge on the PC (`deploy/vanessa-bridge`). The worker
+asks it for the newest successful production deploy and posts one message
+in the work chat. Setup, env keys and behaviour:
+`docs/deploy-watch.md`.
 
 ## PC (native Windows Hermes)
 
@@ -153,9 +164,9 @@ The tunnel heals itself on two levels:
   5 minutes, on resume from sleep, and on network connect. "Do not
   start a new instance" keeps one copy. Battery power does not stop it.
 
-The task runs `conhost.exe --headless`, so the tunnel has no window. A
-visible console (Windows Terminal) can be closed by hand, and that
-kills the whole loop with `0xC000013A`.
+The task runs PowerShell with `-WindowStyle Hidden`, so the tunnel has
+no visible console. Reinstalling the task stops the old loop and its
+SSH child before it starts the new loop.
 
 Logs: `%LOCALAPPDATA%\hermes-tunnel\tunnel.log` (one line per `ssh`
 exit) and `ssh.log` (the `ssh` client errors).
@@ -163,8 +174,9 @@ exit) and `ssh.log` (the `ssh` client errors).
 If the PC loses the network, the server can keep the old session and
 its listen port until its own TCP timeout. With sshd defaults
 (`ClientAliveInterval 0`, kernel keepalive 7200 s) that is about 2 hours.
-Until then the new `ssh` fails the forward and the loop retries. A
-server `ClientAliveInterval` (for example 30) makes this short.
+Until then the new `ssh` fails the forward and the loop retries. The
+server config above drops a lost connection after about 90 seconds.
+The loop can then bind the port again.
 
 ## Hermes profile for Vanessa
 
@@ -177,11 +189,11 @@ Native Windows Hermes runs tools on the PC itself. With
 user, and `approvals.mode: off` runs them without a prompt. Never expose
 that profile to Vanessa. Use a separate Hermes profile for Vanessa:
 
-- Tools: only the MCP servers for Plane, GitLab, agent sessions, Grafana
-  and k8s.
+- Tools: only the MCP servers for Plane, GitLab, agent sessions, Grafana,
+  k8s and the work project's Figma designs.
 - Off: terminal, file, code execution and browser tools.
-- Tokens: Plane and GitLab may read and create. Grafana and k8s are
-  read-only.
+- Tokens: Plane and GitLab may read and create. Grafana, k8s and Figma
+  are read-only.
 - Approvals: deny by default. The worker also stops any run that waits
   for approval.
 
@@ -221,3 +233,69 @@ If the login item logs `no dependency environment is committed`, its
 
 With a multiplexed host gateway instead of `standalone`, `HERMES_URL`
 ends with `/p/vanessa`.
+
+## Gateway recovery on Windows
+
+The gateway's internal liveness watchdog can exit with code 75. The
+Startup VBS runs only at login and does not recover this exit. Install
+the separate process check after the gateway and tunnel are installed:
+
+```powershell
+& ./deploy/hermes-pc/hermes-gateway-watchdog.ps1 -Install
+```
+
+`VanessaHermesGatewayWatchdog` runs a hidden supervisor at login. The
+supervisor checks the `vanessa` profile every 15 seconds. A repeated
+one-minute task trigger restores the supervisor if it stops. The check
+compares the profile path and process creation time
+before trusting `gateway.pid`. If the process is absent, it starts the
+existing gateway VBS. It does not change profile secrets or other
+profiles. PowerShell runs without a visible console; battery power
+does not stop it. Files live beside the tunnel in
+`%LOCALAPPDATA%\hermes-tunnel`; its log is `watchdog.log`.
+
+After installation, verify recovery by stopping only the process
+identified in the profile's `gateway.pid`. Wait for the next scheduled
+check. Verify `/health` locally and from the server's worker container.
+
+## Find work designs in Figma
+
+The local MCP has five read-only tools: search files in configured work
+folders, list team folders, search screen names or UI text, list file
+pages, and read a selected node. The default file is the main design file
+configured in `FIGMA_DEFAULT_FILE`. The supplied link points to `12188:511735`.
+Search covers bounded depths, not the whole design tree. Its response
+includes the scope and `incomplete: true`; an empty result does not
+prove that a design is absent. Inspect page outlines and search within
+the relevant page when needed.
+
+Use a separate Python environment: Hermes's bundled MCP client does not
+necessarily include the FastMCP server package. Install from this repo:
+
+```powershell
+$figmaDir = "$env:LOCALAPPDATA\vanessa-figma-mcp"
+uv venv --python 3.12 "$figmaDir\.venv"
+uv pip install --python "$figmaDir\.venv\Scripts\python.exe" -r deploy/hermes-pc/requirements-figma.txt
+& "$figmaDir\.venv\Scripts\python.exe" deploy/hermes-pc/install_figma.py --profile-home "$env:LOCALAPPDATA\hermes\profiles\vanessa" --install-dir $figmaDir
+```
+
+The installer copies the four MCP modules outside the checkout, enables
+`figma` for `platform_toolsets.api_server`, and adds the lookup rules to
+profile memory. It backs up changed config and memory files. Existing
+tool restrictions remain in place.
+
+In the profile `.env`, set `FIGMA_ACCESS_TOKEN` (`FIGMA_TOKEN` also works).
+The token needs `file_content:read`. To search other files, configure
+`FIGMA_TEAM_IDS` or `FIGMA_PROJECT_IDS` with comma-separated team/folder
+IDs and add `folders:read`. Additional known file keys can be listed in
+`FIGMA_FILE_KEYS`. Keep tokens out of the repo and logs. See the
+[Figma token guide](https://developers.figma.com/docs/rest-api/personal-access-tokens/).
+
+Restart the profile after changing these settings. Without folder IDs,
+Hermes searches the main file and related links in Plane/GitLab. Reading
+another file requires adding its key or discovering it through a
+configured work folder. Missing access produces an explicit error.
+
+The server also needs the updated `gate/planner.yaml` and
+`hermes/followup.yaml` from `config/behavior`. Production images contain
+these files; update both agent and worker and restart those services.

@@ -11,9 +11,11 @@ from vanessa.pipeline.llm.prompts.context_format import (
 from vanessa.pipeline.llm.prompts.message_xml import (
     BOT_SENDER,
     message_attachment_blocks,
+    message_sender_type,
     render_messages,
     render_msg,
 )
+from vanessa.pipeline.llm.prompts.reaction_xml import render_reaction
 
 
 def format_message_line(message: ContextMessage) -> str:
@@ -24,16 +26,27 @@ def format_message_line(message: ContextMessage) -> str:
             message.sender_telegram_id,
             message.sender_name,
         )
+    # A stored reaction (someone reacted to a message) is not a chat message:
+    # render it as its own element so the model reads it as a signal, not text.
+    if message.role == "reaction":
+        return render_reaction(
+            sender=sender,
+            emoji=message.content,
+            time=time_label,
+            to=message.reply_to_message_id,
+        )
     # One <msg> element (XML input-block convention): a verbatim <text>,
     # plus <reply_text> / <attachment> children and metadata attributes.
     return render_msg(
         content=message.content,
         sender=sender,
+        sender_type=message_sender_type(message.role, message.sender_name),
         time=time_label,
         msg_id=message.id,
         anchor=message.is_anchor,
         reply_to=message.reply_to_message_id,
         reply_text=message.reply_to_text,
+        reply_sender=message.reply_to_sender_name,
         attachments=message_attachment_blocks(
             message.attachments,
             message.photo_caption,
@@ -62,6 +75,7 @@ def format_current_message(
     sender_name: str | None = None,
     created_at: datetime | None = None,
     reply_to_text: str | None = None,
+    reply_to_sender_name: str | None = None,
     images: list[ImageAttachment] | None = None,
 ) -> str:
     """Render the current message as a ``<msg>`` element.
@@ -78,8 +92,10 @@ def format_current_message(
     msg = render_msg(
         content=content,
         sender=sender,
+        sender_type=message_sender_type("user", sender_name),
         time=time_label,
         reply_text=reply_to_text,
+        reply_sender=reply_to_sender_name,
         attachments=message_attachment_blocks(images) if images else None,
     )
     return render_messages([msg])

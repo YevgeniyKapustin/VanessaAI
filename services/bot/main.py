@@ -25,6 +25,19 @@ async def _cancel_task(task: asyncio.Task | None) -> None:
         await task
 
 
+def _warn_proxy_privacy(me) -> None:
+    """Proxy answers need every group message: privacy mode must be off."""
+    if not settings.proxy_chat_telegram_id:
+        return
+    if getattr(me, "can_read_all_group_messages", False):
+        return
+    logger.warning(
+        "proxy_mode_needs_privacy_off chat_id=%s: BotFather → Bot Settings → "
+        "Group Privacy → Turn off, then remove and re-add the bot",
+        settings.proxy_chat_telegram_id,
+    )
+
+
 async def main() -> None:
     observability_metrics.start_metrics_http_server(settings.bot_metrics_port)
     logger.info(
@@ -44,6 +57,7 @@ async def main() -> None:
         await services.stickers.resolve_file_ids(bot)
     me = await bot.get_me()
     logger.info("Bot started as @%s id=%s", me.username, me.id)
+    _warn_proxy_privacy(me)
     outbound_task = None
     if services.streams is not None:
         outbound_task = start_outbound_task(

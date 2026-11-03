@@ -117,6 +117,14 @@ def get_photo_placeholder() -> str:
     return get_content().bot.photo_placeholder
 
 
+def get_sticker_placeholder() -> str:
+    return get_content().bot.sticker_placeholder
+
+
+def get_gif_placeholder() -> str:
+    return get_content().bot.gif_placeholder
+
+
 def get_bot_name_aliases() -> tuple[str, ...]:
     names = list(get_content().decision.default_bot_names)
     names.extend(settings.bot_name_aliases)
@@ -170,9 +178,11 @@ __all__ = [
     "get_bot_name_aliases",
     "get_content",
     "get_continuation_phrases",
+    "get_gif_placeholder",
     "get_modal_verbs",
     "get_photo_placeholder",
     "get_question_words",
+    "get_sticker_placeholder",
     "get_trigger_keywords",
     "resolve_content_source",
 ]

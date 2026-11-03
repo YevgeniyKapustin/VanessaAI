@@ -6,8 +6,11 @@ _FENCED_CODE = re.compile(r"```(\w*)\n?(.*?)\n?```", re.DOTALL)
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
 _BOLD = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
 _ITALIC = re.compile(r"(?<!\*)\*([^*\n]+?)\*(?!\*)")
-# Markdown link with an http(s) URL: ``[name](https://...)``.
-_LINK = re.compile(r"\[([^\[\]\n]+)\]\((https?://[^\s()<>\"]+)\)")
+# Markdown link with an http(s) URL or a Telegram mention by user id:
+# ``[name](https://...)`` / ``[name](tg://user?id=123)``.
+_LINK = re.compile(
+    r"\[([^\[\]\n]+)\]\(((?:https?://|tg://user\?id=\d+)[^\s()<>\"']*)\)"
+)
 
 
 def markdown_to_telegram_html(text: str) -> str:

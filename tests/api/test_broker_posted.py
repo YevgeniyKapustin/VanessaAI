@@ -78,7 +78,7 @@ async def test_reply_target_only_on_the_first_row() -> None:
     await recorder.record(_posted())
     targets = [row["reply_to_message_id"] for row in FakeMessages.rows]
     assert targets == [REPLY_TO, None, None]
-    assert {row["channel"] for row in FakeMessages.rows} == {"telegram"}
+    assert {row["channel"] for row in FakeMessages.rows} == {"telegram:-100"}
 
 
 async def test_lookup_result_is_noted() -> None:

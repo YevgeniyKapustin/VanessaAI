@@ -1,6 +1,7 @@
 channel: vrchat
 stickers: false
 photos: false
+reactions: false
 split_messages: false
 scene: true
 speech: true

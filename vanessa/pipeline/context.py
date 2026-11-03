@@ -12,6 +12,7 @@ from vanessa.knowledge.metrics.schema import PersonMetrics
 from vanessa.knowledge.schema import KnowledgeBlock
 from vanessa.pipeline.decision.models import DecisionResult
 from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.proxy.mode import TurnProxyMode
 
 
 @dataclass
@@ -67,6 +68,14 @@ class TurnPipelineContext:
     web_ms: float = 0.0
     llm_ms: float = 0.0
     scene_description: str | None = None
+    outbound_chat_id: int | None = None
+    outbound_text: str | None = None
+    # An agent's question for the owner, or the owner's DM turn.
+    proxy: TurnProxyMode = field(default_factory=TurnProxyMode)
+    # Another bot wrote Vanessa's name in text (see bot_peer.bot_names_vanessa).
+    bot_mentions_name: bool = False
+    # Text the compose model wrote for the owner's DM (proxy questions only).
+    owner_dm_text: str | None = None
 
     @property
     def profile(self) -> ChannelProfile:

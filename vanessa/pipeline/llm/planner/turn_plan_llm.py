@@ -36,6 +36,8 @@ class _TurnPlanLlmMixin:
         in_listen_window: bool = False,
         sender_name: str = "",
         sender_is_owner: bool = False,
+        proxy_question: bool = False,
+        owner_dm: bool = False,
     ) -> TurnPlan:
         client = self._client or create_chat_completer()
         participants = await self._participants_digest(
@@ -52,6 +54,8 @@ class _TurnPlanLlmMixin:
             reply_to_bot=_yes_no(enabled=reply_to_bot),
             reply_to_other_user=_yes_no(enabled=reply_to_other_user),
             listen_window=_yes_no(enabled=in_listen_window),
+            proxy_question=_yes_no(enabled=proxy_question),
+            owner_dm=_yes_no(enabled=owner_dm),
             now=planner_now_text(),
         )
         raw = (

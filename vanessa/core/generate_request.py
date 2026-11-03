@@ -11,6 +11,7 @@ from vanessa.core.messages import (
     PhotoCandidate,
     WebResult,
 )
+from vanessa.core.turn import ChatDestination
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +30,11 @@ class GenerateRequest:
     attitude_note: str | None = None
     sender_telegram_id: int | None = None
     sender_name: str | None = None
+    chat_title: str | None = None
+    chat_type: str | None = None
+    telegram_chat_id: int | None = None
+    known_chats: tuple[ChatDestination, ...] = ()
+    sender_is_owner: bool = False
     system_prompt: str | None = None
     tone: str | None = None
     needs_clarification: bool = False
@@ -50,6 +56,16 @@ class GenerateRequest:
     # Schedule request outcome as a ready directive (see prompt_schedule).
     schedule_note: str | None = None
     channel_profile: ChannelProfile | None = None
+    # Proxy mode: an agent asks the owner in the agents' chat.
+    proxy_question: bool = False
+    proxy_chat_id: int | None = None
+    proxy_chat_title: str | None = None
+    # The owner writes to Vanessa in DM.
+    owner_dm: bool = False
+    # A DM reply to a relayed question: where the answer goes and what was asked.
+    relay_chat_id: int | None = None
+    relay_chat_title: str | None = None
+    relay_question: str | None = None
 
 
 _REQUEST_FIELDS = {field.name for field in fields(GenerateRequest)}

@@ -14,6 +14,7 @@ from services.worker.handlers.knowledge import (
     SweepHandler,
 )
 from services.worker.handlers.photo import PhotoCaptionHandler
+from services.worker.handlers.reactions import ReactionHandler
 from services.worker.hermes import HermesAskHandler, build_hermes_handler
 from vanessa.config import settings
 from vanessa.contracts.messages import TaskKind, TaskMessage
@@ -118,6 +119,7 @@ async def build_worker_handlers(broker=None, outbound_stream: str = "") -> Worke
                 PhotoCaptioner(), async_session_factory
             ),
             TaskKind.INBOX_NOTE: InboxNoteHandler(vault, broker),
+            TaskKind.REACTION: ReactionHandler(async_session_factory),
         },
         sweep=sweep,
         portrait=portrait,

@@ -31,6 +31,7 @@ from vanessa.pipeline.gate_support import (
     finish_decision_ignore,
 )
 from vanessa.pipeline.orchestrator.orchestrator_config import OrchestratorConfig
+from vanessa.pipeline.proxy.mode import detect_proxy_mode
 from vanessa.pipeline.stages.bot_peer import _GateBotPeerMixin
 from vanessa.pipeline.stages.gate_decision import (
     decision_context_from_pipeline,
@@ -73,6 +74,7 @@ class GateStage(_GateVisionMixin, _GateFilterMixin, _GateBotPeerMixin):
         self._bot_budget = bot_budget or BotPeerBudget()
 
     async def run(self, ctx: TurnPipelineContext) -> bool:
+        ctx.proxy = detect_proxy_mode(ctx.turn)
         await apply_owner_ignore_if_needed(self._ignore_registry, ctx)
         if await self._bot_peer_should_stop(ctx):
             return False
@@ -90,12 +92,14 @@ class GateStage(_GateVisionMixin, _GateFilterMixin, _GateBotPeerMixin):
             ctx.turn.message,
             # The planner also sees the thread before the idle gap.
             recent_messages=ctx.session.prompt_messages,
-            mentions_bot=ctx.turn.mentions_bot,
+            mentions_bot=ctx.turn.mentions_bot or ctx.bot_mentions_name,
             reply_to_bot=ctx.turn.reply_to_bot,
             reply_to_other_user=ctx.turn.reply_to_other_user,
             in_listen_window=pipeline_in_listen_window(ctx),
             sender_name=ctx.sender_name,
             sender_is_owner=is_owner(ctx.turn.sender_telegram_id),
+            proxy_question=ctx.proxy.proxy_question,
+            owner_dm=ctx.proxy.owner_dm,
         )
         ctx.plan_ms = (time.perf_counter() - rewrite_started) * 1000
         await self._load_sender_profile(ctx)

@@ -39,14 +39,11 @@ def test_compose_prompt_uses_context_selectively():
     assert "don't dump everything" in llm.answer_text()
 
 
-def test_compose_prompt_teaches_chain_of_thought_answer_tag():
-    # The compose prompt must instruct the model to ALWAYS reason first (chain
-    # of thought on every reply), then emit the final message after the
-    # [answer] tag.
+def test_compose_prompt_keeps_reasoning_private_and_requires_answer_tag():
     llm = get_content().llm
-    assert "ALWAYS reason before you answer" in llm.answer_text()
-    assert "every time, no exceptions" in llm.answer_text()
-    assert "[answer]" in llm.answer_text()
+    assert "Think privately" in llm.answer_text()
+    assert "Never write reasoning, a reply plan or drafts" in llm.answer_text()
+    assert "Start the output with [answer]" in llm.answer_text()
     assert "final message" in llm.answer_text()
 
 

@@ -64,3 +64,6 @@ Desktop.ini
 *~
 *.swp
 *.swo
+
+# Local agent worktrees and scratch
+.claude/

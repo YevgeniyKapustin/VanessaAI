@@ -2,6 +2,7 @@ import logging
 
 from vanessa.config.settings import settings
 from vanessa.core.messages import ImageAttachment
+from vanessa.core.messages_attachments import KIND_PHOTO
 from vanessa.core.request_context import get_request_id
 from vanessa.infrastructure.db.repository import MessageRepository
 from vanessa.pipeline.context import TurnPipelineContext
@@ -161,7 +162,9 @@ def _caption_attachment_from_user(
     if not isinstance(first_attachment, dict):
         return None
     attachment = ImageAttachment.from_dict(first_attachment)
-    if not attachment.data_url:
+    # Only real photos get captioned: a sticker or GIF frame is not a photo
+    # the chat should find in the photo album.
+    if attachment.kind != KIND_PHOTO or not attachment.data_url:
         return None
     return attachment, user_msg.id
 

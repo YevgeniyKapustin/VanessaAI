@@ -1,6 +1,6 @@
 from vanessa.contracts.messages import TurnImage, TurnRequest
 from vanessa.core.messages import ImageAttachment
-from vanessa.core.turn import ChatTurnInput
+from vanessa.core.turn import ChatDestination, ChatTurnInput
 
 
 def _attachment(image: TurnImage) -> ImageAttachment:
@@ -8,6 +8,7 @@ def _attachment(image: TurnImage) -> ImageAttachment:
         data_url=image.data_url,
         mime_type=image.mime_type,
         telegram_file_id=image.telegram_file_id,
+        kind=image.kind,
     )
 
 
@@ -28,10 +29,19 @@ class TurnMapper:
             telegram_message_id=source.telegram_message_id,
             correlation_id=source.correlation_id,
             chat_type=source.chat_type,
+            known_chats=tuple(
+                ChatDestination(
+                    chat_id=chat.chat_id,
+                    title=chat.title,
+                    chat_type=chat.chat_type,
+                )
+                for chat in source.known_chats
+            ),
             sender_username=source.sender_username,
             sender_first_name=source.sender_first_name,
             sender_last_name=source.sender_last_name,
             sender_is_bot=source.sender_is_bot,
+            sender_is_owner=source.sender_is_owner,
             mentions_bot=source.mentions_bot,
             reply_to_bot=source.reply_to_bot,
             reply_to_other_user=source.reply_to_other_user,
@@ -41,4 +51,7 @@ class TurnMapper:
             reply_to_sender_name=source.reply_to_sender_name,
             images=tuple(_attachment(image) for image in source.images),
             scene_image=_scene_attachment(source),
+            relay_chat_id=source.relay_chat_id,
+            relay_chat_title=source.relay_chat_title,
+            relay_question=source.relay_question,
         )

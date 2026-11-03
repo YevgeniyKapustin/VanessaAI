@@ -4,11 +4,14 @@ from collections.abc import Awaitable, Callable
 from aiogram.types import Message as TelegramMessage
 
 from services.bot.container import BotServices
+from services.bot.handlers.cross_chat_delivery import deliver_cross_chat_action
 from services.bot.handlers.message_preview import _preview
 from services.bot.handlers.message_process import _process_incoming, _should_ignore
+from services.bot.handlers.message_reaction import apply_reaction, has_other_output
 from services.bot.handlers.message_send import _send_reply
 from services.bot.handlers.message_tagged import _deliver_tagged_reply
 from services.bot.handlers.message_typing import _ping_typing, _typing_on_signal
+from services.bot.handlers.owner_dm_delivery import deliver_owner_dm_action
 from services.bot.messages import IncomingMessage
 from services.bot.messages.response import ChatProcessResult
 
@@ -118,9 +121,32 @@ async def _handle_text_core(
             result.relevance_score,
         )
         return
+    result = await deliver_cross_chat_action(
+        telegram_message, incoming, services, result
+    )
+    result = await deliver_owner_dm_action(
+        telegram_message, incoming, services, result
+    )
     await _deliver_reply_or_sticker(
         telegram_message, incoming, services, result
     )
+
+
+async def _reaction_is_the_answer(
+    telegram_message: TelegramMessage,
+    incoming: IncomingMessage,
+    result: ChatProcessResult,
+) -> bool:
+    """Put the reaction on the user's message; True when it IS the whole answer."""
+    reacted = await apply_reaction(telegram_message, incoming, result)
+    if not reacted or has_other_output(result):
+        return False
+    logger.info(
+        "reaction_only chat_id=%s emoji=%s",
+        incoming.telegram_chat_id,
+        result.reaction,
+    )
+    return True
 
 
 async def _deliver_reply_or_sticker(
@@ -129,6 +155,8 @@ async def _deliver_reply_or_sticker(
     services: BotServices,
     result: ChatProcessResult,
 ) -> None:
+    if await _reaction_is_the_answer(telegram_message, incoming, result):
+        return
     if services.stickers is not None and services.stickers.is_sticker_only(
         result.sticker_tag
     ):

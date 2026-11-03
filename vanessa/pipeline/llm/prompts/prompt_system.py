@@ -68,6 +68,17 @@ def _split_section(profile: ChannelProfile | None) -> str | None:
     return _SPLIT_OFF_NOTE
 
 
+def _reaction_section(
+    content: AppContent, profile: ChannelProfile | None
+) -> str | None:
+    if profile is not None and not profile.reactions:
+        return None
+    instruction = content.llm.reaction_instruction.strip()
+    if not instruction:
+        return None
+    return f"## Reactions\n{instruction}"
+
+
 def _channel_addendum(profile: ChannelProfile | None) -> str | None:
     if profile is None:
         return None
@@ -84,6 +95,7 @@ def _profile_sections(
     for section in (
         _profanity_section(content),
         _sticker_section(content, profile),
+        _reaction_section(content, profile),
         _split_section(profile),
         _channel_addendum(profile),
     ):

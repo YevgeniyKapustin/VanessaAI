@@ -11,11 +11,13 @@ from vanessa.core.messages import (
 )
 from vanessa.pipeline.llm.photo_request import is_photo_request
 from vanessa.pipeline.llm.prompts import (
+    prompt_chat_identity,
     prompt_context,
     prompt_directives,
     prompt_earlier,
     prompt_format,
     prompt_hermes,
+    prompt_proxy,
     prompt_schedule,
 )
 from vanessa.pipeline.llm.prompts.budget import PRIORITY_DIRECTIVES, apply_budget
@@ -95,6 +97,7 @@ class PromptBuilder:
         sender_name: str | None = None,
         created_at: datetime | None = None,
         reply_to_text: str | None = None,
+        reply_to_sender_name: str | None = None,
         images: list[ImageAttachment] | None = None,
     ) -> str:
         return prompt_format.format_current_message(
@@ -103,6 +106,7 @@ class PromptBuilder:
             sender_name=sender_name,
             created_at=created_at,
             reply_to_text=reply_to_text,
+            reply_to_sender_name=reply_to_sender_name,
             images=images,
         )
 
@@ -116,7 +120,17 @@ class PromptBuilder:
         photo_requested = is_photo_request(request.user_message)
         content = self._content
         parts = []
+        parts.extend(
+            prompt_chat_identity.chat_identity_parts(
+                request.chat_title,
+                request.chat_type,
+                request.telegram_chat_id,
+                request.known_chats,
+                sender_is_owner=request.sender_is_owner,
+            )
+        )
         parts.extend(prompt_directives.aliases_parts(content))
+        parts.extend(prompt_proxy.proxy_parts(request))
         parts.extend(
             prompt_directives.clarification_or_tone_parts(
                 content,
@@ -170,6 +184,7 @@ class PromptBuilder:
                 sender_telegram_id=request.sender_telegram_id,
                 sender_name=request.sender_name,
                 reply_to_text=request.reply_to_text,
+                reply_to_sender_name=request.reply_to_sender_name,
                 current_images=request.current_images,
                 format_current_message=prompt_format.format_current_message,
             )

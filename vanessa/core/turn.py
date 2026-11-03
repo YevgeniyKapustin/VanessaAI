@@ -4,17 +4,26 @@ from vanessa.core.messages import ImageAttachment
 
 
 @dataclass(frozen=True, slots=True)
+class ChatDestination:
+    chat_id: int
+    title: str
+    chat_type: str
+
+
+@dataclass(frozen=True, slots=True)
 class ChatTurnInput:
     telegram_chat_id: int | None
     message: str
     sender_telegram_id: int | None
     chat_title: str | None = None
     chat_type: str | None = None
+    known_chats: tuple[ChatDestination, ...] = ()
     sender_username: str | None = None
     sender_first_name: str | None = None
     sender_last_name: str | None = None
     # The sender is another Telegram bot (an AI peer), not a person.
     sender_is_bot: bool = False
+    sender_is_owner: bool = False
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
@@ -31,6 +40,10 @@ class ChatTurnInput:
     telegram_message_id: int | None = None
     # Broker correlation id of the turn request (dedup key fallback).
     correlation_id: str | None = None
+    # A DM reply to a question Vanessa relayed: where it goes and what was asked.
+    relay_chat_id: int | None = None
+    relay_chat_title: str | None = None
+    relay_question: str | None = None
 
     @property
     def has_image(self) -> bool:
@@ -50,9 +63,16 @@ class ConversationTurnResult:
     context_count: int = 0
     relevance_score: float = 0.0
     sticker_tag: str | None = None
+    # Emoji the bot puts on the user's message (a reaction-only answer has no
+    # reply text — the reaction itself is the turn's output).
+    reaction: str | None = None
     # Telegram file_id of a photo the bot should re-send (compose model picked
     # one from the photo album via the [photo:<index>] marker).
     photo_file_id: str | None = None
     # Base64 data URL of the same photo (the stored bytes) — lets the bot fall
     # back to an upload when the Telegram file_id is stale at delivery time.
     photo_data_url: str | None = None
+    outbound_chat_id: int | None = None
+    outbound_text: str | None = None
+    # Text for the owner's private chat (proxy questions only).
+    owner_dm_text: str | None = None

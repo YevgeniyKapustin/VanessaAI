@@ -86,6 +86,9 @@ class MessageRepository:
         result = await self._session.execute(
             select(Message.telegram_message_id).where(
                 Message.telegram_message_id.in_(telegram_message_ids),
+                # A reaction row repeats the reacted-to message id; it must not
+                # make an importer believe the message itself is already stored.
+                Message.role != "reaction",
             )
         )
         return {row[0] for row in result.all() if row[0] is not None}
@@ -150,5 +153,6 @@ class MessageRepository:
     count_newer_than = message_queries.count_newer_than
     fulltext_search = message_queries.fulltext_search
     search_photo_messages = message_queries.search_photo_messages
+    get_id_by_telegram_message_id = message_queries.get_id_by_telegram_message_id
     _window_for_anchor = message_windows._window_for_anchor
     get_conversation_window_blocks = message_windows.get_conversation_window_blocks

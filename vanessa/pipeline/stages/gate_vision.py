@@ -1,6 +1,10 @@
 import logging
 
-from vanessa.config.content import get_photo_placeholder
+from vanessa.config.content import (
+    get_gif_placeholder,
+    get_photo_placeholder,
+    get_sticker_placeholder,
+)
 from vanessa.config.settings import settings
 from vanessa.core.request_context import get_request_id
 from vanessa.pipeline.context import TurnPipelineContext
@@ -13,6 +17,24 @@ from vanessa.pipeline.decision.turn_plan import TurnPlan
 from vanessa.pipeline.gate_support import finish_ignore_turn
 
 logger = logging.getLogger("vanessa.pipeline.stages")
+
+
+def is_bare_media(ctx: TurnPipelineContext) -> bool:
+    """True when the turn carries media with no words of its own.
+
+    A caption-less photo, a sticker and a GIF are all "bare media": the same
+    politeness rule applies — Vanessa answers them only when she is addressed
+    or actively listening, never just because they were posted.
+    """
+    if not ctx.turn.has_image:
+        return False
+    text = ctx.turn.message.strip()
+    placeholders = (
+        get_photo_placeholder(),
+        get_sticker_placeholder(),
+        get_gif_placeholder(),
+    )
+    return any(placeholder and text.startswith(placeholder) for placeholder in placeholders)
 
 
 class _GateVisionMixin:
@@ -40,12 +62,13 @@ class _GateVisionMixin:
         # Rollback toggle: restore the old "reply to ANY photo" behavior.
         if settings.vision_reply_to_any_photo:
             return await self._force_vision_turn(ctx)
-        if ctx.turn.message.strip() != get_photo_placeholder():
+        if not is_bare_media(ctx):
             return None
-        # Captioned photos flow through the normal gate pipeline (prefilter,
-        # reaction gate, planner, decision engine) like any text message — the
-        # caption is real content. Only when the pipeline decides REPLY does the
-        # compose stage attach the image to the vision model.
+        # Captioned photos, stickers and GIFs flow through the normal gate
+        # pipeline (prefilter, reaction gate, planner, decision engine) like any
+        # text message — the caption is real content. Only when the pipeline
+        # decides REPLY does the compose stage attach the image to the vision
+        # model.
         return await self._resolve_bare_photo(ctx)
 
     async def _resolve_bare_photo(self, ctx: TurnPipelineContext) -> bool:

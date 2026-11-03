@@ -40,8 +40,12 @@ class ReplyPublisher:
                 context_count=result.context_count,
                 relevance_score=result.relevance_score,
                 sticker_tag=result.sticker_tag,
+                reaction=result.reaction,
                 photo_file_id=result.photo_file_id,
                 photo_data_url=result.photo_data_url,
+                outbound_chat_id=result.outbound_chat_id,
+                outbound_text=result.outbound_text,
+                owner_dm_text=result.owner_dm_text,
             ),
             ttl_seconds=self._ttl,
         )

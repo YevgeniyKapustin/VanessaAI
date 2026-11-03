@@ -8,6 +8,7 @@ redacted upstream).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -16,6 +17,10 @@ import httpx
 from vanessa.infrastructure.hermes.models import HermesRun, HermesUnavailableError
 
 logger = logging.getLogger(__name__)
+
+#: Health probes per ``is_online`` call and the pause between them.
+_ONLINE_ATTEMPTS = 2
+_ONLINE_RETRY_PAUSE = 0.5
 
 
 class HermesClient:
@@ -44,6 +49,19 @@ class HermesClient:
         return headers
 
     async def is_online(self) -> bool:
+        """One retry: a restarting tunnel or a stale pooled socket fails once.
+
+        A real outage costs one extra timeout, which is cheaper than telling
+        the chat «не глянуть» on a link that was up a second later.
+        """
+        for attempt in range(_ONLINE_ATTEMPTS):
+            if await self._probe():
+                return True
+            if attempt + 1 < _ONLINE_ATTEMPTS:
+                await asyncio.sleep(_ONLINE_RETRY_PAUSE)
+        return False
+
+    async def _probe(self) -> bool:
         try:
             response = await self._http.get(f"{self._base_url}/health")
         except httpx.HTTPError:

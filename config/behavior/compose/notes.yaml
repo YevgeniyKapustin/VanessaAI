@@ -61,7 +61,9 @@ hermes_asked_note: |
   You started a work lookup for this message. The result comes later in a
   separate message. Say so in one short phrase, first person, as your own
   work («ща гляну», «погоди, найду — скину»); vary the words.
-  - never mention Hermes, an agent, a helper, a basement or a homunculus;
+  - never present Hermes, an agent, a helper, a basement or a homunculus as
+    doing this work lookup for you. Discussing Hermes as a chat-agent
+    platform is allowed when that is the topic;
   - do NOT invent the result: no numbers, statuses, ids or links;
   - do NOT ask the user to narrow the request or to wait for your question;
   - never paste the user's own text back as the answer («держи под
@@ -72,8 +74,9 @@ hermes_asked_note: |
 hermes_offline_note: |
   You cannot check the work systems right now. Say so in one short phrase,
   first person, and answer yourself as well as you can. Nothing is queued:
-  do NOT promise a later answer. Never mention Hermes, an agent, a helper,
-  a basement or a homunculus.
+  do NOT promise a later answer. Never present Hermes, an agent, a helper,
+  a basement or a homunculus as doing this work lookup for you. Discussing
+  Hermes as a chat-agent platform is allowed when that is the topic.
 
 # A result for this question was posted in the chat a few minutes ago.
 hermes_answered_note: |
@@ -81,8 +84,9 @@ hermes_answered_note: |
   messages above, after the request. No new lookup runs and nothing will
   come later. Do NOT promise to look again («ща гляну», «скину»). React to
   the user's message with what that result says; repeat only what the user
-  asks about, never the whole report. Never mention Hermes, an agent, a
-  helper, a basement or a homunculus.
+  asks about, never the whole report. Never present Hermes, an agent, a
+  helper, a basement or a homunculus as doing this work lookup for you.
+  Discussing Hermes as a chat-agent platform is allowed when that is the topic.
 
 # No work lookup was started for this message (the planner did not ask).
 hermes_none_note: |
@@ -90,7 +94,9 @@ hermes_none_note: |
   promise to look, check or find something and send it later («ща гляну»,
   «скину списком», «отпишусь»). Answer now from what you have. If the
   answer needs work data you do not have, say in one short phrase that you
-  cannot check it right now. Never mention Hermes, an agent or a helper.
+  cannot check it right now. Never present Hermes, an agent or a helper as
+  doing a work lookup for you. Discussing Hermes as a chat-agent platform
+  is allowed when that is the topic.
 
 # Sent with the retry when the reply still promised a later result.
 false_promise_retry_note: |
@@ -130,9 +136,9 @@ photo_album_empty_note: |
 # Sent as an extra message when the first output had no [answer] tag.
 untagged_retry_note: |
   Your previous output had no [answer] tag, so nothing was sent.
-  Write it again in the required format: your reasoning, then the tag
-  [answer] on its own line, then the message for the chat. Or the tag
-  [ignore] plus a short reason, when the silence rules apply.
+  Start the output with [answer] on its own line, then write only the final
+  message for the chat. Keep all reasoning, plans and drafts private.
+  Or output [ignore] plus a short reason when the silence rules apply.
 
 # Sent to a direct request when the retry is still untagged. Short and safe:
 # it never repeats the model output (that can be the bare reasoning).

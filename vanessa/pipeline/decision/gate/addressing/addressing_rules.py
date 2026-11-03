@@ -1,8 +1,16 @@
+import re
+
 from vanessa.pipeline.decision.gate.expectation.reply_expectation import (
     is_conversation_closure,
     is_third_party_about_bot,
     is_unsolicited_remark,
 )
+
+_LEADING_USERNAME_RE = re.compile(r"^\s*@[A-Za-z0-9_]+\b")
+
+
+def has_leading_username(text: str) -> bool:
+    return _LEADING_USERNAME_RE.match(text) is not None
 
 
 def is_unaddressed_reply_to_other(

@@ -129,7 +129,7 @@ async def test_ingress_telegram_still_creates_user(monkeypatch):
     await harness._prepare_incoming_context(turn)
     assert harness._users.calls == [sender_id]
     created = harness._messages.created[0]
-    assert created["channel"] == "telegram"
+    assert created["channel"] == "telegram:-1001"
     assert created["sender_telegram_id"] == sender_id
 
 

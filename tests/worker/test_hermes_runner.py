@@ -122,6 +122,16 @@ async def test_untagged_output_is_retried() -> None:
     await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
     assert _only_message(broker).text == "Готово"
     assert len(completer.calls) == UNTAGGED_ATTEMPTS
+    retry_prompt = completer.calls[-1]["messages"][-1]["content"]
+    assert get_content().llm.untagged_retry_note.strip() in retry_prompt
+
+
+async def test_unrecognized_untagged_plan_never_reaches_chat() -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter("Данных достаточно. Короткая сводка, затем ссылка.")
+    await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
+    assert _only_message(broker).text == get_hermes_content().undelivered_fallback
+    assert len(completer.calls) == UNTAGGED_ATTEMPTS
 
 
 async def test_untagged_twice_posts_fixed_line_not_reasoning() -> None:

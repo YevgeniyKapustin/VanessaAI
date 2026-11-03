@@ -11,8 +11,14 @@ class ChatProcessResult:
     messages: list[str] | None = None
     relevance_score: float = 0.0
     sticker_tag: str | None = None
+    # Emoji to put on the user's message (setMessageReaction). A reaction-only
+    # turn has no reply text.
+    reaction: str | None = None
     # Telegram file_id of a photo to re-send (compose picked one from the album).
     photo_file_id: str | None = None
     # Base64 data URL of the same photo (stored bytes) — fallback source for an
     # upload when the Telegram file_id is stale at delivery time.
     photo_data_url: str | None = None
+    outbound_chat_id: int | None = None
+    outbound_text: str | None = None
+    owner_dm_text: str | None = None

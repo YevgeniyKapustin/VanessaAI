@@ -129,8 +129,10 @@ class FakeMessageRepo:
         self,
         query: str,
         limit: int = 30,
+        *,
+        channel: str = "telegram",
     ) -> list[StoredMessage]:
-        _ = query
+        _ = query, channel
         return [m for m in self._messages.values() if m.attachments][:limit]
 
 
@@ -679,6 +681,7 @@ async def test_orchestrator_ignores_bare_photo_not_listening_not_addressed():
             "mime_type": "image/jpeg",
             "telegram_file_id": "f1",
             "description": None,
+            "kind": "photo",
         }
     ]
 
@@ -691,7 +694,11 @@ async def test_orchestrator_replies_to_bare_photo_in_listen_window():
     llm = FakeLLM()
     decision = FakeDecisionEngine(DecisionAction.IGNORE)
     # A recent bot reply puts Vanessa into the post-reply listen window.
-    await messages.create(role="assistant", content="ну привет")
+    await messages.create(
+        role="assistant",
+        content="ну привет",
+        channel="telegram:-1001",
+    )
     orchestrator = _build_orchestrator(
         messages=messages,
         decision=decision,
@@ -1075,9 +1082,9 @@ async def test_compose_stage_searches_photos_by_meaning_not_literal_text():
             self.last_photo_query: str | None = None
 
         async def search_photo_messages(
-            self, query: str, limit: int = 30
+            self, query: str, limit: int = 30, *, channel: str = "telegram"
         ) -> list[StoredMessage]:
-            _ = limit
+            _ = limit, channel
             self.last_photo_query = query
             return [
                 StoredMessage(
@@ -1154,9 +1161,9 @@ async def test_compose_builds_album_for_image_turn_excluding_current():
             self.search_calls = 0
 
         async def search_photo_messages(
-            self, query: str, limit: int = 30
+            self, query: str, limit: int = 30, *, channel: str = "telegram"
         ) -> list[StoredMessage]:
-            _ = query, limit
+            _ = query, limit, channel
             self.search_calls += 1
             return [
                 StoredMessage(
@@ -1372,6 +1379,7 @@ async def test_orchestrator_compose_refuses_repeated_message_without_calling_llm
         role="user",
         content="ванесса, ну чё там с мешем",
         sender_telegram_id=42,
+        channel="telegram:-1001",
     )
     orchestrator = _build_orchestrator(
         messages=messages,

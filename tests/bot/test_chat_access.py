@@ -129,3 +129,22 @@ async def test_non_allowed_private_chat_rejected_as_wrong_chat():
     error = await guard.ensure_access(incoming)
 
     assert error == texts.wrong_chat.strip()
+
+
+@pytest.mark.asyncio
+async def test_owner_private_chat_is_allowed():
+    guard = ChatAccessGuard(required_user_telegram_id=42)
+    incoming = make_incoming(chat_type=ChatType.PRIVATE, chat_id=42)
+
+    assert await guard.ensure_access(incoming) is None
+
+
+@pytest.mark.asyncio
+async def test_owner_private_chat_works_with_single_group_configured():
+    guard = ChatAccessGuard(
+        required_user_telegram_id=42,
+        allowed_chat_telegram_id=-100999,
+    )
+    incoming = make_incoming(chat_type=ChatType.PRIVATE, chat_id=42)
+
+    assert await guard.ensure_access(incoming) is None

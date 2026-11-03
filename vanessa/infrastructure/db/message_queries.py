@@ -70,6 +70,7 @@ async def get_messages_since(
             JOINED_MESSAGE_SQL
             + """
                 WHERE m.created_at >= :since
+                  AND m.role != 'reaction'
                 ORDER BY m.created_at ASC, m.id ASC
                 LIMIT :limit
                 """
@@ -146,6 +147,10 @@ async def search_photo_messages(
                           THEN jsonb_array_length(m.attachments)
                           ELSE 0
                       END > 0
+                      AND NOT (
+                          m.attachments @> '[{"kind": "sticker"}]'
+                          OR m.attachments @> '[{"kind": "gif"}]'
+                      )
                       AND m.search_vector @@ plainto_tsquery('russian', :query)
                     ORDER BY ts_rank(
                         m.search_vector,
@@ -157,3 +162,26 @@ async def search_photo_messages(
             {"query": query, "limit": limit, "channel": channel},
         )
         return [row_to_stored(row) for row in result.mappings().all()]
+
+
+async def get_id_by_telegram_message_id(
+    self,
+    telegram_message_id: int,
+    *,
+    channel: str = CHANNEL_TELEGRAM,
+) -> int | None:
+    """The stored row id of a Telegram message in ``channel`` (or None).
+
+    Used to link a chat reaction to the message it belongs to: reaction rows
+    store ``reply_to_message_id`` = this id, so the prompt can render
+    ``<reaction ... to="<msg id>"/>``.
+    """
+    result = await self._session.execute(
+        select(Message.id)
+        .where(Message.telegram_message_id == telegram_message_id)
+        .where(Message.channel == channel)
+        .where(Message.role != "reaction")
+        .order_by(Message.id.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()

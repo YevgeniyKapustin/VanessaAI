@@ -13,6 +13,7 @@ import logging
 from vanessa.core.session.channel_keys import dialogue_session_key, turn_channel
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget
+from vanessa.pipeline.decision.detectors.intent import IntentDetector
 from vanessa.pipeline.decision.gate.addressing.continuation import (
     last_bot_reply_partner_sender_id,
 )
@@ -33,9 +34,16 @@ def bot_peer_chat_key(ctx: TurnPipelineContext) -> str:
     )
 
 
+def bot_names_vanessa(text: str) -> bool:
+    """Another bot wrote her name in plain text (no @mention entity needed)."""
+    return IntentDetector().detect(text).mentions_bot
+
+
 def bot_talks_to_vanessa(ctx: TurnPipelineContext) -> bool:
     turn = ctx.turn
     if turn.mentions_bot or turn.reply_to_bot:
+        return True
+    if ctx.bot_mentions_name or bot_names_vanessa(turn.message):
         return True
     if not pipeline_in_listen_window(ctx):
         return False
@@ -59,7 +67,8 @@ class _GateBotPeerMixin:
         if not ctx.turn.sender_is_bot:
             self._bot_budget.note_human(key)
             return False
-        if not bot_talks_to_vanessa(ctx):
+        ctx.bot_mentions_name = bot_names_vanessa(ctx.turn.message)
+        if not bot_talks_to_vanessa(ctx) and not ctx.proxy.proxy_question:
             return await self._stop_bot_turn(ctx, DecisionReason.BOT_PEER_SIDE)
         blocked = self._bot_budget.blocked_reason(
             key, ctx.turn.sender_telegram_id or 0

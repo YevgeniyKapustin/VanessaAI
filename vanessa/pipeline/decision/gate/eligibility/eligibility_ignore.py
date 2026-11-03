@@ -1,5 +1,8 @@
 from vanessa.pipeline.decision.context import DecisionContext
 from vanessa.pipeline.decision.detectors.intent import IntentResult
+from vanessa.pipeline.decision.gate.addressing.addressing_rules import (
+    has_leading_username,
+)
 from vanessa.pipeline.decision.gate.addressing.quote_echo import is_recursive_quote_loop
 from vanessa.pipeline.decision.gate.eligibility.eligibility_types import (
     HardIgnoreResult,
@@ -47,14 +50,14 @@ def _unaddressed_third_party(
     return is_third_party_about_bot(text) and not directly_addressed
 
 
-def _unaddressed_reply_to_other(
+def _unaddressed_other_participant(
     context: DecisionContext,
     *,
     directly_addressed: bool,
     detected_mentions_bot: bool,
 ) -> bool:
     return (
-        context.reply_to_other_user
+        (context.reply_to_other_user or has_leading_username(context.text))
         and not directly_addressed
         and not detected_mentions_bot
     )
@@ -75,7 +78,7 @@ def _unaddressed_side_talk(
         directly_addressed=directly_addressed,
     ):
         return HardIgnoreResult("side_talk", DecisionReason.NOT_EXPECTED)
-    if _unaddressed_reply_to_other(
+    if _unaddressed_other_participant(
         context,
         directly_addressed=directly_addressed,
         detected_mentions_bot=detected_mentions_bot,

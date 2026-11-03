@@ -32,4 +32,7 @@ async def _process_incoming(
 def _should_ignore(result: ChatProcessResult) -> bool:
     if result.action != "reply":
         return True
-    return not result.reply and not result.sticker_tag
+    if result.owner_dm_text:
+        return False
+    # A reaction-only turn is a real answer: nothing to send, but not an ignore.
+    return not result.reply and not result.sticker_tag and not result.reaction

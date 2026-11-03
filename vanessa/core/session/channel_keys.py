@@ -14,6 +14,17 @@ def turn_channel(turn: object) -> str:
     return CHANNEL_TELEGRAM
 
 
+def message_storage_channel(turn: object) -> str:
+    """Return a per-chat channel key for persisted Telegram conversation rows."""
+    channel = turn_channel(turn)
+    if channel == CHANNEL_VRCHAT:
+        return channel
+    chat_id = getattr(turn, "telegram_chat_id", None)
+    if chat_id is None:
+        return channel
+    return f"{CHANNEL_TELEGRAM}:{chat_id}"
+
+
 def dialogue_session_key(
     *,
     channel: str | None = None,

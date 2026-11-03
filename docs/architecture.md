@@ -50,7 +50,7 @@ flowchart LR
 - **Compose** — DeepSeek (default) or Claude via the provider adapter.
 - **Post** — Telegram formatting, profanity filter.
 
-Channel flags (`stickers`, `photos`, `split_messages`, `scene`,
+Channel flags (`stickers`, `photos`, `reactions`, `split_messages`, `scene`,
 `speech`, `addressing`, `listen_window`) live in `config/channels/`
 and attach per turn on `TurnPipelineContext.profile`. They are not
 process-level `OrchestratorConfig`.
@@ -78,6 +78,29 @@ The planner suggests `should_reply`. It is **not** the single source of
 truth. The rule engine uses addressing, session state, and the listen
 window. If no rule accepts the turn, the engine ignores it. `ChatSessionState` trims context by idle timeout and listen
 window, not only by message count.
+
+## Proxy mode
+
+In one chat (`PROXY_CHAT_TELEGRAM_ID`, or a title from
+`PROXY_CHAT_TITLES`) Vanessa answers agents for the owner. A bot message
+counts only when it is a clear question (or a direct request) addressed to
+him: a reply to his message, his name, or his @username. She answers in
+her own name, on his behalf; the gate lets the turn through and the
+decision rule replies even when the planner is unsure. The bot-to-bot loop
+budget still applies.
+
+When the question needs the owner himself, compose emits
+`<dm_owner>…</dm_owner>`; the adapter sends that text to his private chat
+and stores `(DM message id) → (source chat, question)` in Redis. An owner
+DM reply to such a message carries the question back to the agent (a
+`relay_*` field on the turn), and the normal `<send_to_chat>` path posts
+his answer to that chat. The owner's DM is the only private chat the bot
+accepts (`OWNER_DM_ENABLED`).
+
+Proxy mode needs every group message, so BotFather's Group Privacy must
+be off (or the bot must be an admin); the bot logs a warning at startup
+when `PROXY_CHAT_TELEGRAM_ID` is set and `can_read_all_group_messages` is
+false.
 
 ## Knowledge vault
 
@@ -168,13 +191,28 @@ rules.
   never names a time zone in the chat. Limits: `SCHEDULE_MAX_PER_CHAT`,
   `SCHEDULE_MIN_INTERVAL_MINUTES`.
 
-## Photos and character
+## Photos, stickers, GIFs and reactions
 
 Vision (optional) captions images and OCR via a cheap DeepSeek vision
 model; captions stay in session for follow-ups. The composer can pick a
 stored photo to re-send. Postgres full-text search finds it by its
 caption. Persona, nicknames, and
 Telegram HTML formatting are config-driven (`config/behavior/`).
+
+An inbound sticker or GIF is looked at, not guessed from its emoji: the
+bot downloads Telegram's JPEG preview frame (`thumbnail`) and sends it as
+an `ImageAttachment` with `kind="sticker"`/`"gif"`, which the prompt renders
+as `<attachment type="sticker">`. A caption-less sticker/GIF is bare media:
+answered only when Vanessa is addressed or in the listen window (same rule
+as a bare photo); the placeholder text is `[стикер 🙂]` / `[гифка]`.
+
+Reactions go both ways. Inbound: the bot turns each `message_reaction`
+update into a `reaction` task the worker stores as a `role="reaction"` row
+in the chat's history, so the prompt shows `<reaction sender="…" emoji="🔥"
+to="<msg id>"/>`. Outbound: the composer may end its answer with
+`[reaction:<emoji>]`; the pipeline strips the marker, validates it against
+Telegram's allowed set, and the bot calls `setMessageReaction` on the user's
+message. A reaction-only turn sends no text at all.
 
 See [Configuration](configuration.md) for YAML. Env keys:
 [`.env.defaults`](../.env.defaults) and [`.env.example`](../.env.example).

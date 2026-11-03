@@ -14,6 +14,9 @@ param(
     [int] $HermesPort = 8642,
     [string] $BindAddress = "172.17.0.1",
     [int] $RemotePort = 8642,
+    # The deploy bridge on the PC; 0 turns the second forward off.
+    [int] $BridgePort = 8643,
+    [int] $BridgeRemotePort = 8643,
     [int] $RetrySeconds = 5,
     [int] $MaxRetrySeconds = 60,
     [int] $StableSeconds = 120,
@@ -37,10 +40,20 @@ function New-EventTrigger([string] $query) {
 }
 
 function Stop-OldTunnel {
-    # A stopped task can leave its ssh.exe alive; it would keep the remote port.
+    # Stopping conhost can leave the loop alive. Stop it before its ssh child.
+    $script = [Regex]::Escape((Join-Path $InstallDir "hermes-tunnel.ps1"))
+    $loopPattern = '-File\s+"?' + $script + '"?(?:\s|$)'
+    Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe'" |
+        Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match $loopPattern } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+    # An orphaned ssh.exe would keep the remote port.
     $forward = "-R ${BindAddress}:${RemotePort}:"
+    $bridge = "-R ${BindAddress}:${BridgeRemotePort}:"
     Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" |
-        Where-Object { $_.CommandLine -like "*$forward*" } |
+        Where-Object {
+            $_.CommandLine -like "*$forward*" -or
+            ($BridgePort -gt 0 -and $_.CommandLine -like "*$bridge*")
+        } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 }
 
@@ -48,12 +61,13 @@ function Install-TunnelTask {
     New-Item -ItemType Directory -Force $InstallDir | Out-Null
     $script = Join-Path $InstallDir "hermes-tunnel.ps1"
     if ($PSCommandPath -ne $script) { Copy-Item $PSCommandPath $script -Force }
-    # conhost --headless: no console window, so nothing can close it.
-    $argsLine = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass" +
+    $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $argsLine = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass" +
         " -File `"$script`" -SshHost $SshHost -SshUser $SshUser -SshPort $SshPort" +
         " -KeyFile `"$KeyFile`" -HermesPort $HermesPort -BindAddress $BindAddress" +
-        " -RemotePort $RemotePort -LogDir `"$LogDir`""
-    $action = New-ScheduledTaskAction -Execute "conhost.exe" -Argument $argsLine
+        " -RemotePort $RemotePort -BridgePort $BridgePort" +
+        " -BridgeRemotePort $BridgeRemotePort -LogDir `"$LogDir`""
+    $action = New-ScheduledTaskAction -Execute $powershell -Argument $argsLine
     $resume = "<Select Path='System'>*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter']" +
         " and EventID=1]] or *[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507]]</Select>"
     $network = "<Select Path='Microsoft-Windows-NetworkProfile/Operational'>*[System[EventID=10000]]</Select>"
@@ -88,19 +102,25 @@ function Write-Log([string] $text) {
 }
 
 function Invoke-Tunnel {
-    & $ssh -N -T `
-        -o BatchMode=yes `
-        -o ConnectTimeout=15 `
-        -o ServerAliveInterval=15 `
-        -o ServerAliveCountMax=3 `
-        -o TCPKeepAlive=yes `
-        -o ExitOnForwardFailure=yes `
-        -o StrictHostKeyChecking=yes `
-        -E (Join-Path $LogDir "ssh.log") `
-        -i $KeyFile `
-        -p $SshPort `
-        -R "${BindAddress}:${RemotePort}:127.0.0.1:${HermesPort}" `
-        "$SshUser@$SshHost"
+    $sshArgs = @(
+        "-N", "-T",
+        "-o", "BatchMode=yes",
+        "-o", "ConnectTimeout=15",
+        "-o", "ServerAliveInterval=15",
+        "-o", "ServerAliveCountMax=3",
+        "-o", "TCPKeepAlive=yes",
+        "-o", "ExitOnForwardFailure=yes",
+        "-o", "StrictHostKeyChecking=yes",
+        "-E", (Join-Path $LogDir "ssh.log"),
+        "-i", $KeyFile,
+        "-p", $SshPort,
+        "-R", "${BindAddress}:${RemotePort}:127.0.0.1:${HermesPort}"
+    )
+    if ($BridgePort -gt 0) {
+        $sshArgs += @("-R", "${BindAddress}:${BridgeRemotePort}:127.0.0.1:${BridgePort}")
+    }
+    $sshArgs += "$SshUser@$SshHost"
+    & $ssh @sshArgs
     return $LASTEXITCODE
 }
 

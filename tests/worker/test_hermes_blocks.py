@@ -44,6 +44,10 @@ def test_final_text_keeps_blocks_only_when_asked() -> None:
     assert final_text("[answer]\n[ignore]", keep_blocks=True) == ""
 
 
+def test_final_text_never_accepts_missing_answer_boundary() -> None:
+    assert final_text("Данных достаточно. Короткая сводка, затем ссылка.") == ""
+
+
 def test_style_goes_right_after_head() -> None:
     page = '<!doctype html><html lang="ru"><head><title>t</title></head></html>'
     styled = with_report_style(page, CSS)

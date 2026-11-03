@@ -1,6 +1,8 @@
 from vanessa.config.settings_bot_peers import BotPeerMixin
+from vanessa.config.settings_deploy import DeployWatchMixin
 from vanessa.config.settings_hermes import HermesMixin
 from vanessa.config.settings_pinned import PinnedNotesMixin
+from vanessa.config.settings_proxy import ProxyMixin
 from vanessa.config.settings_schedule import ScheduleMixin
 from vanessa.config.settings_sections import (
     BotMixin,
@@ -19,8 +21,10 @@ class Settings(
     McpMixin,
     HermesMixin,
     ScheduleMixin,
+    DeployWatchMixin,
     PinnedNotesMixin,
     BotPeerMixin,
+    ProxyMixin,
     TraceLogMixin,
     SharedSettings,
 ):

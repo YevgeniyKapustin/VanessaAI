@@ -3,7 +3,7 @@ import logging
 from vanessa.core.bot_senders import bot_sender_label
 from vanessa.core.messages import attachments_to_dicts
 from vanessa.core.request_context import get_planning_started_signal, get_request_id
-from vanessa.core.session.channel_keys import turn_channel
+from vanessa.core.session.channel_keys import message_storage_channel
 from vanessa.core.session.chat_session_state import (
     EarlierWindow,
     load_chat_session_state,
@@ -76,7 +76,7 @@ class _TurnIngressMixin:
         _record_turn_activity(turn)
         await ensure_people_alias_cache()
         ctx.sender_name = await _resolve_ingress_sender(self._users, turn)
-        channel = turn_channel(turn)
+        channel = message_storage_channel(turn)
         ctx.user_msg = await self._messages.create(
             role="user",
             content=turn.message,

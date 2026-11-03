@@ -437,11 +437,31 @@ async def test_deepseek_bare_ignore_marker_is_not_retried(provider: DeepSeekLLMP
 
 
 @pytest.mark.asyncio
-async def test_deepseek_clean_untagged_content_is_the_answer(provider: DeepSeekLLMProvider):
-    # Thinking mode: the reasoning comes apart, `content` is the clean message.
+async def test_deepseek_native_reasoning_does_not_bypass_answer_tag(
+    provider: DeepSeekLLMProvider,
+):
+    # A separate reasoning field does not guarantee that content is the answer.
     clean = _make_response("Ставлю. Каждую пятницу в 13:00 буду кидать меню", tagged=False)
     clean.choices[0].message.reasoning_content = "He asks to set a reminder. Short."
-    provider._client.chat.completions.create = AsyncMock(return_value=clean)
+    provider._client.chat.completions.create = AsyncMock(
+        side_effect=[clean, _make_response("Ставлю. Каждую пятницу в 13:00 буду кидать меню")]
+    )
     reply = await provider.generate("ванесса", [])
     assert reply == "Ставлю. Каждую пятницу в 13:00 буду кидать меню"
-    provider._client.chat.completions.create.assert_awaited_once()
+    assert provider._client.chat.completions.create.await_count == UNTAGGED_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_deepseek_rejects_production_leak_with_native_reasoning(
+    provider: DeepSeekLLMProvider,
+):
+    leak = _make_response(
+        "Обычное «привет» от владельца — коротко поздороваться, без разгона. "
+        "Можно стикер-приветствие.",
+        tagged=False,
+    )
+    leak.choices[0].message.reasoning_content = "A greeting."
+    provider._client.chat.completions.create = AsyncMock(return_value=leak)
+    with pytest.raises(UntaggedReplyError):
+        await provider.generate("привет", [])
+    assert provider._client.chat.completions.create.await_count == UNTAGGED_ATTEMPTS

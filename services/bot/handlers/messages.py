@@ -9,6 +9,7 @@ from services.bot.handlers.message_delivery import (
     _reject_if_no_access,
     _run_with_typing,
 )
+from services.bot.handlers.message_media import register_media_handlers
 from services.bot.handlers.message_photos import (
     _pick_photo_size,
     _register_photo_handler,
@@ -82,4 +83,5 @@ def create_messages_router(services: BotServices) -> Router:
     router.message.register(cmd_start, CommandStart())
     router.message.register(handle_text, F.text)
     _register_photo_handler(router, services)
+    register_media_handlers(router, services)
     return router

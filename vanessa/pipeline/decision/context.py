@@ -37,6 +37,11 @@ class DecisionContext:
     loop_strength: int = 0
     annoyance: float = 0.0
     addressing: str = "telegram"
+    # Proxy mode: an agent's question for the owner, or the owner's DM turn.
+    proxy_question: bool = False
+    owner_dm: bool = False
+    sender_is_owner: bool = False
+    is_private_chat: bool = False
 
     @property
     def directly_addressed(self) -> bool:

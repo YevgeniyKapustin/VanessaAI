@@ -3,6 +3,7 @@ import logging
 from vanessa.config.settings import settings
 from vanessa.core.messages import ContextMessage, PhotoCandidate, stored_to_context
 from vanessa.core.request_context import get_request_id
+from vanessa.core.session.channel_keys import message_storage_channel
 from vanessa.infrastructure.observability.metrics import (
     record_photo_request_missed,
     record_photo_send,
@@ -79,6 +80,7 @@ class _ComposePhotoMixin:
             stored = await self._messages.search_photo_messages(
                 meaning_query,
                 limit=settings.vision_photo_candidates * 2,
+                channel=message_storage_channel(ctx.turn),
             )
             return [stored_to_context(m) for m in stored]
         except Exception:

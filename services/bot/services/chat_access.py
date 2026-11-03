@@ -34,6 +34,10 @@ class ChatAccessGuard:
         group_types = {_enum_to_str(chat_type) for chat_type in GROUP_CHAT_TYPES}
         return message.chat_type in group_types
 
+    def chat_allowed(self, chat_id: int) -> bool:
+        """Whether the bot is configured to work in ``chat_id`` at all."""
+        return not self._allowed_chat_id or chat_id == self._allowed_chat_id
+
     def _owner_ids(self) -> list[int]:
         extra = owner_telegram_ids() - {self._required_user_id}
         return [self._required_user_id, *sorted(extra)]
@@ -51,11 +55,24 @@ class ChatAccessGuard:
         return False
 
     async def ensure_access(self, message: IncomingMessage) -> str | None:
+        if self.is_private_chat(message):
+            return self._private_access_denial(message)
         denial = self._static_access_denial(message)
         if denial:
             return denial
         if not await self.required_user_in_chat(message):
             return self._messages.required_user_missing.strip()
+        return None
+
+    def _private_access_denial(self, message: IncomingMessage) -> str | None:
+        """Only the owner may use the bot's private chat (proxy relay)."""
+        if not settings.owner_dm_enabled:
+            return self._messages.private_chat.strip()
+        if not self._required_user_id:
+            return self._messages.required_user_not_configured.strip()
+        sender = message.sender_telegram_id
+        if sender != self._required_user_id and not is_owner(sender):
+            return self._wrong_chat(message) or self._messages.private_chat.strip()
         return None
 
     def _static_access_denial(self, message: IncomingMessage) -> str | None:

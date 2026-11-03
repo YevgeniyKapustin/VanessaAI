@@ -67,6 +67,14 @@ class TurnImage(BaseModel):
     data_url: str = Field(min_length=1)
     mime_type: str = "image/jpeg"
     telegram_file_id: str | None = None
+    #: photo | sticker | gif — drives the prompt's <attachment type="...">.
+    kind: str = "photo"
+
+
+class KnownChat(BaseModel):
+    chat_id: int
+    title: str
+    chat_type: str
 
 
 class TurnRequest(BrokerMessage):
@@ -82,11 +90,13 @@ class TurnRequest(BrokerMessage):
     sender_telegram_id: int | None = None
     chat_title: str | None = None
     chat_type: str | None = None
+    known_chats: list[KnownChat] = Field(default_factory=list)
     sender_username: str | None = None
     sender_first_name: str | None = None
     sender_last_name: str | None = None
     #: The sender is another Telegram bot (an AI peer), not a person.
     sender_is_bot: bool = False
+    sender_is_owner: bool = False
     mentions_bot: bool = False
     reply_to_bot: bool = False
     reply_to_other_user: bool = False
@@ -98,6 +108,10 @@ class TurnRequest(BrokerMessage):
     #: VRChat first-person screenshot. Never mixed into ``images`` (those are
     #: user-attached Telegram photos for gate_vision / the album).
     scene_image: TurnImage | None = None
+    #: Owner DM reply to a relayed question: the agents' chat and the question.
+    relay_chat_id: int | None = None
+    relay_chat_title: str | None = None
+    relay_question: str | None = Field(default=None, max_length=4096)
 
 
 class TurnStarted(BrokerMessage):
@@ -122,8 +136,14 @@ class TurnReply(BrokerMessage):
     context_count: int = 0
     relevance_score: float = 0.0
     sticker_tag: str | None = None
+    #: A single emoji the bot should put on the user's message (setMessageReaction).
+    reaction: str | None = None
     photo_file_id: str | None = None
     photo_data_url: str | None = None
+    outbound_chat_id: int | None = None
+    outbound_text: str | None = Field(default=None, max_length=4096)
+    #: DM text for the owner (proxy questions only).
+    owner_dm_text: str | None = Field(default=None, max_length=4096)
 
 
 class TaskKind(StrEnum):
@@ -136,6 +156,9 @@ class TaskKind(StrEnum):
     PHOTO_CAPTION = "photo_caption"
     INBOX_NOTE = "inbox_note"
     HERMES_ASK = "hermes_ask"
+    #: A chat reaction someone put on / removed from a message — recorded as a
+    #: ``reaction`` row so the composer sees it in the session history.
+    REACTION = "reaction"
 
 
 class TaskMessage(BrokerMessage):

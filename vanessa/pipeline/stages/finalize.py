@@ -56,6 +56,10 @@ class FinalizeStage:
                 ctx.decision.relevance_score if ctx.decision is not None else 0.0
             ),
         )
+        if self._bot_budget is not None and ctx.hermes_status == "deferred":
+            # No message now, but the worker's late answer is one reply to the
+            # agent; count it so the loop budget sees the pair as one turn.
+            record_bot_peer_reply(self._bot_budget, ctx)
         self._metrics.record_turn(
             action=ctx.result.action,
             reason=ctx.result.reason,

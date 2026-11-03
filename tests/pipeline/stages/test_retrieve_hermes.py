@@ -10,6 +10,7 @@ from vanessa.core.request_context import request_id_var
 from vanessa.core.turn import ChatTurnInput
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.turn_plan import TurnPlan
+from vanessa.pipeline.proxy.mode import TurnProxyMode
 from vanessa.pipeline.stages.retrieve import RetrieveStage
 from vanessa.pipeline.stages.retrieve_hermes import run_hermes_step
 
@@ -29,6 +30,7 @@ def _ctx(
     ask: bool = True,
     channel: str = "telegram",
     message_id: int | None = _MESSAGE_ID,
+    bot: bool = False,
 ) -> TurnPipelineContext:
     ctx = TurnPipelineContext(
         turn=ChatTurnInput(
@@ -38,6 +40,7 @@ def _ctx(
             channel=channel,
             telegram_message_id=message_id,
             correlation_id="corr-1",
+            sender_is_bot=bot,
         )
     )
     ctx.turn_plan = TurnPlan(
@@ -124,9 +127,31 @@ async def test_online_dispatches_exact_task() -> None:
             "telegram_chat_id": _CHAT_ID,
             "telegram_message_id": _MESSAGE_ID,
             "user_message": "ванесса, что с пайплайном в MR 42?",
+            "bot_peer": False,
+            "proxy": False,
         },
         dedup_key=f"hermes:{_CHAT_ID}:{_MESSAGE_ID}",
     )
+
+
+async def test_bot_sender_defers_the_only_reply() -> None:
+    dispatcher = MagicMock()
+    ctx = _ctx(bot=True)
+    await run_hermes_step(ctx, _hermes(), dispatcher)
+    # No immediate message: the worker's late answer is the only reply.
+    assert ctx.hermes_status == "deferred"
+    payload = dispatcher.submit.call_args.args[1]
+    assert payload["bot_peer"] is True
+
+
+async def test_proxy_question_is_marked_for_the_answer() -> None:
+    dispatcher = MagicMock()
+    ctx = _ctx(bot=True)
+    ctx.proxy = TurnProxyMode(proxy_question=True)
+    await run_hermes_step(ctx, _hermes(), dispatcher)
+    payload = dispatcher.submit.call_args.args[1]
+    assert payload["proxy"] is True
+    assert ctx.hermes_status == "deferred"
 
 
 async def test_dedup_falls_back_to_correlation_id() -> None:

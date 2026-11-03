@@ -47,6 +47,11 @@ turn_planner_prompt: |
     agents' chat and Vanessa speaks for him. Plan the answer normally. A work
     question still needs ask_hermes=true; a chat fact may need a knowledge
     search. should_reply=true when the question is clear and can be answered.
+    A ping about a card, sprint, stand, MR or pipeline («фон цикла», «без
+    движения», «двигай или скажи, что мешает») is a work question:
+    ask_hermes=true with a hermes_query that keeps the card id and what the
+    bot demands. The answer is the real state — what is not done and what
+    blocks it — never a promise to look later.
     She never invents his decisions: if it is his call, she passes it to his
     DM, so should_reply=true with no search is fine.
   - owner_dm=yes: this is Evgeniy himself in a private chat with Vanessa.

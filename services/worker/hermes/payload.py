@@ -19,6 +19,10 @@ class HermesAsk:
     user_message: str
     #: Hermes ``Idempotency-Key``: the task dedup key, else a stable fallback.
     idempotency_key: str
+    #: The question was addressed to the owner: the answer is written for him.
+    proxy: bool = False
+    #: The addressee is another agent: exactly one reply, never a thread.
+    bot_peer: bool = False
 
 
 def _as_int(value: object) -> int | None:
@@ -52,4 +56,6 @@ def parse_hermes_ask(task: TaskMessage) -> HermesAsk | None:
         telegram_message_id=message_id,
         user_message=str(payload.get("user_message") or "").strip(),
         idempotency_key=_idempotency_key(task, chat_id, message_id),
+        proxy=payload.get("proxy") is True,
+        bot_peer=payload.get("bot_peer") is True,
     )

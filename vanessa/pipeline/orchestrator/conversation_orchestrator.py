@@ -102,6 +102,14 @@ class ConversationOrchestrator(
             scene=self._scene,
             run_stage=self._run_stage,
         )
+        # The addressee is another agent and the answer is still being looked
+        # up: agents get one reply, so say nothing now and let the worker's
+        # late answer be the only message.
+        if ctx.hermes_status == "deferred":
+            await self._finalize.skip(ctx, reason="hermes_deferred")
+            self._log_processed(turn, ctx)
+            assert ctx.result is not None
+            return ctx.result
         await self._run_stage("compose", self._compose.run(ctx))
 
         # The compose stage refused the answer (repeated same-sender message /

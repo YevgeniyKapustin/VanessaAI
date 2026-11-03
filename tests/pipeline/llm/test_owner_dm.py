@@ -52,7 +52,6 @@ def test_proxy_question_adds_its_directive() -> None:
     prompt = PromptBuilder().build_user_prompt(request)
 
     assert "## Proxy reply" in prompt
-    pass
     assert "<dm_owner>" in prompt
 
 

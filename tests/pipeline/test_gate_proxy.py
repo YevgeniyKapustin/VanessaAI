@@ -83,6 +83,8 @@ def _question_turn(**overrides) -> ChatTurnInput:
 @pytest.mark.asyncio
 async def test_proxy_question_reaches_the_planner(monkeypatch) -> None:
     monkeypatch.setattr(settings, "proxy_chat_titles", "work")
+    # The reply target must be the configured owner, not the machine's guess.
+    monkeypatch.setattr(settings, "required_user_telegram_id", OWNER)
     planner = FakePlanner()
 
     with pytest.raises(PlannerCalledError):

@@ -458,6 +458,32 @@ async def test_turn_planner_fallback_applies_detail_heuristic():
     assert result.detail == "detailed"
 
 
+CARD_PING = (
+    "Женя, фон спринта: ABC-123 (в работе остались копии) — без движения, "
+    "26 ч. Двигай или скажи, что мешает."
+)
+
+
+@pytest.mark.asyncio
+async def test_proxy_card_ping_forces_the_work_lookup_on_fallback():
+    """A card ping from an agent always gets a Hermes lookup, even offline-LLM."""
+    planner = TurnPlanner(use_llm=False)
+
+    result = await planner.prepare(CARD_PING, proxy_question=True)
+
+    assert result.ask_hermes is True
+    assert "ABC-123" in result.hermes_query
+
+
+@pytest.mark.asyncio
+async def test_card_ping_without_proxy_adds_no_lookup():
+    planner = TurnPlanner(use_llm=False)
+
+    result = await planner.prepare(CARD_PING)
+
+    assert result.ask_hermes is False
+
+
 class _FakeClient:
     """Minimal LLM chat completer that returns a valid planner JSON."""
 

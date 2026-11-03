@@ -43,6 +43,17 @@ def _block(tag: str, text: str) -> str:
     return f"<{tag}>\n{body}\n</{tag}>"
 
 
+def _task(prompts: HermesContent, ask: HermesAsk, *, answered: bool) -> str:
+    """The closing task: agents get a one-message answer, never a thread."""
+    if not answered:
+        return prompts.undelivered_task
+    if ask.proxy:
+        return prompts.proxy_answered_task or prompts.answered_task
+    if ask.bot_peer:
+        return prompts.agent_answered_task or prompts.answered_task
+    return prompts.answered_task
+
+
 def build_followup_user_prompt(
     ask: HermesAsk,
     answer: str | None,
@@ -69,6 +80,6 @@ def build_followup_user_prompt(
         parts.append(timing.replace("{duration}", format_duration(elapsed_seconds)))
     if file_task.strip():
         parts.append(file_task.strip())
-    task = prompts.answered_task if answer else prompts.undelivered_task
+    task = _task(prompts, ask, answered=bool(answer))
     parts.append(task.strip())
     return "\n\n".join(parts)

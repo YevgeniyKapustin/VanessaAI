@@ -34,9 +34,11 @@ class TurnPipelineContext:
     # prompt as a "live web results" block.
     web_blocks: list[WebResult] = field(default_factory=list)
     # Hermes ask outcome from the Retrieve stage: "asked" (task queued for the
-    # worker), "offline" (health check failed), "answered" (a result posted
-    # lately already answers it, nothing queued), None (not requested).
-    hermes_status: Literal["asked", "offline", "answered"] | None = None
+    # worker, Vanessa promises a later answer), "deferred" (the same task, but
+    # the addressee is an agent: the late answer is the ONLY reply), "offline"
+    # (health check failed), "answered" (a result posted lately already answers
+    # it, nothing queued), None (not requested).
+    hermes_status: Literal["asked", "deferred", "offline", "answered"] | None = None
     # Compose directive for a schedule request (add / list / cancel a post
     # Vanessa schedules for herself); None when the turn has none.
     schedule_note: str | None = None

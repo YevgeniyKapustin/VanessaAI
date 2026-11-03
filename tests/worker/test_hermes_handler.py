@@ -114,6 +114,8 @@ def test_payload_parsing_and_idempotency_fallback() -> None:
     assert ask.telegram_chat_id == CHAT_ID
     assert ask.telegram_message_id == MESSAGE_ID
     assert ask.idempotency_key == f"hermes:{CHAT_ID}:{MESSAGE_ID}"
+    assert ask.proxy is False
+    assert ask.bot_peer is False
     bare = TaskMessage(
         task=TaskKind.HERMES_ASK,
         payload={"question": "q", "telegram_chat_id": CHAT_ID},
@@ -122,6 +124,19 @@ def test_payload_parsing_and_idempotency_fallback() -> None:
     assert parsed is not None
     assert parsed.telegram_message_id is None
     assert parsed.idempotency_key == f"hermes:{CHAT_ID}:{bare.correlation_id}"
+
+
+def test_payload_parsing_agent_flags_are_strict_bools() -> None:
+    ask = parse_hermes_ask(ask_task(proxy=True, bot_peer=True))
+    assert ask is not None
+    assert ask.proxy is True
+    assert ask.bot_peer is True
+
+    # A string from a hand-written payload is not the flag.
+    loose = parse_hermes_ask(ask_task(proxy="true", bot_peer="yes"))
+    assert loose is not None
+    assert loose.proxy is False
+    assert loose.bot_peer is False
 
 
 def _settings(*, enabled: bool) -> SimpleNamespace:

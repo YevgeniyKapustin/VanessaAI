@@ -1,5 +1,7 @@
 import logging
 
+import pytest
+
 from services.worker.hermes.compose import OUTBOUND_MAX_CHARS, chat_request
 from services.worker.hermes.prompt import (
     build_followup_system_prompt,
@@ -168,6 +170,22 @@ async def test_text_of_dots_only_posts_fixed_line() -> None:
     completer = FakeCompleter("[answer]\n.")
     await make_runner(FakeClient(output=ANSWER), completer, broker).run(make_ask())
     assert _only_message(broker).text == get_hermes_content().undelivered_fallback
+
+
+@pytest.mark.parametrize("proxy", [False, True])
+async def test_agent_gets_one_message_not_a_thread(*, proxy: bool) -> None:
+    broker = FakeBroker()
+    completer = FakeCompleter(
+        "[answer]\nПо ABC-123 гейта в CI нет.\n[next]\nКопии убрали, но гейта всё ещё нет."
+    )
+    await make_runner(FakeClient(output=ANSWER), completer, broker).run(
+        make_ask(bot_peer=True, proxy=proxy)
+    )
+    message = _only_message(broker)
+    assert message.more_texts == []
+    assert "гейта в CI нет." in message.text
+    assert "Копии убрали" in message.text
+    assert "нет. Копии" in message.text
 
 
 def test_user_prompt_treats_data_as_data() -> None:

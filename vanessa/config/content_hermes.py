@@ -25,6 +25,10 @@ class HermesContent(BaseModel):
     answered_task: str
     undelivered_task: str
     undelivered_fallback: str = Field(min_length=1)
+    # Added instead of answered_task when another agent asked and Vanessa
+    # answers for the owner / answers the agent directly: one message.
+    proxy_answered_task: str = ""
+    agent_answered_task: str = ""
     # Added to the task when the answer had an HTML file (sent / refused).
     file_attached_task: str = ""
     file_refused_task: str = ""

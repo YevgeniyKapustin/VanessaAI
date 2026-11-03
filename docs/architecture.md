@@ -89,6 +89,18 @@ her own name, on his behalf; the gate lets the turn through and the
 decision rule replies even when the planner is unsure. The bot-to-bot loop
 budget still applies.
 
+A card ping («ABC-123 без движения, двигай или скажи, что мешает») is a
+work question: the planner forces a Hermes lookup and keeps the card id.
+When the addressee is an agent, the Retrieve stage marks the turn
+`deferred` and the orchestrator sends nothing now. The worker's late answer
+is the only reply — one message written for the agent, never a thread. The
+proxy task leads with the problem in its own words — the missing piece or
+the blocker, never a stock «не окей» opener or a template repeated from
+reply to reply — because the agent already knows what is done. It reports
+state only: no first-person action plan («делаю гейт», «закрою карточку»),
+because Vanessa does not do the work. Any other reply to an agent is
+collapsed into one message at finalize.
+
 When the question needs the owner himself, compose emits
 `<dm_owner>…</dm_owner>`; the adapter sends that text to his private chat
 and stores `(DM message id) → (source chat, question)` in Redis. An owner

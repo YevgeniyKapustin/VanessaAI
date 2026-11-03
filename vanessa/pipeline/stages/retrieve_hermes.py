@@ -52,6 +52,10 @@ def hermes_task_payload(
         "telegram_chat_id": chat_id,
         "telegram_message_id": ctx.turn.telegram_message_id,
         "user_message": ctx.turn.message,
+        # The addressee is another agent: one reply, and it is the late one.
+        "bot_peer": ctx.turn.sender_is_bot,
+        # An agent asked the owner: the answer is written on his behalf.
+        "proxy": ctx.proxy.proxy_question,
     }
 
 
@@ -138,12 +142,17 @@ async def _dispatch(
         # Fail-open: a broken tunnel or broker never blocks the reply.
         logger.exception("hermes_ask_failed request_id=%s", get_request_id())
         status = "error"
-    ctx.hermes_status = "asked" if status == "asked" else "offline"
+    if status == "asked":
+        # Another agent gets one reply, and that reply is the late answer:
+        # no immediate promise and no second message.
+        ctx.hermes_status = "deferred" if ctx.turn.sender_is_bot else "asked"
+    else:
+        ctx.hermes_status = "offline"
     elapsed_ms = (time.perf_counter() - started) * 1000
     record_hermes_dispatch(status, elapsed_ms)
     logger.info(
         "turn_stage hermes request_id=%s status=%s hermes_ms=%.1f",
         get_request_id(),
-        status,
+        ctx.hermes_status,
         elapsed_ms,
     )

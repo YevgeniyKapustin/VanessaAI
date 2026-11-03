@@ -32,9 +32,27 @@ def test_question_heuristic() -> None:
     assert not looks_like_question("ок")
 
 
+PING = (
+    "Женя, фон спринта: ABC-123 (в работе остались копии, источник...) "
+    "(26 ч) - без движения. Фон это фон, но он тоже висит на тебе и тоже "
+    "считается в спринте. Двигай или скажи, что мешает."
+)
+
+
+def test_imperative_card_ping_is_a_proxy_question(monkeypatch) -> None:
+    """A bot pinging the owner with «двигай или скажи» is a proxy question."""
+    monkeypatch.setattr(settings, "proxy_chat_titles", "agents")
+    monkeypatch.setattr(settings, "proxy_owner_aliases", "Женя")
+
+    assert looks_like_question(PING) is True
+    assert detect_proxy_mode(_turn(message=PING)).proxy_question is True
+
+
 def test_proxy_question_by_reply_to_owner(monkeypatch) -> None:
     monkeypatch.setattr(settings, "proxy_chat_telegram_id", 0)
     monkeypatch.setattr(settings, "proxy_chat_titles", "work")
+    # The test owns the identity: never depend on the machine's env.
+    monkeypatch.setattr(settings, "required_user_telegram_id", OWNER)
 
     mode = detect_proxy_mode(_turn(reply_to_sender_telegram_id=OWNER))
 

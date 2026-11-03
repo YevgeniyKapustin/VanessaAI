@@ -260,6 +260,7 @@ def _build_orchestrator(
     llm: FakeLLM | None = None,
     photo_captioner=None,
     compose_refuse_enabled: bool = True,
+    retrieve=None,
 ) -> ConversationOrchestrator:
     llm = llm or FakeLLM()
     metrics = TurnMetrics()
@@ -269,7 +270,7 @@ def _build_orchestrator(
         users=FakeUserRepo(),
         config=config,
         gate=_gate(decision, config, metrics, messages),
-        retrieve=RetrieveStage(None),
+        retrieve=retrieve or RetrieveStage(None),
         compose=ComposeStage(llm, refuse_enabled=compose_refuse_enabled),
         finalize=FinalizeStage(messages, decision, metrics),
         photo_captioner=photo_captioner,
@@ -370,6 +371,40 @@ async def test_orchestrator_ignores_without_reply():
     assert result.action == DecisionAction.IGNORE
     assert result.reply is None
     assert len(messages._messages) == 1
+
+
+class _DeferredRetrieve:
+    """Stands in for a queued Hermes ask addressed to another agent."""
+
+    async def run(self, ctx) -> bool:
+        ctx.hermes_status = "deferred"
+        return True
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_deferred_hermes_skips_compose():
+    messages = FakeMessageRepo()
+    decision = FakeDecisionEngine(DecisionAction.REPLY)
+    orchestrator = _build_orchestrator(
+        messages=messages,
+        decision=decision,
+        retrieve=_DeferredRetrieve(),
+    )
+
+    result = await orchestrator.handle_incoming(
+        ChatTurnInput(
+            telegram_chat_id=-1001,
+            message="Vanessa, привет",
+            sender_telegram_id=42,
+        )
+    )
+
+    # No promise now: the worker's late answer is the only message.
+    assert result.action == DecisionAction.IGNORE
+    assert result.reason == "hermes_deferred"
+    assert result.reply is None
+    assert len(messages._messages) == 1
+    assert decision.recorded_chats == []
 
 
 @pytest.mark.asyncio

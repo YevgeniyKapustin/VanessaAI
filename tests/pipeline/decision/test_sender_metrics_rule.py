@@ -179,8 +179,8 @@ async def test_engine_never_suppresses_neutral_sender():
 
 
 @pytest.mark.asyncio
-async def test_engine_owner_is_never_suppressed():
-    owner_id = settings.required_user_telegram_id or 999
+async def test_engine_owner_is_never_suppressed(monkeypatch):
+    monkeypatch.setattr(settings, "required_user_telegram_id", 999)
     engine = build_engine(IntentDetector(), TriggerKeywordChecker(()))
     result = await engine.decide(
         DecisionContext(
@@ -188,7 +188,7 @@ async def test_engine_owner_is_never_suppressed():
             telegram_chat_id=1,
             recent_messages=[],
             should_reply=None,
-            sender_telegram_id=owner_id,
+            sender_telegram_id=999,
             sender_metrics=TOXIC_METRICS,
         )
     )

@@ -13,6 +13,7 @@ from vanessa.pipeline.llm.planner.detail_detector import detect_detail_level
 from vanessa.pipeline.llm.planner.generation_config import LLMGenerationParams
 from vanessa.pipeline.llm.planner.turn_plan_llm import _TurnPlanLlmMixin
 from vanessa.pipeline.llm.planner.turn_plan_parse import parse_llm_response
+from vanessa.pipeline.proxy.card_ping import apply_proxy_card_lookup
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,9 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 result.detail,
                 result.reason,
             )
-            return result
+            return apply_proxy_card_lookup(
+                result, message, proxy_question=proxy_question
+            )
 
         try:
             result = await self._plan_with_llm(
@@ -157,7 +160,10 @@ class TurnPlanner(_TurnPlanLlmMixin):
                 result.hermes_query,
                 result.reason,
             )
-        return apply_detail(result, message)
+        result = apply_detail(result, message)
+        return apply_proxy_card_lookup(
+            result, message, proxy_question=proxy_question
+        )
 
     _apply_detail = staticmethod(apply_detail)
     _fallback = staticmethod(fallback_plan)

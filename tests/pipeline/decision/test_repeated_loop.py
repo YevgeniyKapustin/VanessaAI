@@ -347,10 +347,11 @@ def test_low_attitude_rule_does_not_ignore_planner_reply():
     assert result is None
 
 
-def test_low_attitude_rule_never_for_owner():
-    owner = settings.required_user_telegram_id or 999
+def test_low_attitude_rule_never_for_owner(monkeypatch):
+    # The rule compares against the configured owner: own the identity here.
+    monkeypatch.setattr(settings, "required_user_telegram_id", 999)
     result = LowAttitudeRule().evaluate(
-        _context(annoyance=0.9, should_reply=False, sender_id=owner)
+        _context(annoyance=0.9, should_reply=False, sender_id=999)
     )
     assert result is None
 

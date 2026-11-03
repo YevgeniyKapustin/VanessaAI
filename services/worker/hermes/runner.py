@@ -10,7 +10,7 @@ import logging
 import time
 
 from services.worker.hermes.blocks import followup_blocks
-from services.worker.hermes.compose import FollowupComposer
+from services.worker.hermes.compose import FollowupComposer, truncate_message
 from services.worker.hermes.html_file import HtmlFile, SplitAnswer, split_html_file
 from services.worker.hermes.payload import HermesAsk
 from services.worker.hermes.report_style import styled_file
@@ -30,6 +30,7 @@ from vanessa.infrastructure.hermes import (
 from vanessa.infrastructure.observability.metrics.metrics_hermes_jobs import (
     record_hermes_job,
 )
+from vanessa.pipeline.llm.format.message_blocks import strip_block_markers
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,13 @@ class HermesRunner:
             file_task=file_task,
             elapsed_seconds=time.monotonic() - started,
         )
-        blocks = followup_blocks(text) or [self._composer.fallback_line()]
+        if ask.bot_peer:
+            # Agents get one flat message; keep the sentence punctuation the
+            # block splitter would strip at every break.
+            flat = strip_block_markers(text).strip()
+            blocks = [truncate_message(" ".join(flat.split()))]
+        else:
+            blocks = followup_blocks(text) or [self._composer.fallback_line()]
         file = styled_file(split.file, self._css)
         trace_sent(blocks, file)
         await self._broker.publish(self._stream, _outbound(ask, blocks, file))

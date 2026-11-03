@@ -166,6 +166,38 @@ answered_task: |
   message 2
   No [answer] line — nothing is sent. Never use [ignore].
 
+# The answer to an agent that asked the owner in the work chat: Vanessa
+# answers for the owner, in one message.
+proxy_answered_task: |
+  <!-- Task -->
+  Another AI agent asked the owner about a work item; answer for him in one
+  message, from the state Hermes just looked up — first person, female
+  forms, never naming Hermes or a helper.
+  - start with what is missing or blocks it, not with what is done;
+  - status only: no «делаю», «закрою», no plan, no promise; work in progress
+    is «в работе», not your action;
+  - vary the wording: no stock opener, no repeated template;
+  - a jab only when it adds meaning;
+  - under 900 characters; ids and links exactly as in the lookup.
+  [answer]
+  the single message
+  Never use [ignore].
+
+# Another agent asked Vanessa herself: one message, no thread.
+agent_answered_task: |
+  <!-- Task -->
+  Another AI agent asked you about work; Hermes just looked up the state.
+  Answer in one message, first person, female forms, never naming Hermes or
+  a helper.
+  - answer in the first sentence, with facts and ids;
+  - name what blocks it when the lookup has it; no stock opener or repeated
+    template;
+  - give what the agent needs to act on, not a report;
+  - a flat answer is fine.
+  [answer]
+  the single message
+  Never use [ignore].
+
 # Added after answered_task when the answer had an HTML file.
 file_attached_task: |
   The answer has an HTML file ([HTML file attached: …]). The app sends

@@ -1,4 +1,5 @@
 from vanessa.config.content import get_content
+from vanessa.contracts.outbound import MESSAGE_MAX_CHARS
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.llm.format.message_blocks import (
     split_reply_into_blocks,
@@ -37,7 +38,7 @@ def delivery_messages(ctx: TurnPipelineContext, clean_reply: str) -> list[str]:
         if not text.strip():
             return []
         return [text]
-    return [
+    messages = [
         block
         for block in (
             strip_trailing_periods(b)
@@ -45,6 +46,24 @@ def delivery_messages(ctx: TurnPipelineContext, clean_reply: str) -> list[str]:
         )
         if block.strip()
     ]
+    if ctx.turn.sender_is_bot:
+        # Another agent gets exactly one message, never a thread.
+        return one_message(messages)
+    return messages
+
+
+def one_message(messages: list[str]) -> list[str]:
+    """Collapse reply blocks into one message, cut to the wire limit.
+
+    Another AI agent reads one message at a time: a thread of short replies
+    would be several messages, so the blocks are joined with newlines.
+    """
+    if len(messages) <= 1:
+        return messages
+    text = "\n".join(messages)
+    if len(text) > MESSAGE_MAX_CHARS:
+        text = text[: MESSAGE_MAX_CHARS - 1].rstrip() + "…"
+    return [text]
 
 
 def marker_free_reply(clean_reply: str) -> str:

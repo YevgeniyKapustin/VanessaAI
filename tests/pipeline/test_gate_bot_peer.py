@@ -109,10 +109,25 @@ async def test_non_addressed_bot_message_never_calls_planner():
 
 
 @pytest.mark.asyncio
-async def test_bot_in_listen_window_of_its_own_talk_reaches_planner():
+async def test_bot_status_digest_in_listen_window_stays_side_talk():
+    # The agent bot posted a status digest three minutes after Vanessa
+    # answered the same bot. That is a broadcast for the room, not a
+    # continuation of her dialogue: the listen window alone must not open
+    # the bot-to-bot path.
     planner = FakePlanner()
-    with pytest.raises(PlannerCalledError):
-        await _gate(planner, _budget()).run(_ctx(listen=True, recent=_talk(KIRILL)))
+    ctx = _ctx(
+        listen=True,
+        recent=_talk(KIRILL),
+        message=(
+            "Сводка за час: +0,8 п.п., закрыто 2, в тест 2, зашли в цикл 9. "
+            "https://example.test/status"
+        ),
+    )
+
+    assert await _gate(planner, _budget()).run(ctx) is False
+    assert planner.calls == 0
+    assert ctx.result is not None
+    assert ctx.result.reason == DecisionReason.BOT_PEER_SIDE.value
 
 
 @pytest.mark.asyncio

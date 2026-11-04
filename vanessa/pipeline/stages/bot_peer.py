@@ -3,9 +3,13 @@
 With the mode on, Vanessa sees every bot message in her groups. The message
 is already saved as context by ingress. This step stops it before the
 reaction gate and the planner unless the bot talks to Vanessa: it mentions
-her, replies to her, or answers inside her listen window after she last
-answered that same bot. A bot that talks to her is still held to the
+her or replies to her. A bot that talks to her is still held to the
 ``BotPeerBudget`` loop limits.
+
+A bare follow-up inside her listen window does not count: a status digest
+from the same bot three minutes later is addressed to the room, not to her.
+Only an explicit mention, a Telegram reply, or her name in the text opens
+the bot-to-bot path.
 """
 
 import logging
@@ -14,12 +18,8 @@ from vanessa.core.session.channel_keys import dialogue_session_key, turn_channel
 from vanessa.pipeline.context import TurnPipelineContext
 from vanessa.pipeline.decision.bot_peer_budget import BotPeerBudget
 from vanessa.pipeline.decision.detectors.intent import IntentDetector
-from vanessa.pipeline.decision.gate.addressing.continuation import (
-    last_bot_reply_partner_sender_id,
-)
 from vanessa.pipeline.decision.models import DecisionReason
 from vanessa.pipeline.gate_support import finish_ignore_turn
-from vanessa.pipeline.stages.gate_decision import pipeline_in_listen_window
 
 logger = logging.getLogger("vanessa.pipeline.stages")
 
@@ -43,12 +43,7 @@ def bot_talks_to_vanessa(ctx: TurnPipelineContext) -> bool:
     turn = ctx.turn
     if turn.mentions_bot or turn.reply_to_bot:
         return True
-    if ctx.bot_mentions_name or bot_names_vanessa(turn.message):
-        return True
-    if not pipeline_in_listen_window(ctx):
-        return False
-    partner = last_bot_reply_partner_sender_id(ctx.recent)
-    return partner is not None and partner == turn.sender_telegram_id
+    return ctx.bot_mentions_name or bot_names_vanessa(turn.message)
 
 
 def record_bot_peer_reply(budget: BotPeerBudget, ctx: TurnPipelineContext) -> None:

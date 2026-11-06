@@ -24,6 +24,7 @@ from services.bot.telegram_format import markdown_to_telegram_html
 from vanessa.config.settings import settings
 from vanessa.contracts import OutboundMessage
 from vanessa.infrastructure.broker.owner_dm_store import PendingOwnerDm
+from vanessa.pipeline.llm.format.dashes import plain_dashes
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ async def _send_dm(
     owner_id: int,
     text: str,
 ) -> Message | None:
+    text = plain_dashes(text)
     try:
         return await message.bot.send_message(
             owner_id,

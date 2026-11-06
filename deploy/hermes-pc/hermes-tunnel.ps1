@@ -113,9 +113,13 @@ function Invoke-Tunnel {
         "-o", "StrictHostKeyChecking=yes",
         "-E", (Join-Path $LogDir "ssh.log"),
         "-i", $KeyFile,
-        "-p", $SshPort,
-        "-R", "${BindAddress}:${RemotePort}:127.0.0.1:${HermesPort}"
+        "-p", $SshPort
     )
+    # Hermes itself now runs on the server (172.17.0.1:8642 is the local
+    # gateway), so its forward is optional: 0 turns it off.
+    if ($HermesPort -gt 0) {
+        $sshArgs += @("-R", "${BindAddress}:${RemotePort}:127.0.0.1:${HermesPort}")
+    }
     if ($BridgePort -gt 0) {
         $sshArgs += @("-R", "${BindAddress}:${BridgeRemotePort}:127.0.0.1:${BridgePort}")
     }
@@ -131,7 +135,7 @@ if ($Install) {
 }
 
 New-Item -ItemType Directory -Force $LogDir | Out-Null
-Write-Log "start pid $PID, -R ${BindAddress}:${RemotePort} -> 127.0.0.1:${HermesPort}"
+Write-Log "start pid $PID, hermes=$HermesPort bridge=${BridgePort} bind=$BindAddress"
 $delay = $RetrySeconds
 while ($true) {
     $started = Get-Date

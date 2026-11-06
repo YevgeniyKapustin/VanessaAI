@@ -5,6 +5,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message as TelegramMessage
 
 from vanessa.infrastructure.observability.metrics import record_telegram
+from vanessa.pipeline.llm.format.dashes import plain_dashes
 
 logger = logging.getLogger("services.bot.handlers.messages")
 
@@ -16,6 +17,8 @@ async def _emit_chat_text(
     as_reply: bool,
     parse_mode: ParseMode | None = None,
 ) -> None:
+    # One hook for every chat text: replies, Hermes follow-ups, announcements.
+    text = plain_dashes(text)
     send = telegram_message.reply if as_reply else telegram_message.answer
     if parse_mode is None:
         await send(text)

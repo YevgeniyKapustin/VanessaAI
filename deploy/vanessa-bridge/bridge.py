@@ -34,7 +34,10 @@ MAX_COMMITS = 40
 PIPELINES_SCANNED = 8
 DEPLOYS_NEEDED = 2
 #: One glab call may not hang the whole bridge.
-GLAB_TIMEOUT_SECONDS = 25
+GLAB_TIMEOUT_SECONDS = 10
+#: A flaky link (a shared VPN peer, a slow GitLab) fails a call or two, not all.
+GLAB_ATTEMPTS = 3
+GLAB_RETRY_PAUSE_SECONDS = 1.0
 
 
 def _glab_env() -> dict[str, str]:
@@ -95,6 +98,22 @@ class GitLabView:
         return time.monotonic() - self._cached_at < self._cache_seconds
 
     def _api(self, path: str):
+        """Retry a failed call: a flaky link fails one attempt, not the refresh."""
+        last: GitLabError | None = None
+        for attempt in range(1, GLAB_ATTEMPTS + 1):
+            try:
+                return self._api_once(path)
+            except GitLabError as exc:
+                last = exc
+                if attempt < GLAB_ATTEMPTS:
+                    print(
+                        f"gitlab_call_retry attempt={attempt} path={path} {exc}",
+                        flush=True,
+                    )
+                    time.sleep(GLAB_RETRY_PAUSE_SECONDS)
+        raise last or GitLabError("glab did not answer")
+
+    def _api_once(self, path: str):
         try:
             done = run(
                 [self._glab, "api", f"/{path.lstrip('/')}"],

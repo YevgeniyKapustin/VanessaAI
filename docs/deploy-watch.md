@@ -5,18 +5,20 @@ deployed to production: who ran it, what changed for the product, the
 pipeline link.
 
 ```
-GitLab (internal)  <- glab <-  bridge.py on the PC   (deploy/vanessa-bridge)
-                                        ^  reverse SSH: 172.17.0.1:8643
+GitLab (internal)  <- glab <-  bridge.py on the server   (deploy/vanessa-bridge)
+                                        ^  through the dev VPN (wg0)
                                         |
 worker: Announcer (60 s tick per watch) -> LLM bullets -> outbound -> bot -> chat
 ```
 
-## Why a bridge on the PC
+## Why a bridge, and why it sits on the server
 
-The internal GitLab answers **403** to the Vanessa server's IP (nginx allow
-list), while the owner's PC has an authenticated `glab`. The bridge is a
-read-only HTTP view over GitLab on the PC, exposed through the same reverse
-SSH tunnel as Hermes (`docs/hermes.md`). The server never talks to GitLab.
+The internal GitLab answers **403** to the Vanessa server's public IP (nginx
+allow list). The bridge is a read-only HTTP view over GitLab, and it now runs on
+the Vanessa server itself, reaching GitLab through the owner's dev VPN
+(GitLab is routed through `wg0`). `glab` there is authenticated with
+the same PAT the owner uses. Details and the shared-peer caveat:
+[vpn-shared-peer](vpn-shared-peer.md).
 
 `deploy/vanessa-bridge/bridge.py`:
 
@@ -29,27 +31,22 @@ SSH tunnel as Hermes (`docs/hermes.md`). The server never talks to GitLab.
 It only reads; no writes, and the token comes from a file
 (`%LOCALAPPDATA%\vanessa-bridge\token`), never the command line.
 
-## Install (PC)
+## Install (server)
 
-```powershell
-$token = -join ((48..57) + (97..102) | Get-Random -Count 64 | % {[char]$_})
-& .\deploy\vanessa-bridge\run-bridge.ps1 -Install -Token $token
-& .\deploy\hermes-pc\hermes-tunnel.ps1 -SshHost <server> -SshUser root -Install
+```bash
+# glab + PAT for the internal GitLab (once, through the VPN route)
+glab auth login --hostname <gitlab-host> --api-protocol https --stdin   # paste the PAT
+# token for the bridge's own HTTP auth: the same value as DEPLOY_BRIDGE_TOKEN
+install -d -m700 /root/vanessa-bridge && echo <token> > /root/vanessa-bridge/token
+# service
+systemctl enable --now vanessa-bridge
 ```
 
-The second command reinstalls the tunnel task; it now forwards
-`172.17.0.1:8642` (Hermes) **and** `172.17.0.1:8643` (bridge). The server's
-`~/.ssh/authorized_keys` line for the tunnel key must allow both:
-
-```
-restrict,port-forwarding,permitlisten="172.17.0.1:8642",permitlisten="172.17.0.1:8643",command="/usr/sbin/nologin" ssh-ed25519 AAAA... vanessa-hermes
-```
-
-Check the bridge by hand:
-
-```powershell
-python .\deploy\vanessa-bridge\bridge.py --check --glab <glab.exe> --token-file $env:LOCALAPPDATA\vanessa-bridge\token
-```
+The unit lives at `/etc/systemd/system/vanessa-bridge.service`; it runs
+`bridge.py --host 172.17.0.1 --port 8643 --token-file /root/vanessa-bridge/token`
+so only the server and its containers can reach it. Health, GitLab reachability
+and the shared-peer fight are covered by `vanessa-vpn-check.timer`
+(`/var/log/vanessa-vpn.log`) — see [vpn-shared-peer](vpn-shared-peer.md).
 
 ## Server (.env.local)
 
@@ -114,7 +111,12 @@ docker logs --since=5m vanessa-worker-1 | grep deploy_watch
 
 ## Limits
 
-- No PC, no announcements: the bridge lives there, like Hermes.
+- The bridge works while GitLab is reachable through the dev VPN; the tunnel is
+  a shared peer, so a busy laptop costs freshness, not the endpoint
+  ([vpn-shared-peer](vpn-shared-peer.md)).
+- No GitLab, no announcements: nothing is queued on the GitLab side, but a
+  deploy stays announceable for `DEPLOY_MAX_LATE_HOURS` after the tick that
+  missed it.
 - The changelog is the commit list between the two deploys; when nothing in
   it matters for the product, the post is the header and the rollout line.
 - The readiness probe is the public origin, not Argo: a 200 means the stand

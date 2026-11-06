@@ -4,7 +4,7 @@ photos: true
 reactions: true
 split_messages: true
 scene: false
-speech: false
+speech: true
 listen_window: "current"
 addressing: telegram
 prompt_addendum: ""

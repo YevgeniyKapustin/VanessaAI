@@ -24,6 +24,7 @@ from services.bot.handlers.message_typing import (
     _typing_loop,
     _typing_on_signal,
 )
+from services.bot.handlers.message_voice import register_voice_handler
 from services.bot.messages import IncomingMessage
 
 logger = logging.getLogger(__name__)
@@ -84,4 +85,5 @@ def create_messages_router(services: BotServices) -> Router:
     router.message.register(handle_text, F.text)
     _register_photo_handler(router, services)
     register_media_handlers(router, services)
+    register_voice_handler(router, services)
     return router

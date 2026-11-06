@@ -10,7 +10,11 @@ from vanessa.core.protocols.compose import (
 from vanessa.core.protocols.hermes import HermesHealthProtocol
 from vanessa.core.protocols.knowledge import PinnedNotesProtocol
 from vanessa.core.protocols.reminders import ReminderStoreProtocol
-from vanessa.core.protocols.speech import SpeechAudio, SpeechSynthesizer
+from vanessa.core.protocols.speech import (
+    SpeechAudio,
+    SpeechSynthesizer,
+    SpeechTranscriber,
+)
 from vanessa.core.protocols.storage import (
     ChatUserProtocol,
     MessageRepositoryProtocol,
@@ -32,6 +36,7 @@ __all__ = [
     "SceneDescriberProtocol",
     "SpeechAudio",
     "SpeechSynthesizer",
+    "SpeechTranscriber",
     "TurnMetricsProtocol",
     "UnitOfWorkProtocol",
     "UserRepositoryProtocol",

@@ -8,7 +8,7 @@ from services.bot.speech_settings import resolve_telegram_speech_enabled
 from services.bot.stickers import StickerDecider, StickerService, build_catalog
 from vanessa.config import settings
 from vanessa.config.content import BotMessagesContent, get_content
-from vanessa.core.protocols.speech import SpeechSynthesizer
+from vanessa.core.protocols.speech import SpeechSynthesizer, SpeechTranscriber
 from vanessa.infrastructure.broker.redis_streams import RedisStreamBroker
 from vanessa.infrastructure.broker.streams import BrokerStreams
 from vanessa.infrastructure.speech import create_speech_synthesizer
@@ -27,8 +27,13 @@ class BotServices:
     message_delay_seconds: float = 0.7
     max_messages: int = 8
     speech: SpeechSynthesizer | None = None
+    #: Same ElevenLabs client: incoming voice notes → text (Telegram only).
+    speech_transcriber: SpeechTranscriber | None = None
     speech_enabled: bool = False
-    speech_send: str = "voice_and_text"
+    #: on_request (default) | voice_and_text | voice_only | off
+    speech_send: str = "on_request"
+    #: Output format of the voice note itself (MP3 for Telegram).
+    speech_format: str = "mp3_44100_128"
     #: Broker and stream names for background consumers (outbound follow-ups).
     broker: RedisStreamBroker | None = None
     streams: BrokerStreams | None = None
@@ -63,7 +68,11 @@ def create_bot_services() -> BotServices:
     speech_enabled = resolve_telegram_speech_enabled(
         default=settings.speech_enabled,
     )
-    speech = create_speech_synthesizer() if speech_enabled else None
+    speech_client = (
+        create_speech_synthesizer(output_format=settings.elevenlabs_voice_format)
+        if speech_enabled
+        else None
+    )
 
     return BotServices(
         chat_client=chat_client,
@@ -78,9 +87,11 @@ def create_bot_services() -> BotServices:
         typing_interval_seconds=settings.bot_typing_interval_seconds,
         message_delay_seconds=settings.bot_message_delay_seconds,
         max_messages=settings.bot_max_messages,
-        speech=speech,
+        speech=speech_client,
+        speech_transcriber=speech_client,
         speech_enabled=speech_enabled,
         speech_send=settings.speech_send,
+        speech_format=settings.elevenlabs_voice_format,
         broker=broker,
         streams=streams,
     )

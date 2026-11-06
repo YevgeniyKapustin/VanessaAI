@@ -37,7 +37,10 @@ class SharedSettings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
     elevenlabs_model_id: str = "eleven_multilingual_v2"
+    elevenlabs_stt_model_id: str = "scribe_v1"
     elevenlabs_output_format: str = "pcm_24000"
+    #: Format of the Telegram voice note (MP3 keeps bot payloads small).
+    elevenlabs_voice_format: str = "mp3_44100_128"
     elevenlabs_timeout_seconds: float = 30.0
 
     # --- HTTP (health / metrics on the agent process) ------------------------

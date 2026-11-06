@@ -29,7 +29,8 @@ class BotMixin:
 
     # Telegram TTS stays off unless channel YAML or env flips it.
     speech_enabled: bool = False
-    speech_send: str = "voice_and_text"
+    #: on_request (default) | voice_and_text | voice_only | off
+    speech_send: str = "on_request"
 
     # Port for the bot process Prometheus HTTP endpoint.
     bot_metrics_port: int = 9101

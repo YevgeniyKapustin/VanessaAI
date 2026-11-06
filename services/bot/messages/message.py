@@ -37,6 +37,8 @@ class IncomingMessage:
     reply_to_sender_name: str | None = None
     # Images attached to this message (vision). Empty for plain text turns.
     images: tuple[ImageAttachment, ...] = ()
+    # The turn started as a voice note; ``text`` is its transcript.
+    is_voice: bool = False
 
     @classmethod
     def from_telegram(
@@ -45,6 +47,7 @@ class IncomingMessage:
         *,
         images: tuple[ImageAttachment, ...] = (),
         text: str | None = None,
+        voice: bool = False,
     ) -> "IncomingMessage":
         if message.from_user is None:
             raise ValueError("Сообщение без отправителя не поддерживается")
@@ -71,6 +74,7 @@ class IncomingMessage:
             reply_to_text=addressing.reply_to_text,
             reply_to_sender_name=addressing.reply_to_sender_name,
             images=images,
+            is_voice=voice,
         )
 
     def to_api_payload(self) -> dict[str, Any]:

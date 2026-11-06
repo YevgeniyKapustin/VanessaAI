@@ -75,11 +75,27 @@ channel; VRChat adds a short `prompt_addendum` here.
 |------|----------|--------|
 | `stickers` / `photos` / `reactions` / `split_messages` | on | off |
 | `scene` | off | on |
-| `speech` | false | true |
+| `speech` | true | true |
 | `listen_window` | current session window | on |
 | `addressing` | telegram mention entity | addressed (no TG entity) |
 
 HTML, typing, `/note`, and access stay in the adapter, not this profile.
+
+## Voice (Telegram)
+
+ElevenLabs, called straight from the adapter — no audio ever crosses Redis.
+
+- **Out**: `SPEECH_SEND` decides when she speaks. `on_request` (default) sends a
+  voice note only when the message asks for one (`голосом`, `озвучь`, `вслух`,
+  `voice note`) or when it is an answer to a voice note. `voice_and_text` and
+  `voice_only` speak every reply. Format: `ELEVENLABS_VOICE_FORMAT`
+  (`mp3_44100_128`, accepted by `sendVoice` as-is).
+- **In**: a voice note is transcribed with `ELEVENLABS_STT_MODEL_ID`
+  (`scribe_v1`) and handled as a normal text turn.
+- **Fallback**: `SPEECH_ENABLED=true` plus `speech: true` only *allow* voice.
+  Without `ELEVENLABS_API_KEY`/`ELEVENLABS_VOICE_ID` synthesis returns nothing
+  and the same reply goes out as plain text; an incoming voice note is
+  transcribed or, failing that, left unanswered.
 
 ## Identity
 

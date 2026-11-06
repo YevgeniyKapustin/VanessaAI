@@ -106,3 +106,56 @@ async def test_synthesize_builds_httpx_client(monkeypatch) -> None:
     assert audio is not None
     assert audio.pcm == pcm
     assert captured
+
+
+def _stt_client(payload: object) -> AsyncMock:
+    client = AsyncMock()
+    response = MagicMock()
+    response.json.return_value = payload
+    response.raise_for_status.return_value = None
+    client.post.return_value = response
+    return client
+
+
+@pytest.mark.asyncio
+async def test_transcribe_posts_the_voice_note() -> None:
+    client = _stt_client({"text": "  привет, как дела  "})
+    speech = ElevenLabsSpeech(
+        api_key="xi-test",
+        voice_id="voice-1",
+        stt_model_id="scribe_v1",
+        client=client,
+    )
+    text = await speech.transcribe(b"OggS", filename="voice.ogg")
+
+    assert text == "привет, как дела"
+    call = client.post.await_args
+    assert call.args[0].endswith("/v1/speech-to-text")
+    assert call.kwargs["headers"]["xi-api-key"] == "xi-test"
+    assert call.kwargs["files"]["file"] == ("voice.ogg", b"OggS", "audio/ogg")
+    assert call.kwargs["data"]["model_id"] == "scribe_v1"
+
+
+@pytest.mark.asyncio
+async def test_transcribe_skips_without_credentials() -> None:
+    client = AsyncMock()
+    speech = ElevenLabsSpeech(api_key="", voice_id="voice-1", client=client)
+    assert await speech.transcribe(b"OggS", filename="voice.ogg") is None
+    client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_transcribe_skips_empty_audio() -> None:
+    client = AsyncMock()
+    speech = ElevenLabsSpeech(api_key="xi-test", voice_id="voice-1", client=client)
+    assert await speech.transcribe(b"", filename="voice.ogg") is None
+    client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [{"text": "   "}, {"text": None}, {}, []])
+async def test_transcribe_unusable_payload_returns_none(payload: object) -> None:
+    client = _stt_client(payload)
+    speech = ElevenLabsSpeech(api_key="xi-test", voice_id="voice-1", client=client)
+    assert await speech.transcribe(b"OggS", filename="voice.ogg") is None
+

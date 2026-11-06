@@ -8,6 +8,7 @@ from services.bot.handlers.message_speech import maybe_send_voice, omit_text_aft
 from services.bot.handlers.message_typing import _ping_typing
 from services.bot.messages import IncomingMessage
 from services.bot.messages.response import ChatProcessResult
+from services.bot.speech_policy import wants_voice_reply
 from services.bot.stickers.heuristics import is_sticker_request
 
 logger = logging.getLogger("services.bot.handlers.messages")
@@ -22,7 +23,13 @@ async def _deliver_tagged_reply(
     await _ping_typing(
         telegram_message.bot, incoming.telegram_chat_id, "pre_reply"
     )
-    voice_sent = await maybe_send_voice(telegram_message, result, services)
+    voice_sent = await maybe_send_voice(
+        telegram_message,
+        result,
+        services,
+        requested=wants_voice_reply(incoming.text),
+        replied_to_voice=incoming.is_voice,
+    )
     skip_text = omit_text_after_voice(
         voice_sent=voice_sent, speech_send=services.speech_send
     )

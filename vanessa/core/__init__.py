@@ -7,6 +7,7 @@ from vanessa.core.protocols import (
     MessageRepositoryProtocol,
     SpeechAudio,
     SpeechSynthesizer,
+    SpeechTranscriber,
     UnitOfWorkProtocol,
 )
 from vanessa.core.request_context import get_request_id, new_request_id
@@ -22,6 +23,7 @@ __all__ = [
     "MessageRepositoryProtocol",
     "SpeechAudio",
     "SpeechSynthesizer",
+    "SpeechTranscriber",
     "StoredMessage",
     "UnitOfWorkProtocol",
     "as_generate_request",

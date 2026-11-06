@@ -14,7 +14,7 @@ def test_telegram_profile_keeps_current_agent_flags() -> None:
     assert profile.photos is True
     assert profile.split_messages is True
     assert profile.scene is False
-    assert profile.speech is False
+    assert profile.speech is True
     assert profile.listen_window == "current"
     assert profile.addressing == "telegram"
     assert profile.prompt_addendum.strip() == ""

@@ -1,4 +1,9 @@
-"""Telegram ``speech`` flag. Prefer channel YAML; otherwise stay off."""
+"""Telegram ``speech`` flag. Prefer channel YAML; otherwise stay off.
+
+``SPEECH_ENABLED`` is the global switch and the channel YAML declares whether
+this adapter can speak at all — both must be on, so one env var silences voice
+everywhere without editing the config tree.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +24,10 @@ def resolve_telegram_speech_enabled(
 ) -> bool:
     if channels_path is not None:
         return _flag_or_default(channels_path, default=default)
+    return default and _channel_flag(default=default)
+
+
+def _channel_flag(*, default: bool) -> bool:
     try:
         return load_channel_profile("telegram").speech
     except (OSError, ValueError) as exc:
@@ -32,7 +41,7 @@ def _flag_or_default(path: Path, *, default: bool) -> bool:
     flag = _speech_flag_from_yaml(path)
     if flag is None:
         return default
-    return flag
+    return default and flag
 
 
 def _speech_flag_from_yaml(path: Path) -> bool | None:

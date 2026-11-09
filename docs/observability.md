@@ -163,3 +163,6 @@ Prometheus scrapes api, bot, worker, and MCP on the Compose network.
 Grafana is preloaded from the files above. There is no separate
 `plans/observability.md` — this file is the catalog. Env flags:
 [`.env.defaults`](../.env.defaults).
+
+Разборы инцидентов лежат в [`incidents/`](incidents/): замеры, классы
+ошибок и пути к логам, без текста переписки.

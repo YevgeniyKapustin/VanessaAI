@@ -18,6 +18,12 @@ worker (background job): POST /v1/runs → poll GET /v1/runs/{id}
 - One Hermes session per chat: `session_id = <channel>-<chat_id>`.
 - A run that waits for approval or clarification is stopped (deny-and-stop).
 - A run longer than `HERMES_MAX_WAIT_SECONDS` is stopped.
+- A run past `HERMES_PROGRESS_SECONDS` (90) gets one "still looking" line
+  in the chat (`progress_line` in the follow-up YAML). Agents (`bot_peer`)
+  never see it.
+- A run that ends with nothing names why: the poller reports `blocked`,
+  `timeout`, `interrupted`, `failed` or `empty`, and the follow-up task
+  says it in one line from `failure_meanings` instead of shrugging.
 - Streaming is not used: its error chunks are not redacted upstream.
 - A worker restart loses jobs in progress. The Hermes run itself continues.
 - One open job per question in a chat. A new ask that repeats an open job
@@ -97,6 +103,30 @@ HERMES_API_KEY=<same as API_SERVER_KEY on the PC>
 ```
 docker compose exec worker curl -s http://host.docker.internal:8642/health
 ```
+
+5. `browser_exec` on the Hermes host needs the GUI libraries Chromium
+   links against. Without them it exits 127 with
+   `libatk-1.0.so.0: cannot open shared object file`, and the CDP
+   supervisor then burns its five reconnects. Ubuntu 24.04 (`t64` names):
+
+```
+sudo apt-get install -y libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 \
+  libxkbcommon0 libgbm1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+  libpango-1.0-0 libcairo2 libasound2t64 libnss3 libnspr4 libx11-xcb1
+```
+
+   Check: `/root/.hermes/tools/chromium-*/chrome-linux64/chrome --headless=new
+   --no-sandbox --disable-gpu --dump-dom https://example.com | head -c 100`.
+
+6. `execute_code` is refused on the `api_server` surface unless Hermes
+   `config.yaml` sets `approvals.unattended_mode: approve` (default
+   `deny`). Nothing can approve a card in `/v1/runs`, so every step
+   becomes its own `terminal` call: 23–26 round-trips per task, minutes
+   of silence. `terminal` on that surface already runs unsandboxed under
+   `approvals.mode: smart`, and a heredoc script is auto-approved there,
+   so the flag removes round-trips, not a sandbox. Keep the smart policy
+   (`approvals.smart_policy`) as it is: it still denies the five
+   dangerous classes.
 
 ## Deploy announcements share the tunnel
 

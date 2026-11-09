@@ -2,6 +2,7 @@ import logging
 
 import pytest
 
+from services.worker.hermes import runner as runner_module
 from services.worker.hermes.compose import OUTBOUND_MAX_CHARS, chat_request
 from services.worker.hermes.prompt import (
     build_followup_system_prompt,
@@ -20,6 +21,7 @@ from tests.worker.hermes_fakes import (
 from vanessa.config.content import get_content
 from vanessa.config.content_hermes import get_hermes_content
 from vanessa.contracts.outbound import OutboundMessage
+from vanessa.infrastructure.hermes import HermesWaitResult
 from vanessa.pipeline.llm.tagged_reply import UNTAGGED_ATTEMPTS
 
 _MAX_TOKENS = 900
@@ -63,23 +65,89 @@ async def test_success_publishes_persona_text_as_reply(caplog) -> None:
     assert "run-1" in caplog.text
 
 
-async def test_no_answer_publishes_short_line() -> None:
+async def test_no_answer_names_the_reason() -> None:
     client = FakeClient(status="failed")
     completer = FakeCompleter("[answer]\nГермес сегодня не в духе")
     broker = FakeBroker()
     await make_runner(client, completer, broker).run(make_ask())
     assert _only_message(broker).text == "Гермес сегодня не в духе"
     prompt = _user_prompt(completer)
+    prompts = get_hermes_content()
     assert "</hermes_answer>" not in prompt
-    assert get_hermes_content().undelivered_task.strip() in prompt
+    # The reason block and its task replace the generic shrug.
+    assert prompts.failure_meanings["failed"] in prompt
+    assert "code: failed" in prompt
+    assert prompts.undelivered_reason_task.strip() in prompt
+    assert prompts.undelivered_task.strip() not in prompt
 
 
 async def test_approval_wait_is_stopped_and_reported() -> None:
     client = FakeClient(status="waiting_for_approval")
     broker = FakeBroker()
-    await make_runner(client, FakeCompleter("[answer]\nне принёс"), broker).run(make_ask())
+    completer = FakeCompleter("[answer]\nне принёс")
+    await make_runner(client, completer, broker).run(make_ask())
     assert client.stopped == ["run-1"]
     assert _only_message(broker).text == "не принёс"
+    assert "code: blocked" in _user_prompt(completer)
+
+
+async def test_unknown_failure_code_keeps_the_generic_line(monkeypatch) -> None:
+    """No meaning for the code: no invented reason in the prompt."""
+
+    async def fake_wait(client, run_id, **kwargs):
+        return HermesWaitResult(failure="weird")
+
+    monkeypatch.setattr(runner_module, "wait_for_output", fake_wait)
+    completer = FakeCompleter("[answer]\nне вышло")
+    broker = FakeBroker()
+    await make_runner(FakeClient(), completer, broker).run(make_ask())
+    assert _only_message(broker).text == "не вышло"
+    prompt = _user_prompt(completer)
+    assert "code: weird" not in prompt
+    assert get_hermes_content().undelivered_task.strip() in prompt
+
+
+async def test_long_run_publishes_one_progress_line(monkeypatch) -> None:
+    seen: dict = {}
+
+    async def fake_wait(client, run_id, **kwargs):
+        seen.update(kwargs)
+        await kwargs["on_progress"]()
+        return HermesWaitResult(answer=ANSWER)
+
+    monkeypatch.setattr(runner_module, "wait_for_output", fake_wait)
+    broker = FakeBroker()
+    completer = FakeCompleter("[answer]\nготово")
+    runner = make_runner(
+        FakeClient(output=ANSWER),
+        completer,
+        broker,
+        progress_seconds=90.0,
+        progress_line="Ещё копаюсь.",
+    )
+    await runner.run(make_ask())
+    assert seen["progress_after_seconds"] == 90.0
+    progress = [m for _stream, m in broker.published if m.source == "hermes_progress"]
+    assert [m.text for m in progress] == ["Ещё копаюсь."]
+    assert broker.published[-1][1].source == "hermes"
+
+
+async def test_bot_peer_gets_no_progress_line(monkeypatch) -> None:
+    async def fake_wait(client, run_id, **kwargs):
+        await kwargs["on_progress"]()
+        return HermesWaitResult(answer=ANSWER)
+
+    monkeypatch.setattr(runner_module, "wait_for_output", fake_wait)
+    broker = FakeBroker()
+    runner = make_runner(
+        FakeClient(output=ANSWER),
+        FakeCompleter("[answer]\nготово"),
+        broker,
+        progress_seconds=90.0,
+        progress_line="Ещё копаюсь.",
+    )
+    await runner.run(make_ask(bot_peer=True))
+    assert [m.source for _s, m in broker.published] == ["hermes"]
 
 
 async def test_unavailable_publishes_short_line_without_error_text(caplog) -> None:

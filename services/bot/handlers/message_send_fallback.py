@@ -5,7 +5,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message as TelegramMessage
 
 from vanessa.infrastructure.observability.metrics import record_telegram
-from vanessa.pipeline.llm.format.dashes import plain_dashes
+from vanessa.core.text.dashes import plain_dashes
 
 logger = logging.getLogger("services.bot.handlers.messages")
 

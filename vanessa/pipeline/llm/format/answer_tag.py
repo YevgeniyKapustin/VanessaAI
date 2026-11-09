@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import re
 
-from vanessa.pipeline.llm.format.code_fences import (
+from vanessa.core.text.code_fences import (
     FENCED_CODE as _FENCED_CODE,
 )
-from vanessa.pipeline.llm.format.code_fences import (
+from vanessa.core.text.code_fences import (
     map_outside_fences as _map_outside_fences,
 )
 

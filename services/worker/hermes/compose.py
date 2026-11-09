@@ -94,14 +94,19 @@ class FollowupComposer:
         *,
         file_task: str = "",
         elapsed_seconds: float | None = None,
+        failure_reason: str = "",
     ) -> str:
         """Always return a non-empty text; ``[next]`` lines split it.
 
         ``followup_blocks`` cuts it into messages of at most 4096 chars.
         ``elapsed_seconds``: the real time from the run start to the answer.
+        ``failure_reason``: why the run has no answer (``blocked``, ``timeout``,
+        …), so the line can name it instead of shrugging.
         """
         try:
-            raw = await self._complete(ask, answer, file_task, elapsed_seconds)
+            raw = await self._complete(
+                ask, answer, file_task, elapsed_seconds, failure_reason
+            )
         except Exception as exc:  # noqa: BLE001 - any LLM failure → plain fallback
             # The type only: provider errors may echo the prompt.
             logger.warning(
@@ -138,6 +143,7 @@ class FollowupComposer:
         answer: str | None,
         file_task: str,
         elapsed_seconds: float | None,
+        failure_reason: str,
     ) -> str:
         user = build_followup_user_prompt(
             ask,
@@ -145,6 +151,7 @@ class FollowupComposer:
             self._prompts,
             file_task=file_task,
             elapsed_seconds=elapsed_seconds,
+            failure_reason=failure_reason,
         )
         async def create(*, strict: bool) -> str:
             messages, extra = chat_request(

@@ -27,7 +27,7 @@ from vanessa.pipeline.llm.format.block_markers import (
     _strip_marker_tokens,
     strip_block_markers,
 )
-from vanessa.pipeline.llm.format.code_fences import FENCED_CODE as _FENCED_CODE
+from vanessa.core.text.code_fences import FENCED_CODE as _FENCED_CODE
 
 
 def _flush_current_block(blocks: list[str], current: list[str]) -> None:

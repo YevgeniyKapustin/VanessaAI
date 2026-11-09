@@ -7,6 +7,7 @@ from dataclasses import replace
 
 from services.worker.hermes.compose import FollowupComposer
 from services.worker.hermes.payload import HermesAsk
+from services.worker.hermes.progress import ProgressLine
 from services.worker.hermes.runner import HermesRunner
 from vanessa.config.content_hermes import get_hermes_content
 from vanessa.contracts.messages import TaskKind, TaskMessage
@@ -47,10 +48,19 @@ def make_ask(**overrides) -> HermesAsk:
 
 
 class FakeClient:
-    def __init__(self, *, status: str = "completed", output: str = "", fail: bool = False):
+    def __init__(
+        self,
+        *,
+        status: str = "completed",
+        output: str = "",
+        fail: bool = False,
+        statuses: list[str] | None = None,
+    ):
         self.status = status
         self.output = output
         self.fail = fail
+        # One status per poll, in order; the last one sticks.
+        self._statuses = list(statuses or [])
         self.started: list[tuple[str, dict]] = []
         self.stopped: list[str] = []
 
@@ -61,6 +71,8 @@ class FakeClient:
         return "run-1"
 
     async def get_run(self, run_id: str) -> HermesRun:
+        if self._statuses:
+            self.status = self._statuses.pop(0)
         return HermesRun(run_id=run_id, status=self.status, output=self.output)
 
     async def stop_run(self, run_id: str) -> None:
@@ -137,7 +149,19 @@ def make_composer(completer: FakeCompleter) -> FollowupComposer:
     )
 
 
-def make_runner(client: FakeClient, completer: FakeCompleter, broker: FakeBroker):
+def make_runner(
+    client: FakeClient,
+    completer: FakeCompleter,
+    broker: FakeBroker,
+    *,
+    progress_seconds: float = 0.0,
+    progress_line: str = "",
+):
+    progress = (
+        ProgressLine(broker, stream="vanessa:outbound", line=progress_line)
+        if progress_line
+        else None
+    )
     return HermesRunner(
         client,
         make_composer(completer),
@@ -146,4 +170,6 @@ def make_runner(client: FakeClient, completer: FakeCompleter, broker: FakeBroker
         instructions="work only",
         poll_seconds=0.0,
         max_wait_seconds=60.0,
+        progress=progress,
+        progress_seconds=progress_seconds,
     )

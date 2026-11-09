@@ -7,6 +7,7 @@ from dataclasses import replace
 from services.worker.hermes.compose import FollowupComposer
 from services.worker.hermes.handler import HermesAskHandler
 from services.worker.hermes.payload import SUPPORTED_CHANNEL
+from services.worker.hermes.progress import ProgressLine
 from services.worker.hermes.prompt import build_followup_system_prompt
 from services.worker.hermes.runner import HermesRunner
 from vanessa.config.content import AppContent, get_content
@@ -53,6 +54,10 @@ def build_hermes_runner(
         max_wait_seconds=settings.hermes_max_wait_seconds,
         file_max_bytes=settings.hermes_file_max_bytes,
         report_css=get_report_css(),
+        progress=ProgressLine(
+            broker, stream=outbound_stream, line=prompts.progress_line
+        ),
+        progress_seconds=settings.hermes_progress_seconds,
     )
 
 

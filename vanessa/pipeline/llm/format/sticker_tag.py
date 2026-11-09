@@ -6,7 +6,7 @@ from vanessa.infrastructure.observability.metrics import (
     sticker_tagged_total,
     sticker_unknown_tags_total,
 )
-from vanessa.pipeline.llm.format.code_fences import (
+from vanessa.core.text.code_fences import (
     map_outside_fences as _map_outside_fences,
 )
 

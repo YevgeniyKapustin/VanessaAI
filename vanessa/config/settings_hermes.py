@@ -14,11 +14,14 @@ class HermesMixin:
     # Per HTTP call (health, start, poll); the agent waits only this long.
     hermes_timeout_seconds: float = 5.0
     hermes_poll_seconds: float = 5.0
-    # A run still not done after this is stopped and dropped.
-    hermes_max_wait_seconds: float = 6000.0
+    # A run still not done after this is stopped and dropped. The chat gets
+    # a progress line meanwhile (``hermes_progress_seconds``).
+    hermes_max_wait_seconds: float = 600.0
+    # One "still looking" chat line once a run passes this; 0 = off.
+    hermes_progress_seconds: float = 90.0
     # Hermes jobs the worker runs at the same time.
     hermes_max_parallel: int = 3
-    hermes_query_max_chars: int = 500
+    hermes_query_max_chars: int = 900
     # Largest generated HTML file the worker sends as a document (UTF-8 bytes).
     hermes_file_max_bytes: int = 262_144
     # A lookup result posted less than this long ago answers a reaction to

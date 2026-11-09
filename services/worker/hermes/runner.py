@@ -13,6 +13,7 @@ from services.worker.hermes.blocks import followup_blocks
 from services.worker.hermes.compose import FollowupComposer, truncate_message
 from services.worker.hermes.html_file import HtmlFile, SplitAnswer, split_html_file
 from services.worker.hermes.payload import HermesAsk
+from services.worker.hermes.progress import ProgressLine
 from services.worker.hermes.report_style import styled_file
 from services.worker.hermes.trace import bind_job, trace_answer, trace_query, trace_sent
 from vanessa.contracts.outbound import (
@@ -24,6 +25,7 @@ from vanessa.contracts.outbound import (
 from vanessa.infrastructure.hermes import (
     HermesClient,
     HermesUnavailableError,
+    HermesWaitResult,
     hermes_session_id,
     wait_for_output,
 )
@@ -54,6 +56,8 @@ class HermesRunner:
         max_wait_seconds: float,
         file_max_bytes: int = 262_144,
         report_css: str = "",
+        progress: ProgressLine | None = None,
+        progress_seconds: float = 0.0,
     ) -> None:
         self._client = client
         self._composer = composer
@@ -63,6 +67,8 @@ class HermesRunner:
         self._poll_seconds = poll_seconds
         self._max_wait_seconds = max_wait_seconds
         self._css = report_css
+        self._progress = progress
+        self._progress_seconds = progress_seconds
         # Bytes >= chars, so the file plus our stylesheet stays under the
         # wire cap.
         room = DOCUMENT_MAX_CHARS - len(report_css) - _STYLE_TAGS_CHARS
@@ -71,7 +77,7 @@ class HermesRunner:
     async def run(self, ask: HermesAsk) -> None:
         bind_job(ask)
         started = time.monotonic()
-        answer, outcome = await self._ask_hermes(ask)
+        answer, outcome, failure = await self._ask_hermes(ask)
         trace_answer(answer, outcome)
         split = split_html_file(answer or "", max_bytes=self._file_max_bytes)
         file_task = self._composer.file_task(
@@ -82,6 +88,7 @@ class HermesRunner:
             split.text or None,
             file_task=file_task,
             elapsed_seconds=time.monotonic() - started,
+            failure_reason=failure,
         )
         if ask.bot_peer:
             # Agents get one flat message; keep the sentence punctuation the
@@ -95,20 +102,21 @@ class HermesRunner:
         await self._broker.publish(self._stream, _outbound(ask, blocks, file))
         seconds = time.monotonic() - started
         record_hermes_job(outcome, seconds)
-        _log_done(ask, outcome, seconds, blocks, split)
+        _log_done(ask, outcome, failure, seconds, blocks, split)
 
-    async def _ask_hermes(self, ask: HermesAsk) -> tuple[str | None, str]:
+    async def _ask_hermes(self, ask: HermesAsk) -> tuple[str | None, str, str]:
+        """Answer, outcome for metrics, and why there is no answer."""
         try:
-            answer = await self._run_and_wait(ask)
+            result = await self._run_and_wait(ask)
         except HermesUnavailableError:
             # The error text may carry the tunnel URL; log the fact only.
             logger.warning("hermes_unavailable chat_id=%s", ask.telegram_chat_id)
-            return None, "unavailable"
-        if not answer:
-            return None, "no_answer"
-        return answer, "answered"
+            return None, "unavailable", ""
+        if not result.answer:
+            return None, "no_answer", result.failure
+        return result.answer, "answered", ""
 
-    async def _run_and_wait(self, ask: HermesAsk) -> str | None:
+    async def _run_and_wait(self, ask: HermesAsk) -> HermesWaitResult:
         run_started = time.monotonic()
         trace_query(ask, self._instructions)
         run_id = await self._client.start_run(
@@ -120,33 +128,48 @@ class HermesRunner:
         logger.info(
             "hermes_run_started run_id=%s chat_id=%s", run_id, ask.telegram_chat_id
         )
-        answer = await wait_for_output(
+        result = await wait_for_output(
             self._client,
             run_id,
             poll_seconds=self._poll_seconds,
             max_wait_seconds=self._max_wait_seconds,
+            progress_after_seconds=self._progress_seconds,
+            on_progress=self._progress_callback(ask),
         )
         logger.info(
-            "hermes_run_finished run_id=%s answered=%s seconds=%.1f",
+            "hermes_run_finished run_id=%s answered=%s failure=%s seconds=%.1f",
             run_id,
-            bool(answer),
+            bool(result.answer),
+            result.failure or "-",
             time.monotonic() - run_started,
         )
-        return answer
+        return result
+
+    def _progress_callback(self, ask: HermesAsk):
+        """The one mid-job line; None when progress is off or unset."""
+        if self._progress is None or self._progress_seconds <= 0:
+            return None
+
+        async def tell() -> None:
+            await self._progress.tell(ask)
+
+        return tell
 
 
 def _log_done(
     ask: HermesAsk,
     outcome: str,
+    failure: str,
     seconds: float,
     blocks: list[str],
     split: SplitAnswer,
 ) -> None:
     logger.info(
-        "hermes_job_done chat_id=%s outcome=%s seconds=%.1f len=%s messages=%s "
-        "file_bytes=%s file_refused=%s",
+        "hermes_job_done chat_id=%s outcome=%s failure=%s seconds=%.1f len=%s "
+        "messages=%s file_bytes=%s file_refused=%s",
         ask.telegram_chat_id,
         outcome,
+        failure or "-",
         seconds,
         sum(len(block) for block in blocks),
         len(blocks),

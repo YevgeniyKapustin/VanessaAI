@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from vanessa.pipeline.llm.format.code_fences import map_outside_fences
+from vanessa.core.text.code_fences import map_outside_fences
 
 _TAIL_TAG = re.compile(r"(^|[ \t])\[\s*([a-z][a-z_-]{1,19})\s*\][ \t]*$", re.MULTILINE)
 _KEPT = frozenset({"next", "ignore"})

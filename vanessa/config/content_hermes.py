@@ -34,6 +34,13 @@ class HermesContent(BaseModel):
     file_refused_task: str = ""
     # The real run time; ``{duration}`` becomes «16 seconds» / «3 minutes».
     timing_note: str = ""
+    # A run that brought nothing back: the reason block ({reason}, {meaning})
+    # and the task that names it in one line instead of shrugging.
+    failure_note: str = ""
+    failure_meanings: dict[str, str] = Field(default_factory=dict)
+    undelivered_reason_task: str = ""
+    # One mid-job line ("still looking"); empty = no progress message.
+    progress_line: str = ""
     # null or 0 = off: max_tokens is not sent.
     max_tokens: int | None = Field(default=1024, ge=0, le=4096)
 

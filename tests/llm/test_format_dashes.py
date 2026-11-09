@@ -1,6 +1,6 @@
-"""Typographic dashes never reach a chat: see ``vanessa.pipeline.llm.format.dashes``."""
+"""Typographic dashes never reach a chat: see ``vanessa.core.text.dashes``."""
 
-from vanessa.pipeline.llm.format.dashes import plain_dashes
+from vanessa.core.text.dashes import plain_dashes
 
 
 def test_em_dash_becomes_a_hyphen() -> None:

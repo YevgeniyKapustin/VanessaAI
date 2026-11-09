@@ -11,7 +11,7 @@ rewriting it would break what the person is meant to copy.
 
 from __future__ import annotations
 
-from vanessa.pipeline.llm.format.code_fences import map_outside_fences
+from vanessa.core.text.code_fences import map_outside_fences
 
 #: Typographic dash code points and the plain hyphen each one becomes.
 DASHES: dict[int, str] = {

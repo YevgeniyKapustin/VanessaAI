@@ -9,7 +9,7 @@ re-send it.
 
 import re
 
-from vanessa.pipeline.llm.format.code_fences import (
+from vanessa.core.text.code_fences import (
     map_outside_fences as _map_outside_fences,
 )
 

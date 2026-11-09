@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from vanessa.pipeline.llm.format.block_markers import _keep_nonempty
-from vanessa.pipeline.llm.format.code_fences import FENCED_CODE as _FENCED_CODE
+from vanessa.core.text.code_fences import FENCED_CODE as _FENCED_CODE
 
 # Paragraph / sentence boundaries — used by the deterministic fallback splitter.
 _PARAGRAPH_BOUNDARY = re.compile(r"\n\s*\n")

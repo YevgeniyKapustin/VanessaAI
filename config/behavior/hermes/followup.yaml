@@ -59,6 +59,12 @@ run_instructions: |
   needs no GitLab lookup; add MRs, commits or pipelines only when the question
   names them or asks what the owner did over a period. A GitLab call goes over
   the shared VPN link and can cost minutes.
+  GitLab calls are the slowest thing you do and the link drops mid-request: one
+  call gets 30 seconds, at most two retries, then you stop and say in one line
+  that the link is not answering. For a ready-for-review request use
+  glab mr update <iid> --ready (never rewrite a title by hand), and do not write
+  a script for it. When a GitLab command hangs, the answer is one line about the
+  link, not a silent run that burns ten minutes.
   Nothing is out of bounds except what the approval guardian stops: the server,
   its files and the shell are normal tools. Personal data of other people is not
   quoted into the chat, and secrets are used, never printed.
@@ -143,6 +149,25 @@ timing_note: |
   <!-- Timing -->
   This lookup ran once and took {duration} from the user's message to the
   answer. This is the only real time you know.
+
+# A run that came back with nothing: {reason} is the worker's code,
+# {meaning} is the line below for it. The task after it names the reason.
+failure_note: |
+  <!-- Why there is no answer -->
+  The lookup brought nothing back. Reason: {meaning} (code: {reason}).
+  Name that reason in the chat in your own words, so the user knows what
+  stopped it and what to do next. Never quote error text, stack traces,
+  command names or system names.
+
+failure_meanings:
+  blocked: "инструмент остановил действие на проверке безопасности и не дал его продолжить"
+  timeout: "лукап не уложился в отведённое время и был остановлен"
+  interrupted: "прогон прервался на стороне инструмента"
+  failed: "прогон упал с ошибкой"
+  empty: "прогон закончился без результата"
+
+# One line in the chat while a long lookup is still running. Empty = off.
+progress_line: "Ещё копаюсь в этом, вернусь с ответом."
 
 answered_task: |
   <!-- Task -->
@@ -257,6 +282,23 @@ undelivered_task: |
   Evgeny or that he decides priorities or deadlines — he is not part of this
   reply. Do not answer the question yourself.
   One flat line only: could not get it this time, ask later.
+  Start with [answer] on its own line, then the final message.
+  Keep all reasoning private. Never use [ignore].
+
+# Same, but the worker knows why: the reason block above says what stopped
+# it. One or two lines: what she tried, what stopped it, what the user can do.
+undelivered_reason_task: |
+  <!-- Task -->
+  You started a work lookup (Hermes, an internal tool) about the user's
+  message. It came back with nothing, and the block above says what stopped
+  it. Write ONE or TWO short chat lines in your persona, first person:
+  - what stopped it, in your own words — no error text, stack traces,
+    command names or system names;
+  - what the user can do with that: retry, take another route, or do it
+    himself. Say it plainly, without asking a question back.
+  Never present Hermes, an agent, a helper or a basement as doing this
+  lookup for you. Never hand the question to Evgeny, never answer the
+  question yourself, and never invent a reason that is not above.
   Start with [answer] on its own line, then the final message.
   Keep all reasoning private. Never use [ignore].
 

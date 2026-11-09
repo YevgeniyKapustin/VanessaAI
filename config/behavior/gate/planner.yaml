@@ -106,8 +106,11 @@ turn_planner_prompt: |
     «какие ревью на мне»);
   - the state of work now («что по задачам», «что с релизом», «есть
     алерты?», «как там qa», «что сейчас по…», «что с нагрузкой»);
-  - a work action: «глянь», «проверь», «найди», «чекни», «заведи задачу»,
-    «дай ссылку на дашборд» about work items.
+  - a work action: «сделай», «прогони», «запусти», «собери», «глянь»,
+    «проверь», «найди», «чекни», «заведи задачу», «дай ссылку на
+    дашборд» about work items. When the owner asks to DO something, keep
+    the action verbatim in hermes_query («сделай», «прогони») — never turn
+    it into a status question or refuse it as not Vanessa's job.
   - finding a work design by name or feature («найди наш макет оплаты»,
     «где дизайн онбординга») or a Figma question about screens, components,
     text, states or a comparison with a work task. Keep the feature name,

@@ -71,7 +71,10 @@ async def test_shipped_watch_config_parses() -> None:
 
     assert "deploy" in specs
     assert specs["deploy"].kind == "deploy"
-    assert specs["deploy"].mention is True
+    # Один и тот же человек катит каждый прод-деплой: имя в шапке не нужно.
+    assert specs["deploy"].mention is False
+    assert specs["deploy"].rich is True
+    assert "{release}" in specs["deploy"].header
 
 
 def test_enabled_and_configured_watch_builds_one_loop(monkeypatch, tmp_path) -> None:

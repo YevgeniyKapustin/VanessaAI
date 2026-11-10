@@ -9,10 +9,10 @@ same reverse SSH tunnel as Hermes:
     GET /deploy/latest   -> {"deploy": {...} | null}   (Bearer token)
 
 ``deploy`` is the newest successful ``deploy:production`` job with the
-commits between it and the previous production deploy. All business logic
-(announcing, dedupe, wording) lives on the server; this file only reads
-GitLab. No writes, no tokens on the command line: the bearer token comes
-from a file.
+commits between it and the previous production deploy, newest first. All
+business logic (announcing, dedupe, wording) lives on the server; this file
+only reads GitLab. No writes, no tokens on the command line: the bearer
+token comes from a file.
 """
 
 from __future__ import annotations
@@ -31,10 +31,15 @@ from subprocess import SubprocessError, run
 from urllib.parse import urlsplit
 
 MAX_COMMITS = 40
-PIPELINES_SCANNED = 8
+#: One page of the branch's pipelines; two pages outlive any normal gap
+#: between deploys (the widest seen was six pipelines).
+PIPELINES_PAGE = 20
+PIPELINE_PAGES = 2
 DEPLOYS_NEEDED = 2
 #: One glab call may not hang the whole bridge.
 GLAB_TIMEOUT_SECONDS = 10
+#: Tags read per refresh, to name the release the deploy belongs to.
+TAGS_PAGE = 20
 #: A flaky link (a shared VPN peer, a slow GitLab) fails a call or two, not all.
 GLAB_ATTEMPTS = 3
 GLAB_RETRY_PAUSE_SECONDS = 1.0
@@ -141,22 +146,59 @@ class GitLabView:
         deploy, started = found[0]
         previous = found[1][0] if len(found) > 1 else None
         commits, total = self._commits(previous, deploy)
-        return {"deploy": _payload(deploy, started, commits, total)}
+        payload = _payload(deploy, started, commits, total)
+        payload.update(self._release(deploy))
+        return {"deploy": payload}
+
+    def _release(self, deploy: dict) -> dict:
+        """The tag of this deploy, else the newest tag the branch rides on."""
+        try:
+            tags = _as_list(
+                self._api(
+                    f"projects/{self._project}/repository/tags"
+                    f"?per_page={TAGS_PAGE}&order_by=updated&sort=desc"
+                )
+            )
+        except GitLabError:
+            # A tag lookup must never cost the deploy: empty labels are fine.
+            return {"tag": "", "latest_tag": ""}
+        sha = (deploy.get("pipeline") or {}).get("sha") or ""
+        tag = next(
+            (
+                item.get("name", "")
+                for item in tags
+                if (item.get("commit") or {}).get("id") == sha
+            ),
+            "",
+        )
+        latest = tags[0].get("name", "") if tags else ""
+        return {"tag": tag, "latest_tag": latest}
 
     def _scan(self) -> list[tuple[dict, dict | None]]:
-        pipelines = self._api(
-            f"projects/{self._project}/pipelines"
-            f"?ref={self._branch}&per_page={PIPELINES_SCANNED}"
-        )
         found: list[tuple[dict, dict | None]] = []
-        for pipeline in _as_list(pipelines):
-            pair = self._pipeline_pair(pipeline)
-            if pair is None:
-                continue
-            found.append(pair)
+        for page in range(1, PIPELINE_PAGES + 1):
+            found += self._scan_page(page, DEPLOYS_NEEDED - len(found))
             if len(found) >= DEPLOYS_NEEDED:
                 break
         return found
+
+    def _scan_page(self, page: int, wanted: int) -> list[tuple[dict, dict | None]]:
+        """Successful deploy jobs on one page, stopping after ``wanted``."""
+        pairs: list[tuple[dict, dict | None]] = []
+        pipelines = _as_list(
+            self._api(
+                f"projects/{self._project}/pipelines"
+                f"?ref={self._branch}&per_page={PIPELINES_PAGE}&page={page}"
+            )
+        )
+        for pipeline in pipelines:
+            pair = self._pipeline_pair(pipeline)
+            if pair is None:
+                continue
+            pairs.append(pair)
+            if len(pairs) >= wanted:
+                break
+        return pairs
 
     def _pipeline_pair(self, pipeline: dict) -> tuple[dict, dict | None] | None:
         if pipeline.get("status") != "success":
@@ -173,18 +215,27 @@ class GitLabView:
         head = (deploy.get("pipeline") or {}).get("sha") or ""
         base = (previous or {}).get("pipeline", {}).get("sha") or ""
         commits = _as_list(self._raw_commits(base, head))
-        return [_commit(commit) for commit in commits[:MAX_COMMITS]], len(commits)
+        # GitLab answers oldest first; the prompt wants the newest changes
+        # first, so a long release keeps the newest commits, not the oldest.
+        newest = reversed(commits[-MAX_COMMITS:])
+        return [_commit(commit) for commit in newest], len(commits)
 
     def _raw_commits(self, base: str, head: str):
-        if base and head and base != head:
+        """The range oldest first; empty when the same commit was deployed twice."""
+        if base and head:
+            if base == head:
+                return []
             data = self._api(
                 f"projects/{self._project}/repository/compare?from={base}&to={head}"
             )
             return data.get("commits") if isinstance(data, dict) else None
-        return self._api(
-            f"projects/{self._project}/repository/commits"
-            f"?ref_name={head or self._branch}&per_page={MAX_COMMITS}"
+        commits = _as_list(
+            self._api(
+                f"projects/{self._project}/repository/commits"
+                f"?ref_name={head or self._branch}&per_page={MAX_COMMITS}"
+            )
         )
+        return list(reversed(commits))
 
 
 def _as_list(value) -> list:

@@ -11,6 +11,7 @@ import logging
 
 from services.worker.announce.models import Actor, Announcement, Item
 from services.worker.deploys.models import DeployEvent
+from services.worker.deploys.release import event_release
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ def deploy_announcement(payload: dict) -> Announcement | None:
             for commit in event.commits
         ),
         total=event.total_commits,
+        release=event_release(event),
     )
 
 

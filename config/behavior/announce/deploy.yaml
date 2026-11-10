@@ -18,14 +18,19 @@ poll_seconds: 60
 max_late_hours: 12
 ready_timeout_seconds: 900
 ready_poll_seconds: 30
-mention: true
+# Off: every production deploy is rolled out by the same person, so the
+# name adds nothing to the header (and no @-mention is worth the lookup).
+mention: false
 
 link_envs:
   rollout: DEPLOY_ROLLOUT_URL
 
 context: "контур: production (прод)"
-header: "На прод [выкатили в {when}]({url}) — выкатывал {started_by}"
+header: "Релиз [{release}]({url})"
 footer: "[Раскатка тенантов на проде]({links[rollout]})"
+# The rich card keeps this text visible and folds the card-by-card разбор
+# under it; a client that refuses the card gets the text as before.
+rich: true
 
 task: |
   <!-- Task -->

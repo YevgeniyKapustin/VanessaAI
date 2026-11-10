@@ -25,6 +25,8 @@ QUESTION_MAX_CHARS = 4096
 MessageText = Annotated[str, Field(min_length=1, max_length=MESSAGE_MAX_CHARS)]
 #: A safe name: letters, digits, ``_`` and ``-``, then ``.html``.
 DOCUMENT_NAME_PATTERN = r"^[\w-]{1,60}\.html$"
+#: Wire cap for a rich-message body (one Telegram message, folded in place).
+RICH_HTML_MAX_CHARS = 20_000
 
 
 class OutboundDocument(BaseModel):
@@ -54,6 +56,9 @@ class OutboundMessage(BrokerMessage):
     source: str = "unknown"
     #: A file to send with the text (e.g. a generated HTML report).
     document: OutboundDocument | None = None
+    #: HTML for a rich message (headings, tables, ``<details>``) instead of
+    #: plain text. ``text`` stays the fallback when Telegram refuses it.
+    rich_html: str | None = Field(default=None, max_length=RICH_HTML_MAX_CHARS)
     #: More short messages, posted in order after ``text`` (and the file).
     more_texts: list[MessageText] = Field(
         default_factory=list, max_length=MORE_TEXTS_MAX

@@ -27,7 +27,12 @@ Parser = Callable[[dict], Announcement | None]
 
 
 def outbound_message(
-    spec: WatchSpec, announcement: Announcement, text: str, chat_id: int
+    spec: WatchSpec,
+    announcement: Announcement,
+    text: str,
+    chat_id: int,
+    *,
+    rich_html: str | None = None,
 ) -> OutboundMessage:
     """The message id is stable per event, so a retry cannot double-post."""
     return OutboundMessage(
@@ -36,6 +41,7 @@ def outbound_message(
         telegram_chat_id=chat_id,
         text=text,
         source=spec.id,
+        rich_html=rich_html,
     )
 
 
@@ -134,10 +140,13 @@ class Announcer:
     async def _announce(self, announcement: Announcement) -> int:
         ready = await self._wait_ready()
         mention = await self._mention(announcement)
-        text = await self._composer.compose(
+        composed = await self._composer.compose_all(
             announcement, stand_ready=ready, mention=mention
         )
-        message = outbound_message(self._spec, announcement, text, self._chat_id)
+        text = composed.text
+        message = outbound_message(
+            self._spec, announcement, text, self._chat_id, rich_html=composed.rich_html
+        )
         try:
             await self._broker.publish(self._stream, message)
         except Exception:

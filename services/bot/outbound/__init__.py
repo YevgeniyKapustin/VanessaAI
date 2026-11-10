@@ -7,6 +7,7 @@ from services.bot.outbound.consumer import (
     start_outbound_task,
 )
 from services.bot.outbound.document import post_document
+from services.bot.outbound.rich import post_rich
 from services.bot.outbound.send import post_outbound
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "handle_outbound",
     "post_document",
     "post_outbound",
+    "post_rich",
     "run_outbound_loop",
     "start_outbound_task",
 ]

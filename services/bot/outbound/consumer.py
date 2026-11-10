@@ -21,6 +21,7 @@ from services.bot.outbound.document import post_document
 from services.bot.outbound.gate import owner_allows, should_post
 from services.bot.outbound.more import post_more_texts, should_post_more
 from services.bot.outbound.posted import PostedReporter
+from services.bot.outbound.rich import post_rich
 from services.bot.outbound.send import post_outbound
 from vanessa.config import settings
 from vanessa.contracts import OutboundMessage
@@ -175,8 +176,12 @@ async def _post_and_log(
 async def _post_all(
     bot: Bot, message: OutboundMessage, delay_seconds: float
 ) -> tuple[bool, int]:
-    """The main post (text or file), then the extra messages."""
-    post = post_outbound if message.document is None else post_document
+    """The main post (text, rich card or file), then the extra messages."""
+    post = post_outbound
+    if message.document is not None:
+        post = post_document
+    elif message.rich_html:
+        post = post_rich
     delivered = await post(bot, message)
     if not should_post_more(message, delivered=delivered):
         return delivered, 0

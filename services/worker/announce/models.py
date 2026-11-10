@@ -45,6 +45,8 @@ class Announcement:
     actor: Actor | None = None
     items: tuple[Item, ...] = ()
     total: int = 0
+    #: Release label for the header («v0.1.7», «v0.1.6 (79545)»), if any.
+    release: str = ""
 
     @property
     def actor_label(self) -> str:

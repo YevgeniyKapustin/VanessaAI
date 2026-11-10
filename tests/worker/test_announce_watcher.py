@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from services.worker.announce.compose import Composed
 from services.worker.announce.content import WatchSpec
 from services.worker.announce.models import Actor, Announcement, Item
 from services.worker.announce.watcher import Announcer
@@ -67,6 +68,10 @@ class FakeComposer:
         self.stand.append(stand_ready)
         self.mentions.append(mention)
         return self.text
+
+    async def compose_all(self, announcement, *, stand_ready, mention=None):
+        text = await self.compose(announcement, stand_ready=stand_ready, mention=mention)
+        return Composed(text=text)
 
 
 def _watcher(

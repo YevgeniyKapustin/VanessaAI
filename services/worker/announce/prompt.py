@@ -52,6 +52,7 @@ def _render(template: str, announcement: Announcement, *, zone: tzinfo, author: 
         url=announcement.url.strip(),
         started_by=author or announcement.actor_label,
         links=links,
+        release=announcement.release.strip(),
     ).strip()
     # Nothing to point at → keep the words, drop the empty anchor.
     return _EMPTY_LINK.sub(r"\1", text) if "()" in text else text

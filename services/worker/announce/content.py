@@ -46,6 +46,9 @@ class WatchSpec(BaseModel):
     header: str = Field(min_length=1)
     footer: str = ""
     task: str = Field(min_length=1)
+    #: Post the announcement as a rich message (one folded card) instead of
+    #: plain text. Any refusal falls back to the text, so this is safe to try.
+    rich: bool = False
     fallback_bullet: str = "• {title}"
     fallback_more: str = ""
     stand_down_line: str = "Стенд пока не отвечает"

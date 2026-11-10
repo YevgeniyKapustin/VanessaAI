@@ -7,8 +7,10 @@ titles, so the news always reaches the chat.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import tzinfo
 
+from services.worker.announce.card_html import card_for
 from services.worker.announce.content import WatchSpec
 from services.worker.announce.mention import Participant
 from services.worker.announce.models import Announcement
@@ -26,6 +28,14 @@ from vanessa.pipeline.llm.format.answer_tag import is_untagged_reply
 from vanessa.pipeline.llm.tagged_reply import request_tagged
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class Composed:
+    """One announcement in both shapes: the plain text and the rich card."""
+
+    text: str
+    rich_html: str | None = None
 
 
 class AnnounceComposer:
@@ -59,6 +69,19 @@ class AnnounceComposer:
         mention: Participant | None = None,
     ) -> str:
         """Header, bullets, footer — separated by blank lines."""
+        composed = await self.compose_all(
+            announcement, stand_ready=stand_ready, mention=mention
+        )
+        return composed.text
+
+    async def compose_all(
+        self,
+        announcement: Announcement,
+        *,
+        stand_ready: bool | None,
+        mention: Participant | None = None,
+    ) -> Composed:
+        """The text a watch always keeps, plus the card when the spec asks."""
         author = mention.markdown if mention is not None else ""
         header = build_header(
             self._spec,
@@ -78,7 +101,26 @@ class AnnounceComposer:
         )
         if footer:
             blocks.append(footer)
-        return truncate_message("\n\n".join(block for block in blocks if block.strip()))
+        text = truncate_message("\n\n".join(block for block in blocks if block.strip()))
+        return Composed(text=text, rich_html=self._card(header, body, footer, announcement))
+
+    def _card(
+        self,
+        header: str,
+        bullets: list[str],
+        footer: str,
+        announcement: Announcement,
+    ) -> str | None:
+        """The folded card; None when the watch posts plain text only."""
+        if not self._spec.rich:
+            return None
+        return card_for(
+            header=header,
+            bullets=bullets,
+            items=announcement.items,
+            total=announcement.item_total,
+            footer=footer,
+        )
 
     async def _bullets(
         self, announcement: Announcement, *, stand_ready: bool | None

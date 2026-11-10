@@ -51,6 +51,10 @@ class DeployEvent(BaseModel):
     commits: list[DeployCommit] = Field(default_factory=list)
     #: Commits in the whole release, including the ones not listed above.
     commit_total: int = 0
+    #: Tag pointing at this exact pipeline (a tagged release), if any.
+    tag: str = ""
+    #: Newest tag on the branch — the release number between releases.
+    latest_tag: str = ""
 
     @property
     def started_by_label(self) -> str:

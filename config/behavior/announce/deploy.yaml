@@ -31,6 +31,9 @@ footer: "[Раскатка тенантов на проде]({links[rollout]})"
 # The rich card keeps this text visible and folds the card-by-card разбор
 # under it; a client that refuses the card gets the text as before.
 rich: true
+# Every card in the разбор links to its own card: DEPLOY_CARD_URL holds a
+# URL template with {card}, so the commit tag becomes the card's own page.
+card_url_env: DEPLOY_CARD_URL
 
 task: |
   <!-- Task -->

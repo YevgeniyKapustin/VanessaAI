@@ -11,6 +11,7 @@ from vanessa.llm.generation import LLMGenerationParams
 TZ = timezone(timedelta(hours=4))
 URL = "https://git.example/app/-/pipelines/79545"
 ROLLOUT = "https://grafana.example/d/tenants?var-stand=prod"
+CARD_URL = "https://board.example/ws/browse/{card}/"
 
 
 def spec(*, rich: bool) -> WatchSpec:
@@ -34,6 +35,7 @@ def composer(*, rich: bool) -> AnnounceComposer:
         generation=LLMGenerationParams(temperature=0.5, top_p=0.9, max_tokens=900),
         zone=TZ,
         links={"rollout": ROLLOUT},
+        card_url=CARD_URL,
     )
 
 
@@ -65,7 +67,7 @@ async def test_rich_watch_adds_a_folded_card() -> None:
     visible, folded = html.split("<details>", 1)
     assert f'<a href="{URL}">v0.1.6 (79545)</a>' in visible
     assert "разбор: 143 коммита, 2 карточки" in folded
-    assert "<td>ABC-101</td>" in folded
+    assert '<a href="https://board.example/ws/browse/ABC-101/">ABC-101</a>' in folded
     assert f'<a href="{ROLLOUT}">Раскатка тенантов на проде</a>' in folded
 
 

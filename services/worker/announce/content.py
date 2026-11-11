@@ -27,6 +27,9 @@ class WatchSpec(BaseModel):
     url_env: str = ""
     token_env: str = ""
     probe_url_env: str = ""
+    #: Env name holding a card-page URL template with ``{card}``: every card
+    #: in the разбор becomes a link. Unset → plain card ids.
+    card_url_env: str = ""
     #: Extra link placeholders for the prompts, ``{links[name]}``.
     link_envs: dict[str, str] = Field(default_factory=dict)
     #: Dedupe marker: the id of the last announced event.

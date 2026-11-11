@@ -101,6 +101,7 @@ def _composer(spec: WatchSpec, settings, links: dict[str, str]) -> AnnounceCompo
         generation=generation,
         zone=schedule_zone(settings.schedule_timezone),
         links=links,
+        card_url=str(_value(settings, spec.card_url_env) or ""),
     )
 
 

@@ -36,3 +36,7 @@ class DeployWatchMixin:
     # interpolated, so a single `$` disappears. A Python default cannot be
     # used for a real URL without naming production here.
     deploy_rollout_url: str = ""
+    # Card page for every card named in the разбор: a URL template with
+    # `{card}` («…/browse/{card}/»), so the commit tag links to its own card.
+    # Empty keeps the ids as plain text; no default for the same reason.
+    deploy_card_url: str = ""

@@ -1,9 +1,8 @@
-"""The same announcement as a rich message: header, bullets, one folded разбор.
+"""Commits grouped by the product card each one belongs to.
 
-What the chat already sees stays visible — the release line and the bullets.
-Everything else (which cards the release holds, who wrote them, the rollout
-link) folds into ``<details>``, so nobody scrolls a changelog unless they ask
-for it. Cards are grouped by the issue id in the commit title (``[ABC-101] …``).
+A card is named in the commit title (``[ABC-101] …``, ``ABC-101: …``) or in
+the merge branch (``… 'feature/abc-101-…'``); a commit that names none is
+«без карточки». The markup that shows this is ``card_render``.
 """
 
 from __future__ import annotations
@@ -23,15 +22,6 @@ _MERGE_RE = re.compile(r"^(?:merge\b|свести\b|merge commit\b)", re.IGNOREC
 _TOPIC_MAX = 44
 _ROWS_MAX = 5
 _UNCARDED_MAX = 6
-# Russian pluralia: 1 / 2–4 / the rest, with 11–14 always in «the rest».
-_ONE = 1
-_FEW_MIN = 2
-_FEW_MAX = 4
-_TEEN_ELEVEN = 11
-_TEENS_MIN = 12
-_TEENS_MAX = 14
-_TEN = 10
-_HUNDRED = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,75 +111,8 @@ def escape(text: str) -> str:
     return html.escape(text or "", quote=True)
 
 
-def _plural(count: int, one: str, few: str, many: str) -> str:
-    tail = count % _TEN
-    hundred = count % _HUNDRED
-    if tail == _ONE and hundred != _TEEN_ELEVEN:
-        return one
-    if _FEW_MIN <= tail <= _FEW_MAX and not _TEENS_MIN <= hundred <= _TEENS_MAX:
-        return few
-    return many
-
-
-def _visible(header_html: str, bullets: Sequence[str]) -> list[str]:
-    parts = [f"<p>{header_html}</p>"] if header_html else []
-    parts.extend(f"<p>{escape(bullet)}</p>" for bullet in bullets if bullet.strip())
-    return parts
-
-
-def _table(rows: Sequence[CardRow]) -> list[str]:
-    if not rows:
-        return []
-    head = "<tr><th>Карточка</th><th>Автор</th><th>О чём</th></tr>"
-    body = "".join(
-        f"<tr><td>{escape(row.card)}</td>"
-        f"<td>{escape(row.authors)} · {row.count}</td>"
-        f"<td>{escape(row.topic)}</td></tr>"
-        for row in rows
-    )
-    return [f"<table>{head}{body}</table>"]
-
-
-def _rest(items: Sequence[Item]) -> list[str]:
-    if not items:
-        return []
-    line = "<p>Остальные коммиты выпуска — без карточки:</p>"
-    entries = "".join(
-        f"<li>{escape(topic_of(item.title))}"
-        + (f" — {escape(item.author)}" if item.author.strip() else "")
-        + "</li>"
-        for item in items
-    )
-    return [line, f"<ul>{entries}</ul>"]
-
-
-def build_card(
-    *,
-    header_html: str,
-    bullets: Sequence[str],
-    items: Sequence[Item],
-    total: int,
-    footer_html: str = "",
-) -> str:
-    """The message as rich HTML: visible summary, folded разбор, footer."""
-    rows = card_rows(items)
-    parts = _visible(header_html, bullets)
-    summary = (
-        f"разбор: {total} {_plural(total, 'коммит', 'коммита', 'коммитов')}, "
-        f"{len(rows)} {_plural(len(rows), 'карточка', 'карточки', 'карточек')}"
-    )
-    folded = [f"<details><summary>{escape(summary)}</summary>"]
-    folded += _table(rows)
-    folded += _rest(uncarded(items))
-    if footer_html:
-        folded.append(f"<p>{footer_html}</p>")
-    folded.append("</details>")
-    return "".join(parts + folded)
-
-
 __all__ = [
     "CardRow",
-    "build_card",
     "card_key",
     "card_rows",
     "escape",

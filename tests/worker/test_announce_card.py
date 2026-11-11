@@ -1,7 +1,7 @@
 """The deploy card: grouping commits by card, and the folded HTML around them."""
 
-from services.worker.announce.card import build_card, card_key, card_rows, topic_of, uncarded
-from services.worker.announce.card_html import links_to_html
+from services.worker.announce.card import card_key, card_rows, topic_of, uncarded
+from services.worker.announce.card_render import build_card, card_anchor
 from services.worker.announce.models import Item
 
 ITEMS = (
@@ -14,6 +14,7 @@ ITEMS = (
 HEADER = 'Релиз <a href="https://git.example/-/pipelines/79545">v0.1.6 (79545)</a>'
 BULLETS = ("• Новый чат теперь и в вебе", "• Отметки прочитанного живут")
 FOOTER = '<a href="https://grafana.example/d/tenants">Раскатка тенантов на проде</a>'
+CARD_URL = "https://board.example/ws/browse/{card}/"
 
 
 def test_card_key_reads_the_id_from_the_title() -> None:
@@ -98,3 +99,31 @@ def test_without_a_footer_no_empty_paragraph_appears() -> None:
     html = build_card(header_html=HEADER, bullets=(), items=(), total=0)
     assert html.endswith("</details>")
     assert "<p></p>" not in html
+
+
+def test_every_card_links_to_its_own_card_on_the_board() -> None:
+    html = build_card(
+        header_html=HEADER,
+        bullets=(),
+        items=ITEMS,
+        total=143,
+        card_url=CARD_URL,
+    )
+    assert '<td><a href="https://board.example/ws/browse/ABC-101/">ABC-101</a></td>' in html
+    assert '<td><a href="https://board.example/ws/browse/XYZ-202/">XYZ-202</a></td>' in html
+    assert "<td>ABC-101</td>" not in html
+
+
+def test_without_a_template_card_ids_stay_plain_text() -> None:
+    html = build_card(header_html=HEADER, bullets=(), items=ITEMS, total=143)
+    assert "<td>ABC-101</td>" in html
+    assert '<a href="https://board' not in html
+
+
+def test_card_anchor_carries_the_id_into_the_template_and_escapes_it() -> None:
+    assert card_anchor("", "ABC-101") == "ABC-101"
+    assert card_anchor(" ", "ABC-101") == "ABC-101"
+    assert (
+        card_anchor("https://e/browse/{card}/?a=1&b=2", "ABC-101")
+        == '<a href="https://e/browse/ABC-101/?a=1&amp;b=2">ABC-101</a>'
+    )

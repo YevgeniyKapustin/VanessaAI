@@ -51,6 +51,7 @@ class AnnounceComposer:
         generation: LLMGenerationParams,
         zone: tzinfo,
         links: dict[str, str] | None = None,
+        card_url: str = "",
     ) -> None:
         # completer=None turns the rewrite off: the fallback text is posted.
         self._completer = completer
@@ -60,6 +61,7 @@ class AnnounceComposer:
         self._generation = generation
         self._zone = zone
         self._links = links or {}
+        self._card_url = card_url
 
     async def compose(
         self,
@@ -120,6 +122,7 @@ class AnnounceComposer:
             items=announcement.items,
             total=announcement.item_total,
             footer=footer,
+            card_url=self._card_url,
         )
 
     async def _bullets(

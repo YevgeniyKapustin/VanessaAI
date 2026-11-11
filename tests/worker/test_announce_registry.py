@@ -75,6 +75,18 @@ async def test_shipped_watch_config_parses() -> None:
     assert specs["deploy"].mention is False
     assert specs["deploy"].rich is True
     assert "{release}" in specs["deploy"].header
+    # The card links come from .env.local, never from the repository.
+    assert specs["deploy"].card_url_env == "DEPLOY_CARD_URL"
+
+
+def test_card_url_env_resolves_to_its_settings_field() -> None:
+    spec = next(spec for spec in load_specs() if spec.id == "deploy")
+    settings = _settings(deploy_card_url="https://board.example/browse/{card}/")
+
+    assert (
+        registry._value(settings, spec.card_url_env)
+        == "https://board.example/browse/{card}/"
+    )
 
 
 def test_enabled_and_configured_watch_builds_one_loop(monkeypatch, tmp_path) -> None:

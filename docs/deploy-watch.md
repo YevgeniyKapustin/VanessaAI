@@ -26,7 +26,9 @@ the same PAT the owner uses. Details and the shared-peer caveat:
 - `GET /deploy/latest` (Bearer token) → the newest successful
   `deploy:production` job, who pressed `deploy:production:start`, the
   pipeline, and the commits between it and the previous production deploy
-  (at most 40, plus the real total).
+  (the newest 40, newest first, plus the real total). The pipelines are
+  paged 20 at a time (two pages), so a run of merges between two deploys
+  cannot push the previous one out of view.
 
 It only reads; no writes, and the token comes from a file
 (`%LOCALAPPDATA%\vanessa-bridge\token`), never the command line.
@@ -58,6 +60,7 @@ DEPLOY_CHAT_ID=<real chat id>
 # Optional; kept out of git on purpose:
 # DEPLOY_PROBE_URL=https://<stand-host>/api/auth/methods
 # DEPLOY_ROLLOUT_URL=https://<grafana>/d/<dashboard>?var-tenant=$$__all
+# DEPLOY_CARD_URL=https://<board>/<workspace>/browse/{card}/
 ```
 
 `DEPLOY_ROLLOUT_URL` needs `$$__all`: an `--env-file` value is interpolated
@@ -83,10 +86,12 @@ docker logs --since=5m vanessa-worker-1 | grep deploy_watch
 - Before composing, the worker probes `DEPLOY_PROBE_URL` (the public prod
   origin) until it answers or `DEPLOY_READY_TIMEOUT_SECONDS` pass; the model
   is told only when the stand is still not answering.
-- The first line («На прод [выкатили в 14:54](pipeline) — выкатывал …») and
+- The first line («На прод [выкатили в 14:54](pipeline)») and
   the rollout line («[Раскатка тенантов на проде](Grafana)») are built in
-  code, so a reply quoting the message always carries the stand, the author,
-  the time and both links — no bare URLs in the text. The model writes only
+  code, so a reply quoting the message always carries the stand, the time and
+  both links — no bare URLs in the text. The deployer is deliberately not
+  named: every production rollout is made by the same person, so the name was
+  noise in the header. The model writes only
   1–3 product bullets from
   the commit list (`config/behavior/announce/deploy.yaml`); header lines,
   filler («остальное техническое») and links it invents are dropped. A
@@ -96,6 +101,11 @@ docker logs --since=5m vanessa-worker-1 | grep deploy_watch
   LLM failure posts raw commit titles as bullets instead. `DEPLOY_ROLLOUT_URL`
   empty → the rollout line disappears; a missing pipeline URL keeps the
   words without the anchor.
+- Each card in the folded разбор links to its own card when `DEPLOY_CARD_URL`
+  holds a URL template with `{card}` (`https://<board>/<workspace>/browse/{card}/`),
+  so a release traces back to the work item it shipped. Empty or unset → the
+  id stays plain text. The board URL lives in `.env.local`, not in the watch
+  YAML: the repository names no production host.
 - The bridge caches its answer for a minute and keeps serving the cached
   one while a refresh runs or fails, so a slow `glab` costs freshness, not
   the endpoint.
@@ -117,8 +127,10 @@ docker logs --since=5m vanessa-worker-1 | grep deploy_watch
 - No GitLab, no announcements: nothing is queued on the GitLab side, but a
   deploy stays announceable for `DEPLOY_MAX_LATE_HOURS` after the tick that
   missed it.
-- The changelog is the commit list between the two deploys; when nothing in
-  it matters for the product, the post is the header and the rollout line.
+- The changelog is the commit list between the two deploys; a redeploy of
+  the same commit has no range at all, so it posts without bullets. When
+  nothing in the list matters for the product, the post is the header and
+  the rollout line.
 - The readiness probe is the public origin, not Argo: a 200 means the stand
   answers, not that every pod is on the new digest.
 

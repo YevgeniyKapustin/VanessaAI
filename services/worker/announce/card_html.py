@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from services.worker.announce.card import build_card, escape
+from services.worker.announce.card import escape
+from services.worker.announce.card_render import build_card
 from services.worker.announce.models import Item
 from vanessa.contracts.outbound import RICH_HTML_MAX_CHARS
 
@@ -30,6 +31,7 @@ def card_for(
     items: Sequence[Item],
     total: int,
     footer: str = "",
+    card_url: str = "",
     limit: int = RICH_HTML_MAX_CHARS,
 ) -> str | None:
     """The folded card for these parts; None when the markup would be cut."""
@@ -39,6 +41,7 @@ def card_for(
         items=items,
         total=total,
         footer_html=links_to_html(footer) if footer else "",
+        card_url=card_url,
     )
     # Cut markup never parses: an oversized card is dropped, the text stays.
     return markup if len(markup) <= limit else None

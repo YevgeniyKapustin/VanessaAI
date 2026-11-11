@@ -70,8 +70,40 @@ def _people_signature() -> tuple:
 type _IdentityCache = tuple[tuple, dict[str, tuple[str, ...]], dict[int, str]]
 
 
+def _claimed_by_people(aliases: dict[str, tuple[str, ...]], people: set[str]) -> set[str]:
+    """Every name a person card owns — its canonical and its aliases."""
+    claimed = {_normalize(name) for name in people}
+    for canonical, alias_list in aliases.items():
+        if canonical in people:
+            claimed.update(_normalize(alias) for alias in alias_list)
+    return claimed
+
+
+def _drop_stolen_aliases(
+    aliases: dict[str, tuple[str, ...]], people: set[str]
+) -> dict[str, tuple[str, ...]]:
+    """A person's name never stays on a shared group card.
+
+    A team card merged from many members used to carry every member's name as
+    its own alias, so a member's plain name resolved to the team card and the
+    bot treated the sender as a stranger. The person card (the one with a
+    telegram_id) wins; the group card keeps only the names nobody else owns.
+    """
+    claimed = _claimed_by_people(aliases, people)
+    return {
+        canonical: tuple(
+            alias
+            for alias in alias_list
+            if canonical in people or _normalize(alias) not in claimed
+        )
+        for canonical, alias_list in aliases.items()
+    }
+
+
 def _cache_from_notes(signature: tuple, notes) -> _IdentityCache:
-    return signature, aliases_from_notes(notes), telegram_nicknames_from_notes(notes)
+    telegram = telegram_nicknames_from_notes(notes)
+    aliases = _drop_stolen_aliases(aliases_from_notes(notes), set(telegram.values()))
+    return signature, aliases, telegram
 
 
 async def ensure_people_alias_cache() -> None:

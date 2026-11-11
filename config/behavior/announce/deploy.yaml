@@ -43,6 +43,9 @@ task: |
     «типы», «миграции», «сборка»;
   - the most product-relevant change goes first; the list is longer than
     you need — pick the few that matter;
+  - name the actor and the effect: what people or the chat agent now does,
+    sees or gets — not that «правила появились» or that a check «больше не
+    задевает»;
   - never invent a change that is not in the list; a number you keep stays
     exactly as written;
   - NOTHING else: no header, no time, no name, no link, no «остальное

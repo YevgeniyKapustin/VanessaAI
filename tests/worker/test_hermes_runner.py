@@ -291,3 +291,17 @@ def test_hermes_content_loads() -> None:
     assert "Never ask questions back" in prompts.run_instructions
     # Off: reasoning counts against max_tokens, and a cap cut the [answer] tag.
     assert prompts.max_tokens is None
+
+
+def test_run_instructions_read_the_commit_not_a_stale_clone() -> None:
+    """A release question was answered from an old local clone, which led to
+    «такого раздела нет» — the payload answer comes first and a stale tree
+    proves nothing."""
+    prompts = get_hermes_content()
+    rules = prompts.run_instructions
+    assert "the deploy payload first" in rules
+    assert "is NOT a finding" in rules
+    assert "up to three quick retries" in rules
+    assert "within two minutes" in rules
+    assert "one sentence with the verdict" in rules
+    assert "ONE message, two sentences at most" in prompts.answered_task

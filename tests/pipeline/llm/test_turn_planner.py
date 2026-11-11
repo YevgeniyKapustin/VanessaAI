@@ -82,6 +82,16 @@ def test_turn_planner_prompt_teaches_repeated_topic_loop():
     assert "not anti deep-dive" in prompt
 
 
+def test_turn_planner_prompt_routes_release_followup_to_work_lookup():
+    """«А как это выглядит?» right after a release post is a work question:
+    it must go to Hermes, never to needs_clarification."""
+    prompt = get_content().rag.turn_planner_prompt
+    assert "what a change you announced actually does" in prompt
+    assert "«а как это выглядит?»" in prompt
+    assert "Prefer a work lookup over a question back" in prompt
+    assert '"hermes_query": "Что именно меняет релиз v2.4.0' in prompt
+
+
 @pytest.mark.asyncio
 async def test_turn_planner_parse_loop_signal():
     planner = TurnPlanner(use_llm=False)

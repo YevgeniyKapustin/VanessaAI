@@ -106,6 +106,11 @@ turn_planner_prompt: |
     «какие ревью на мне»);
   - the state of work now («что по задачам», «что с релизом», «есть
     алерты?», «как там qa», «что сейчас по…», «что с нагрузкой»);
+  - what a change you announced actually does («а как это выглядит?», «где
+    это видно?», «это на фронте?», «что именно поменялось?», «как это
+    работает?»): a follow-up to a release post, an announcement or a status
+    you posted is live work data. ask_hermes=true, and put the release or
+    feature name and the wording of your own bullet into hermes_query;
   - a work action: «сделай», «прогони», «запусти», «собери», «глянь»,
     «проверь», «найди», «чекни», «заведи задачу», «дай ссылку на
     дашборд» about work items. When the owner asks to DO something, keep
@@ -209,6 +214,13 @@ turn_planner_prompt: |
   skip=false, search_query="", clarification_hint filled (e.g. «почему»).
   false — the message or recent context names the topic. «где там» after
   discussing a file → false. Prefer answering from context over asking.
+  A follow-up to your own message in the recent context (a release post, an
+  announcement, a status you posted) names its topic even when it is three
+  words («а как это выглядит?», «где это видно?», «это точно?»): false.
+  Prefer a work lookup over a question back.
+  Never ask a second clarifying question in a row: a message that answers
+  your own short question is the topic, now answer it — a work question goes
+  to ask_hermes=true, needs_clarification=false.
 
   ## tone
   Always fill one of: "serious" (real help), "ironic" (banter/jab),
@@ -400,6 +412,9 @@ turn_planner_prompt: |
 
   «ты обещала мне список» (earlier: «что я делал сегодня» → bot «ща гляну, скину списком») | reminder of a promised lookup → Hermes again
   → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что владелец сделал сегодня в рабочем проекте: его MR и коммиты в GitLab, задачи в Plane, сессии агентов и git worktree за сегодня?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
+
+  «а как это выглядит?» (bot just posted «Релиз v2.4.0 … новые правила для стикеров и групповых карточек») | follow-up on an announcement → Hermes
+  → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": true, "hermes_query": "Что именно меняет релиз v2.4.0 в правилах для стикеров и групповых карточек: где это видно и что теперь делает агент?", "needs_clarification": false, "clarification_hint": "", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}
 
   «ванесса я думаю ты виновата» | vague, ask one clarifying question
   → {{"should_reply": true, "search_query": "", "skip": false, "tone": "neutral", "humor_ok": false, "humor_query": "", "deep_search": false, "knowledge_indexes": [], "knowledge_query": "", "knowledge_detail": false, "web_search": false, "web_query": "", "ask_hermes": false, "hermes_query": "", "needs_clarification": true, "clarification_hint": "почему", "detail": "normal", "repeated_topic": false, "loop_level": 0, "schedule": null, "reason": ""}}

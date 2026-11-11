@@ -101,6 +101,17 @@ def test_prompt_builder_assembles_system_prompt_from_persona():
         assert "## Emotional language" in prompt
 
 
+def test_compose_prompt_forbids_guessing_and_passing_the_question_on():
+    """The bot invented frontend impact and told the asker to ask a third party
+    who was the one asking. The system prompt must forbid both."""
+    prompt = get_content().llm.task
+    assert "Facts and gaps" in prompt
+    assert "Never invent how something looks" in prompt
+    assert "an answer: either you know it" in prompt
+    assert "never send the asker to someone else to ask" in prompt
+    assert "a yes/no or one-fact question gets one sentence" in prompt
+
+
 def test_prompt_builder_builds_user_prompt():
     builder = PromptBuilder()
     prompt = builder.build_user_prompt(

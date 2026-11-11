@@ -134,6 +134,33 @@ def test_format_aliases_for_prompt_uses_vault_aliases(monkeypatch, tmp_path):
     assert "Гриша = Ну я" in nicknames.format_aliases_for_prompt()
 
 
+def _write_group_card(tmp_path: Path, filename: str, names: list[str]) -> None:
+    """A merged team card: no telegram_id, so it is not a person."""
+    people = tmp_path / "People"
+    people.mkdir(parents=True, exist_ok=True)
+    aliases_block = "\n".join(f"- {name}" for name in names)
+    (people / filename).write_text(
+        f"---\ntype: person\nid: {Path(filename).stem}\nnickname: Команда\n"
+        f"aliases:\n{aliases_block}\n---\n\n## Контекст жизни\n",
+        encoding="utf-8",
+    )
+
+
+def test_group_card_does_not_steal_a_person_name(monkeypatch, tmp_path):
+    """A merged team card kept every member name as its own alias, so a
+    member's plain name resolved to the team card — the bot then treated that
+    sender as a third party and told him to ask himself."""
+    _write_people_card(tmp_path, "анна.md", "327160360", ["Анна", "Anna"])
+    _write_group_card(tmp_path, "команда.md", ["Команда", "Анна", "Борис"])
+    monkeypatch.setattr(settings, "knowledge_path", str(tmp_path))
+    monkeypatch.setattr(nicknames, "get_chat_nicknames", lambda: ("Команда", "Анна"))
+
+    aliases = nicknames.get_chat_aliases()
+    assert aliases["Анна"] == ("Anna",)
+    assert aliases["Команда"] == ("Борис",)
+    assert nicknames.canonical_name_for("Анна") == "Анна"
+
+
 # ---------------------------------------------------------------------------
 # Telegram @username: the People card carries a dedicated frontmatter field
 # (``telegram_username`` / ``username``, e.g. ``nu_ya`` for ``@nu_ya``) which is

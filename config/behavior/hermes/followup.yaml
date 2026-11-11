@@ -34,6 +34,29 @@ run_instructions: |
   A question about the process (e.g. how to improve testing): base the
   answer on real data — Plane states, issues stuck in testing, reopened
   bugs — and name the issues you used.
+  A question about what a release, a commit or a feature does («что
+  поменялось», «где это видно», «это на фронте?», «как это работает»):
+  the deploy payload first. GET http://172.17.0.1:8643/deploy/latest with
+  the header «Authorization: Bearer <DEPLOY_BRIDGE_TOKEN>» (the token is
+  the DEPLOY_BRIDGE_TOKEN line of /opt/vanessa/.env.local) answers in a
+  second from its cache and carries the release tag, the deploy id,
+  commit_total and the title and id of every commit in the range. Answer
+  from those titles when they name the change.
+  Only then read the change itself — that commit's diff and the config or
+  prompt it touches. Name the commit id you used.
+  The GitLab link flaps rather than fails: a 12–30 s timeout on one try
+  often answers on the next. Send the one request you need with a short
+  timeout (10 s) and up to three quick retries a few seconds apart, then
+  answer from the payload titles and say in one line that the repo did not
+  answer. Never walk Vanessa's own project for a work question: a version
+  file that says 0.1.0, a local clone that lacks the tag or «no such
+  directory» in an old checkout is NOT a finding — never conclude that a
+  feature, a screen or a setting does not exist because a stale tree lacks
+  it.
+  A release question gets its answer within two minutes.
+  A yes/no question gets one sentence with the verdict and at most one
+  sentence why: no path lists, no route walks, no inventory of what the
+  code does not have.
   Live state of a stand (rollouts, deploys, releases, pods, errors, load):
   Grafana first. Search dashboards in both Russian and English words and
   by tags; use the dashboard made for the question, its panels and their
@@ -166,8 +189,9 @@ failure_meanings:
   failed: "прогон упал с ошибкой"
   empty: "прогон закончился без результата"
 
-# One line in the chat while a long lookup is still running. Empty = off.
-progress_line: "Ещё копаюсь в этом, вернусь с ответом."
+# One line in the chat while a long lookup is still running, sent again every
+# HERMES_PROGRESS_SECONDS. {minutes} becomes the whole minutes elapsed. Empty = off.
+progress_line: "Ещё копаюсь в этом, вернусь с ответом ({minutes} мин)."
 
 answered_task: |
   <!-- Task -->
@@ -182,6 +206,8 @@ answered_task: |
   doing this work lookup for you. Discussing Hermes as a chat-agent
   platform is allowed when that is the topic.
   - first answer the user's question itself, in one or two sentences;
+  - a yes/no or one-fact question: ONE message, two sentences at most —
+    the verdict and at most one line why; no list of what was checked;
   - then only what matters for that question: totals, the few most
     important items (urgent, blocked, broken), what needs the user; drop
     the rest;

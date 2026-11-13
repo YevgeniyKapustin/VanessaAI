@@ -17,10 +17,12 @@ worker (background job): POST /v1/runs → poll GET /v1/runs/{id}
 
 - One Hermes session per chat: `session_id = <channel>-<chat_id>`.
 - A run that waits for approval or clarification is stopped (deny-and-stop).
-- A run longer than `HERMES_MAX_WAIT_SECONDS` is stopped.
-- A run past `HERMES_PROGRESS_SECONDS` (90) gets one "still looking" line
-  in the chat (`progress_line` in the follow-up YAML). Agents (`bot_peer`)
-  never see it.
+- A run longer than `HERMES_MAX_WAIT_SECONDS` is stopped: the poller takes one
+  last look first, so an answer that lands on the deadline is kept.
+- A run alive past `HERMES_PROGRESS_SECONDS` (120) gets a "still looking" line
+  in the chat, repeated every 120 s with the elapsed minutes
+  (`progress_line` in the follow-up YAML; `{minutes}` is the number). Agents
+  (`bot_peer`) never see it.
 - A run that ends with nothing names why: the poller reports `blocked`,
   `timeout`, `interrupted`, `failed` or `empty`, and the follow-up task
   says it in one line from `failure_meanings` instead of shrugging.

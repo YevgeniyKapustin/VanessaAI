@@ -165,4 +165,16 @@ Grafana is preloaded from the files above. There is no separate
 [`.env.defaults`](../.env.defaults).
 
 Разборы инцидентов лежат в [`incidents/`](incidents/): замеры, классы
-ошибок и пути к логам, без текста переписки.
+ошибок и пути к логам, без текста переписки. Последний —
+[2026-11-10-vanessa-ten-minute-silences](incidents/2026-11-10-vanessa-ten-minute-silences.md)
+(десятиминутная тишина релея, OOM хоста).
+
+Файловый лог и trace — не само собой: каталог, который монтируется в
+`/app/logs` (в dev-overlay это `./data/logs`, у агента так и есть),
+должен принадлежать uid контейнера. Иначе в старте контейнера видно
+`failed to open log file at logs` и `trace_log_open_failed`, и остаётся
+только `docker logs`:
+
+```bash
+chown -R 1000:1000 /opt/vanessa/data/logs
+```

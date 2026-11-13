@@ -146,12 +146,12 @@ class HermesRunner:
         return result
 
     def _progress_callback(self, ask: HermesAsk):
-        """The one mid-job line; None when progress is off or unset."""
+        """One heartbeat per progress window; None when progress is off."""
         if self._progress is None or self._progress_seconds <= 0:
             return None
 
-        async def tell() -> None:
-            await self._progress.tell(ask)
+        async def tell(elapsed_seconds: float) -> None:
+            await self._progress.tell(ask, elapsed_seconds)
 
         return tell
 

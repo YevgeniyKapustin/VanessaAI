@@ -107,12 +107,12 @@ async def test_unknown_failure_code_keeps_the_generic_line(monkeypatch) -> None:
     assert get_hermes_content().undelivered_task.strip() in prompt
 
 
-async def test_long_run_publishes_one_progress_line(monkeypatch) -> None:
+async def test_long_run_publishes_a_progress_line(monkeypatch) -> None:
     seen: dict = {}
 
     async def fake_wait(client, run_id, **kwargs):
         seen.update(kwargs)
-        await kwargs["on_progress"]()
+        await kwargs["on_progress"](95.0)
         return HermesWaitResult(answer=ANSWER)
 
     monkeypatch.setattr(runner_module, "wait_for_output", fake_wait)
@@ -122,19 +122,19 @@ async def test_long_run_publishes_one_progress_line(monkeypatch) -> None:
         FakeClient(output=ANSWER),
         completer,
         broker,
-        progress_seconds=90.0,
+        progress_seconds=120.0,
         progress_line="Ещё копаюсь.",
     )
     await runner.run(make_ask())
-    assert seen["progress_after_seconds"] == 90.0
+    assert seen["progress_after_seconds"] == 120.0
     progress = [m for _stream, m in broker.published if m.source == "hermes_progress"]
     assert [m.text for m in progress] == ["Ещё копаюсь."]
     assert broker.published[-1][1].source == "hermes"
 
 
-async def test_bot_peer_gets_no_progress_line(monkeypatch) -> None:
+async def test_progress_line_carries_the_elapsed_minutes(monkeypatch) -> None:
     async def fake_wait(client, run_id, **kwargs):
-        await kwargs["on_progress"]()
+        await kwargs["on_progress"](275.0)
         return HermesWaitResult(answer=ANSWER)
 
     monkeypatch.setattr(runner_module, "wait_for_output", fake_wait)
@@ -143,7 +143,26 @@ async def test_bot_peer_gets_no_progress_line(monkeypatch) -> None:
         FakeClient(output=ANSWER),
         FakeCompleter("[answer]\nготово"),
         broker,
-        progress_seconds=90.0,
+        progress_seconds=120.0,
+        progress_line="Ещё копаюсь ({minutes} мин).",
+    )
+    await runner.run(make_ask())
+    progress = [m for _stream, m in broker.published if m.source == "hermes_progress"]
+    assert [m.text for m in progress] == ["Ещё копаюсь (4 мин)."]
+
+
+async def test_bot_peer_gets_no_progress_line(monkeypatch) -> None:
+    async def fake_wait(client, run_id, **kwargs):
+        await kwargs["on_progress"](95.0)
+        return HermesWaitResult(answer=ANSWER)
+
+    monkeypatch.setattr(runner_module, "wait_for_output", fake_wait)
+    broker = FakeBroker()
+    runner = make_runner(
+        FakeClient(output=ANSWER),
+        FakeCompleter("[answer]\nготово"),
+        broker,
+        progress_seconds=120.0,
         progress_line="Ещё копаюсь.",
     )
     await runner.run(make_ask(bot_peer=True))

@@ -17,8 +17,9 @@ class HermesMixin:
     # A run still not done after this is stopped and dropped. The chat gets
     # a progress line meanwhile (``hermes_progress_seconds``).
     hermes_max_wait_seconds: float = 600.0
-    # One "still looking" chat line once a run passes this; 0 = off.
-    hermes_progress_seconds: float = 90.0
+    # One "still looking" chat line, repeated every this many seconds while a
+    # run is alive; 0 = off.
+    hermes_progress_seconds: float = 120.0
     # Hermes jobs the worker runs at the same time.
     hermes_max_parallel: int = 3
     hermes_query_max_chars: int = 900

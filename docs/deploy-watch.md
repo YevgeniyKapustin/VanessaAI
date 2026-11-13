@@ -101,6 +101,16 @@ docker logs --since=5m vanessa-worker-1 | grep deploy_watch
   LLM failure posts raw commit titles as bullets instead. `DEPLOY_ROLLOUT_URL`
   empty → the rollout line disappears; a missing pipeline URL keeps the
   words without the anchor.
+- The commit list is not raw. Merges and the paperwork a release carries
+  (a spec, an ADR, a plan, a re-run of the MR checks — `is_noise` in
+  `services/worker/announce/prompt.py`) never reach the model, while the
+  folded разбор still shows every commit; a release made of nothing but
+  paperwork falls back to the full list so a lone change is still named.
+  The task ranks what is left: a new capability for a person or the agent
+  first, then a behaviour change, then a fix, and an internal decision
+  (access, keys, limits) last. A capability whose commit is named after a
+  tool («инструмент X в production») must be translated into what people
+  can now do, never dropped as «technical».
 - Each card in the folded разбор links to its own card when `DEPLOY_CARD_URL`
   holds a URL template with `{card}` (`https://<board>/<workspace>/browse/{card}/`),
   so a release traces back to the work item it shipped. Empty or unset → the

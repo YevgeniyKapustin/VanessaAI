@@ -44,8 +44,16 @@ task: |
   - say what a person can now do, see or gets by default — not how;
     no file, package, module, class, test or CI words; no «рефакторинг»,
     «типы», «миграции», «сборка»;
-  - the most product-relevant change goes first; the list is longer than
-    you need — pick the few that matter;
+  - order of preference, strongest first: a new capability a person or the
+    chat agent gets → a change of default behaviour → a fix of something
+    broken → an internal decision (access, keys, limits, budgets) — the
+    last one only when there is nothing else;
+  - a commit that names a tool or a module is often the capability itself
+    («инструмент X в production», «провести право …», «повторять вызов …»):
+    say what a person or the agent can now do, and never drop it because
+    its title is technical;
+  - a commit about a spec, an ADR, a plan, a review re-run or a merge is
+    not a change for people: skip it instead of paraphrasing it;
   - name the actor and the effect: what people or the chat agent now does,
     sees or gets — not that «правила появились» or that a check «больше не
     задевает»;

@@ -24,6 +24,23 @@ FALLBACK_TITLES = 5
 _FILLER = re.compile(
     r"техническ|ничего не меняет|без изменений для продукт|остальн", re.IGNORECASE
 )
+#: Commits that are not a change for people: a merge, or the paperwork a
+#: release carries (a spec, an ADR, a plan, a re-run of the MR checks). They
+#: stay in ``Announcement.items`` — the card's разбор keeps every commit —
+#: and only leave the pool the model picks its few bullets from.
+_NOISE = re.compile(
+    r"\b(?:merge|слить|свести)\b"
+    r"|\b(?:adr|адр|спека|спеке|спеку|спецификаци\w*|документаци\w*)\b"
+    r"|\bзафиксировать решени\w*"
+    r"|запись о прогоне|проверки mr|в переносе",
+    re.IGNORECASE,
+)
+
+
+def is_noise(title: str) -> bool:
+    """A merge or a document: nothing changes for people because of it."""
+    return bool(_NOISE.search(title or ""))
+
 
 
 def local_when(announcement: Announcement, zone: tzinfo) -> str:
@@ -37,11 +54,12 @@ def local_when(announcement: Announcement, zone: tzinfo) -> str:
 
 
 def item_lines(announcement: Announcement) -> list[str]:
+    """The model's pool: real changes first, paperwork only if nothing is left."""
+    titled = [item for item in announcement.items if item.title.strip()]
+    changes = [item for item in titled if not is_noise(item.title)]
     return [
-        f"- {item.title.strip()}"
-        + (f" ({item.author})" if item.author else "")
-        for item in announcement.items[:MAX_ITEMS_IN_PROMPT]
-        if item.title.strip()
+        f"- {item.title.strip()}" + (f" ({item.author})" if item.author else "")
+        for item in (changes or titled)[:MAX_ITEMS_IN_PROMPT]
     ]
 
 
@@ -137,6 +155,7 @@ __all__ = [
     "build_prompt",
     "clean_bullets",
     "fallback_bullets",
+    "is_noise",
     "item_lines",
     "local_when",
     "now_utc",

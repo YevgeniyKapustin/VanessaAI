@@ -13,6 +13,11 @@ class _Tasks:
         self.spawned.append(name)
         coro.close()
 
+    def supervise(self, factory, *, name: str, log_stop: bool = False) -> None:
+        del log_stop
+        self.spawned.append(name)
+        factory().close()
+
     async def cancel_all(self) -> None:
         self.spawned.append("cancel")
 

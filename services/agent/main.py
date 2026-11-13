@@ -14,6 +14,7 @@ from services.agent.container import AppContainer
 from services.agent.lifespan import lifespan
 from vanessa.config import settings
 from vanessa.core.logging_setup import configure_logging
+from vanessa.infrastructure.broker.liveness import dead_consumers
 from vanessa.infrastructure.db.locked_upgrade import _dsn
 from vanessa.infrastructure.observability.metrics import start_metrics_http_server
 from vanessa.infrastructure.observability.trace_log import configure_trace_log
@@ -38,6 +39,19 @@ def postgres_ready() -> bool:
         return False
 
 
+def consumers_alive() -> bool:
+    """False once a consume loop finished: the process is up but deaf."""
+    dead = dead_consumers()
+    if not dead:
+        return True
+    logger.warning("dead_consumer_loops %s", ",".join(dead))
+    return False
+
+
+def ready() -> bool:
+    return postgres_ready() and consumers_alive()
+
+
 async def run(*, container: AppContainer | None = None) -> None:
     configure_logging("agent")
     configure_trace_log("agent")
@@ -45,7 +59,7 @@ async def run(*, container: AppContainer | None = None) -> None:
     start_metrics_http_server(
         settings.api_port,
         addr=settings.api_host,
-        ready_check=postgres_ready,
+        ready_check=ready,
     )
     logger.info("agent health/metrics on :%s", settings.api_port)
     async with lifespan(owned):

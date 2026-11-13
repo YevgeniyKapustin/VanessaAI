@@ -36,8 +36,10 @@ def _start_turn_worker(
             async_session_factory, container.graph.hermes_answers
         ),
     )
-    tasks.spawn(
-        turn_worker.run_forever(),
+    # Supervised: a dead turn worker is a bot that answers nothing, so restart
+    # the loop instead of leaving the process "healthy" and mute.
+    tasks.supervise(
+        turn_worker.run_forever,
         name="broker_turn_worker",
         log_stop=True,
     )

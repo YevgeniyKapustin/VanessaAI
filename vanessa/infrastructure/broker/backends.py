@@ -15,6 +15,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from vanessa.contracts.messages import BrokerMessage
+from vanessa.infrastructure.broker.consume_retry import (
+    ensure_group_retrying,
+    read_retrying,
+)
+from vanessa.infrastructure.broker.liveness import consumer_key, unwatch, watch
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +75,50 @@ async def consume_forever(
 
     Reads are non-blocking and paced by ``poll_seconds`` so the loop never
     hogs the event loop and behaves identically against real Redis and
-    in-memory test doubles.
+    in-memory test doubles. A transport error backs off and retries instead
+    of ending the loop: one Redis hiccup must not silence the whole process
+    while its container still reports healthy.
     """
-    await backend.ensure_group(stream, group)
+    name = consumer_key(group=group, stream=stream)
+    watch(name, asyncio.current_task())
+    try:
+        await ensure_group_retrying(backend, stream=stream, group=group)
+        await _deliver_forever(
+            backend,
+            stream=stream,
+            group=group,
+            consumer=consumer,
+            handler=handler,
+            dedup=dedup,
+            poll_seconds=poll_seconds,
+            count=count,
+        )
+    except asyncio.CancelledError:
+        # Shutdown: the only way a consumer may leave the liveness registry.
+        unwatch(name)
+        raise
+
+
+async def _deliver_forever(
+    backend: StreamBackend,
+    *,
+    stream: str,
+    group: str,
+    consumer: str,
+    handler: MessageHandler,
+    dedup: DedupGuard | None,
+    poll_seconds: float,
+    count: int,
+) -> None:
+    failures = 0
     while True:
-        deliveries = await backend.read(
-            stream=stream, group=group, consumer=consumer, count=count
+        deliveries, failures = await read_retrying(
+            backend,
+            stream=stream,
+            group=group,
+            consumer=consumer,
+            count=count,
+            failures=failures,
         )
         for delivery in deliveries:
             await _process_one(backend, group, delivery, handler, dedup)

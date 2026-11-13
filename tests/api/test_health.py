@@ -5,7 +5,7 @@ from urllib.request import urlopen
 
 import pytest
 
-from services.agent.main import postgres_ready
+from services.agent.main import consumers_alive, postgres_ready, ready
 from vanessa.infrastructure.observability.metrics import start_metrics_http_server
 
 
@@ -44,3 +44,22 @@ def test_postgres_ready_false_on_error(monkeypatch) -> None:
         MagicMock(side_effect=RuntimeError("db down")),
     )
     assert postgres_ready() is False
+
+
+def test_consumers_alive_true_and_false(monkeypatch) -> None:
+    monkeypatch.setattr("services.agent.main.dead_consumers", list)
+    assert consumers_alive() is True
+    monkeypatch.setattr(
+        "services.agent.main.dead_consumers", lambda: ["consume:agent:turns"]
+    )
+    assert consumers_alive() is False
+
+
+def test_ready_needs_both_postgres_and_consumers(monkeypatch) -> None:
+    monkeypatch.setattr("services.agent.main.postgres_ready", lambda: True)
+    monkeypatch.setattr("services.agent.main.dead_consumers", list)
+    assert ready() is True
+    monkeypatch.setattr(
+        "services.agent.main.dead_consumers", lambda: ["consume:agent:turns"]
+    )
+    assert ready() is False
